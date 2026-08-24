@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 import {
     Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause,
     RefreshCw, Send, Smartphone, BookOpen, Layers, GripVertical, Zap,
-    AlertCircle, CheckCircle, ArrowDown
+    AlertCircle, CheckCircle, ArrowDown, Download, Upload
 } from 'lucide-react';
 import { SparklesIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
@@ -58,6 +58,114 @@ const ChatbotSettings: React.FC = () => {
     const [currentNode, setCurrentNode] = useState<ChatbotNode | null>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleExportFlow = () => {
+        if (!selectedFlow) return;
+        
+        const flowData = {
+            version: '1.0',
+            flow: {
+                name: selectedFlow.name,
+                description: selectedFlow.description,
+            },
+            nodes: nodes.map(n => ({
+                id: n.id,
+                type: n.type,
+                content: n.content,
+                sort_order: n.sort_order
+            }))
+        };
+
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+            JSON.stringify(flowData, null, 2)
+        )}`;
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute('href', jsonString);
+        downloadAnchor.setAttribute('download', `${selectedFlow.name.toLowerCase().replace(/\s+/g, '_')}_flow.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    };
+
+    const handleImportFlow = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !selectedFlow) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+                if (!data.nodes || !Array.isArray(data.nodes)) {
+                    alert('Formato de arquivo inválido. O arquivo deve conter uma lista de etapas (nodes).');
+                    return;
+                }
+
+                if (!window.confirm('Atenção: Importar este fluxo irá apagar todas as etapas atuais do fluxo selecionado. Deseja continuar?')) {
+                    return;
+                }
+
+                setLoading(true);
+
+                // 1. Map old UUIDs to new UUIDs to preserve connections
+                const oldToNewIdMap: Record<string, string> = {};
+                
+                // First pass: generate new UUIDs
+                data.nodes.forEach((node: any) => {
+                    oldToNewIdMap[node.id] = crypto.randomUUID();
+                });
+
+                // 2. Prepare nodes for insertion with updated references
+                const finalizedNodes = data.nodes.map((node: any) => {
+                    let updatedContent = { ...node.content };
+                    if (node.type === 'menu' && Array.isArray(updatedContent.options)) {
+                        updatedContent.options = updatedContent.options.map((opt: any) => ({
+                            ...opt,
+                            next_node: oldToNewIdMap[opt.next_node] || opt.next_node
+                        }));
+                    }
+                    return {
+                        id: oldToNewIdMap[node.id],
+                        flow_id: selectedFlow.id,
+                        type: node.type,
+                        content: updatedContent,
+                        sort_order: typeof node.sort_order === 'number' ? node.sort_order : 0
+                    };
+                });
+
+                // 3. Clear existing nodes in database
+                await supabase.from('whatsapp_chatbot_nodes').delete().eq('flow_id', selectedFlow.id);
+
+                // 4. Insert new nodes
+                const { error: insertErr } = await supabase.from('whatsapp_chatbot_nodes').insert(finalizedNodes);
+                if (insertErr) throw insertErr;
+
+                // 5. Update flow metadata if present in JSON
+                if (data.flow) {
+                    const updatedFlow = {
+                        ...selectedFlow,
+                        name: data.flow.name || selectedFlow.name,
+                        description: data.flow.description || selectedFlow.description
+                    };
+                    await supabase.from('whatsapp_chatbot_flows')
+                        .update({ name: updatedFlow.name, description: updatedFlow.description })
+                        .eq('id', selectedFlow.id);
+                    setSelectedFlow(updatedFlow);
+                }
+
+                // 6. Reload nodes
+                await fetchNodes(selectedFlow.id);
+                alert('Fluxo importado com sucesso!');
+            } catch (err: any) {
+                console.error('Erro ao importar fluxo:', err);
+                alert('Erro ao importar fluxo: ' + err.message);
+            } finally {
+                setLoading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+        reader.readAsText(file);
+    };
 
     const applyFormatting = (format: 'bold' | 'italic' | 'strike' | 'mono') => {
         const textarea = textareaRef.current;
@@ -851,6 +959,47 @@ const ChatbotSettings: React.FC = () => {
                             <li>Arraste os nós pelo <b>handle</b> ⠿ para reordenar.</li>
                         </ul>
                     </div>
+
+                    <div className="m-4 mt-0 p-5 bg-blue-500/5 border border-blue-500/10 rounded-3xl space-y-3">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <Layers className="w-4 h-4" /> Estrutura do JSON
+                        </p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold leading-relaxed">
+                            O arquivo importado deve conter metadados e um array de etapas (nodes).
+                        </p>
+                        <div className="text-[9px] bg-slate-100 dark:bg-black/30 p-2.5 rounded-xl font-mono text-slate-650 dark:text-slate-400 max-h-36 overflow-y-auto no-scrollbar whitespace-pre-wrap select-all cursor-text">
+{`{
+  "flow": {
+    "name": "Nome do Fluxo",
+    "description": "Descrição"
+  },
+  "nodes": [
+    {
+      "id": "antigo-uuid-1",
+      "type": "greeting",
+      "content": { "text": "Olá! Seja bem-vindo." },
+      "sort_order": 0
+    },
+    {
+      "id": "antigo-uuid-2",
+      "type": "menu",
+      "content": {
+        "text": "Selecione uma opção:",
+        "options": [
+          { "label": "1. Falar com Atendente", "next_node": "antigo-uuid-3" }
+        ]
+      },
+      "sort_order": 1
+    }
+  ]
+}`}
+                        </div>
+                        <ul className="text-[9px] text-gray-500 dark:text-gray-400 space-y-1.5 pl-3 list-disc font-medium leading-normal">
+                            <li>O fluxo **deve** começar com uma etapa **Saudação** (`greeting`).</li>
+                            <li>A Saudação é imediatamente seguida pelo primeiro **Menu** em ordem.</li>
+                            <li>A importação mapeia os IDs antigos para novos UUIDs sem quebrar links.</li>
+                        </ul>
+                    </div>
                 </div>
 
                 {/* Column 2: Editor & Simulator (Col-9) */}
@@ -907,8 +1056,31 @@ const ChatbotSettings: React.FC = () => {
                                             Salvar Fluxo
                                         </button>
                                         <button
+                                            onClick={handleExportFlow}
+                                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
+                                            title="Exportar fluxo para arquivo JSON"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            Exportar
+                                        </button>
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
+                                            title="Importar fluxo de arquivo JSON"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            Importar
+                                        </button>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={handleImportFlow}
+                                            accept=".json"
+                                            className="hidden"
+                                        />
+                                        <button
                                             onClick={isSimulating ? resetSimulation : startSimulation}
-                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20"
+                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20 cursor-pointer"
                                         >
                                             <Smartphone className="w-4 h-4" />
                                             {isSimulating ? 'Reiniciar' : 'Simular'}

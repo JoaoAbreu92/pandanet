@@ -1204,6 +1204,94 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 }
 
 
+function formatMenuText(node) {
+    let text = node.content?.text || "";
+    const options = node.content?.options || [];
+    if (options.length > 0) {
+        const optionsList = options.map((opt, idx) => {
+            const label = opt.label || "";
+            // Se o label já começa com um número (ex: "1. Algo", "1 - Algo"), mantemos. Caso contrário, numeramos.
+            if (/^\d+[\.\-\s]/.test(label)) {
+                return label;
+            }
+            return `${idx + 1}. ${label}`;
+        }).join('\n');
+        text = `${text}\n\n${optionsList}`;
+    }
+    return text;
+}
+
+async function sendBotMessage(text, conversation, companyId, connectionId) {
+    if (!text) return;
+    const instanceName = `conn_${connectionId}`;
+    try {
+        await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+            method: 'POST',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                number: conversation.contact_phone,
+                text: text
+            })
+        });
+    } catch (e) {
+        console.error('[CHATBOT] Erro ao enviar msg:', e.message);
+    }
+
+    try {
+        await supabase.from('whatsapp_messages').insert({
+            company_id: companyId,
+            conversation_id: conversation.id,
+            message_text: text,
+            is_from_customer: false,
+            sent_by: null // null indica bot
+        });
+    } catch (e) {
+        console.error('[CHATBOT] Erro ao salvar msg no banco:', e.message);
+    }
+}
+
+async function executeNode(node, conversation, companyId, connectionId, allNodes) {
+    if (node.type === 'transfer_queue') {
+        const queueId = node.content?.queue_id;
+        await supabase.from('whatsapp_conversations').update({ 
+            queue_id: queueId, 
+            chatbot_node_id: null 
+        }).eq('id', conversation.id);
+        
+        await sendBotMessage("Encaminhando seu atendimento para o setor responsável...", conversation, companyId, connectionId);
+    } else if (node.type === 'transfer_user') {
+        const userId = node.content?.user_id;
+        await supabase.from('whatsapp_conversations').update({ 
+            assigned_to: userId, 
+            chatbot_node_id: null 
+        }).eq('id', conversation.id);
+
+        await sendBotMessage("Encaminhando seu atendimento para um atendente...", conversation, companyId, connectionId);
+    } else if (node.type === 'menu') {
+        const menuText = formatMenuText(node);
+        await sendBotMessage(menuText, conversation, companyId, connectionId);
+        await supabase.from('whatsapp_conversations').update({ chatbot_node_id: node.id }).eq('id', conversation.id);
+    } else if (node.type === 'message') {
+        const text = node.content?.text || "";
+        if (text) {
+            await sendBotMessage(text, conversation, companyId, connectionId);
+        }
+        await supabase.from('whatsapp_conversations').update({ chatbot_node_id: node.id }).eq('id', conversation.id);
+    } else if (node.type === 'greeting') {
+        const text = node.content?.text || "";
+        if (text) {
+            await sendBotMessage(text, conversation, companyId, connectionId);
+        }
+        const idx = allNodes.indexOf(node);
+        const nextNode = allNodes.find((n, i) => i > idx && n.type !== 'greeting');
+        if (nextNode) {
+            await executeNode(nextNode, conversation, companyId, connectionId, allNodes);
+        } else {
+            await supabase.from('whatsapp_conversations').update({ chatbot_node_id: null }).eq('id', conversation.id);
+        }
+    }
+}
+
 async function runChatbot(message, conversation, companyId, connectionId) {
     try {
         const text = (message.message?.conversation || message.message?.extendedTextMessage?.text || message.text || "").trim().toLowerCase();
@@ -1218,97 +1306,65 @@ async function runChatbot(message, conversation, companyId, connectionId) {
             .maybeSingle();
         if (!flow) return;
 
+        // Buscar todos os nós do fluxo ordenados por sort_order ASC
+        const { data: nodes, error: nodesErr } = await supabase
+            .from('whatsapp_chatbot_nodes')
+            .select('*')
+            .eq('flow_id', flow.id)
+            .order('sort_order', { ascending: true });
+        
+        if (nodesErr || !nodes || nodes.length === 0) return;
+
         let currentNodeId = conversation.chatbot_node_id;
-        let node;
+        let currentNode = currentNodeId ? nodes.find(n => n.id === currentNodeId) : null;
 
-        if (!currentNodeId) {
-            // Iniciar com o node de saudação (tipo 'greeting')
-            const { data: greetingNode } = await supabase
-                .from('whatsapp_chatbot_nodes')
-                .select('*')
-                .eq('flow_id', flow.id)
-                .eq('type', 'greeting')
-                .maybeSingle();
-            node = greetingNode;
-        } else {
-            // Verificar resposta para o node atual (se for menu)
-            const { data: currentNode } = await supabase
-                .from('whatsapp_chatbot_nodes')
-                .select('*')
-                .eq('id', currentNodeId)
-                .single();
-            
-            if (currentNode?.type === 'menu') {
-                const options = currentNode.content?.options || [];
-                // Tenta achar opção por número ou texto
-                const selectedOption = options.find(opt => 
-                    text === opt.label.toLowerCase() || 
-                    text === (options.indexOf(opt) + 1).toString()
-                );
+        // Se o nó atual for do tipo menu, processar a resposta do usuário
+        if (currentNode && currentNode.type === 'menu') {
+            const options = currentNode.content?.options || [];
+            // Tenta achar a opção pelo número ou pela label exata (case insensitive)
+            const selectedOption = options.find((opt, idx) => {
+                const optNum = (idx + 1).toString();
+                const cleanLabel = (opt.label || "").trim().toLowerCase();
+                const labelWithoutPrefix = cleanLabel.replace(/^\d+[\.\-\s]*/, '').trim();
+                const textWithoutPrefix = text.replace(/^\d+[\.\-\s]*/, '').trim();
+                
+                return text === optNum || 
+                       text === cleanLabel || 
+                       text === labelWithoutPrefix ||
+                       textWithoutPrefix === labelWithoutPrefix;
+            });
 
-                if (selectedOption) {
-                    const { data: nextNode } = await supabase
-                        .from('whatsapp_chatbot_nodes')
-                        .select('*')
-                        .eq('id', selectedOption.next_node)
-                        .maybeSingle();
-                    node = nextNode;
+            if (selectedOption) {
+                const nextNode = nodes.find(n => n.id === selectedOption.next_node);
+                if (nextNode) {
+                    await executeNode(nextNode, conversation, companyId, connectionId, nodes);
                 } else {
-                    // Repetir menu se opção inválida
-                    node = currentNode;
+                    await sendBotMessage("🤖 Opção configurada sem destino. Por favor, tente novamente.", conversation, companyId, connectionId);
+                    await executeNode(currentNode, conversation, companyId, connectionId, nodes);
                 }
             } else {
-                // Se não for menu, talvez apenas avançar ou reiniciar? 
-                // Para simplificar: se não for menu e estiver preso num node, reiniciar no greeting se mandou algo novo
-                const { data: greetingNode } = await supabase
-                    .from('whatsapp_chatbot_nodes')
-                    .select('*')
-                    .eq('flow_id', flow.id)
-                    .eq('type', 'greeting')
-                    .maybeSingle();
-                node = greetingNode;
+                await sendBotMessage("Opção inválida. Por favor, escolha uma das opções do menu:", conversation, companyId, connectionId);
+                await executeNode(currentNode, conversation, companyId, connectionId, nodes);
             }
-        }
-
-        if (node) {
-            // Processar ações do node
-            if (node.type === 'transfer_queue') {
-                const queueId = node.content?.queue_id;
-                await supabase.from('whatsapp_conversations').update({ 
-                    queue_id: queueId, 
-                    chatbot_node_id: null 
-                }).eq('id', conversation.id);
-            } else if (node.type === 'transfer_user') {
-                const userId = node.content?.user_id;
-                await supabase.from('whatsapp_conversations').update({ 
-                    assigned_to: userId, 
-                    chatbot_node_id: null 
-                }).eq('id', conversation.id);
-            } else {
-                // Node de mensagem ou menu: Enviar resposta e salvar estado
-                const replyText = node.content?.text || "";
-                if (replyText) {
-                    // Enviar resposta usando as URLs e chaves globais
-                    const instanceName = `conn_${connectionId}`;
-                    await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                            method: 'POST',
-                            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                number: conversation.contact_phone,
-                                text: replyText
-                            })
-                        }).catch(e => console.error('[CHATBOT] Erro ao enviar msg:', e.message));
-
-                        // Salvar msg enviada pelo bot no banco
-                        await supabase.from('whatsapp_messages').insert({
-                            company_id: companyId,
-                            conversation_id: conversation.id,
-                            message_text: replyText,
-                            is_from_customer: false,
-                            sent_by: null // 'null' indica que foi o bot
-                        });
+        } else {
+            // Se chatbot_node_id for nulo ou se o nó atual não for um 'menu'
+            // Envia a saudação (se existir) + a mensagem do nó seguinte (geralmente menu)
+            const greetingNode = nodes.find(n => n.type === 'greeting');
+            if (greetingNode) {
+                const greetingText = greetingNode.content?.text || "";
+                if (greetingText) {
+                    await sendBotMessage(greetingText, conversation, companyId, connectionId);
                 }
-                await supabase.from('whatsapp_conversations').update({ chatbot_node_id: node.id }).eq('id', conversation.id);
+            }
+
+            // Achar o nó seguinte ao greeting
+            const greetingIndex = greetingNode ? nodes.indexOf(greetingNode) : -1;
+            const nextNode = nodes.find((n, idx) => idx > greetingIndex && n.type !== 'greeting');
+
+            if (nextNode) {
+                await executeNode(nextNode, conversation, companyId, connectionId, nodes);
+            } else {
+                await supabase.from('whatsapp_conversations').update({ chatbot_node_id: null }).eq('id', conversation.id);
             }
         }
     } catch (err) {
@@ -1925,7 +1981,23 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         const currentConv = conv || { id: conversationId, contact_phone: fromPhone, queue_id: null, assigned_to: null };
                         let hasTransferred = false;
 
-                        if (!currentConv.queue_id && !currentConv.assigned_to) {
+                        // Verificar se há fluxo de chatbot ativo
+                        let hasActiveChatbot = false;
+                        try {
+                            const { data: activeFlow } = await supabase
+                                .from('whatsapp_chatbot_flows')
+                                .select('id')
+                                .eq('company_id', companyId)
+                                .eq('is_active', true)
+                                .maybeSingle();
+                            if (activeFlow) {
+                                hasActiveChatbot = true;
+                            }
+                        } catch (err) {
+                            console.error('[IA TRIAGEM] Erro ao verificar fluxo ativo:', err.message);
+                        }
+
+                        if (!hasActiveChatbot && !currentConv.queue_id && !currentConv.assigned_to) {
                             try {
                                 const { data: settings } = await supabase
                                     .from('whatsapp_settings')

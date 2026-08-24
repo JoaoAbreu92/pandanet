@@ -218,6 +218,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // --- State: Pagination ---
     const [page, setPage] = useState(1);
+
+    const getCacheKey = (folderName: string, pageNum: number, configOverride?: EmailSettings) => {
+        const activeConfig = configOverride || settings;
+        const imapUser = activeConfig?.imap_user || 'no_user';
+        const currentUserId = currentUser?.id || 'unknown';
+        return `${currentUserId}_${imapUser}_${folderName}_${pageNum}`;
+    };
     const [pageSize, setPageSize] = useState(10); // User requested 10
     const [totalEmails, setTotalEmails] = useState(0);
     const [unseenCount, setUnseenCount] = useState(0);
@@ -754,7 +761,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             });
 
             // Always update cache with the new body data
-            const cacheKey = `${currentUser.id}_${folder}_${page}`;
+            const cacheKey = getCacheKey(folder, page);
             if (emailCache[cacheKey]) {
                 emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => {
                     if (e.uid === uid) {
@@ -867,7 +874,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         }
 
         // Update the cache directly so returning to the folder shows correct read status without waiting for network
-        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        const cacheKey = getCacheKey(currentFolder, page);
         if (emailCache[cacheKey]) {
             emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
                 e.uid === email.uid ? { ...e, flags: newFlags } : e
@@ -921,7 +928,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         });
 
         // Invalidate cache
-        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        const cacheKey = getCacheKey(currentFolder, page);
         delete emailCache[cacheKey];
     };
 
@@ -1017,7 +1024,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setEmails(prev => prev.filter(e => !emailUids.includes(e.uid)));
 
             // Invalidate current folder cache
-            const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+            const cacheKey = getCacheKey(currentFolder, page);
             delete emailCache[cacheKey];
 
             // If background refreshing is on, it will eventually re-fetch
@@ -1115,9 +1122,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         fetchInProgress.current = true;
 
         try {
-            const isSearchingGlobal = searchQuery.trim().length > 0;
             const currentUserId = currentUser?.id || 'unknown';
-            const cacheKey = `${currentUserId}_${isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder}_${page}`;
+            const isSearchingGlobal = searchQuery.trim().length > 0;
+            const cacheKey = getCacheKey(isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder, page, activeConfig);
             const cached = emailCache[cacheKey];
 
             // Use cache on initial load (not background polling, not forced refresh)

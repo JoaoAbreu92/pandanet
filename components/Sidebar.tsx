@@ -309,6 +309,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavMenu label="Social" icon={UserGroupIcon} menuKey="social" permission={true}>
                     <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
                     <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
+                    <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
@@ -325,7 +326,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="reservas" label="Salas" icon={HomeIcon} permission="viewReservations" featureId="reservations" context={{ tab: 'rooms' }} />
                     <NavItem page="reservas" label="Veículos" icon={RocketLaunchIcon} permission="viewReservations" featureId="reservations" context={{ tab: 'vehicles' }} />
                 </NavMenu>
-                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
@@ -342,7 +342,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <hr className="my-2 border-gray-100 dark:border-slate-800" />
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
-                <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
                 {/* <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" /> */}
 
                 <NavMenu label={t('sidebar.rh_gestao')} icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
@@ -357,6 +356,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" featureId="onboarding" />
                     <NavItem page="documentos" label={t('sidebar.library')} icon={FolderIcon} permission="viewDocuments" />
                     <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
+                    <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
                 </NavMenu>
 
                 <NavMenu label={t('sidebar.ti_suporte')} icon={LifebuoyIcon} menuKey="ti" permission={hasTiAccess}>

@@ -212,6 +212,13 @@ export const MiniCalendar: React.FC<MiniCalendarProps> = ({ onNavigate, currentU
               >
                 <span className="text-[11px]">{cell.day}</span>
                 
+                {/* X vermelho para dias passados */}
+                {cell.isCurrentMonth && cell.dateString && cell.dateString < todayStr && (
+                  <span className="absolute top-1 right-1.5 text-[8px] font-black text-rose-600 dark:text-rose-450 select-none pointer-events-none" title="Dia passado">
+                    X
+                  </span>
+                )}
+                
                 {/* Indicadores sob o dia */}
                 {cell.isCurrentMonth && (hasEvents || isBday) && (
                   <div className="absolute bottom-1 flex gap-0.5 justify-center w-full">
