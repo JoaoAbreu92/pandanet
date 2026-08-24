@@ -35,9 +35,10 @@ import KanbanBoard from './KanbanBoard';
 interface ChatProps {
   onConversationSelect?: (isActive: boolean) => void;
   initialSearch?: string;
+  type?: 'private' | 'group' | 'all';
 }
 
-const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' }) => {
+const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private' }) => {
   const { user, profile, currentUser } = useAuth();
   const activeProfile = currentUser || profile;
   const permissions = (activeProfile?.whatspanda_permissions as any) || {};
@@ -82,7 +83,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [filterConnection, setFilterConnection] = useState<string[]>([]);
   const [filterQueue, setFilterQueue] = useState<string[]>([]);
   const [filterAssignee, setFilterAssignee] = useState<string[]>([]);
-  const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'private' | 'group'>('private');
+  const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'private' | 'group'>(type);
   const [connections, setConnections] = useState<any[]>([]);
   const [queues, setQueues] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
@@ -205,6 +206,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter]);
+
+  useEffect(() => {
+    if (type) {
+      setChatTypeFilter(type);
+    }
+  }, [type]);
 
 
   const fetchConversations = async () => {
@@ -508,22 +515,24 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               </button>
             ))}
           </div>
-          {/* Tipo de conversa: Privado / Grupo */}
-          <div className="flex gap-1 mt-2">
-            {([{ v: 'private', label: '💬 Privados' }, { v: 'group', label: '👥 Grupos' }] as const).map(({ v, label }) => (
-              <button
-                key={v}
-                onClick={() => setChatTypeFilter(chatTypeFilter === v ? 'all' : v as any)}
-                className={`flex-1 text-[10px] py-1 rounded-lg font-semibold border transition-all ${
-                  chatTypeFilter === v
-                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                    : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-emerald-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Tipo de conversa: Privado / Grupo - Hide if enforced by prop */}
+          {type === 'all' && (
+            <div className="flex gap-1 mt-2">
+              {([{ v: 'private', label: '💬 Privados' }, { v: 'group', label: '👥 Grupos' }] as const).map(({ v, label }) => (
+                <button
+                  key={v}
+                  onClick={() => setChatTypeFilter(chatTypeFilter === v ? 'all' : v as any)}
+                  className={`flex-1 text-[10px] py-1 rounded-lg font-semibold border transition-all ${
+                    chatTypeFilter === v
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                      : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-emerald-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Search and Actions */}
@@ -540,6 +549,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               />
             </div>
             <button
+              onClick={() => fetchConversations()}
+              className="p-2 rounded-xl bg-slate-50 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:border-emerald-500 hover:text-emerald-500 transition-all"
+              title="Recarregar"
+            >
+              <RefreshCcw className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 rounded-xl border text-xs font-bold transition-all ${
                 showFilters || filterConnection.length > 0 || filterQueue.length > 0 || filterAssignee.length > 0
@@ -548,7 +564,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               }`}
               title="Filtros Avançados"
             >
-              ⚙
+              <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
           

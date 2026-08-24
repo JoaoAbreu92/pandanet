@@ -14,8 +14,9 @@ import Channels from './whatspanda/Channels';
 import Settings from './whatspanda/Settings';
 
 import { useAuth } from './AuthContext';
+import { Loader2 } from 'lucide-react';
 
-type View = 'chat' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
+type View = 'chat' | 'groups' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -32,31 +33,37 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     setCurrentView('chat');
   };
 
-  const permissions = profile?.whatspanda_permissions || {
-    can_view_contacts: false,
+  const permissions: any = {
+    can_view_contacts: true,
     can_edit_contacts: false,
-    can_view_chats: false,
-    can_send_messages: false,
-    can_send_media: false,
-    can_manage_settings: false
+    can_view_chats: true,
+    can_send_messages: true,
+    can_send_media: true,
+    can_manage_settings: false,
+    can_view_groups: false,
+    ...(profile?.whatspanda_permissions || {})
   };
 
+  const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
+
   // Admin override
-  if (profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin') {
+  if (isAdmin) {
     permissions.can_view_contacts = true;
     permissions.can_edit_contacts = true;
     permissions.can_view_chats = true;
     permissions.can_send_messages = true;
     permissions.can_send_media = true;
     permissions.can_manage_settings = true;
+    permissions.can_view_groups = true;
   }
 
   const menuItems = React.useMemo(() => [
     ...(permissions.can_view_chats ? [{ id: 'chat', label: 'Conversas', icon: MessageCircle, view: 'chat' }] : []),
+    ...(permissions.can_view_groups ? [{ id: 'groups', label: 'Grupos', icon: Users, view: 'groups' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
-  ], [permissions.can_view_chats, permissions.can_view_contacts, permissions.can_manage_settings]);
+  ], [permissions.can_view_chats, permissions.can_view_groups, permissions.can_view_contacts, permissions.can_manage_settings]);
 
   // Set default view if current is invalid
   React.useEffect(() => {
@@ -67,6 +74,17 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   }, [menuItems, currentView]);
 
   const renderView = () => {
+    const { loading: authLoading } = useAuth();
+
+    if (authLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500 animate-pulse">
+          <Loader2 className="w-12 h-12 mb-4 text-emerald-500 animate-spin" />
+          <p className="text-xs font-bold uppercase tracking-widest opacity-60">Sincronizando WhatsPanda...</p>
+        </div>
+      );
+    }
+
     if (menuItems.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -77,7 +95,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     }
 
     switch (currentView) {
-      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} /> : null;
+      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" /> : null;
+      case 'groups': return permissions.can_view_groups ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
       case 'new-ticket': return permissions.can_view_chats ? (
         <NewTicket 

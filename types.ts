@@ -242,6 +242,7 @@ export interface WhatsAppPermissions {
   assigned_queues?: string[]; // IDs of assigned queues
   allowed_connections?: string[]; // IDs of Allowed connections
   can_view_others_chats?: boolean; // New: Can view chats from other sectors/users
+  can_view_groups?: boolean; // New: Can view and send messages in groups
 }
 
 export interface Employee {

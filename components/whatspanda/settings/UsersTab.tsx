@@ -17,7 +17,8 @@ const DEFAULT_PERMISSIONS: WhatsAppPermissions = {
     can_manage_settings: false,
     can_transfer: false,
     can_see_all_departments: false,
-    can_manage_tags: false
+    can_manage_tags: false,
+    can_view_groups: false
 };
 
 const UsersTab: React.FC = () => {
@@ -351,6 +352,7 @@ const UsersTab: React.FC = () => {
                                         { key: 'can_see_all_departments', label: 'Ver Todos Departamentos', desc: 'Ver conversas de qualquer departamento.' },
                                         { key: 'can_view_others_chats', label: 'Ver Chats de Terceiros', desc: 'Ver conversas atribuídas a outros usuários.' },
                                         { key: 'can_manage_tags', label: 'Gerenciar Tags', desc: 'Criar e atribuir tags a conversas.' },
+                                        { key: 'can_view_groups', label: 'Ver Grupos', desc: 'Visualizar e enviar mensagens em grupos de WhatsApp.' },
                                         { key: 'can_manage_settings', label: 'Gerenciar Configurações', desc: 'Acesso total às configurações.' },
                                     ].map((perm) => (
                                         <div key={perm.key} className="flex items-start group/perm cursor-pointer" onClick={() => handlePermissionChange(perm.key as keyof WhatsAppPermissions)}>
