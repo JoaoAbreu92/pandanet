@@ -499,7 +499,11 @@ const Channels: React.FC = () => {
                                 <div className="bg-white p-8 inline-block border-[12px] border-slate-900 dark:border-white/5 rounded-[3rem] shadow-2xl mb-10 transform scale-110">
                                     {qrCode ? (
                                         <div className="rounded-2xl overflow-hidden shadow-inner">
-                                            <QRCode value={qrCode} size={256} fgColor="#0f172a" />
+                                            {qrCode.length > 1000 || qrCode.startsWith('data:image/') ? (
+                                                <img src={qrCode.startsWith('data:image/') ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code" className="w-[256px] h-[256px] object-contain" />
+                                            ) : (
+                                                <QRCode value={qrCode} size={256} fgColor="#0f172a" />
+                                            )}
                                         </div>
                                     ) : (
                                             <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-transparent text-gray-400 space-y-4">
