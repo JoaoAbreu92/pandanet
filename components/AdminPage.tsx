@@ -156,7 +156,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     const tabs = allTabs.filter(tab => {
         if (tab.category !== activeCategory) return false;
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
-        if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
         // Permissões granulares para não-Super Admins
         if (useAuth().profile?.role !== 'Super Admin') {

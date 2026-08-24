@@ -57,7 +57,7 @@ const PollFormModal: React.FC<{
             // 2. Create Options
             const optionsToInsert = validOptions.map(text => ({
                 poll_id: poll.id,
-                text,
+                option_text: text,
                 votes: 0
             }));
 
@@ -197,7 +197,7 @@ const PollManager: React.FC = () => {
                                 <ul className="space-y-1">
                                     {poll.poll_options?.map((opt: any) => (
                                         <li key={opt.id} className="text-sm text-brand-subtle-text flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                            <span>{opt.text}</span>
+                                            <span>{opt.option_text}</span>
                                             <span className="font-medium bg-white px-2 py-0.5 rounded border text-xs">{opt.votes || 0} votos</span>
                                         </li>
                                     ))}

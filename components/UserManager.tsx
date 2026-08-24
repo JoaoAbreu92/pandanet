@@ -129,6 +129,15 @@ const UserFormModal: React.FC<{
         can_nudge: user?.can_nudge ?? true,
         nudge_cooldown: user?.nudge_cooldown ?? 30,
         is_whatsapp_agent: user?.is_whatsapp_agent ?? false,
+        whatspanda_permissions: user?.whatspanda_permissions || {
+            can_view_contacts: true,
+            can_edit_contacts: false,
+            can_view_chats: true,
+            can_send_messages: true,
+            can_send_media: true,
+            can_manage_settings: false,
+            can_view_groups: true,
+        }
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,8 +286,35 @@ const UserFormModal: React.FC<{
                                         checked={formData.is_whatsapp_agent} 
                                         onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
                                     />
-                                    <div className="p-3 bg-white/50 rounded-xl border border-dashed border-blue-200 flex items-center">
-                                        <p className="text-[10px] text-gray-500 leading-tight">Define se o usuário aparece como agente disponível para atendimento no WhatsPanda.</p>
+                                    <div className="p-3 bg-white/50 rounded-xl border border-dashed border-blue-200">
+                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Define se o usuário aparece como agente. Permissões detalhadas:</p>
+                                        <div className="grid grid-cols-1 gap-1.5">
+                                            {[
+                                                { key: 'can_view_contacts', label: 'Ver Contatos' },
+                                                { key: 'can_edit_contacts', label: 'Editar Contatos' },
+                                                { key: 'can_view_chats', label: 'Ver Chats' },
+                                                { key: 'can_send_messages', label: 'Enviar Mensagens' },
+                                                { key: 'can_send_media', label: 'Enviar Mídia' },
+                                                { key: 'can_manage_settings', label: 'Gerenciar Configs' },
+                                                { key: 'can_view_groups', label: 'Ver Grupos' },
+                                            ].map(perm => (
+                                                <label key={perm.key} className="flex items-center space-x-2 text-[10px] text-gray-600">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={(formData.whatspanda_permissions as any)?.[perm.key]} 
+                                                        onChange={(e) => setFormData(prev => ({
+                                                            ...prev,
+                                                            whatspanda_permissions: {
+                                                                ...(prev.whatspanda_permissions as any),
+                                                                [perm.key]: e.target.checked
+                                                            }
+                                                        }))}
+                                                        className="rounded text-blue-500 w-3 h-3"
+                                                    />
+                                                    <span>{perm.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -376,7 +412,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_education_level: (userData as any).education_level || null,
                     p_can_nudge: !!(userData as any).can_nudge,
                     p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
-                    p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent
+                    p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
+                    p_whatspanda_permissions: (userData as any).whatspanda_permissions || {}
                 });
 
                 // Manual password update if field is provided
@@ -423,7 +460,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_cpf: (userData as any).cpf || null,
                         p_can_nudge: !!(userData as any).can_nudge,
                         p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
-                        p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent
+                        p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
+                        p_whatspanda_permissions: (userData as any).whatspanda_permissions || {}
                     });
 
                     if (error) {
