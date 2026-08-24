@@ -265,6 +265,13 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         const { data, error } = await callEmailServer('folders', { config: settings, action: 'list' });
         if (data && !error) {
             setFolders(data);
+        } else {
+            console.error("Falha ao buscar pastas:", error);
+            // Silent fail for UI mostly, but log it. 
+            // If it's 404, it means backend is old.
+            if (error?.message?.includes('404') || error?.message?.includes('Cannot POST')) {
+                alert("Aviso: As pastas não carregaram. O servidor de e-mail parece desatualizado. Por favor, reinicie o backend (server).");
+            }
         }
     };
 
