@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
-import { Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check } from 'lucide-react';
-
-import NewTicket from './NewTicket';
-
+import { Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check, RefreshCw } from 'lucide-react';
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     
     // Modal & Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isAutoAttendanceOpen, setIsAutoAttendanceOpen] = useState(false);
     const [editingContact, setEditingContact] = useState<WhatsAppContact | null>(null);
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -51,6 +48,18 @@ const Contacts: React.FC = () => {
 
         const { data: queues } = await supabase.from('whatsapp_queues').select('*').eq('is_active', true);
         if (queues) setAvailableQueues(queues);
+    };
+
+    const handleSyncContacts = async () => {
+        setSyncing(true);
+        // In a real scenario, this might trigger a backend sync job.
+        // For now, we refresh the list from Supabase to ensure we have the latest.
+        await fetchContacts();
+
+        // Simulate a short delay for visual feedback if fetch is too fast
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        setSyncing(false);
     };
 
     const handleOpenModal = (contact?: WhatsAppContact) => {
@@ -133,12 +142,13 @@ const Contacts: React.FC = () => {
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setIsAutoAttendanceOpen(true)}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm gap-2"
-                        title="Iniciar Atendimento Automático"
+                        onClick={handleSyncContacts}
+                        disabled={syncing}
+                        className={`flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm gap-2 ${syncing ? 'opacity-70 cursor-wait' : ''}`}
+                        title="Sincronizar Contatos do WhatsApp"
                     >
-                        <img src="/img/panda_phone_icon.png" alt="Panda" className="w-6 h-6 rounded-full bg-white p-0.5" />
-                        <span className="font-medium">Atendimento Automático</span>
+                        <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+                        <span className="font-medium">{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
                     </button>
                     <button
                         onClick={() => handleOpenModal()}
@@ -232,22 +242,7 @@ const Contacts: React.FC = () => {
                 )}
             </div>
 
-            {/* New Ticket / Auto Attendance Modal */}
-            {isAutoAttendanceOpen && (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[80vh] overflow-hidden flex flex-col relative">
-                        <button 
-                            onClick={() => setIsAutoAttendanceOpen(false)}
-                            className="absolute top-4 right-4 z-10 bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
-                        >
-                            <X className="w-6 h-6 text-gray-600" />
-                        </button>
-                        <div className="flex-1 overflow-hidden">
-                             <NewTicket />
-                        </div>
-                    </div>
-                 </div>
-            )}
+
             
             {/* Contact Modal */}
             {isModalOpen && (

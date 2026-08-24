@@ -39,7 +39,30 @@ const PlanFormModal: React.FC<{
                         <label className="block text-sm font-medium text-brand-subtle-text">Limite de Usuários</label>
                         <input type="number" name="userLimit" value={formData.userLimit} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/>
                     </div>
-                    {/* Feature management could be added here */}
+                    <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 p-2 rounded-md">
+                        <label className="block text-sm font-medium text-brand-subtle-text mb-2">Recursos do Plano</label>
+                        {Object.keys(formData.features).map((key) => (
+                            <label key={key} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded-md cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.features[key as keyof typeof formData.features]}
+                                    onChange={(e) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            features: {
+                                                ...prev.features,
+                                                [key]: e.target.checked
+                                            }
+                                        }));
+                                    }}
+                                    className="rounded text-brand-primary focus:ring-brand-primary border-gray-300"
+                                />
+                                <span className="text-sm text-gray-700">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
+                            </label>
+                        ))}
+                    </div>
+
+
                     <div className="flex justify-end space-x-3 pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
                         <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">Salvar Alterações</button>
