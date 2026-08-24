@@ -661,3 +661,61 @@ NOTIFY pgrst, 'reload schema';
 -- 6. Drop UNIQUE constraint on email_settings.user_id to support multiple email accounts per user
 ALTER TABLE public.email_settings DROP CONSTRAINT IF EXISTS email_settings_user_id_key;
 
+-- 7. CHAT MESSAGE & CONVERSATION UPDATE POLICIES
+DROP POLICY IF EXISTS "Users can update messages" ON public.messages;
+CREATE POLICY "Users can update messages" ON public.messages 
+FOR UPDATE TO authenticated 
+USING (conversation_id IN (SELECT get_safe_conversation_ids()))
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can update conversations" ON public.conversations;
+CREATE POLICY "Users can update conversations" ON public.conversations 
+FOR UPDATE TO authenticated 
+USING (id IN (SELECT get_safe_conversation_ids()))
+WITH CHECK (true);
+
+-- 8. REOPEN INTERNAL CONVERSATIONS (SAME COMPANY) THAT ARE CLOSED
+UPDATE public.conversations SET is_closed = false 
+WHERE id IN (
+  SELECT c.id FROM public.conversations c 
+  JOIN public.conversation_participants cp1 ON c.id = cp1.conversation_id 
+  JOIN public.conversation_participants cp2 ON c.id = cp2.conversation_id 
+  JOIN public.profiles p1 ON cp1.user_id = p1.id 
+  JOIN public.profiles p2 ON cp2.user_id = p2.id 
+  WHERE c.is_group = false 
+    AND p1.company_id = p2.company_id 
+    AND p1.id != p2.id
+);
+
+-- 9. SCHEDULING SYSTEM COLUMNS & TABLES
+ALTER TABLE public.scheduling_bookings ADD COLUMN IF NOT EXISTS guest_cpf TEXT;
+
+CREATE TABLE IF NOT EXISTS public.scheduling_settings (
+    company_id UUID PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE,
+    company_name TEXT,
+    logo_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+ALTER TABLE public.scheduling_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso completo de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Acesso completo de configurações por empresa" ON public.scheduling_settings
+    FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid()) OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "Leitura pública de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Leitura pública de configurações por empresa" ON public.scheduling_settings
+    FOR SELECT USING (true);
+
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS duration_unit TEXT DEFAULT 'minutes';
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS disable_time_slots BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS has_capacity_limit BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS capacity_limit INTEGER DEFAULT 0;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS show_capacity_to_guest BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS has_lunch_break BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_start_time TEXT DEFAULT '12:00';
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_end_time TEXT DEFAULT '13:00';
+
+-- Final Force Schema Cache Reload
+NOTIFY pgrst, 'reload schema';
+
