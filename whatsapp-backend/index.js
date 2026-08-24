@@ -46,41 +46,41 @@ const supabase = createClient(supabaseUrl, supabaseKey.trim());
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.warn('[auth] WhatsApp: Missing or invalid Authorization header');
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    console.warn('[auth] WhatsApp: Missing or invalid Authorization header.');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-  const token = authHeader.split(' ')[1];
 
-  // Strategy 1: Verify via Supabase auth.getUser (preferred)
+  const token = authHeader.split(' ')[1];
   try {
+    // 1. Try Supabase verify first (this might fail if internal kong URL is unreachable from node)
     const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (!error && user) {
-      req.user = user;
+    
+    if (error || !user) {
+      console.warn(`[auth] Supabase Auth fail: ${error?.message || 'No user'}. Trying direct JWT verify...`);
+      // 2. Fallback: Verify JWT signature directly with JWT_SECRET (bypasses network issues)
+      if (!JWT_SECRET) {
+        return res.status(401).json({ error: 'Server misconfigured: Missing JWT_SECRET', detail: error?.message });
+      }
+      
+      const decodedUser = jwt.verify(token, JWT_SECRET);
+      // Construct a minimal user object matching Supabase's format
+      req.user = { id: decodedUser.sub, email: decodedUser.email, role: decodedUser.role };
+      console.log(`[auth] Verified token manually for user ${req.user.id}`);
       return next();
     }
-    console.warn('[auth] Supabase getUser failed, trying JWT fallback:', error?.message);
-  } catch (err) {
-    console.warn('[auth] Supabase getUser threw error, trying JWT fallback:', err.message);
-  }
 
-  // Strategy 2: Direct JWT verification using JWT_SECRET (fallback)
-  if (JWT_SECRET) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      // Supabase access tokens have a 'sub' (user ID) claim
-      if (decoded && (decoded.sub || decoded.role)) {
-        console.log('[auth] JWT verified via secret fallback. Role:', decoded.role, 'Sub:', decoded.sub);
-        req.user = { id: decoded.sub, role: decoded.role, email: decoded.email };
-        return next();
-      }
-    } catch (jwtErr) {
-      console.error('[auth] JWT secret fallback also failed:', jwtErr.message);
-    }
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error(`[auth] JWT Verify fail: ${error.message}`, error);
+    return res.status(401).json({ 
+      error: 'Invalid or expired token', 
+      reason: error.message,
+      secret_available: !!JWT_SECRET,
+      token_preview: token.substring(0, 15) + '...'
+    });
   }
-
-  return res.status(401).json({ error: 'Invalid or expired token' });
 }
-
 app.get('/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
 
 app.get('/', (req, res) => {
