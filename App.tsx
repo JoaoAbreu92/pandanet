@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, ActiveChatHead } from './types';
+import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, ActiveChatHead, Plan } from './types';
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
@@ -304,7 +304,21 @@ const AppContent: React.FC = () => {
                         if (error) throw error;
 
                         if (company) {
-                            const mappedCompany = company as unknown as Company;
+                            const rawPlan = company.plan as any;
+                            const mappedPlan: Plan | undefined = rawPlan ? {
+                                id: rawPlan.id,
+                                name: rawPlan.name,
+                                userLimit: rawPlan.user_limit,
+                                whatsappLimit: rawPlan.whatsapp_limit || 1,
+                                emailLimit: rawPlan.email_limit || 1,
+                                features: rawPlan.features || {},
+                                price: rawPlan.price
+                            } : undefined;
+
+                            const mappedCompany: Company = {
+                                ...company,
+                                plan: mappedPlan
+                            } as unknown as Company;
                             const baseData = (mappedCompany.data || {}) as any;
                             // Fetch real employees for this company
                             const { data: realProfiles } = await supabase
@@ -345,7 +359,9 @@ const AppContent: React.FC = () => {
                                         is_manager: p.is_manager || false,
                                         reports_to: p.reports_to || null,
                                         sector_manager_id: p.sector_manager_id || null,
-                                        department_id: p.department_id || null
+                                        department_id: p.department_id || null,
+                                        email_permissions: p.email_permissions || null,
+                                        whatspanda_permissions: p.whatspanda_permissions || null
                                     };
                                 }) : [],
                                 announcements: baseData.announcements || [],
