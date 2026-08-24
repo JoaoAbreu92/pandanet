@@ -119,9 +119,7 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate, on
         if (onNavigate) {
             onNavigate(page as any, context);
         } else {
-            // Fallback if onNavigate not provided
-            const query = context.conversationId ? `?conversation=${context.conversationId}` : '';
-            window.location.href = `/${page}${query}`;
+            console.warn(`[TeamDirectory] onNavigate não fornecido para a página: ${page}. Verifique se o componente pai está passando a prop corretamente.`);
         }
     };
 
