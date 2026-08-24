@@ -118,6 +118,26 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     };
     fetchSignature();
   }, [activeProfile?.id, profile?.id]);
+  const handleToggleSignature = async () => {
+    const nextVal = !useSignature;
+    setUseSignature(nextVal);
+    
+    const profileId = activeProfile?.id || profile?.id;
+    if (!profileId) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ use_whatsapp_signature: nextVal })
+        .eq('id', profileId);
+
+      if (error) {
+        console.error('Erro ao atualizar assinatura no banco:', error.message);
+      }
+    } catch (err) {
+      console.error('Exceção ao atualizar assinatura no banco:', err);
+    }
+  };
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, conversationId: string, isMuted: boolean } | null>(null);
   const [nudgeCooldowns, setNudgeCooldowns] = useState<{ [key: string]: number }>({});
@@ -314,6 +334,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [agents, setAgents] = useState<any[]>([]);
   const [userQueues, setUserQueues] = useState<string[] | null>(null);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchConversationsRef = useRef(fetchConversations);
+  useEffect(() => {
+    fetchConversationsRef.current = fetchConversations;
+  }, [fetchConversations]);
 
   // Canal access: list of {channel_id, can_send_messages, can_send_media, force_signature}
   const [channelAccess, setChannelAccess] = useState<any[]>([]);
@@ -359,14 +383,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
         // Se for um novo registro (INSERT), atualiza na hora para nao ter delay
         if (payload.eventType === 'INSERT') {
-          fetchConversations();
+          fetchConversationsRef.current();
           return;
         }
         
         // Debounce: aguardar 600ms antes de refazer o fetch para updates/deletes
         if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = setTimeout(() => {
-          fetchConversations();
+          fetchConversationsRef.current();
         }, 600);
       })
       .subscribe();
@@ -1240,7 +1264,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     // Assinatura: verifica force_signature no canal da conversa, ou se o usuário ativou manualmente
     const channelPerms = channelAccess.find((ca: any) => ca.channel_id === selectedConversation.connection_id);
     const forceSig = channelPerms?.force_signature === true;
-    const senderName = activeProfile?.name || profile?.name || '';
+    const senderName = activeProfile?.full_name || profile?.full_name || activeProfile?.name || profile?.name || '';
     const autoSignature = forceSig && senderName ? `*${senderName}*` : null;
     const effectiveSignature = autoSignature || (useSignature && signatureText.trim() ? signatureText.trim() : null);
 
@@ -1915,6 +1939,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     }`}
                   >
                     <div className="space-y-2">
+                      {selectedConversation?.is_group && msg.is_from_customer && (msg.sender_name || msg.sender_phone) && (
+                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mb-1">
+                          {msg.sender_name || (() => {
+                            const clean = (msg.sender_phone || '').replace(/\D/g, '');
+                            if (clean.length === 12 && clean.startsWith('55')) {
+                              return `+${clean.slice(0, 2)} ${clean.slice(2, 4)} ${clean.slice(4, 8)}-${clean.slice(8)}`;
+                            } else if (clean.length === 13 && clean.startsWith('55')) {
+                              return `+${clean.slice(0, 2)} ${clean.slice(2, 4)} ${clean.slice(4, 9)}-${clean.slice(9)}`;
+                            }
+                            return msg.sender_phone;
+                          })()}
+                        </div>
+                      )}
                       {msg.media_type === 'gif' ? (
                         <div className="relative group inline-block" onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'video' })}>
                           <video
@@ -2248,7 +2285,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     <div className="flex flex-col items-center justify-center px-1 mb-2">
                       <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
                       <button
-                        onClick={() => setUseSignature(!useSignature)}
+                        onClick={handleToggleSignature}
                         className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
                         title={useSignature ? "Assinatura Ativa" : "Sem Assinatura"}
                       >

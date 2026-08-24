@@ -693,6 +693,8 @@ export interface WhatsAppMessage {
   media_type?: string;
   is_from_customer: boolean;
   sent_by?: string; // profile_id (null if customer)
+  sender_phone?: string;
+  sender_name?: string;
   created_at: string;
 }
 

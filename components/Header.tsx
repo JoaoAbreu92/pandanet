@@ -252,7 +252,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     <button
                         onClick={toggleTheme}
                         className="hidden lg:flex p-2 text-gray-500 rounded-full hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:bg-gray-700"
-                        title={theme === 'light' ? t('theme.dark') : t('theme.light')}
+                        title={theme === 'light' ? t('theme.mode_dark') : t('theme.mode_light')}
                     >
                         {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                     </button>
@@ -322,16 +322,16 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                 {/* Mobile Only Items */}
                                 <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
                                     <button onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        {theme === 'light' ? <MoonIcon className="w-5 h-5 mr-3 text-slate-500" /> : <SunIcon className="w-5 h-5 mr-3 text-yellow-500" />} {theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+                                        {theme === 'light' ? <MoonIcon className="w-5 h-5 mr-3 text-slate-500" /> : <SunIcon className="w-5 h-5 mr-3 text-yellow-500" />} {theme === 'light' ? t('theme.mode_dark') : t('theme.mode_light')}
                                     </button>
                                     <button onClick={() => { const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es']; setLanguage(langs[(langs.indexOf(language) + 1) % langs.length]); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        <SparklesIcon className="w-5 h-5 mr-3 text-blue-500" /> Idioma: {language.toUpperCase()}
+                                        <SparklesIcon className="w-5 h-5 mr-3 text-blue-500" /> {t('language.label')}: {language.toUpperCase()}
                                     </button>
                                     <button onClick={() => { window.dispatchEvent(new CustomEvent('toggle-panda-ai')); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
                                         <SparklesIcon className="w-5 h-5 mr-3 text-brand-primary" /> Panda IA
                                     </button>
                                     <button onClick={() => { testNotifications(); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> Ativar Sons
+                                        <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> {t('header.notifications_sound')}
                                     </button>
                                 </div>
 

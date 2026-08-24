@@ -273,8 +273,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
               key={item.id}
               onClick={() => setCurrentView(item.view as View)}
               className={`p-2 flex flex-col items-center justify-center transition-all min-w-[64px] rounded-xl
-                ${currentView === item.view 
-                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400' 
+                ${currentView === item.view
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
               `}
             >

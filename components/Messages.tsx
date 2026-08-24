@@ -1728,6 +1728,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                         <div 
                             ref={scrollContainerRef}
                             className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar"
+                            style={{ scrollbarGutter: 'stable' }}
                             onScroll={(e) => {
                                 const target = e.currentTarget;
                                 // Detectar se chegou no topo (com margem de 100px)
@@ -1919,7 +1920,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             </div>
 
             {/* Right Sidebar: Sticky Notes (Local Only) */}
-            <div className="hidden lg:flex flex-col w-72 bg-gray-50/50 dark:bg-[#020617]/40 backdrop-blur-xl border-l border-gray-100 dark:border-white/5 p-4 overflow-hidden">
+            <div className="hidden lg:flex flex-col w-80 bg-gray-50/50 dark:bg-[#020617]/40 backdrop-blur-xl border-l border-gray-100 dark:border-white/5 p-4 overflow-hidden">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-700 flex items-center gap-2">
                         <span className="text-xl">📝</span> Notas Rápidas

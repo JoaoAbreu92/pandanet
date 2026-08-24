@@ -154,7 +154,7 @@ app.post('/api/email/fetch-by-ids', authMiddleware, async (req, res) => {
                 const uids = [...new Set(uidsArrays.flat())];
                 
                 if (uids.length > 0) {
-                    for await (const message of client.fetch(uids, { envelope: true, uid: true, source: true })) {
+                    for await (const message of client.fetch(uids, { envelope: true, uid: true, source: true, flags: true })) {
                         const parsed = await simpleParser(message.source);
                         const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
                         allResults.push({
@@ -232,7 +232,7 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                     // Limit to newest 20 per folder to avoid timeout/bloat
                     const sortedUids = uids.sort((a, b) => b - a).slice(0, 20);
                     
-                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true, source: true })) {
+                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true, source: true, flags: true })) {
                         const parsed = await simpleParser(message.source);
                         const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
                         
@@ -330,7 +330,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const range = `${startIndex}:${endIndex}`;
             console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
-            for await (const message of client.fetch(range, { envelope: true, uid: true, source: true })) {
+            for await (const message of client.fetch(range, { envelope: true, uid: true, source: true, flags: true })) {
                 // Generate a simple snippet by parsing the source briefly or just first part
                 const parsed = await simpleParser(message.source);
                 const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';

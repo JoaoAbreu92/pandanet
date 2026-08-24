@@ -1441,6 +1441,16 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             }
         }
 
+        let senderPhone = null;
+        let senderName = null;
+        if (isGroup) {
+            const participantJid = message.key?.participant || message.participant || '';
+            if (participantJid) {
+                senderPhone = participantJid.split('@')[0];
+            }
+            senderName = pushName;
+        }
+
         // 2. Inserir a mensagem
         if (conversationId) {
             const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
@@ -1451,6 +1461,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 whatsapp_message_id: msgId,
                 media_url: mediaUrl,
                 media_type: mediaType,
+                sender_phone: senderPhone,
+                sender_name: senderName,
                 created_at: parseMessageTimestamp(message.messageTimestamp)
             });
 

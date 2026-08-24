@@ -271,14 +271,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" featureId="equip" />
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
-                    <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
+                    <NavItem page="infosec" label={t('sidebar.infosec')} icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>
 
 
                 {/* SaaS Super Admin Button */}
                 {currentUser.role === 'Super Admin' && (
                     <>
-                        <NavItem page="support-inbox" label="Suporte (Master)" icon={LifebuoyIcon} permission={true} />
+                        <NavItem page="support-inbox" label={t('sidebar.support_master')} icon={LifebuoyIcon} permission={true} />
                         <button
                             type="button"
                             onClick={() => onNavigate('saas-dashboard')}

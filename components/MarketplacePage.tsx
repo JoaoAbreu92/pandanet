@@ -11,25 +11,57 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
     const [category, setCategory] = useState('Eletrônicos');
     const [condition, setCondition] = useState('Bom');
     const [description, setDescription] = useState('');
-    const [image, setImage] = useState<File | null>(null);
+    const [images, setImages] = useState<File[]>([]);
+    const [previews, setPreviews] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const filesArray = Array.from(e.target.files);
+            const combined = [...images, ...filesArray].slice(0, 7);
+            setImages(combined);
+
+            previews.forEach(url => URL.revokeObjectURL(url));
+            const urls = combined.map(file => URL.createObjectURL(file));
+            setPreviews(urls);
+        }
+    };
+
+    const handleRemoveImage = (index: number) => {
+        const combined = images.filter((_, i) => i !== index);
+        setImages(combined);
+
+        previews.forEach(url => URL.revokeObjectURL(url));
+        const urls = combined.map(file => URL.createObjectURL(file));
+        setPreviews(urls);
+    };
+
+    useEffect(() => {
+        return () => {
+            previews.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [previews]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (images.length < 2 || images.length > 7) {
+            alert('Você precisa selecionar entre 2 e 7 fotos para o anúncio.');
+            return;
+        }
         if (!title || !price || !description || !currentUser) return;
 
         setUploading(true);
         try {
             let imageUrls: string[] = [];
 
-            if (image) {
-                const fileExt = image.name.split('.').pop();
+            for (const file of images) {
+                const fileExt = file.name.split('.').pop();
                 const fileName = `${Math.random()}.${fileExt}`;
                 const filePath = `${currentUser.id}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('marketplace-media')
-                    .upload(filePath, image);
+                    .upload(filePath, file);
 
                 if (uploadError) throw uploadError;
 
@@ -37,7 +69,9 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                     .from('marketplace-media')
                     .getPublicUrl(filePath);
 
-                if (data) imageUrls.push(data.publicUrl);
+                if (data?.publicUrl) {
+                    imageUrls.push(data.publicUrl);
+                }
             }
 
             const { error } = await supabase
@@ -69,11 +103,11 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up max-h-[90vh] overflow-y-auto">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                     <XCircleIcon className="w-6 h-6" />
                 </button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">Anunciar Novo Item</h3>
+                <h3 className="text-xl font-bold text-brand-text dark:text-gray-100 mb-4">Anunciar Novo Item</h3>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -87,8 +121,8 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                             <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-brand-text">Condição</label>
-                            <select value={condition} onChange={e => setCondition(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                            <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Condição</label>
+                            <select value={condition} onChange={e => setCondition(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
                                 <option>Novo</option>
                                 <option>Quase Novo</option>
                                 <option>Bom</option>
@@ -114,8 +148,32 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Foto do Item</label>
-                        <input type="file" accept="image/*" onChange={e => setImage(e.target.files ? e.target.files[0] : null)} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">Fotos do Item (Mínimo 2, Máximo 7)</label>
+                        
+                        {previews.length > 0 && (
+                            <div className="grid grid-cols-4 gap-2 mb-3">
+                                {previews.map((url, idx) => (
+                                    <div key={idx} className="relative group rounded border dark:border-slate-700 overflow-hidden h-16 bg-gray-100 dark:bg-slate-900">
+                                        <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveImage(idx)}
+                                            className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                                        >
+                                            <XCircleIcon className="w-5 h-5 text-red-500" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            multiple 
+                            onChange={handleImageChange} 
+                            className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" 
+                        />
                     </div>
 
                     <div className="pt-4 flex justify-end">
@@ -127,7 +185,7 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                 </form>
             </div>
         </div>
-    )
+    );
 }
 
 const ItemDetailModal: React.FC<{
@@ -197,6 +255,233 @@ const ItemDetailModal: React.FC<{
     );
 };
 
+const EditItemModal: React.FC<{
+    item: MarketplaceItem;
+    onClose: () => void;
+    onUpdateItem: () => void;
+    currentUser: any;
+}> = ({ item, onClose, onUpdateItem, currentUser }) => {
+    const [title, setTitle] = useState(item.title);
+    const [price, setPrice] = useState(item.price.toString());
+    const [category, setCategory] = useState(item.category);
+    const [condition, setCondition] = useState(item.condition);
+    const [description, setDescription] = useState(item.description);
+    
+    // Imagens que já existem no banco
+    const [existingImageUrls, setExistingImageUrls] = useState<string[]>(item.imageUrls || []);
+    
+    // Novas imagens adicionadas
+    const [newImages, setNewImages] = useState<File[]>([]);
+    const [newPreviews, setNewPreviews] = useState<string[]>([]);
+    const [updating, setUploading] = useState(false);
+
+    const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const filesArray = Array.from(e.target.files);
+            const totalCount = existingImageUrls.length + newImages.length + filesArray.length;
+            if (totalCount > 7) {
+                alert('O limite máximo de fotos é 7.');
+                return;
+            }
+            const combined = [...newImages, ...filesArray];
+            setNewImages(combined);
+
+            newPreviews.forEach(url => URL.revokeObjectURL(url));
+            const urls = combined.map(file => URL.createObjectURL(file));
+            setNewPreviews(urls);
+        }
+    };
+
+    const handleRemoveNewImage = (index: number) => {
+        const combined = newImages.filter((_, i) => i !== index);
+        setNewImages(combined);
+        
+        newPreviews.forEach(url => URL.revokeObjectURL(url));
+        const urls = combined.map(file => URL.createObjectURL(file));
+        setNewPreviews(urls);
+    };
+
+    const handleRemoveExistingImage = (index: number) => {
+        setExistingImageUrls(prev => prev.filter((_, i) => i !== index));
+    };
+
+    useEffect(() => {
+        return () => {
+            newPreviews.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [newPreviews]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const totalImages = existingImageUrls.length + newImages.length;
+        if (totalImages < 2 || totalImages > 7) {
+            alert('Você precisa fornecer entre 2 e 7 fotos no total.');
+            return;
+        }
+        if (!title || !price || !description || !currentUser) return;
+
+        setUploading(true);
+        try {
+            let finalImageUrls = [...existingImageUrls];
+
+            for (const file of newImages) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `${currentUser.id}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('marketplace-media')
+                    .upload(filePath, file);
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage
+                    .from('marketplace-media')
+                    .getPublicUrl(filePath);
+
+                if (data?.publicUrl) {
+                    finalImageUrls.push(data.publicUrl);
+                }
+            }
+
+            const { error } = await supabase
+                .from('marketplace_items')
+                .update({
+                    title,
+                    price: parseFloat(price),
+                    category,
+                    condition,
+                    description,
+                    image_urls: finalImageUrls
+                })
+                .eq('id', item.id);
+
+            if (error) throw error;
+
+            onUpdateItem();
+            onClose();
+            alert('Item atualizado com sucesso!');
+        } catch (error) {
+            console.error('Error updating item:', error);
+            alert('Erro ao atualizar item. Tente novamente.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up max-h-[90vh] overflow-y-auto">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <XCircleIcon className="w-6 h-6" />
+                </button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-gray-100 mb-4">Editar Anúncio</h3>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Título do Anúncio</label>
+                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Preço (R$)</label>
+                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Condição</label>
+                            <select value={condition} onChange={e => setCondition(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                                <option>Novo</option>
+                                <option>Quase Novo</option>
+                                <option>Bom</option>
+                                <option>Usado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Categoria</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                            <option>Eletrônicos</option>
+                            <option>Móveis</option>
+                            <option>Livros</option>
+                            <option>Roupas</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Descrição</label>
+                        <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required></textarea>
+                    </div>
+
+                    {/* Gerenciamento de Fotos */}
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">Fotos do Anúncio (Mínimo 2, Máximo 7)</label>
+                        
+                        {/* Imagens Existentes */}
+                        {existingImageUrls.length > 0 && (
+                            <div className="mb-4">
+                                <span className="text-xs text-gray-400 dark:text-gray-500 block mb-1">Fotos Existentes:</span>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {existingImageUrls.map((url, idx) => (
+                                        <div key={`exist-${idx}`} className="relative group rounded border dark:border-slate-700 overflow-hidden h-16 bg-gray-100 dark:bg-slate-900">
+                                            <img src={url} alt="existing" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveExistingImage(idx)}
+                                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                                            >
+                                                <XCircleIcon className="w-5 h-5 text-red-500" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Novas Imagens Selecionadas */}
+                        {newPreviews.length > 0 && (
+                            <div className="mb-4">
+                                <span className="text-xs text-gray-400 dark:text-gray-500 block mb-1">Novas Fotos Adicionadas:</span>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {newPreviews.map((url, idx) => (
+                                        <div key={`new-${idx}`} className="relative group rounded border dark:border-slate-700 overflow-hidden h-16 bg-gray-100 dark:bg-slate-900">
+                                            <img src={url} alt="new preview" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveNewImage(idx)}
+                                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                                            >
+                                                <XCircleIcon className="w-5 h-5 text-red-500" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            multiple 
+                            onChange={handleNewImageChange} 
+                            className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" 
+                        />
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <button type="button" onClick={onClose} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-slate-600">Cancelar</button>
+                        <button type="submit" disabled={updating} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
+                            {updating ? 'Salvando...' : 'Salvar Alterações'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const MarketplacePage: React.FC = () => {
     const { currentUser } = useAuth();
     const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -205,6 +490,10 @@ const MarketplacePage: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
     const [isSellModalOpen, setSellModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    
+    // Estados do Menu de Contexto e Edição
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: MarketplaceItem } | null>(null);
+    const [editingItem, setEditingItem] = useState<MarketplaceItem | null>(null);
 
     const fetchItems = async () => {
         if (!currentUser?.company_id) {
@@ -254,6 +543,12 @@ const MarketplacePage: React.FC = () => {
         fetchItems();
     }, [currentUser?.company_id]);
 
+    useEffect(() => {
+        const closeMenu = () => setContextMenu(null);
+        window.addEventListener('click', closeMenu);
+        return () => window.removeEventListener('click', closeMenu);
+    }, []);
+
     const categories = ['Todos', ...new Set(items.map(item => item.category))];
 
     const filteredItems = useMemo(() => {
@@ -288,6 +583,22 @@ const MarketplacePage: React.FC = () => {
         } catch (error) {
             console.error('Error reserving item:', error);
             alert('Erro ao reservar item.');
+        }
+    };
+
+    const handleDeleteItem = async (item: MarketplaceItem) => {
+        if (!window.confirm(`Deseja realmente excluir o anúncio "${item.title}"?`)) return;
+        try {
+            const { error } = await supabase
+                .from('marketplace_items')
+                .delete()
+                .eq('id', item.id);
+            if (error) throw error;
+            alert('Anúncio excluído com sucesso!');
+            fetchItems();
+        } catch (err) {
+            console.error('Erro ao excluir anúncio:', err);
+            alert('Erro ao excluir anúncio. Tente novamente.');
         }
     };
 
@@ -329,7 +640,22 @@ const MarketplacePage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredItems.map(item => (
-                    <div key={item.id} onClick={() => setSelectedItem(item)} className={`rounded-lg shadow-md hover:shadow-xl dark:shadow-none transition-shadow duration-300 cursor-pointer bg-white dark:bg-slate-800 flex flex-col overflow-hidden border-2 ${getStatusBorder(item.status)}`}>
+                    <div 
+                        key={item.id} 
+                        onClick={() => setSelectedItem(item)} 
+                        onContextMenu={(e) => {
+                            if (currentUser && item.listedBy === currentUser.id) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setContextMenu({
+                                    x: e.clientX,
+                                    y: e.clientY,
+                                    item
+                                });
+                            }
+                        }}
+                        className={`rounded-lg shadow-md hover:shadow-xl dark:shadow-none transition-shadow duration-300 cursor-pointer bg-white dark:bg-slate-800 flex flex-col overflow-hidden border-2 ${getStatusBorder(item.status)}`}
+                    >
                         <div className="relative">
                             {item.imageUrls.length > 0 ? (
                                 <img src={item.imageUrls[0]} alt={item.title} className="h-48 w-full object-cover" />
@@ -356,9 +682,46 @@ const MarketplacePage: React.FC = () => {
             </div>
             {filteredItems.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-12">Nenhum item encontrado. Tente ajustar sua busca.</p>}
 
+            {/* Menu de Contexto Customizado */}
+            {contextMenu && (
+                <div
+                    className="fixed z-50 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 py-1 w-48 text-left"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={() => {
+                            setEditingItem(contextMenu.item);
+                            setContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center"
+                    >
+                        Editar Anúncio
+                    </button>
+                    <button
+                        onClick={() => {
+                            handleDeleteItem(contextMenu.item);
+                            setContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center"
+                    >
+                        Excluir Anúncio
+                    </button>
+                </div>
+            )}
+
             {selectedItem && currentUser && <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onReserve={handleReserveItem} currentUserId={currentUser.id} />}
 
             {isSellModalOpen && <SellItemModal onClose={() => setSellModalOpen(false)} onAddItem={fetchItems} currentUser={currentUser} />}
+
+            {editingItem && (
+                <EditItemModal
+                    item={editingItem}
+                    onClose={() => setEditingItem(null)}
+                    onUpdateItem={fetchItems}
+                    currentUser={currentUser}
+                />
+            )}
         </div>
     );
 };

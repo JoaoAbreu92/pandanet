@@ -56,14 +56,14 @@ const MONTH_THEMES: Record<number, { name: string, color: string, bg: string, bo
     1: { name: 'Fev', color: 'bg-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-200 dark:border-purple-500/30', text: 'text-purple-700 dark:text-purple-300', campaign: 'Roxo', phrase: 'Conscientização sobre Lúpus, Alzheimer e Fibromialgia.' },
     2: { name: 'Mar', color: 'bg-fuchsia-500', bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/10', border: 'border-fuchsia-200 dark:border-fuchsia-500/30', text: 'text-fuchsia-700 dark:text-fuchsia-300', campaign: 'Lilás', phrase: 'Prevenção do câncer de colo de útero.' },
     3: { name: 'Abr', color: 'bg-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-200 dark:border-blue-500/30', text: 'text-blue-700 dark:text-blue-300', campaign: 'Azul', phrase: 'Conscientização sobre o Autismo.' },
-    4: { name: 'Mai', color: 'bg-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/10', border: 'border-emerald-200 dark:border-emerald-500/30', text: 'text-emerald-700 dark:text-emerald-300', campaign: 'Amarelo', phrase: 'Atenção pela vida no trânsito.' },
+    4: { name: 'Mai', color: 'bg-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-amber-200 dark:border-amber-500/30', text: 'text-amber-700 dark:text-amber-300', campaign: 'Amarelo', phrase: 'Atenção pela vida no trânsito.' },
     5: { name: 'Jun', color: 'bg-red-500', bg: 'bg-red-50 dark:bg-red-900/10', border: 'border-red-200 dark:border-red-500/30', text: 'text-red-700 dark:text-red-300', campaign: 'Vermelho', phrase: 'Doe sangue, doe vida.' },
     6: { name: 'Jul', color: 'bg-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-amber-200 dark:border-amber-500/30', text: 'text-amber-700 dark:text-amber-300', campaign: 'Amarelo', phrase: 'Combate às hepatites virais.' },
     7: { name: 'Ago', color: 'bg-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-200 dark:border-yellow-500/30', text: 'text-yellow-700 dark:text-yellow-300', campaign: 'Dourado', phrase: 'Amamentar é a base da vida.' },
     8: { name: 'Set', color: 'bg-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-200 dark:border-yellow-500/30', text: 'text-yellow-700 dark:text-yellow-300', campaign: 'Amarelo', phrase: 'Falar é a melhor solução (Prevenção ao Suicídio).' },
     9: { name: 'Out', color: 'bg-pink-400', bg: 'bg-pink-50 dark:bg-pink-900/10', border: 'border-pink-200 dark:border-pink-500/30', text: 'text-pink-700 dark:text-pink-300', campaign: 'Rosa', phrase: 'Um toque de cuidado (Pela prevenção do câncer de mama).' },
     10: { name: 'Nov', color: 'bg-sky-600', bg: 'bg-sky-50 dark:bg-sky-900/10', border: 'border-sky-200 dark:border-sky-500/30', text: 'text-sky-700 dark:text-sky-300', campaign: 'Azul', phrase: 'Saúde também é coisa de homem.' },
-    11: { name: 'Dez', color: 'bg-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/10', border: 'border-rose-200 dark:border-rose-500/30', text: 'text-rose-700 dark:text-rose-300', campaign: 'Laranja', phrase: 'Prevenção do câncer de pele.' },
+    11: { name: 'Dez', color: 'bg-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-200 dark:border-orange-500/30', text: 'text-orange-700 dark:text-orange-300', campaign: 'Laranja', phrase: 'Prevenção do câncer de pele.' },
 };
 
 interface CalendarPageProps {
@@ -440,17 +440,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 <div className="grid grid-cols-7">
                     {days.map((day, idx) => {
                         const isToday = day && day.toDateString() === new Date().toDateString();
+                        const isPast = day && (() => {
+                            const today = new Date();
+                            today.setHours(0,0,0,0);
+                            const checkDay = new Date(day);
+                            checkDay.setHours(0,0,0,0);
+                            return checkDay.getTime() < today.getTime();
+                        })();
                         const evs = day ? allCalendarEvents.filter(e => {
                             const d = new Date(e.date);
                             return d.getUTCFullYear() === day.getFullYear() && d.getUTCMonth() === day.getMonth() && d.getUTCDate() === day.getDate();
                         }) : [];
 
                         return (
-                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer' : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
+                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? (isPast ? 'bg-slate-50/70 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/60 cursor-pointer' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer') : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
                                   onClick={() => { if (day) { setSelectedDayOptionsDate(day); setDayOptionsOpen(true); } }}>
                                 {day && (
                                     <>
                                          <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
+                                         {isPast && (
+                                             <span className="text-[10px] text-gray-400 dark:text-gray-600 absolute top-2 right-2 select-none" title="Dia passado">✕</span>
+                                         )}
                                          {(() => {
                                              const hasPendingInvite = evs.some(e => 
                                                  e.invites?.some(inv => inv.user_id === currentUser?.id && inv.status === 'pending')
