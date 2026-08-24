@@ -1884,9 +1884,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                             }
                         }
 
-                        // Inserir conversa como fechada por padrão, exceto se houver mensagens não lidas
+                        // Inserir conversa como fechada por padrão, exceto se houver mensagens não lidas ou se for sync por data (backup)
                         const hasUnread = (chat.unreadCount || 0) > 0;
-                        const status = hasUnread ? 'aberto' : 'fechado';
+                        const status = (startDate && endDate) ? 'aberto' : (hasUnread ? 'aberto' : 'fechado');
 
                         const { data: newConv, error: insertErr } = await supabase
                             .from('whatsapp_conversations')

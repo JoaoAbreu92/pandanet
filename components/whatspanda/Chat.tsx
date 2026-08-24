@@ -1703,7 +1703,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       const proxyUrl = await getProxyUrl(rawUrl, true);
       if (!proxyUrl) throw new Error('Sessão expirada');
 
-      // Fazer fetch do arquivo através do proxy
+      // Se estiver rodando dentro do APK (Capacitor/WebView), abrir no navegador do sistema para download nativo
+      const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+      if (isCapacitor) {
+        window.open(proxyUrl, '_system');
+        return;
+      }
+
+      // Fazer fetch do arquivo através do proxy (PC/Navegador)
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error(`Falha no download (Status: ${response.status})`);
       
