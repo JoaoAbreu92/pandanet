@@ -352,7 +352,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_marital_status: (userData as any).marital_status || null,
                     p_education_level: (userData as any).education_level || null,
                     p_can_nudge: !!(userData as any).can_nudge,
-                    p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30
+                    p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30
                 });
 
                 if (error) {
@@ -385,7 +385,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_rg: (userData as any).rg || null,
                         p_cpf: (userData as any).cpf || null,
                         p_can_nudge: !!(userData as any).can_nudge,
-                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30
+                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30
                     });
 
                     if (error) {

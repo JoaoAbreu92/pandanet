@@ -384,7 +384,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
         
         // Dynamic cooldown from profile (in seconds), fallback to 30s
-        const cooldownSeconds = profile?.nudge_cooldown || 30;
+        const cooldownSeconds = profile?.nudge_cooldown ?? 30;
         const cooldownMs = cooldownSeconds * 1000;
 
         if (now - lastNudge < cooldownMs) {
@@ -1781,7 +1781,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                         </button>
 
                                             {/* Nudge Button */}
-                                            {(profile?.can_nudge || (profile as any)?.isAdmin || (profile as any)?.isCompanyAdmin) && (
+                                            {profile?.can_nudge && (
                                                 <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
                                                     <button
                                                         type="button"

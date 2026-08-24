@@ -109,7 +109,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       
       Object.keys(nudgeCooldowns).forEach(convId => {
         const lastNudge = nudgeCooldowns[convId];
-        const cooldownSeconds = activeProfile?.nudge_cooldown || 30;
+        const cooldownSeconds = activeProfile?.nudge_cooldown ?? 30;
         const cooldownMs = cooldownSeconds * 1000;
         const elapsed = now - lastNudge;
 
@@ -130,7 +130,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     const now = Date.now();
     const lastNudge = nudgeCooldowns[selectedConversation.id] || 0;
-    const cooldownSeconds = activeProfile?.nudge_cooldown || 30;
+    const cooldownSeconds = activeProfile?.nudge_cooldown ?? 30;
     const cooldownMs = cooldownSeconds * 1000;
 
     if (now - lastNudge < cooldownMs) return;
@@ -1524,7 +1524,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
 
                 {/* Botão Chamar Atenção (Nudge) */}
-                {(activeProfile?.can_nudge || isAdmin) && (
+                {activeProfile?.can_nudge && (
                   <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
                     <button
                       type="button"
