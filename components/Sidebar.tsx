@@ -48,9 +48,10 @@ interface SidebarProps {
     isImpersonating: boolean;
     isMasterAdmin?: boolean; // New prop
     customFeatures?: Record<string, boolean>;
+    pageContext?: any;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures, pageContext }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false, agenda: false, newAgenda: false, reservations: false });
     const navRef = useRef<HTMLDivElement>(null);
@@ -127,6 +128,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (!isAdmin && !hasPermission) {
             return null;
         }
+
+        const isActive = currentPage === page && (
+            !context
+                ? true
+                : (pageContext && pageContext.tab
+                    ? pageContext.tab === context.tab
+                    : (page === 'agenda' ? context.tab === 'visits' : page === 'reservas' ? context.tab === 'rooms' : true)
+                  )
+        );
+
         // Se a feature não foi aprovada pelo SaaS, não exibir
         if (featureId && customFeatures) {
             const feat = customFeatures[featureId] as any;
@@ -173,24 +184,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 type="button"
                 onClick={() => onNavigate(page, context)}
                 className={`w-full flex items-center p-2.5 md:p-3 rounded-xl transition-all duration-300 relative group 
-                    ${currentPage === page
+                    ${isActive
                         ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30 dark:shadow-brand-primary/10 scale-[1.02] border border-white/10'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
                     } ${isOpen ? '' : 'justify-center'}`}
                 title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
             >
                 <div className="relative">
-                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
+                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
                     {badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
                             {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                     )}
                 </div>
-                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${currentPage === page ? 'font-semibold' : ''}`}>{label}</span>}
+                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${isActive ? 'font-semibold' : ''}`}>{label}</span>}
 
                 {/* Visual indicator for active item */}
-                {currentPage === page && (
+                {isActive && (
                     <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                 )}
             </button>

@@ -21,7 +21,8 @@ import {
     ArrowUturnLeftIcon,
     TrashIcon,
     PencilIcon,
-    ShareIcon
+    ShareIcon,
+    PlayIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory, Page } from '../types';
 import { supabase } from '../supabaseClient';
@@ -117,6 +118,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             }
         }
     }, [initialContext]);
+
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [personalTasks, setPersonalTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -129,6 +131,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [declineReason, setDeclineReason] = useState('');
     const [selectedDayOptionsDate, setSelectedDayOptionsDate] = useState<Date | null>(null);
     const [isDayOptionsOpen, setDayOptionsOpen] = useState(false);
+
+    useEffect(() => {
+        if (initialContext?.eventId && events.length > 0) {
+            const matchedEvent = events.find(event => String(event.id) === String(initialContext.eventId));
+            if (matchedEvent) {
+                setSelectedEvent(matchedEvent);
+                setDetailModalOpen(true);
+            }
+        }
+    }, [events, initialContext]);
     
     // Sharing states
     const [sharedWithMe, setSharedWithMe] = useState<any[]>([]);
@@ -1871,6 +1883,48 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 >
                                     <PlusIcon className="w-4 h-4" />
                                     <span>Agendar Novo Evento</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const year = selectedDayOptionsDate.getFullYear();
+                                        const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
+                                        const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
+                                        const formattedDate = `${year}-${month}-${day}`;
+                                        onNavigate?.('agenda', { tab: 'visits', date: formattedDate });
+                                        setDayOptionsOpen(false);
+                                    }}
+                                    className="w-full bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-950/20 dark:hover:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border border-yellow-200 dark:border-yellow-900/30 flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <UsersIcon className="w-4 h-4" />
+                                    <span>Agendar visita</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const year = selectedDayOptionsDate.getFullYear();
+                                        const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
+                                        const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
+                                        const formattedDate = `${year}-${month}-${day}`;
+                                        onNavigate?.('agenda', { tab: 'trainings', date: formattedDate });
+                                        setDayOptionsOpen(false);
+                                    }}
+                                    className="w-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <PlayIcon className="w-4 h-4" />
+                                    <span>Agendar treinamento</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const year = selectedDayOptionsDate.getFullYear();
+                                        const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
+                                        const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
+                                        const formattedDate = `${year}-${month}-${day}`;
+                                        onNavigate?.('agenda', { tab: 'meetings', date: formattedDate });
+                                        setDayOptionsOpen(false);
+                                    }}
+                                    className="w-full bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-950/20 dark:hover:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border border-yellow-200 dark:border-yellow-900/30 flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <HeroUserGroupIcon className="w-4 h-4" />
+                                    <span>Agendar reunião</span>
                                 </button>
                                 <button onClick={() => setDayOptionsOpen(false)} className="w-full py-3 text-sm font-black text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300">
                                     CANCELAR

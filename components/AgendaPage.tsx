@@ -36,9 +36,10 @@ interface Visit {
 
 interface AgendaPageProps {
     initialTab?: 'visits' | 'meetings' | 'trainings';
+    initialDate?: string;
 }
 
-const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
+const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     const { currentUser } = useAuth();
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<'visits' | 'meetings' | 'trainings'>(initialTab || 'visits');
@@ -53,7 +54,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
     const [visitorName, setVisitorName] = useState(currentUser?.full_name || currentUser?.name || '');
     const [clientName, setClientName] = useState('');
     const [visitDescription, setVisitDescription] = useState('');
-    const [visitDate, setVisitDate] = useState(new Date().toISOString().split('T')[0]);
+    const [visitDate, setVisitDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
     const [visitTime, setVisitTime] = useState('09:00');
     const [visitDuration, setVisitDuration] = useState('1 hora');
 
@@ -64,7 +65,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
 
     // Meeting Form
     const [meetingTitle, setMeetingTitle] = useState('');
-    const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [meetingDate, setMeetingDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
     const [meetingTime, setMeetingTime] = useState('10:00');
     const [meetingDuration, setMeetingDuration] = useState('1 hora');
     const [meetingLocation, setMeetingLocation] = useState('');
@@ -73,7 +74,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
 
     // Training Form
     const [trainingTitle, setTrainingTitle] = useState('');
-    const [trainingDate, setTrainingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [trainingDate, setTrainingDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
     const [trainingTime, setTrainingTime] = useState('14:00');
     const [trainingDuration, setTrainingDuration] = useState('2 horas');
     const [trainingType, setTrainingType] = useState('online');
@@ -161,17 +162,19 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
             const endHour = (Number(hourParts[0]) + 1).toString().padStart(2, '0');
             const endTimeCalculated = `${endHour}:00`;
 
+            const combinedStartTime = new Date(`${visitDate}T${visitTime}:00Z`).toISOString();
+            const combinedEndTime = new Date(`${visitDate}T${endTimeCalculated}:00Z`).toISOString();
+
             const eventPayload = {
                 company_id: currentUser.company_id,
                 creator_id: currentUser.id,
                 title: `Visita: ${visitorName} em ${clientName}`,
-                description: visitDescription || 'Visita comercial agendada.',
+                description: `${visitDescription || 'Visita comercial agendada.'}\n\nVisitante: ${visitorName}\nCliente: ${clientName}`,
                 date: visitDate,
-                start_time: visitTime,
-                end_time: endTimeCalculated,
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
                 category: 'Visita', // Cor amarela
                 location: clientName,
-                notes: `Visitante: ${visitorName}\nCliente: ${clientName}`,
                 is_private: false
             };
 
@@ -233,17 +236,19 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
             const endHour = (Number(hourParts[0]) + 1).toString().padStart(2, '0');
             const endTimeCalculated = `${endHour}:00`;
 
+            const combinedStartTime = new Date(`${meetingDate}T${meetingTime}:00Z`).toISOString();
+            const combinedEndTime = new Date(`${meetingDate}T${endTimeCalculated}:00Z`).toISOString();
+
             const eventPayload = {
                 company_id: currentUser.company_id,
                 creator_id: currentUser.id,
                 title: meetingTitle,
                 description: meetingNotes || 'Reunião comercial.',
                 date: meetingDate,
-                start_time: meetingTime,
-                end_time: endTimeCalculated,
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
                 category: 'Reunião', // Cor amarela
                 location: meetingLocation || 'Sala Virtual / Presencial',
-                notes: meetingNotes,
                 is_private: meetingIsPrivate
             };
 
@@ -275,17 +280,19 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab }) => {
             const endHour = (Number(hourParts[0]) + 2).toString().padStart(2, '0');
             const endTimeCalculated = `${endHour}:00`;
 
+            const combinedStartTime = new Date(`${trainingDate}T${trainingTime}:00Z`).toISOString();
+            const combinedEndTime = new Date(`${trainingDate}T${endTimeCalculated}:00Z`).toISOString();
+
             const eventPayload = {
                 company_id: currentUser.company_id,
                 creator_id: currentUser.id,
                 title: `Treinamento: ${trainingTitle}`,
-                description: `Tipo: ${trainingType.toUpperCase()}. ${trainingNotes || ''}`,
+                description: `Tipo: ${trainingType.toUpperCase()}.\nObservações: ${trainingNotes || 'Nenhuma'}`,
                 date: trainingDate,
-                start_time: trainingTime,
-                end_time: endTimeCalculated,
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
                 category: 'Treinamento', // Cor azul
                 location: trainingType === 'online' ? 'Plataforma Online' : 'Auditório da Empresa',
-                notes: `Tipo de Treinamento: ${trainingType}\nObservações: ${trainingNotes}`,
                 is_private: false
             };
 

@@ -12,9 +12,9 @@
 
   body {
     color: #1e293b;
-    background-color: #f8fafc;
-    background-image: radial-gradient(at 0% 0%, rgba(248, 250, 252, 1) 0, transparent 50%), 
-                      radial-gradient(at 100% 0%, rgba(241, 245, 249, 1) 0, transparent 50%);
+    background-color: #ecf0f3;
+    background-image: radial-gradient(at 0% 0%, rgba(236, 240, 243, 1) 0, transparent 50%), 
+                      radial-gradient(at 100% 0%, rgba(226, 232, 240, 1) 0, transparent 50%);
     background-attachment: fixed;
     min-height: 100vh;
     font-family: var(--font-sans);
@@ -37,7 +37,7 @@
     background-color: #020617; /* Deep Slate 950 */
     background-image: radial-gradient(at 0% 0%, rgba(15, 23, 42, 1) 0, transparent 50%), 
                       radial-gradient(at 100% 0%, rgba(2, 6, 23, 1) 0, transparent 50%);
-    color: #f1f5f9;
+    color: #f8fafc;
   }
 
   /* Global smooth transitions */
@@ -347,33 +347,33 @@
   .dark .text-gray-500,
   .dark .text-slate-400,
   .dark .text-gray-400 {
-    color: #94a3b8 !important; /* Brilho slate-400 */
+    color: #cbd5e1 !important; /* Brilho slate-350 */
   }
 
   .dark .text-slate-650,
   .dark .text-slate-600,
   .dark .text-gray-600 {
-    color: #cbd5e1 !important; /* Brilho slate-300 */
+    color: #f1f5f9 !important; /* Brilho slate-200 */
   }
 
   .dark .text-slate-700,
   .dark .text-gray-700,
   .dark .text-slate-800,
   .dark .text-gray-800 {
-    color: #f1f5f9 !important; /* Quase branco */
+    color: #ffffff !important; /* Branco puro */
   }
 
   .dark input,
   .dark select,
   .dark textarea {
-    background-color: #0f172a !important;
-    color: #f1f5f9 !important;
-    border-color: #334155 !important;
+    background-color: #1e293b !important; /* Cinza escuro (Slate 800) */
+    color: #ffffff !important; /* Fontes ao digitar brancas */
+    border-color: #475569 !important;
   }
 
   .dark input::placeholder,
   .dark textarea::placeholder {
-    color: #64748b !important;
+    color: #94a3b8 !important;
   }
 
   .dark .bg-gray-50,

@@ -140,17 +140,20 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
             const endHour = (Number(startTime.split(':')[0]) + (durationUnit === 'hours' ? Number(duration) : 1)).toString().padStart(2, '0');
             const endTimeCalculated = `${endHour}:00`;
 
+            const combinedStartTime = new Date(`${startDate}T${startTime}:00Z`).toISOString();
+            const calculatedEndTime = durationUnit === 'hours' ? endTimeCalculated : '18:00';
+            const combinedEndTime = new Date(`${startDate}T${calculatedEndTime}:00Z`).toISOString();
+
             const eventPayload = {
                 company_id: currentUser.company_id,
                 creator_id: currentUser.id,
                 title: `Reserva: ${selectedItem.name} (${solicitante})`,
                 description: `Reserva efetuada pelo colaborador ${solicitante}. Motivo: ${motivo || 'Não informado'}. Duração: ${durationStr}. ${selectedItem.type === 'room' ? `Acessórios: ${selectedAccessories.join(', ') || 'Nenhum'}` : ''}`,
                 date: startDate,
-                start_time: startTime,
-                end_time: durationUnit === 'hours' ? endTimeCalculated : '18:00',
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
                 category: 'Reserva', // Para ter a cor verde
                 location: selectedItem.type === 'room' ? selectedItem.name : 'Veículo Corporativo',
-                notes: motivo,
                 is_private: false
             };
 

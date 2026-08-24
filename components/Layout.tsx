@@ -19,6 +19,7 @@ interface LayoutProps {
     impersonatedUser?: Employee | null;
     onNavigate: (page: Page, context?: any) => void;
     currentPage: Page;
+    pageContext?: any;
     onLogout: () => void;
     onEndImpersonation: () => void;
 
@@ -51,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({
     impersonatedUser,
     onNavigate,
     currentPage,
+    pageContext,
     onLogout,
     onEndImpersonation,
     notifications,
@@ -145,11 +147,12 @@ const Layout: React.FC<LayoutProps> = ({
                 >
                     <Sidebar
                         isOpen={isSidebarOpen}
-                        onNavigate={(page) => {
-                            onNavigate(page);
+                        onNavigate={(page, context) => {
+                            onNavigate(page, context);
                             if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
                         }}
                         currentPage={currentPage}
+                        pageContext={pageContext}
                         currentUser={currentUser}
                         companyName={companySettings.companyName}
                         companyLogo={companySettings.logoUrl}

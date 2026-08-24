@@ -67,7 +67,7 @@ const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ onNavigate }) => {
       title="Próximos Eventos" 
       headerAction={
         <button 
-          onClick={() => onNavigate?.('events')} 
+          onClick={() => onNavigate?.('calendar')} 
           className="text-sm font-medium text-brand-primary hover:underline"
         >
           Ver todos
@@ -83,7 +83,7 @@ const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ onNavigate }) => {
             return (
               <div 
                 key={event.id} 
-                onClick={() => onNavigate?.('events', { eventId: event.id })}
+                onClick={() => onNavigate?.('calendar', { selectedDate: event.date, eventId: event.id })}
                 className="flex items-center space-x-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 p-2 rounded-2xl transition-all active:scale-[0.99]"
               >
                 <div className="flex-shrink-0 text-center bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl min-w-[60px] border dark:border-emerald-900/20">

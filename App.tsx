@@ -954,7 +954,7 @@ const AppContent: React.FC = () => {
                 if (agendaFeat === false || agendaFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agenda está desativado para a sua empresa.</div>;
                 }
-                return <AgendaPage initialTab={pageContext?.tab} />;
+                return <AgendaPage initialTab={pageContext?.tab} initialDate={pageContext?.date} />;
             }
             case 'reservas': {
                 if (!canAccess('viewReservations')) return null;
@@ -1072,6 +1072,7 @@ const AppContent: React.FC = () => {
                 impersonatedCompanyName={impersonatedCompany?.name}
                 onNavigate={handleNavigate}
                 currentPage={currentPage}
+                pageContext={pageContext}
                 onLogout={handleLogout}
                 onEndImpersonation={handleImpersonateEnd}
                 notifications={notifications}
