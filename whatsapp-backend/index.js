@@ -795,11 +795,11 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             if (sendReq.ok && !sendRes?.error) sendOk = true;
 
         } else {
-            // Envia no formato padrão suportado por Evolution API v1.x (sem fallbacks cegos que causam reenvio duplo)
+            // Envia no formato padrão suportado pela Evolution API da VPS (textMessage)
             const sendReq = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phoneNumber, text: message })
+                body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
             });
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta sendText (${sendReq.status}):`, JSON.stringify(sendRes));
@@ -1281,7 +1281,7 @@ async function dispatchTextEvolution(instanceName, phoneNumber, text) {
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 number: cleanNumber,
-                text: text
+                textMessage: { text: text }
             })
         });
         try { sendRes = await res.json(); } catch(e) { sendRes = {}; }
@@ -1728,13 +1728,45 @@ async function fetchGroupInfo(instanceName, groupJid) {
  */
 async function checkBusinessHours(companyId, connectionId, queueId = null) {
     const now = new Date();
-    // Converter para fuso de Brasília (UTC-3)
-    const spOffset = -3;
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const spTime = new Date(utc + (3600000 * spOffset));
     
-    const currentDayStr = spTime.getDay().toString(); // "0" a "6"
-    const currentHourStr = spTime.toTimeString().slice(0, 5); // "HH:MM"
+    // Obtém partes da data formatadas no fuso de São Paulo (Brasília)
+    let parts;
+    try {
+        parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hour12: false
+        }).formatToParts(now).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    } catch (err) {
+        console.error('[EXPEDIENTE] Erro ao formatar data/fuso no checkBusinessHours:', err.message);
+        // Fallback robusto
+        parts = {
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+            day: now.getDate(),
+            hour: now.getHours(),
+            minute: now.getMinutes(),
+            second: now.getSeconds()
+        };
+    }
+
+    // Cria a data correspondente ao fuso de SP
+    const spTime = new Date(
+        parseInt(parts.year),
+        parseInt(parts.month) - 1,
+        parseInt(parts.day),
+        parseInt(parts.hour),
+        parseInt(parts.minute),
+        parseInt(parts.second)
+    );
+
+    const currentDayStr = spTime.getDay().toString(); // "0" (domingo) a "6" (sábado)
+    const currentHourStr = `${parts.hour.padStart(2, '0')}:${parts.minute.padStart(2, '0')}`;
 
     // 1. Buscar configurações da conexão do WhatsApp
     const { data: settings } = await supabase
