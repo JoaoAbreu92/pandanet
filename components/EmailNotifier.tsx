@@ -32,9 +32,17 @@ const EmailNotifier: React.FC = () => {
                 `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
 
             try {
+                const session = await supabase.auth.getSession();
+                const token = session.data.session?.access_token;
+
+                if (!token) return;
+
                 const response = await fetch(`${EMAIL_SERVER_URL}/fetch`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         config: settings,
                         path: 'INBOX',

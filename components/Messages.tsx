@@ -1017,6 +1017,31 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         }
     };
 
+    const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!window.confirm("Deseja apagar esta conversa da sua lista?")) return;
+
+        try {
+            // Force delete the participant connection, letting RLS or cascades handle it
+            const { error } = await supabase
+                .from('conversation_participants')
+                .delete()
+                .eq('conversation_id', convId)
+                .eq('user_id', currentUser.id);
+
+            if (error) throw error;
+
+            if (selectedConversationId === convId) setSelectedConversationId(null);
+
+            // Remove locally instantly
+            setConversations(prev => prev.filter(c => c.id !== convId));
+
+        } catch (err: any) {
+            console.error("Erro deletar:", err);
+            alert("Erro ao apagar conversa: " + (err.message || "Você não tem permissão"));
+        }
+    };
+
     // Lógica de Notas Adesivas
     const handleAddNote = () => {
         if (!newNoteText.trim()) return;
@@ -1269,7 +1294,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             }).map(conv => {
                                 // Online status logic would require presence tracking (realtime), omitted for basic scope
                                 return (
-                                    <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
+                                    <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group">
                                         <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 premium-card ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
                                             <div className="relative">
                                                 <img
@@ -1288,7 +1313,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-center">
                                                     <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
-                                                    <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
+                                                    <div className="flex items-center gap-1">
+                                                        <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
+                                                        <button
+                                                            onClick={(e) => handleDeleteConversation(conv.id, e)}
+                                                            className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
+                                                            title="Apagar conversa"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <p className="text-sm text-brand-subtle-text truncate">{conv.lastMessage}</p>
                                             </div>

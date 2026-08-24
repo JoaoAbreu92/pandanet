@@ -25,6 +25,8 @@ import {
     ExclamationTriangleIcon, XMarkIcon,
     PaperClipIcon, ArrowDownTrayIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
+import { useToast } from './ToastContext';
+import ConfirmModal from './ui/ConfirmModal';
 
 // --- Types ---
 
@@ -77,6 +79,29 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const { t, language } = useLanguage();
+    const { showToast } = useToast();
+
+    // --- State: Confirm Modal ---
+    const [confirmState, setConfirmState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        type?: 'danger' | 'warning' | 'info' | 'success';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        type: 'warning'
+    });
+
+    const openConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' | 'success' = 'warning') => {
+        setConfirmState({ isOpen: true, title, message, onConfirm, type });
+    };
+
+    const closeConfirm = () => setConfirmState(prev => ({ ...prev, isOpen: false }));
+
     // --- State: Navigation & Layout ---
     const [view, setView] = useState<'inbox' | 'compose' | 'settings' | 'read'>('inbox');
     const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
@@ -216,9 +241,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const saveSettings = async () => {
         const payload = { user_id: currentUser.id, ...settings };
         const { error } = await supabase.from('email_settings').upsert(payload, { onConflict: 'user_id' });
-        if (error) alert('Erro ao salvar: ' + error.message);
-        else {
-            alert('Configurações salvas!');
+        if (error) {
+            showToast('Erro ao salvar as configurações: ' + error.message, 'error');
+        } else {
+            showToast('Configurações salvas com sucesso!', 'success');
             setView('inbox');
             setSavedImapUser(settings.imap_user); // Update savedImapUser so polling uses new config
             fetchEmails(true); // Force refresh with new settings
@@ -237,7 +263,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
         for (const file of files) {
             if (file.size > MAX_ATTACHMENT_SIZE) {
-                alert(`O arquivo "${file.name}" excede o limite de 20MB e não será adicionado.`);
+                showToast(`O arquivo "${file.name}" excede o limite de 20MB e não será adicionado.`, 'warning');
                 continue;
             }
 
@@ -323,7 +349,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             if (email && !(email.flags || []).includes('\\Seen')) {
                 toggleFlag(email, '\\Seen', true);
             } else if (email) {
-                // If it was already seen, still ensure cache is fresh
+                // If it was already seen, still ensure cache is fresh with new text/html bodies
                 const cacheKey = `${currentUser.id}_${folder}_${page}`;
                 if (emailCache[cacheKey]) {
                     emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
@@ -370,7 +396,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (err: any) {
-            alert('Erro ao baixar: ' + err.message);
+            showToast('Erro ao baixar anexo: ' + err.message, 'error');
         }
     };
     const toggleFlag = async (email: EmailMessage, flag: string, add: boolean) => {
@@ -394,9 +420,19 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             else if (!add && !wasUnread) setUnseenCount(prev => prev + 1);
         }
 
-        // Invalidate cache for current folder so next switch-away reloads fresh
+        // Update the cache directly so returning to the folder shows correct read status without waiting for network
         const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
-        delete emailCache[cacheKey];
+        if (emailCache[cacheKey]) {
+            emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
+                e.uid === email.uid ? { ...e, flags: newFlags } : e
+            );
+            // Optionally update unseen count in cache
+            if (currentFolder === 'INBOX' && flag === '\\Seen') {
+                const wasUnread = !(email.flags || []).includes('\\Seen');
+                if (add && wasUnread) emailCache[cacheKey].unseen = Math.max(0, emailCache[cacheKey].unseen - 1);
+                else if (!add && !wasUnread) emailCache[cacheKey].unseen += 1;
+            }
+        }
 
         // Call Server
         await callEmailServer('flags', {
@@ -440,9 +476,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             path: folderName
         });
 
-        if (error) alert('Erro ao criar pasta: ' + error.message);
-        else {
-            alert('Pasta criada com sucesso!');
+        if (error) {
+            showToast('Erro ao criar pasta: ' + error.message, 'error');
+        } else {
+            showToast('Pasta criada com sucesso!', 'success');
             fetchFolders();
         }
     };
@@ -457,7 +494,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             // Silent fail for UI mostly, but log it. 
             // If it's 404, it means backend is old.
             if (error?.message?.includes('404') || error?.message?.includes('Cannot POST')) {
-                alert("Aviso: As pastas não carregaram. O servidor de e-mail parece desatualizado. Por favor, reinicie o backend (server).");
+                showToast("Aviso: As pastas não carregaram. O servidor de e-mail parece desatualizado. Por favor, reinicie o backend (server).", "warning");
             }
         }
     };
@@ -475,8 +512,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             color: newTagColor
         }).select();
 
-        if (error) alert('Erro ao criar tag: ' + error.message);
-        else if (data) {
+        if (error) {
+            showToast('Erro ao criar tag: ' + error.message, 'error');
+        } else if (data) {
             setAvailableTags(prev => [...prev, data[0]]);
             setNewTagLabel('');
             // Optional: Close modal if intended, but keeping open for multiple adds
@@ -484,12 +522,21 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const deleteTag = async (tagId: string) => {
-        if (!confirm('Excluir esta tag?')) return;
-        const { error } = await supabase.from('email_tags').delete().eq('id', tagId);
-        if (error) alert('Erro ao excluir: ' + error.message);
-        else {
-            setAvailableTags(prev => prev.filter(t => t.id !== tagId));
-        }
+        openConfirm(
+            'Excluir Tag',
+            'Tem certeza que deseja excluir esta tag?',
+            async () => {
+                closeConfirm();
+                const { error } = await supabase.from('email_tags').delete().eq('id', tagId);
+                if (error) {
+                    showToast('Erro ao excluir tag: ' + error.message, 'error');
+                } else {
+                    setAvailableTags(prev => prev.filter(t => t.id !== tagId));
+                    showToast('Tag excluída com sucesso.', 'success');
+                }
+            },
+            'danger'
+        );
     };
 
     const moveEmail = async (emailUids: string[], toFolder: string) => {
@@ -511,7 +558,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             // If background refreshing is on, it will eventually re-fetch
         } catch (err: any) {
-            alert('Erro ao mover: ' + err.message);
+            showToast('Erro ao mover e-mail: ' + err.message, 'error');
         }
     };
 
@@ -534,35 +581,42 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const deleteEmail = async (email: EmailMessage) => {
-        if (!confirm('Tem certeza que deseja mover este e-mail para a lixeira?')) return;
+        openConfirm(
+            'Lixeira',
+            'Tem certeza que deseja mover este e-mail para a lixeira?',
+            async () => {
+                closeConfirm();
 
-        // Optimistic remove
-        setEmails(prev => prev.filter(e => e.uid !== email.uid));
-        if (selectedEmail?.uid === email.uid) {
-            setSelectedEmail(null);
-            setView('inbox');
-        }
+                // Optimistic remove
+                setEmails(prev => prev.filter(e => e.uid !== email.uid));
+                if (selectedEmail?.uid === email.uid) {
+                    setSelectedEmail(null);
+                    setView('inbox');
+                }
 
-        // Detect Trash Folder
-        // 1. Look for specialUse: \Trash
-        // 2. Look for common names
-        const trashFolderObj = folders.find((f: any) => f.specialUse === '\\Trash') ||
-            folders.find((f: any) => ['Trash', 'Bin', 'Lixeira', 'Deleted', 'Itens Excluídos'].includes(f.path));
+                // Detect Trash Folder
+                const trashFolderObj = folders.find((f: any) => f.specialUse === '\\Trash') ||
+                    folders.find((f: any) => ['Trash', 'Bin', 'Lixeira', 'Deleted', 'Itens Excluídos'].includes(f.path));
 
-        const trashPath = trashFolderObj ? trashFolderObj.path : 'Trash';
+                const trashPath = trashFolderObj ? trashFolderObj.path : 'Trash';
 
-        const { error } = await callEmailServer('move', {
-            config: settings,
-            uids: [email.uid],
-            fromPath: currentFolder,
-            toPath: trashPath
-        });
+                const { error } = await callEmailServer('move', {
+                    config: settings,
+                    uids: [email.uid],
+                    fromPath: currentFolder,
+                    toPath: trashPath
+                });
 
-        if (error) {
-            console.error('Error deleting email:', error);
-            alert(`Erro ao mover para lixeira (${trashPath}). O e-mail reaparecerá se a pasta não existir.`);
-            fetchFolders(); // Retry fetching folders in case they changed
-        }
+                if (error) {
+                    console.error('Error deleting email:', error);
+                    showToast(`Erro ao mover para lixeira (${trashPath}). O e-mail reaparecerá se a pasta não existir.`, 'error');
+                    fetchFolders(); // Retry fetching folders in case they changed
+                } else {
+                    showToast('E-mail movido para a lixeira.', 'success');
+                }
+            },
+            'danger'
+        );
     };
 
 
@@ -622,7 +676,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             emailCache[cacheKey] = { emails: mergedEmails, total, unseen, timestamp: Date.now() };
         } catch (err: any) {
             console.error("Fetch Error:", err);
-            if (!isBackground) alert(`Erro ao buscar e-mails: ${err.message || "Verifique as configurações."}`);
+            if (!isBackground) showToast(`Erro ao buscar e-mails: ${err.message || "Verifique as configurações."}`, "error");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -681,21 +735,23 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             if (error) throw error;
             if (data.error) throw new Error(data.error);
 
-            alert('E-mail enviado com sucesso!');
+            showToast('E-mail enviado com sucesso!', 'success');
             setComposeTo('');
             setComposeCc('');
             setComposeBcc('');
             setComposeReplyTo('');
             setComposeSubject('');
-            setComposeBody('');
+            setComposeBody(`<br/><br/>${settings.signature || ''}`);
             setAttachments([]); // Reset attachments
             setToTags([]);
             setCcTags([]);
             setBccTags([]);
             setView('inbox');
-            setView('inbox');
         } catch (err: any) {
-            alert('Erro ao enviar: ' + err.message);
+            console.error("Send Email Error:", err);
+            showToast('Erro ao enviar: O e-mail não pôde ser enviado devido a um problema de comunicação com o servidor SMTP. A mensagem foi salva e permanecerá na janela de composição.', 'error');
+            // We do NOT clear the state so the user doesn't lose their draft.
+            // In a more complete implementation, we might explicitly save to a "Drafts" folder here.
         } finally {
             setLoading(false);
         }
@@ -741,20 +797,32 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             email: newContactEmail
         }).select();
 
-        if (error) alert('Erro ao salvar contato: ' + error.message);
-        else if (data) {
+        if (error) {
+            showToast('Erro ao salvar contato: ' + error.message, 'error');
+        } else if (data) {
             setContacts(prev => [...prev, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
             setNewContactName('');
             setNewContactEmail('');
-            // Optional: alert('Contato salvo!');
+            showToast('Contato salvo com sucesso!', 'success');
         }
     };
 
     const deleteContact = async (id: string) => {
-        if (!confirm('Excluir este contato?')) return;
-        const { error } = await supabase.from('email_contacts').delete().eq('id', id);
-        if (error) alert('Erro ao excluir: ' + error.message);
-        else setContacts(prev => prev.filter(c => c.id !== id));
+        openConfirm(
+            'Excluir Contato',
+            'Tem certeza que deseja excluir este contato?',
+            async () => {
+                closeConfirm();
+                const { error } = await supabase.from('email_contacts').delete().eq('id', id);
+                if (error) {
+                    showToast('Erro ao excluir contato: ' + error.message, 'error');
+                } else {
+                    setContacts(prev => prev.filter(c => c.id !== id));
+                    showToast('Contato excluído!', 'success');
+                }
+            },
+            'danger'
+        );
     };
 
     // --- Helpers ---
@@ -1662,6 +1730,15 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmState.isOpen}
+                title={confirmState.title}
+                message={confirmState.message}
+                onConfirm={confirmState.onConfirm}
+                onCancel={closeConfirm}
+                type={confirmState.type}
+            />
         </div>
     );
 };
