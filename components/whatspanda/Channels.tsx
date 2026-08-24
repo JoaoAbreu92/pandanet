@@ -197,7 +197,7 @@ const Channels: React.FC = () => {
             {step === 'qr' && (
                  <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg text-center border border-gray-100 animate-in fade-in zoom-in duration-300">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Escaneie o QR Code</h2>
-                    <p className="text-gray-500 mb-6">Abra o WhatsApp > Aparelhos Conectados > Conectar</p>
+                    <p className="text-gray-500 mb-6">Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar</p>
 
                     <div className="bg-white p-4 inline-block border-4 border-gray-900 rounded-xl mb-6">
                         {qrCode ? (
