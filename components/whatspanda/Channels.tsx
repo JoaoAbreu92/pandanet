@@ -5,6 +5,8 @@ import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSqua
 import QRCode from 'react-qr-code';
 
 const Channels: React.FC = () => {
+    const { user, profile } = useAuth();
+
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -19,11 +21,22 @@ const Channels: React.FC = () => {
     useEffect(() => {
         fetchSettings();
 
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        console.log('[Channels] Setting up Realtime subscription for company:', companyId);
+
         const subscription = supabase
             .channel('whatsapp_settings_qr')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whatsapp_settings' }, (payload) => {
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'whatsapp_settings',
+                filter: `company_id=eq.${companyId}` // Filter by company_id
+            }, (payload) => {
+                console.log('[Channels] Realtime UPDATE received:', payload);
                 const newData = payload.new;
                 if (newData) {
+                    console.log('[Channels] QR Code:', newData.qr_code ? 'EXISTS' : 'NULL');
+                    console.log('[Channels] Is Connected:', newData.is_connected);
                     setIsConnected(newData.is_connected);
                     setQrCode(newData.qr_code);
                     if (newData.is_connected) setStep('connected');
@@ -35,14 +48,24 @@ const Channels: React.FC = () => {
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, []);
+    }, [profile, user]);
 
     const fetchSettings = async () => {
         setLoading(true);
-        const { data } = await supabase
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        console.log('[fetchSettings] Fetching for company:', companyId);
+
+        const { data, error } = await supabase
             .from('whatsapp_settings')
             .select('*')
-            .maybeSingle(); // Usar maybeSingle para evitar erro 406 se não existir registro
+            .eq('company_id', companyId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[fetchSettings] Error:', error);
+        }
+
+        console.log('[fetchSettings] Data:', data);
         
         if (data) {
             setIsConnected(data.is_connected);
@@ -54,9 +77,8 @@ const Channels: React.FC = () => {
             if (data.is_connected) {
                 setStep('connected');
             } else if (data.qr_code) {
+                console.log('[fetchSettings] QR Code found, switching to QR step');
                 setQrCode(data.qr_code);
-                // If we have a QR but user hasn't "submitted" the form roughly, we might still want to show form? 
-                // Let's assume if there's a QR, we go to QR step, but user can go back.
                 setStep('qr');
             } else {
                 setStep('form');
@@ -64,12 +86,6 @@ const Channels: React.FC = () => {
         }
         setLoading(false);
     };
-
-    const { user, profile } = useAuth(); // Assuming useAuth is available or we import it.
-    // Actually, we must import useAuth correctly.
-    // Based on previous files, it's exported from '../AuthContext'. 
-    // But this file `Channels.tsx` is in `components/whatspanda/`.
-    // So import path is `../../AuthContext`.
 
     const startSession = async (companyId: string) => {
         try {
