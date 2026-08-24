@@ -473,16 +473,11 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
         console.log(`[SYNC] Iniciando sincronização total para ${instanceName}...`);
-        const contactMap = {};
         const processedJids = new Set();
         const contactsToUpsert = [];
-
         const headers = { 'apikey': evoKey, 'Content-Type': 'application/json' };
         
-        // Configuração para permitir certificados auto-assinados se a URL for HTTPS na rede local
-        const fetchOptions = { headers };
         if (evoUrl.startsWith('https')) {
-            // Em ambientes Node.js, isso pode ser necessário para Evolution API com SSL auto-assinado
             process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         }
 
@@ -497,15 +492,12 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     const jid = c.remoteJid || c.jid || c.id || '';
                     if (!jid || jid.includes('@g.us')) continue;
                     const phone = jid.split('@')[0];
-                    const name = c.pushName || c.verifiedName || c.name || c.notify || null;
-                    if (name) contactMap[phone] = name;
-                    
                     if (!processedJids.has(phone)) {
                         processedJids.add(phone);
                         contactsToUpsert.push({ 
                             company_id: companyId, 
                             phone, 
-                            name: name || formatPhoneDisplay(phone), 
+                            name: c.pushName || c.verifiedName || c.name || c.notify || formatPhoneDisplay(phone), 
                             is_group: false,
                             updated_at: new Date().toISOString() 
                         });
@@ -514,191 +506,109 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
 
-        // 2. Buscar TODOS os Grupos (Tenta primeiro endpoint V2, depois V1)
+        // 2. Buscar TODOS os Grupos
         try {
             console.log(`[SYNC] Buscando grupos via Evolution API para ${instanceName}...`);
             let respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
-            
-            // Fallback se o endpoint v2 falhar
             if (!respG.ok) {
-                console.warn(`[SYNC] fetchAllGroups falhou (Status ${respG.status}). Tentando group/findAll...`);
                 respG = await fetch(`${evoUrl}/group/findAll/${instanceName}`, { headers });
             }
 
             if (respG.ok) {
                 const groups = await respG.json();
                 const groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
-                console.log(`[SYNC] ${groupList.length} grupos encontrados na Evolution API.`);
+                console.log(`[SYNC] ${groupList.length} grupos encontrados.`);
                 
                 if (groupList.length === 0) {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A Evolution API não retornou nenhum grupo para a instância ${instanceName}.` }).eq('id', connectionId);
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A API retornou 0 grupos para ${instanceName}.` }).eq('id', connectionId);
                 } else {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados na API. Processando...` }).eq('id', connectionId);
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados.` }).eq('id', connectionId);
                 }
 
                 for (const g of groupList) {
                     const jid = g.jid || g.id || g.remoteJid || '';
                     if (!jid || (!jid.includes('@g.us') && !jid.includes('-'))) continue;
-                    
                     const phone = jid.split('@')[0];
-                    if (processedJids.has(phone)) continue;
-                    processedJids.add(phone);
-
-                    contactsToUpsert.push({ 
-                        company_id: companyId, 
-                        phone, 
-                        name: g.subject || g.name || 'Grupo Sem Nome', 
-                        updated_at: new Date().toISOString() 
-                    });
-                }
-            } else {
-                const errText = await respG.text();
-                console.error(`[SYNC] Falha ao buscar grupos: ${respG.status} - ${errText}`);
-                await supabase.from('whatsapp_settings').update({ last_sync_error: `Erro API Grupos: ${respG.status} - ${errText}` }).eq('id', connectionId);
-            }
-        } catch(e) { 
-            console.error(`[SYNC] Erro busca grupos:`, e.message); 
-            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção Grupos: ${e.message}` }).eq('id', connectionId);
-        }
-
-        if (contactsToUpsert.length > 0) {
-            console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas em whatsapp_contacts...`);
-            const { error: errC } = await supabase
-                .from('whatsapp_contacts')
-                .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
-            if (errC) console.error('[SYNC] Erro upsert contatos:', errC.message);
-
-            // --- GARANTIA DE CONVERSA PARA GRUPOS ---
-            const groupEntries = contactsToUpsert.filter(c => {
-                return c.phone && (c.phone.length > 15 || c.phone.includes('-'));
-            });
-
-            if (groupEntries.length > 0) {
-                console.log(`[SYNC] Garantindo ${groupEntries.length} conversas de grupo...`);
-                for (const group of groupEntries) {
-                    try {
-                        const { data: existing } = await supabase
-                            .from('whatsapp_conversations')
-                            .select('id')
-                            .eq('company_id', companyId)
-                            .eq('contact_phone', group.phone)
-                            .maybeSingle();
-                        
-                        if (!existing) {
-                            await supabase.from('whatsapp_conversations').insert({
-                                company_id: companyId,
-                                contact_phone: group.phone,
-                                contact_name: group.name,
-                                is_group: true,
-                                status: 'pendente',
-                                connection_id: connectionId,
-                                unread_count: 0
-                            });
-                        }
-                    } catch (e) {
-                        console.error(`[SYNC] Erro garantia grupo ${group.phone}:`, e.message);
+                    if (!processedJids.has(phone)) {
+                        processedJids.add(phone);
+                        contactsToUpsert.push({ 
+                            company_id: companyId, 
+                            phone, 
+                            name: g.subject || g.name || 'Grupo Sem Nome', 
+                            updated_at: new Date().toISOString() 
+                        });
                     }
                 }
-                
-                await supabase.from('whatsapp_settings').update({ 
-                    last_sync_error: `✅ Sincronização concluída com sucesso às ${new Date().toLocaleTimeString()}. ${groupEntries.length} grupos importados.` 
-                }).eq('id', connectionId);
-            } else {
-                await supabase.from('whatsapp_settings').update({ 
-                    last_sync_error: `✅ Sincronização concluída. Nenhum grupo novo para importar.` 
-                }).eq('id', connectionId);
             }
-        } catch (e) {
-            console.error(`[SYNC] Erro busca grupos:`, e.message); 
-            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção Grupos: ${e.message}` }).eq('id', connectionId);
+        } catch(e) { console.error(`[SYNC] Erro grupos:`, e.message); }
+
+        // 3. Salvar Contatos e Garantir Conversas de Grupo
+        if (contactsToUpsert.length > 0) {
+            console.log(`[SYNC] Salvando ${contactsToUpsert.length} contatos...`);
+            await supabase.from('whatsapp_contacts').upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
+
+            const groupEntries = contactsToUpsert.filter(c => c.phone && (c.phone.length > 15 || c.phone.includes('-')));
+            for (const group of groupEntries) {
+                try {
+                    const { data: existing } = await supabase.from('whatsapp_conversations').select('id').eq('company_id', companyId).eq('contact_phone', group.phone).maybeSingle();
+                    if (!existing) {
+                        await supabase.from('whatsapp_conversations').insert({
+                            company_id: companyId,
+                            contact_phone: group.phone,
+                            contact_name: group.name,
+                            is_group: true,
+                            status: 'pendente',
+                            connection_id: connectionId,
+                            unread_count: 0
+                        });
+                    }
+                } catch (e) { console.error(`[SYNC] Erro conversa grupo:`, e.message); }
+            }
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos e grupos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
         }
 
-        // 4. Buscar Histórico (10 msgs) para cada conversa ativa
-        // Buscamos os chats ativos primeiro para priorizar
+        // 4. Buscar Histórico
         let activeChats = [];
         try {
-            const respC = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { 
-                method: 'POST', 
-                headers, 
-                body: JSON.stringify({ where: {} }) 
-            });
+            const respC = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { method: 'POST', headers, body: JSON.stringify({ where: {} }) });
             if (respC.ok) {
                 const raw = await respC.json();
                 activeChats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
             }
         } catch(e) { console.error(`[SYNC] Erro findChats:`, e.message); }
 
-        console.log(`[SYNC] Buscando histórico para ${activeChats.length} conversas ativas...`);
-        
-        // Limitar a sincronização de histórico para evitar sobrecarga nas primeiras conversas
+        console.log(`[SYNC] Histórico para ${activeChats.length} chats...`);
         const batchSize = 5; 
         for (let i = 0; i < activeChats.length; i += batchSize) {
             const batch = activeChats.slice(i, i + batchSize);
             await Promise.all(batch.map(async (chat) => {
                 const jid = chat.remoteJid || chat.jid || chat.id;
                 if (!jid) return;
-
                 try {
-                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({
-                            where: { remoteJid: jid },
-                            limit: 10
-                        })
-                    });
-
+                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, { method: 'POST', headers, body: JSON.stringify({ where: { remoteJid: jid }, limit: 10 }) });
                     if (msgResp.ok) {
                         const messages = await msgResp.json();
                         const msgs = Array.isArray(messages) ? messages : (messages.messages || messages.data || []);
-                        
                         if (msgs.length > 0) {
-                            // Buscar ou criar a conversa no Supabase primeiro
                             const phone = jid.split('@')[0];
-                            const { data: conv } = await supabase
-                                .from('whatsapp_conversations')
-                                .select('id')
-                                .eq('company_id', companyId)
-                                .eq('contact_phone', phone)
-                                .single();
-
-                            let convId = conv?.id;
-                            if (!convId) {
-                                const isGroup = jid.includes('@g.us');
-                                const { data: newConv } = await supabase
-                                    .from('whatsapp_conversations')
-                                    .insert({
-                                        company_id: companyId,
-                                        contact_phone: phone,
-                                        contact_name: chat.name || chat.subject || phone,
-                                        is_group: isGroup,
-                                        status: 'pendente'
-                                    })
-                                    .select('id')
-                                    .single();
-                                convId = newConv?.id;
-                            }
-
-                            if (convId) {
+                            const { data: conv } = await supabase.from('whatsapp_conversations').select('id').eq('company_id', companyId).eq('contact_phone', phone).maybeSingle();
+                            if (conv) {
                                 const msgsToInsert = msgs.map(m => ({
                                     company_id: companyId,
-                                    conversation_id: convId,
+                                    conversation_id: conv.id,
                                     message_text: m.message?.conversation || m.message?.extendedTextMessage?.text || (m.pushName ? `[Mídia de ${m.pushName}]` : '[Mídia]'),
                                     is_from_customer: !m.key?.fromMe,
                                     whatsapp_message_id: m.key?.id,
                                     created_at: new Date(m.messageTimestamp * 1000).toISOString()
                                 }));
-
                                 await supabase.from('whatsapp_messages').upsert(msgsToInsert, { onConflict: 'whatsapp_message_id' });
                             }
                         }
                     }
                 } catch(e) { console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); }
             }));
-            // Pequena pausa entre lotes
             await new Promise(r => setTimeout(r, 500));
         }
-
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
         console.error(`[SYNC] Erro fatal:`, err.message);
