@@ -5,6 +5,8 @@ import { supabase } from '../supabaseClient';
 import Logo from './Logo';
 import { useLanguage } from './LanguageContext';
 
+const initcap = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+
 const LoginPage: React.FC = () => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
@@ -51,26 +53,57 @@ const LoginPage: React.FC = () => {
                 }
                 setError(msg);
             } else if (authData.user) {
-                // Try to find company by domain
-                const { data: companyData } = await supabase
-                    .from('companies')
-                    .select('id')
-                    .ilike('domain', domain.trim())
-                    .maybeSingle();
-
-                // Profile is usually created by a database trigger on auth.users insert.
-                // We will try to update it here with the company_id and status pending
+                // Logic moved to a safer async follow-up
                 setTimeout(async () => {
+                    const trimmedDomain = domain.trim().toLowerCase();
+                    const emailDomain = email.split('@')[1].toLowerCase();
+                    
+                    // Domain to use: prioritize manual input if it's not a common provider, otherwise use email domain
+                    const targetDomain = (trimmedDomain && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'].includes(trimmedDomain))
+                        ? trimmedDomain 
+                        : emailDomain;
+
+                    // 1. Try to find company
+                    let { data: companyData } = await supabase
+                        .from('companies')
+                        .select('id')
+                        .ilike('domain', targetDomain)
+                        .maybeSingle();
+
+                    // 2. If not found, create it (matching user's requirement: first user creates company)
+                    if (!companyData && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com'].includes(targetDomain)) {
+                        const { data: newCompany, error: createError } = await supabase
+                            .from('companies')
+                            .insert({
+                                name: initcap(targetDomain.split('.')[0]),
+                                domain: targetDomain,
+                                status: 'active',
+                                responsible_email: email
+                            })
+                            .select()
+                            .single();
+                        
+                        if (!createError) {
+                            companyData = newCompany;
+                        } else {
+                            console.error("Error auto-creating company:", createError);
+                        }
+                    }
+
+                    // 3. Update profile with company and status
+                    const isFirstUser = !!companyData && !['gmail.com', 'hotmail.com'].includes(targetDomain);
                     const { error: updateError } = await supabase
                         .from('profiles')
                         .update({
                             company_id: companyData?.id || null,
-                            status: 'pending'
+                            status: 'pending',
+                            role: isFirstUser ? 'admin' : 'employee',
+                            is_company_admin: isFirstUser
                         })
                         .eq('id', authData.user!.id);
 
-                    if (updateError) console.error("Error updating profile with company:", updateError);
-                }, 1000); // Small delay to let trigger finish
+                    if (updateError) console.error("Error updating profile with company/status:", updateError);
+                }, 1500); // Wait for trigger + some buffer
 
                 setMessage(language === 'pt'
                     ? 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação.'

@@ -303,6 +303,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     useEffect(() => {
         fetchData();
+
+        // Realtime listener for profiles changes (new signups, status updates)
+        const profilesChannel = supabase
+            .channel('saas-profiles-changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'profiles' },
+                () => {
+                    console.log('[SaaS] Mudança detectada nos perfis. Atualizando dados...');
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profilesChannel);
+        };
     }, []);
 
     // --- Dados Computados ---
