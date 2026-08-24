@@ -52,7 +52,7 @@ const WhatsPandaDashboard: React.FC = () => {
       // 1. Atendimentos Ativos e Totais (Carrega perfis de atribuição e encerramento)
       const { data: convs, error: convError } = await supabase
         .from('whatsapp_conversations')
-        .select('*, assigned_to_profile:profiles(full_name), closed_by_profile:profiles(full_name)')
+        .select('*, assigned_to_profile:profiles!assigned_to(full_name), closed_by_profile:profiles!closed_by(full_name)')
         .eq('company_id', companyId);
 
       if (convError) throw convError;

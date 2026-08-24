@@ -16,13 +16,10 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const now = new Date();
-        const spOffset = -3;
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-        const spTime = new Date(utc + (3600000 * spOffset));
+        const spTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
         const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
         const currentDayStr = daysMap[spTime.getDay()];
-        const currentHourStr = spTime.toTimeString().slice(0, 5); // "HH:MM"
+        const currentHourStr = `${spTime.getHours().toString().padStart(2, '0')}:${spTime.getMinutes().toString().padStart(2, '0')}`;
 
         // Calcular se cada fila está aberta ou fechada com base nas businessHours
         const queuesStatus = (queues || []).map(q => {

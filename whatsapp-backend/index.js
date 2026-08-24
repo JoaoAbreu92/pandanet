@@ -150,10 +150,31 @@ async function runAutoMigration() {
             console.error('[MIGRATION] Erro ao adicionar media_type a whatsapp_scheduled_campaigns:', errMedia.message);
         } else {
             console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna media_type em whatsapp_scheduled_campaigns).');
-            // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar a nova coluna imediatamente
-            await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
-            console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');
         }
+
+        console.log('[MIGRATION] Verificando e criando tabela public.whatsapp_quick_messages se não existir...');
+        const { error: errQuickMsg } = await supabase.rpc('exec_sql', {
+            sql: `
+                CREATE TABLE IF NOT EXISTS public.whatsapp_quick_messages (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+                    shortcut TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    is_public BOOLEAN DEFAULT TRUE,
+                    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            `
+        });
+        if (errQuickMsg) {
+            console.error('[MIGRATION] Erro ao garantir whatsapp_quick_messages:', errQuickMsg.message);
+        } else {
+            console.log('[MIGRATION] Auto-migração da tabela whatsapp_quick_messages executada.');
+        }
+
+        // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar todas as atualizações
+        await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
+        console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');
     } catch (err) {
         console.error('[MIGRATION] Falha ao rodar auto-migração:', err.message);
     }
@@ -1740,46 +1761,10 @@ async function fetchGroupInfo(instanceName, groupJid) {
  * Retorna { inHours: boolean, awayMessage: string | null }
  */
 async function checkBusinessHours(companyId, connectionId, queueId = null) {
-    const now = new Date();
-    
-    // Obtém partes da data formatadas no fuso de São Paulo (Brasília)
-    let parts;
-    try {
-        parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            second: 'numeric',
-            hour12: false
-        }).formatToParts(now).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
-    } catch (err) {
-        console.error('[EXPEDIENTE] Erro ao formatar data/fuso no checkBusinessHours:', err.message);
-        // Fallback robusto
-        parts = {
-            year: now.getFullYear(),
-            month: now.getMonth() + 1,
-            day: now.getDate(),
-            hour: now.getHours(),
-            minute: now.getMinutes(),
-            second: now.getSeconds()
-        };
-    }
-
-    // Cria a data correspondente ao fuso de SP
-    const spTime = new Date(
-        parseInt(parts.year),
-        parseInt(parts.month) - 1,
-        parseInt(parts.day),
-        parseInt(parts.hour),
-        parseInt(parts.minute),
-        parseInt(parts.second)
-    );
-
+    // Criar a data correspondente ao fuso de São Paulo de forma robusta e independente da VPS
+    const spTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const currentDayStr = spTime.getDay().toString(); // "0" (domingo) a "6" (sábado)
-    const currentHourStr = `${parts.hour.padStart(2, '0')}:${parts.minute.padStart(2, '0')}`;
+    const currentHourStr = `${spTime.getHours().toString().padStart(2, '0')}:${spTime.getMinutes().toString().padStart(2, '0')}`;
 
     // 1. Buscar configurações da conexão do WhatsApp
     const { data: settings } = await supabase
@@ -2747,6 +2732,42 @@ async function processScheduledCampaigns() {
 // Iniciar o loop de disparos a cada 15 segundos
 setInterval(processScheduledCampaigns, 15000);
 
+
+app.get('/debug-db', async (req, res) => {
+    try {
+        const results = {};
+        
+        // 1. Verificar colunas de whatsapp_quick_messages
+        const { data: qmCols } = await supabase.rpc('exec_sql', {
+            sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_quick_messages';"
+        });
+        results.whatsapp_quick_messages_columns = qmCols;
+
+        // 2. Verificar colunas de whatsapp_scheduled_campaigns
+        const { data: scCols } = await supabase.rpc('exec_sql', {
+            sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_scheduled_campaigns';"
+        });
+        results.whatsapp_scheduled_campaigns_columns = scCols;
+
+        // 3. Verificar hora atual do banco
+        const { data: timeData } = await supabase.rpc('exec_sql', {
+            sql: "SELECT NOW() as pg_now, CURRENT_TIME as pg_time, timezone('America/Sao_Paulo', NOW()) as sp_now;"
+        });
+        results.db_time = timeData;
+
+        // 4. Verificar campanhas cadastradas e seus status
+        const { data: campaigns } = await supabase.from('whatsapp_scheduled_campaigns').select('*');
+        results.campaigns = campaigns;
+
+        // 5. Verificar alvos (amostra)
+        const { data: targets } = await supabase.from('whatsapp_scheduled_targets').select('id, campaign_id, status, error_message, sent_at').limit(20);
+        results.targets_sample = targets;
+
+        return res.json(results);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 app.listen(port, () => {
   console.log(`🚀 Servidor WhatsPanda (Evolution Proxy) rodando na porta ${port}`);

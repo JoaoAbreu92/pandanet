@@ -1002,6 +1002,25 @@ ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT NULL;
 -- 18. WHATSAPP SCHEDULED CAMPAIGNS NEW FEATURES
 ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS media_type VARCHAR(50) DEFAULT 'image';
 
+-- 19. WHATSAPP QUICK MESSAGES TABLE & POLICIES
+CREATE TABLE IF NOT EXISTS public.whatsapp_quick_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+    shortcut TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_public BOOLEAN DEFAULT TRUE,
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.whatsapp_quick_messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_quick_messages;
+CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_quick_messages
+    FOR ALL TO authenticated
+    USING (company_id = public.get_user_company_id() OR public.is_admin_in_profile())
+    WITH CHECK (company_id = public.get_user_company_id() OR public.is_admin_in_profile());
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 
