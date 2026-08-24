@@ -33,9 +33,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .eq('id', userId)
                 .single();
 
-            if (error) {
+            if (error || !data) {
+                // FALLBACK FOR MASTER ADMIN
+                if ((email || '').toLowerCase() === 'ti@grupopixel.com.br') {
+                    console.log("Profile not found for Master Admin, using fallback.");
+                    const masterAdmin: Employee = {
+                        id: userId,
+                        name: 'Master TI',
+                        email: email || 'ti@grupopixel.com.br',
+                        role: 'Super Admin',
+                        team: 'Admin',
+                        avatarUrl: 'https://ui-avatars.com/api/?name=Master+TI',
+                        joinDate: new Date().toISOString(),
+                        birthDate: new Date().toISOString(),
+                        isAdmin: true,
+                        isOnline: true,
+                        permissions: {
+                            viewMessages: true, viewCalendar: true, useMarketplace: true,
+                            canPostText: true, canPostImage: true, canPostVideo: true,
+                            viewDirectory: true, viewForms: true, viewBenefits: true,
+                            viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
+                            viewTiDashboard: true, openTickets: true, openTiRequests: true,
+                            viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
+                        },
+                        following: [],
+                        phone: '',
+                        officeLocation: '',
+                        bio: ''
+                    };
+                    setProfile(masterAdmin);
+                    return;
+                }
+
                 console.error('Erro ao buscar perfil:', error);
-                // Lógica de fallback ou criação de perfil pode ser feita aqui
                 return;
             }
 
