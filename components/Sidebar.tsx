@@ -1,0 +1,163 @@
+import React, { useState } from 'react';
+import Logo from './Logo';
+import {
+    HomeIcon,
+    ChatBubbleLeftRightIcon,
+    TicketIcon,
+    CalendarDaysIcon,
+    UsersIcon,
+    FolderIcon,
+    SparklesIcon,
+    BuildingStorefrontIcon,
+    DocumentTextIcon,
+    HeartIcon,
+    RocketLaunchIcon,
+    Cog6ToothIcon,
+    ShieldCheckIcon,
+    ChevronDownIcon,
+    QuestionMarkCircleIcon,
+    ArrowPathIcon,
+    PlusIcon,
+    NewspaperIcon, // Importado
+    BuildingOfficeIcon
+} from './icons';
+import type { Page, Employee, EmployeePermissions } from '../types';
+import { useLanguage } from './LanguageContext';
+
+interface SidebarProps {
+    isOpen: boolean;
+    onNavigate: (page: Page) => void;
+    currentPage: Page;
+    currentUser: Employee;
+    companyName: string;
+    companyLogo?: string;
+    isImpersonating: boolean;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating }) => {
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false });
+
+    const toggleMenu = (menu: 'rh' | 'ti') => {
+        setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
+    };
+
+    const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof Employee['permissions'] | true }> = ({ page, label, icon: Icon, permission }) => {
+        if (permission !== true && !currentUser.permissions[permission]) {
+            return null;
+        }
+        return (
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate(page); }} className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'} ${isOpen ? '' : 'justify-center'}`} title={label}>
+                <Icon className="w-6 h-6 flex-shrink-0" />
+                {isOpen && <span className="ml-4 truncate">{label}</span>}
+            </a>
+        );
+    };
+
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti'; children: React.ReactNode, permission: boolean }> = ({ label, icon: Icon, menuKey, children, permission }) => {
+        if (!permission) return null;
+
+        const isActive = React.Children.toArray(children).some(child =>
+            React.isValidElement(child) && child.props.page === currentPage
+        );
+
+        return (
+            <div>
+                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'}`}>
+                    <div className="flex items-center">
+                        <Icon className="w-6 h-6 flex-shrink-0" />
+                        {isOpen && <span className="ml-4 truncate font-semibold">{label}</span>}
+                    </div>
+                    {isOpen && <ChevronDownIcon className={`w-5 h-5 transition-transform ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
+                </button>
+                {openMenus[menuKey] && isOpen && (
+                    <div className="pl-8 pt-2 space-y-1">
+                        {children}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const rhPermissionKeys: (keyof EmployeePermissions)[] = ['viewDirectory', 'viewForms', 'viewBenefits', 'viewOnboarding', 'viewRecognition', 'viewDocuments', 'viewTraining', 'viewSurveys', 'viewPolicies'];
+    const hasRhAccess = rhPermissionKeys.some(key => !!currentUser.permissions[key]);
+
+    const tiPermissionKeys: (keyof EmployeePermissions)[] = ['viewTiDashboard', 'openTickets', 'openTiRequests', 'viewKnowledgeBase', 'viewServiceStatus', 'viewInfoSec'];
+    const hasTiAccess = tiPermissionKeys.some(key => !!currentUser.permissions[key]);
+    const { t } = useLanguage();
+
+    return (
+        <aside className={`transition-all duration-300 ${isOpen ? 'w-64' : 'w-20'} flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700`}>
+            <div className="flex items-center justify-center h-20 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700">
+                <Logo showText={isOpen} />
+            </div>
+            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
+                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} />
+                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" />
+                <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" />
+                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" />
+                <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" />
+
+                <hr className="my-4 border-gray-200 dark:border-gray-700" />
+
+                <NavMenu label="RH" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
+                    <NavItem page="directory" label={t('sidebar.directory')} icon={UsersIcon} permission="viewDirectory" />
+                    <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
+                    <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" />
+                    <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
+                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" />
+                    <NavItem page="documentos" label={t('sidebar.documents')} icon={FolderIcon} permission="viewDocuments" />
+                    {/* New RH Menus */}
+                    <NavItem page="training" label="Treinamentos" icon={RocketLaunchIcon} permission="viewTraining" />
+                    <NavItem page="surveys" label="Pesquisas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
+                    <NavItem page="policies" label="Políticas" icon={ShieldCheckIcon} permission="viewPolicies" />
+                </NavMenu>
+
+                <NavMenu label="T.I." icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
+                    <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" />
+                    <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" />
+                    <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
+                    {/* New TI Menus */}
+                    <NavItem page="knowledge-base" label="Base de Conhecimento" icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" />
+                    <NavItem page="service-status" label="Status de Serviço" icon={ArrowPathIcon} permission="viewServiceStatus" />
+                    <NavItem page="infosec" label="Segurança da Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
+                </NavMenu>
+
+                {/* SaaS Super Admin Button */}
+                {currentUser.role === 'Super Admin' && (
+                    <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); onNavigate('saas-dashboard'); }}
+                        className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
+                            } ${isOpen ? '' : 'justify-center'} mt-2 border-2 border-dashed border-purple-200 dark:border-gray-700`}
+                        title="Painel SaaS"
+                    >
+                        <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
+                        {isOpen && <span className="ml-4 truncate font-bold">Painel SaaS</span>}
+                    </a>
+                )}
+
+                {(currentUser.isAdmin && isImpersonating) && (
+                    <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}
+                        className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'admin' ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'
+                            } ${isOpen ? '' : 'justify-center'}`}
+                        title={t('sidebar.admin')}
+                    >
+                        <ShieldCheckIcon className="w-6 h-6 flex-shrink-0" />
+                        {isOpen && <span className="ml-4 truncate">{t('sidebar.admin')}</span>}
+                    </a>
+                )}
+            </nav>
+            <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden'}`}>
+                {companyLogo && (
+                    <img src={companyLogo} alt={companyName} className="h-10 mx-auto mb-2 object-contain dark:filter dark:brightness-0 dark:invert dark:opacity-80" />
+                )}
+                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{companyName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('sidebar.corporate_intranet')}</p>
+            </div>
+        </aside>
+    );
+};
+export default Sidebar;
