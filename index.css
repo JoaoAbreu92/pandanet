@@ -271,4 +271,31 @@
 .animate-spin-slow {
   animation: spin-slow 15s linear infinite;
 }
+
+/* React Quill Dark Mode Styles */
+.dark .ql-toolbar {
+  background-color: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark .ql-toolbar .ql-stroke {
+  stroke: #e2e8f0 !important;
+}
+.dark .ql-toolbar .ql-fill {
+  fill: #e2e8f0 !important;
+}
+.dark .ql-toolbar .ql-picker {
+  color: #e2e8f0 !important;
+}
+.dark .ql-toolbar .ql-picker-options {
+  background-color: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark .ql-container {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: #090d16 !important;
+  color: #f1f5f9 !important;
+}
+.dark .ql-editor.ql-blank::before {
+  color: #64748b !important;
+}
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "843668700206",
+    "project_id": "pandanet-b0f15",
+    "storage_bucket": "pandanet-b0f15.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:843668700206:android:928307e26de0d8d0e733bf",
+        "android_client_info": {
+          "package_name": "com.grupopixel.pandanet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHmBgPt-NS48gltc7TEgCa4lYD37D1r1c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

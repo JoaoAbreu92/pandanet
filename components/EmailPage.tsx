@@ -329,6 +329,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         setModuleUnreadCount('email', unseenCount);
     }, [unseenCount, setModuleUnreadCount]);
 
+    // Close sidebar on mobile when view changes to a subview (settings, compose, read)
+    useEffect(() => {
+        if (window.innerWidth < 768 && (view === 'settings' || view === 'compose' || view === 'read')) {
+            setSidebarOpen(false);
+        }
+    }, [view]);
+
     // --- Effects ---
 
     useEffect(() => {
@@ -961,26 +968,26 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (!settings.imap_user || fetchInProgress.current) return;
         fetchInProgress.current = true;
 
-        const isSearchingGlobal = searchQuery.trim().length > 0;
-        const cacheKey = `${currentUser.id}_${isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder}_${page}`;
-        const cached = emailCache[cacheKey];
-
-        // Use cache on initial load (not background polling, not forced refresh)
-        if (!isBackground && !forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-            setEmails(cached.emails);
-            setTotalEmails(cached.total);
-            if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(cached.unseen);
-            fetchInProgress.current = false;
-            return;
-        }
-
-        if (!isBackground) setLoading(true);
-        else setRefreshing(true);
-
         try {
+            const isSearchingGlobal = searchQuery.trim().length > 0;
+            const currentUserId = currentUser?.id || 'unknown';
+            const cacheKey = `${currentUserId}_${isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder}_${page}`;
+            const cached = emailCache[cacheKey];
+
+            // Use cache on initial load (not background polling, not forced refresh)
+            if (!isBackground && !forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+                setEmails(cached.emails);
+                setTotalEmails(cached.total);
+                if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(cached.unseen);
+                return;
+            }
+
+            if (!isBackground) setLoading(true);
+            else setRefreshing(true);
+
             // Check for Tag Filter
             if (filterTag && !isSearchingGlobal) {
-                const { data: allMeta } = await supabase.from('email_metadata').select('id, message_id, tags, notes').eq('user_id', currentUser.id);
+                const { data: allMeta } = await supabase.from('email_metadata').select('id, message_id, tags, notes').eq('user_id', currentUserId);
                 const taggedIds = (allMeta || [])
                     .filter(m => Array.isArray(m.tags) && m.tags.some((t: any) => t.label?.toLowerCase() === filterTag?.toLowerCase()))
                     .map(m => m.message_id)
@@ -989,9 +996,6 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 if (taggedIds.length === 0) {
                     setEmails([]);
                     setTotalEmails(0);
-                    setLoading(false);
-                    setRefreshing(false);
-                    fetchInProgress.current = false;
                     return;
                 }
 
@@ -1021,9 +1025,6 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 
                 setEmails(mergedEmails);
                 setTotalEmails(mergedEmails.length);
-                setLoading(false);
-                setRefreshing(false);
-                fetchInProgress.current = false;
                 return;
             }
 
@@ -2180,51 +2181,51 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     </button>
                                 </div>
                             ) : (
-                                    <>
-                                            <div className="bg-white dark:bg-gray-50 rounded-xl p-6 shadow-inner min-h-[300px] overflow-hidden">
-                                                <div
-                                                    className="prose max-w-none text-gray-800"
-                                                    dangerouslySetInnerHTML={{
-                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`, {
-                                                            RETURN_TRUSTED_TYPE: true,
-                                                            ADD_TAGS: ['iframe', 'style'],
-                                                            ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling']
-                                                        }).toString().replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
-                                                    }}
-                                                />
-                                            </div>
+                                <>
+                                    <div className="bg-white dark:bg-slate-900/50 rounded-xl p-4 sm:p-6 shadow-inner min-h-[300px] overflow-x-auto">
+                                        <div
+                                            className="prose dark:prose-invert max-w-none text-gray-800 dark:text-gray-200"
+                                            dangerouslySetInnerHTML={{
+                                                __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`, {
+                                                    RETURN_TRUSTED_TYPE: true,
+                                                    ADD_TAGS: ['iframe', 'style'],
+                                                    ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling']
+                                                }).toString().replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
+                                            }}
+                                        />
+                                    </div>
 
-                                        {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                                            <div className="mt-8 border-t pt-6">
-                                                <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                                                    <FolderIcon className="w-4 h-4" />
-                                                    Anexos ({selectedEmail.attachments.length})
-                                                </h4>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                    {selectedEmail.attachments.map(att => (
-                                                        <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-brand-primary transition-colors group">
-                                                            <div className="flex items-center gap-3 min-w-0">
-                                                                <div className="w-8 h-8 bg-white rounded flex items-center justify-center border text-gray-400">
-                                                                    <PaperAirplaneIcon className="w-4 h-4 rotate-90" />
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="text-xs font-medium text-gray-700 truncate">{att.filename}</p>
-                                                                    <p className="text-[10px] text-gray-400">{(att.size / 1024).toFixed(1)} KB</p>
-                                                                </div>
+                                    {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                        <div className="mt-8 border-t pt-6">
+                                            <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                                <FolderIcon className="w-4 h-4" />
+                                                Anexos ({selectedEmail.attachments.length})
+                                            </h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {selectedEmail.attachments.map(att => (
+                                                    <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-brand-primary transition-colors group">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-8 h-8 bg-white rounded flex items-center justify-center border text-gray-400">
+                                                                <PaperAirplaneIcon className="w-4 h-4 rotate-90" />
                                                             </div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); downloadAttachment(selectedEmail, att.id, att.filename); }}
-                                                                className="p-2 text-gray-400 hover:text-brand-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                title="Baixar"
-                                                            >
-                                                                <ArrowPathIcon className="w-4 h-4" />
-                                                            </button>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-medium text-gray-700 truncate">{att.filename}</p>
+                                                                <p className="text-[10px] text-gray-400">{(att.size / 1024).toFixed(1)} KB</p>
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); downloadAttachment(selectedEmail, att.id, att.filename); }}
+                                                            className="p-2 text-gray-400 hover:text-brand-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title="Baixar"
+                                                        >
+                                                            <ArrowPathIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        )}
-                                    </>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -2234,12 +2235,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             <p>{t('email.select_to_read')}</p>
                     </div>
                 ) : view === 'compose' ? (
-                            <div className="flex-1 flex flex-col h-full bg-white overflow-hidden">
+                            <div className="flex-1 flex flex-col h-full bg-white dark:bg-slate-900 overflow-hidden">
                                 <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                                     {/* Edit Area */}
-                                    <div className="flex-1 p-6 flex flex-col space-y-4 overflow-y-auto border-r border-gray-100">
+                                    <div className="flex-1 p-6 flex flex-col space-y-4 overflow-y-auto border-r border-gray-100 dark:border-white/5">
                                         <div className="space-y-2">
-                                            <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-2">
+                                            <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 dark:border-white/5 py-2">
                                                 {toTags.map(tag => (
                                                     <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-sm group">
                                                         {tag}
@@ -2269,16 +2270,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                                 <button
                                                                     key={c.id}
                                                                     onClick={() => handleAddRecipientTag('to', c.email)}
-                                                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 flex flex-col border-b border-gray-100 last:border-0"
+                                                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 flex flex-col border-b border-gray-100 dark:border-white/5 last:border-0"
                                                                 >
-                                                                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
-                                                                    <span className="text-xs text-gray-500">{c.email}</span>
+                                                                    <span className="text-sm font-medium text-gray-800 dark:text-white">{c.name}</span>
+                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{c.email}</span>
                                                                 </button>
                                                             ))}
                                                             {!toTags.includes(composeTo) && composeTo.includes('@') && (
                                                                 <button
                                                                     onClick={() => handleAddRecipientTag('to', composeTo)}
-                                                                    className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-brand-primary text-xs font-bold"
+                                                                    className="w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-brand-primary text-xs font-bold"
                                                                 >
                                                                     Adicionar "{composeTo}"
                                                                 </button>
@@ -2294,12 +2295,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 </button>
                                             </div>
                                             {showCc && (
-                                                <div className="space-y-2 bg-gray-50 p-2 rounded">
+                                                <div className="space-y-2 bg-gray-50 dark:bg-slate-800/40 p-2 rounded border dark:border-white/5">
                                                     {/* CC */}
-                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 dark:border-white/5 py-1">
                                                         <span className="text-xs text-gray-400 min-w-[30px]">CC:</span>
                                                         {ccTags.map(tag => (
-                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded text-[11px]">
                                                                 {tag}
                                                                 <button onClick={() => removeRecipientTag('cc', tag)} className="hover:text-red-500">
                                                                     <XMarkIcon className="w-3 h-3" />
@@ -2307,7 +2308,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                             </span>
                                                         ))}
                                                         <input
-                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm dark:text-white"
                                                             value={composeCc}
                                                             onChange={e => setComposeCc(e.target.value)}
                                                             onKeyDown={e => {
@@ -2321,10 +2322,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         />
                                                     </div>
                                                     {/* BCC */}
-                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 dark:border-white/5 py-1">
                                                         <span className="text-xs text-gray-400 min-w-[30px]">CCO:</span>
                                                         {bccTags.map(tag => (
-                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded text-[11px]">
                                                                 {tag}
                                                                 <button onClick={() => removeRecipientTag('bcc', tag)} className="hover:text-red-500">
                                                                     <XMarkIcon className="w-3 h-3" />
@@ -2332,7 +2333,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                             </span>
                                                         ))}
                                                         <input
-                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm dark:text-white"
                                                             value={composeBcc}
                                                             onChange={e => setComposeBcc(e.target.value)}
                                                             onKeyDown={e => {
@@ -2346,7 +2347,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         />
                                                     </div>
                                                     <input
-                                                        className="w-full border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                        className="w-full border-b border-gray-200 dark:border-white/5 py-1 bg-transparent focus:outline-none text-sm dark:text-white"
                                                         placeholder="Reply-To (Opcional):"
                                                         value={composeReplyTo}
                                                         onChange={e => setComposeReplyTo(e.target.value)}
@@ -2361,7 +2362,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             />
                                         </div>
 
-                                        <div className="flex-1 border rounded-lg overflow-hidden flex flex-col min-h-[300px]">
+                                        <div className="flex-1 border border-gray-200 dark:border-white/5 rounded-lg overflow-hidden flex flex-col min-h-[300px]">
                                             <ReactQuill
                                                 theme="snow"
                                                 value={composeBody}
@@ -2381,18 +2382,18 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     </div>
 
                                     {/* --- Attachments Sidebar --- */}
-                                    <div className="w-full lg:w-80 bg-gray-50 p-6 flex flex-col overflow-y-auto shrink-0 border-l border-gray-100">
+                                    <div className="w-full lg:w-80 bg-gray-50 dark:bg-slate-900/40 p-6 flex flex-col overflow-y-auto shrink-0 border-l border-gray-100 dark:border-white/5">
                                         <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400">Anexos</h3>
-                                            <span className="text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-500 font-bold">LIMITE 20MB</span>
+                                            <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">Anexos</h3>
+                                            <span className="text-[10px] bg-gray-200 dark:bg-slate-800 px-2 py-0.5 rounded text-gray-500 dark:text-gray-400 font-bold">LIMITE 20MB</span>
                                         </div>
 
                                         <button
-                                            className="w-full flex flex-col items-center justify-center gap-2 bg-white border-2 border-dashed border-gray-200 hover:border-brand-primary hover:bg-emerald-50 text-gray-400 hover:text-brand-primary p-8 rounded-2xl transition-all group shadow-sm"
+                                            className="w-full flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-800/40 border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-brand-primary hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-gray-400 hover:text-brand-primary p-8 rounded-2xl transition-all group shadow-sm"
                                             onClick={() => document.getElementById('file-upload')?.click()}
                                         >
                                             <input id="file-upload" type="file" multiple className="hidden" onChange={handleFileChange} />
-                                            <div className="p-3 bg-gray-50 rounded-full group-hover:bg-brand-primary/10 transition-colors">
+                                            <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-full group-hover:bg-brand-primary/10 transition-colors">
                                                 <PaperClipIcon className="w-6 h-6" />
                                             </div>
                                             <span className="text-sm font-bold">Anexar Arquivo</span>
@@ -2404,19 +2405,19 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             <div className="space-y-3 mt-8">
                                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-2">Arquivos Carregados ({attachments.length})</div>
                                                 {attachments.map((file, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                                                    <div key={idx} className="flex items-center justify-between bg-white dark:bg-slate-800/60 p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all group">
                                                         <div className="flex items-center gap-3 min-w-0">
                                                             <div className="bg-brand-primary/10 p-2 rounded-lg">
                                                                 <PaperClipIcon className="w-4 h-4 text-brand-primary" />
                                                             </div>
                                                             <div className="truncate pr-2">
-                                                                <div className="text-xs font-bold text-gray-700 truncate">{file.filename}</div>
+                                                                <div className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate">{file.filename}</div>
                                                                 <div className="text-[10px] font-medium text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
                                                             </div>
                                                         </div>
                                                         <button
                                                             onClick={() => removeAttachment(idx)}
-                                                            className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-lg transition-all"
+                                                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-500/20 text-gray-300 dark:text-gray-500 hover:text-red-500 rounded-lg transition-all"
                                                             title="Remover"
                                                         >
                                                             <XMarkIcon className="w-4 h-4" />
@@ -2428,7 +2429,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
                                         {!attachments.length && (
                                             <div className="mt-8 flex flex-col items-center justify-center text-center opacity-30 select-none">
-                                                <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 flex items-center justify-center">
+                                                <div className="w-16 h-16 bg-gray-200 dark:bg-slate-800 rounded-full mb-4 flex items-center justify-center">
                                                     <ArrowDownTrayIcon className="w-8 h-8 text-gray-400" />
                                                 </div>
                                                 <p className="text-xs font-medium text-gray-600">Nenhum arquivo<br />adicionado ainda</p>
@@ -2437,7 +2438,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     </div>
                                 </div>
 
-                                <div className="p-4 border-t bg-gray-50 flex justify-between items-center shrink-0">
+                                <div className="p-4 border-t border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-slate-900/40 flex justify-between items-center shrink-0">
                                     <span className="text-xs text-gray-400 ml-1">
                                         {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
                                     </span>
@@ -2467,17 +2468,17 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 </div>
                             </div>
                         ) : view === 'settings' ? (
-                            <div className="flex-1 p-8 overflow-y-auto bg-gray-50/30">
+                            <div className="flex-1 p-8 overflow-y-auto bg-gray-50/30 dark:bg-transparent">
                                 <div className="max-w-4xl mx-auto">
                                     <div className="flex justify-between items-center mb-8">
                                         <div>
                                             <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Gerenciar Contas</h2>
-                                            <p className="text-gray-500 text-sm mt-1">Configure múltiplos e-mails para sua empresa.</p>
+                                            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Configure múltiplos e-mails para sua empresa.</p>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Suas Contas</p>
-                                                <p className="text-sm font-black text-gray-900">{accounts.length} / {currentUser.email_permissions?.account_limit || 1}</p>
+                                                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Suas Contas</p>
+                                                <p className="text-sm font-black text-gray-900 dark:text-white">{accounts.length} / {currentUser.email_permissions?.account_limit || 1}</p>
                                             </div>
                                             {canManageAccounts && (
                                                 <button 
@@ -2490,7 +2491,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         });
                                                         showToast('Formulário pronto para nova conta.', 'info');
                                                     }}
-                                                    className={`px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${accounts.length >= (currentUser.email_permissions?.account_limit || 1) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-brand-primary text-white hover:bg-emerald-600 active:scale-95'}`}
+                                                    className={`px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${accounts.length >= (currentUser.email_permissions?.account_limit || 1) ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'bg-brand-primary text-white hover:bg-emerald-600 active:scale-95'}`}
                                                     disabled={accounts.length >= (currentUser.email_permissions?.account_limit || 1)}
                                                 >
                                                     <UserPlusIcon className="w-5 h-5" />
@@ -2502,21 +2503,21 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                                         {accounts.map(acc => (
-                                            <div key={acc.id} className={`p-6 rounded-3xl border transition-all cursor-pointer group ${activeAccountId === acc.id ? 'bg-white border-emerald-200 shadow-xl ring-2 ring-emerald-500/20' : 'bg-white/50 border-gray-100 hover:border-gray-200 shadow-sm'}`} onClick={() => setActiveAccountId(acc.id)}>
+                                            <div key={acc.id} className={`p-6 rounded-3xl border transition-all cursor-pointer group ${activeAccountId === acc.id ? 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-500/30 shadow-xl ring-2 ring-emerald-500/20' : 'bg-white/50 dark:bg-slate-900/50 border-gray-100 dark:border-white/5 hover:border-gray-200 shadow-sm'}`} onClick={() => setActiveAccountId(acc.id)}>
                                                 <div className="flex justify-between items-start mb-4">
-                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${activeAccountId === acc.id ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${activeAccountId === acc.id ? 'bg-brand-primary text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500'}`}>
                                                         {acc.imap_user.substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={(e) => { e.stopPropagation(); deleteAccount(acc.id); }} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                                        <button onClick={(e) => { e.stopPropagation(); deleteAccount(acc.id); }} className="p-2 text-gray-300 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-lg">
                                                             <TrashIcon className="w-4 h-4" />
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="font-bold text-gray-900 truncate mb-1">{acc.imap_user}</div>
-                                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{acc.imap_host}</div>
+                                                <div className="font-bold text-gray-900 dark:text-white truncate mb-1">{acc.imap_user}</div>
+                                                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">{acc.imap_host}</div>
                                                 {activeAccountId === acc.id && (
-                                                    <div className="mt-4 flex items-center gap-2 text-emerald-600 text-[10px] font-black uppercase">
+                                                    <div className="mt-4 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase">
                                                         <CheckIcon className="w-3 h-3" /> Editando Agora
                                                     </div>
                                                 )}
@@ -2525,62 +2526,62 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     </div>
 
                                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
-                                            <h3 className="font-black text-gray-900 mb-6 text-xl tracking-tight flex items-center gap-3">
-                                                <div className="p-2 bg-emerald-50 rounded-lg text-brand-primary"><InboxIcon className="w-5 h-5" /></div>
+                                        <div className="bg-white dark:bg-slate-900/60 p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-6 text-xl tracking-tight flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-brand-primary"><InboxIcon className="w-5 h-5" /></div>
                                                 {t('email.incoming_server')}
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.host_imap')}</label>
-                                                    <input value={settings.imap_host} onChange={e => setSettings(s => ({ ...s, imap_host: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="imap.gmail.com" />
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.host_imap')}</label>
+                                                    <input value={settings.imap_host} onChange={e => setSettings(s => ({ ...s, imap_host: e.target.value }))} className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="imap.gmail.com" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.port')}</label>
-                                                    <input type="number" value={settings.imap_port} onChange={e => setSettings(s => ({ ...s, imap_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="993" />
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.port')}</label>
+                                                    <input type="number" value={settings.imap_port} onChange={e => setSettings(s => ({ ...s, imap_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="993" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.user')}</label>
-                                                    <input value={settings.imap_user} onChange={e => setSettings(s => ({ ...s, imap_user: e.target.value, smtp_user: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.user')}</label>
+                                                    <input value={settings.imap_user} onChange={e => setSettings(s => ({ ...s, imap_user: e.target.value, smtp_user: e.target.value }))} className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.pass')}</label>
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.pass')}</label>
                                                     <div className="relative mt-2">
-                                                        <input type={showEmailPass ? 'text' : 'password'} value={settings.imap_pass} onChange={e => setSettings(s => ({ ...s, imap_pass: e.target.value, smtp_pass: e.target.value }))} className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all pr-10" />
+                                                        <input type={showEmailPass ? 'text' : 'password'} value={settings.imap_pass} onChange={e => setSettings(s => ({ ...s, imap_pass: e.target.value, smtp_pass: e.target.value }))} className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all pr-10 dark:text-white" />
                                                         <button type="button" onClick={() => setShowEmailPass(p => !p)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
                                                             {showEmailPass ? <XMarkIcon className="w-5 h-5" /> : <MagnifyingGlassIcon className="w-5 h-5" />}
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                                <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-white/5">
                                                     <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" checked={settings.imap_ssl} onChange={e => setSettings(s => ({ ...s, imap_ssl: e.target.checked }))} />
-                                                    <label className="text-sm font-bold text-gray-700">{t('email.use_ssl')}</label>
+                                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('email.use_ssl')}</label>
                                                 </div>
                                             </div>
 
-                                            <h3 className="font-black text-gray-900 mb-6 mt-12 text-xl tracking-tight flex items-center gap-3">
-                                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><PaperAirplaneIcon className="w-5 h-5" /></div>
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-6 mt-12 text-xl tracking-tight flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg text-blue-600"><PaperAirplaneIcon className="w-5 h-5" /></div>
                                                 {t('email.outgoing_server')}
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.host_smtp')}</label>
-                                                    <input value={settings.smtp_host} onChange={e => setSettings(s => ({ ...s, smtp_host: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="smtp.gmail.com" />
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.host_smtp')}</label>
+                                                    <input value={settings.smtp_host} onChange={e => setSettings(s => ({ ...s, smtp_host: e.target.value }))} className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="smtp.gmail.com" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.port')}</label>
-                                                    <input type="number" value={settings.smtp_port} onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="465" />
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{t('email.port')}</label>
+                                                    <input type="number" value={settings.smtp_port} onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="465" />
                                                 </div>
-                                                <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                                <div className="flex items-center gap-3 bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-white/5">
                                                     <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" checked={settings.smtp_ssl} onChange={e => setSettings(s => ({ ...s, smtp_ssl: e.target.checked }))} />
-                                                    <label className="text-sm font-bold text-gray-700">{t('email.use_ssl')}</label>
+                                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('email.use_ssl')}</label>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
-                                            <h3 className="font-black text-gray-900 mb-2 text-xl tracking-tight">{t('email.signature_title')}</h3>
-                                            <p className="text-sm text-gray-500 mb-6">{t('email.signature_desc')}</p>
+                                        <div className="bg-white dark:bg-slate-900/60 p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-2 text-xl tracking-tight">{t('email.signature_title')}</h3>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{t('email.signature_desc')}</p>
                                             <div className="min-h-[250px] mb-8">
                                                 <ReactQuill
                                                     theme="snow"
@@ -2591,8 +2592,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             </div>
                                         </div>
 
-                                        <div className="flex justify-end gap-4 p-8 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                                            <button onClick={() => setView('inbox')} className="px-6 py-3 text-gray-500 font-bold hover:text-gray-700 transition-colors">{t('generic.cancel')}</button>
+                                        <div className="flex justify-end gap-4 p-8 bg-white dark:bg-slate-900/60 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+                                            <button onClick={() => setView('inbox')} className="px-6 py-3 text-gray-500 dark:text-gray-400 font-bold hover:text-gray-700 dark:hover:text-gray-200 transition-colors">{t('generic.cancel')}</button>
                                             <button onClick={saveSettings} className="px-10 py-3 bg-brand-primary text-white rounded-2xl font-black shadow-lg hover:bg-emerald-600 transition-all active:scale-95">{t('email.save_settings')}</button>
                                         </div>
                                     </div>
@@ -2649,12 +2650,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             {/* --- Tag Management Modal --- */}
             {showTagModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-                        <h3 className="text-lg font-bold mb-4">{t('email.manage_tags')}</h3>
+                    <div className="bg-white dark:bg-slate-900 rounded-lg p-6 w-96 shadow-xl border dark:border-white/5">
+                        <h3 className="text-lg font-bold mb-4 dark:text-white">{t('email.manage_tags')}</h3>
 
                         <div className="flex gap-2 mb-4">
                             <input
-                                className="flex-1 border rounded px-2"
+                                className="flex-1 border dark:border-white/10 rounded px-2 dark:bg-slate-800 dark:text-white"
                                 placeholder={t('email.new_tag')}
                                 value={newTagLabel}
                                 onChange={e => setNewTagLabel(e.target.value)}
@@ -2672,8 +2673,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {availableTags.map(tag => (
-                                <div key={tag.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                    <div className="flex items-center gap-2">
+                                <div key={tag.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/40 border dark:border-white/5 rounded">
+                                    <div className="flex items-center gap-2 dark:text-gray-200">
                                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }}></span>
                                         <span>{tag.label}</span>
                                     </div>
@@ -2685,7 +2686,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">{t('email.close')}</button>
+                            <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded">{t('email.close')}</button>
                         </div>
                     </div>
                 </div>
@@ -2693,25 +2694,25 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             {/* --- Contacts Modal --- */}
             {showContactsModal && (
                 <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] border dark:border-white/5">
                         {/* Header */}
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50/80">
+                        <div className="p-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/80 dark:bg-slate-900">
                             <div className="flex items-center gap-2">
                                 <UsersIcon className="w-5 h-5 text-brand-primary" />
-                                <h3 className="font-bold text-gray-800 text-lg">Diretório de Contatos</h3>
+                                <h3 className="font-bold text-gray-800 dark:text-white text-lg">Diretório de Contatos</h3>
                             </div>
-                            <button onClick={() => setShowContactsModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                            <button onClick={() => setShowContactsModal(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-white/5 rounded-full transition-colors">
                                 <XMarkIcon className="w-6 h-6 text-gray-500" />
                             </button>
                         </div>
 
                         {/* Add New Contact Form */}
-                        <div className="p-4 bg-emerald-50/50 border-b border-emerald-100">
+                        <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-500/20">
                             <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3">Novo Contato</h4>
                             <div className="flex flex-col sm:flex-row gap-2">
                                 <div className="flex-1">
                                     <input
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                                        className="w-full border border-gray-300 dark:border-white/10 dark:bg-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all dark:text-white"
                                         placeholder="Nome"
                                         value={newContactName}
                                         onChange={e => setNewContactName(e.target.value)}
@@ -2719,7 +2720,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 </div>
                                 <div className="flex-1">
                                     <input
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                                        className="w-full border border-gray-300 dark:border-white/10 dark:bg-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all dark:text-white"
                                         placeholder="Email"
                                         value={newContactEmail}
                                         onChange={e => setNewContactEmail(e.target.value)}
@@ -2737,7 +2738,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         </div>
 
                         {/* Contacts List */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-slate-950/30">
                             {(() => {
                                 if (contacts.length === 0) {
                                     return (
@@ -2756,17 +2757,17 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 }, {} as Record<string, typeof contacts>);
 
                                 return Object.entries(grouped).sort(([d1], [d2]) => d1.localeCompare(d2)).map(([domain, domainContacts]) => (
-                                    <div key={domain} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                                    <div key={domain} className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm">
                                         <button
                                             onClick={() => setExpandedDomains(prev => ({ ...prev, [domain]: !prev[domain] }))}
-                                            className="w-full flex justify-between items-center p-4 hover:bg-emerald-50/50 transition-colors"
+                                            className="w-full flex justify-between items-center p-4 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                                                     {domain.charAt(0)}
                                                 </div>
-                                                <div className="text-left font-bold text-gray-800 tracking-tight text-sm">{domain}</div>
-                                                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">{domainContacts.length}</span>
+                                                <div className="text-left font-bold text-gray-800 dark:text-white tracking-tight text-sm">{domain}</div>
+                                                <span className="text-[10px] bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">{domainContacts.length}</span>
                                             </div>
                                             <div className="text-gray-400">
                                                 {expandedDomains[domain] !== false ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
@@ -2775,7 +2776,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                         {expandedDomains[domain] !== false && (
                                             <div className="px-2 pb-2 space-y-1">
                                                 {domainContacts.map(contact => (
-                                                    <div key={contact.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-all group">
+                                                    <div key={contact.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-all group">
                                                         <input 
                                                             type="checkbox" 
                                                             checked={selectedContacts.includes(contact.email)}
@@ -2788,7 +2789,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                             {contact.name?.substring(0, 1).toUpperCase() || '?'}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="font-bold text-gray-800 text-sm truncate">{contact.name}</div>
+                                                            <div className="font-bold text-gray-800 dark:text-gray-200 text-sm truncate">{contact.name}</div>
                                                             <div className="text-[11px] text-gray-500 truncate">{contact.email}</div>
                                                         </div>
                                                         <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2802,7 +2803,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                             >
                                                                 <EnvelopeIcon className="w-4 h-4" />
                                                             </button>
-                                                            <button onClick={() => deleteContact(contact.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                                            <button onClick={() => deleteContact(contact.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-lg transition-colors">
                                                                 <TrashIcon className="w-4 h-4" />
                                                             </button>
                                                         </div>
@@ -2815,7 +2816,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             })()}
                         </div>
                         {selectedContacts.length > 0 && (
-                            <div className="p-4 bg-brand-primary/5 border-t border-brand-primary/10 flex justify-between items-center animate-fade-in-up flex-shrink-0">
+                            <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border-t border-brand-primary/10 dark:border-brand-primary/20 flex justify-between items-center animate-fade-in-up flex-shrink-0">
                                 <span className="text-sm font-bold text-brand-primary">{selectedContacts.length} contato{selectedContacts.length > 1 ? 's' : ''} selecionado{selectedContacts.length > 1 ? 's' : ''}</span>
                                 <button
                                     onClick={() => {
