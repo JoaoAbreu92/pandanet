@@ -86,6 +86,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false); // Added loading state for messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   // const [user] = useState({ id: 'current-user-id' }); // Mock removed
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showContactSidebar, setShowContactSidebar] = useState(false);
@@ -191,6 +192,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       fetchMessages(selectedConversation.id);
       markAsRead(selectedConversation.id);
       
+      // Force scroll on conversation change
+      scrollToBottom(true);
+      
       // Clear bell notifications for this conversation
       markNotificationsByLink('/whatspanda');
     }
@@ -200,8 +204,22 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (force = false) => {
+    if (force) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      // Se estiver até 150px do fundo, auto-scrolla
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
+      if (isAtBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   };
 
   const fetchSettings = async () => {
@@ -605,6 +623,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         setShowStickerPicker(false);
         // Recarregar mensagens após o envio
         fetchMessages(selectedConversation.id);
+        // Forçar scroll para baixo para ver a própria mensagem enviada
+        scrollToBottom(true);
     } catch (error) {
         console.error('Error sending message:', error);
         alert('Erro ao enviar mensagem.');
@@ -1057,7 +1077,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+            <div 
+              ref={scrollContainerRef}
+              className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
+            >
               {messages.map((msg) => (
                 <div
                   key={msg.id}
