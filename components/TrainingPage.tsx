@@ -32,6 +32,7 @@ interface Submission {
     employee_id: string;
     completed_at?: string;
     answers: number[];
+    status?: string;
 }
 
 function getEmbedUrl(url: string): string {
