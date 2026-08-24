@@ -67,10 +67,12 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
     const fetchReservations = async () => {
         if (!currentUser?.company_id) return;
         try {
+            const itemType = activeTab === 'rooms' ? 'room' : 'vehicle';
             const { data, error } = await supabase
                 .from('reservations')
-                .select('*, reservation_items(name, type)')
+                .select('*, reservation_items!inner(name, type)')
                 .eq('company_id', currentUser.company_id)
+                .eq('reservation_items.type', itemType)
                 .order('start_date', { ascending: false })
                 .order('start_time', { ascending: false });
 
@@ -281,29 +283,39 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
             </div>
 
             {/* Abas */}
-            <div className="flex gap-2 bg-slate-100 dark:bg-slate-950 p-1.5 rounded-2xl max-w-sm border dark:border-slate-800">
+            <div className="flex gap-2">
                 <button
                     onClick={() => setActiveTab('rooms')}
-                    className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all border-2 ${
                         activeTab === 'rooms'
-                            ? 'bg-white dark:bg-slate-900 text-brand-primary shadow-md'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                            ? 'bg-brand-primary text-white border-brand-primary shadow-lg shadow-brand-primary/20'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-brand-primary'
                     }`}
                 >
-                    <BuildingOfficeIcon className="w-4 h-4" />
-                    Salas e Espaços
+                    <BuildingOfficeIcon className="w-5 h-5" />
+                    🏢 Salas e Espaços
+                    {activeTab === 'rooms' && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-black">{reservations.length}</span>}
                 </button>
                 <button
                     onClick={() => setActiveTab('vehicles')}
-                    className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all border-2 ${
                         activeTab === 'vehicles'
-                            ? 'bg-white dark:bg-slate-900 text-brand-primary shadow-md'
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-blue-500'
                     }`}
                 >
-                    <RocketLaunchIcon className="w-4 h-4" />
-                    Veículos
+                    <RocketLaunchIcon className="w-5 h-5" />
+                    🚗 Veículos da Frota
+                    {activeTab === 'vehicles' && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-black">{reservations.length}</span>}
                 </button>
+            </div>
+            {/* Indicador do tipo ativo */}
+            <div className={`text-xs font-bold px-3 py-1.5 rounded-xl w-fit ${
+                activeTab === 'rooms'
+                    ? 'bg-brand-primary/10 text-brand-primary'
+                    : 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+            }`}>
+                {activeTab === 'rooms' ? '🏢 Você está em: Reservas de Salas e Espaços' : '🚗 Você está em: Reservas de Veículos'}
             </div>
 
             {loading ? (
@@ -529,8 +541,7 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
 
                     {/* Colunas do Layout (Coluna 2, 3, 4) */}
                     {(() => {
-                        const currentType = activeTab === 'rooms' ? 'room' : 'vehicle';
-                        const tabReservations = reservations.filter(r => (r.type || r.reservation_items?.type) === currentType);
+                        const tabReservations = reservations;
                         
                         const approvedActive = tabReservations.filter(r => r.status === 'approved' && r.start_date >= new Date().toISOString().split('T')[0]);
                         const pendingActive = tabReservations.filter(r => r.status === 'pending');
