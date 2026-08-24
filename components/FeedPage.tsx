@@ -549,18 +549,18 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
                         <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
                         <hr className="mb-4" />
-                        <div className="grid grid-cols-3 gap-1 border-t border-gray-100 pt-4 -mx-2">
-                            <div className="text-center">
-                                <p className="font-bold text-brand-text text-base leading-none">{(currentUser.following || []).length}</p>
-                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Seguidores</p>
+                        <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-5 mt-2">
+                            <div className="flex flex-col items-center">
+                                <span className="font-bold text-brand-text text-xl">{(currentUser.following || []).length}</span>
+                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Seguidores</span>
                             </div>
-                            <div className="text-center border-x border-gray-100">
-                                <p className="font-bold text-brand-text text-base leading-none">{allEmployees.length}</p>
-                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Usuários</p>
+                            <div className="flex flex-col items-center border-x border-gray-100">
+                                <span className="font-bold text-brand-text text-xl">{allEmployees.length}</span>
+                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Usuários</span>
                             </div>
-                            <div className="text-center">
-                                <p className="font-bold text-brand-text text-base leading-none">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p>
-                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Interações</p>
+                            <div className="flex flex-col items-center">
+                                <span className="font-bold text-brand-text text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
+                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Interações</span>
                             </div>
                         </div>
                     </Card>

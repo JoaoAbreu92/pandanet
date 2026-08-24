@@ -100,6 +100,12 @@ const CompanyPoll: React.FC = () => {
           ]);
 
         if (error) {
+          if (error.code === '23505') {
+            console.log('Duplicate vote detected (Code 23505). Syncing UI as "Already Voted".');
+            setHasVoted(true);
+            fetchLatestPoll();
+            return;
+          }
           console.error('Supabase Vote Insert Error:', error);
           alert(`Erro ao registrar voto: ${error.message} (${error.code})`);
           throw error;
