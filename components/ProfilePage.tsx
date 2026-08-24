@@ -208,7 +208,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                 </div>
                 <div className="absolute -bottom-12 left-6">
                     <div className="relative group">
-                        <img src={userData.avatarUrl} alt="User Avatar" className="w-24 h-24 rounded-full border-4 border-white" />
+                        <img src={userData.avatarUrl} alt="User Avatar" className="w-24 h-24 rounded-full border-4 border-white object-cover" />
                         {isEditing && (
                             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
