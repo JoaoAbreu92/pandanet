@@ -1517,12 +1517,12 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
             ctx.save();
             ctx.fillStyle = borderColor || '#ffffff';
             ctx.shadowColor = glowColor;
-            ctx.shadowBlur = 6;
-            const starRadius = 10;
-            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.14;
+            ctx.shadowBlur = 8;
+            const starRadius = 20;
+            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.16;
             for (let i = 0; i < starsCount; i++) {
-                const angle = startAngle + i * 0.28;
-                const dist = outerRadius + 14;
+                const angle = startAngle + i * 0.32;
+                const dist = outerRadius + 22;
                 const sx = cx + dist * Math.cos(angle);
                 const sy = cy + dist * Math.sin(angle);
                 drawStar(ctx, sx, sy, 5, starRadius, starRadius / 2);
@@ -1532,9 +1532,9 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
         // 7. Draw Level Badge Frame at the bottom right
         if (showBadgeFrame) {
-            const bx = 422;
-            const by = 422;
-            const br = 52; 
+            const bx = 458;
+            const by = 458;
+            const br = 48; 
 
             ctx.save();
             ctx.beginPath();
