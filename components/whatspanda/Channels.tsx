@@ -415,7 +415,6 @@ const Channels: React.FC = () => {
 
         const updates: Partial<WhatsAppSettings> = {
             company_id: companyId,
-            user_id: currentUser.id,
             connection_name: connectionName,
             channel_type: channelType,
             phone_number: phoneNumber,
