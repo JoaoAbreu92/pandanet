@@ -219,7 +219,10 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 number: conv.contact_phone,
-                text: message
+                text: message,
+                textMessage: {
+                    text: message
+                }
             })
         });
 

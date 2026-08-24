@@ -78,7 +78,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
         const { data: queues } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         if (queues) setAvailableQueues(queues);
 
-        const { data: users } = await supabase.from('profiles').select('id, name').eq('company_id', companyId);
+        const { data: users } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
         if (users) setAvailableUsers(users);
     };
 
