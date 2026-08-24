@@ -405,14 +405,14 @@ const AppContent: React.FC = () => {
                 const companyId = companies[0].id;
                 const isResp = (companies[0].responsible_email || '').toLowerCase() === session.user.email.toLowerCase();
 
-                // 2. Insert Profile
-                const { error } = await supabase.from('profiles').insert({
+                // 2. Insert or Update Profile (Upsert)
+                const { error } = await supabase.from('profiles').upsert({
                     id: session.user.id,
                     full_name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
                     email: session.user.email,
                     company_id: companyId,
                     role: isResp ? 'admin' : 'employee'
-                });
+                }, { onConflict: 'id' });
 
                 if (error) {
                     alert("Erro ao recuperar perfil: " + error.message);
