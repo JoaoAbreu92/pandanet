@@ -1005,10 +1005,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         if (!window.confirm("Deseja encerrar este suporte? O chat será bloqueado para novas mensagens.")) return;
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('conversations')
                 .update({ is_closed: true })
-                .eq('id', selectedConversationId);
+                .eq('id', selectedConversationId)
+                .select()
+                .single();
 
             if (error) throw error;
 
@@ -1016,7 +1018,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             // Trigger refresh to block input
             await fetchConversations();
         } catch (err: any) {
-            alert("Erro ao encerrar suporte: " + err.message);
+            console.error("Erro no UPDATE is_closed:", err);
+            alert("Erro ao encerrar suporte: " + (err.message || "Acesso negado no banco. Recarregue a página e tente novamente."));
         }
     };
 
