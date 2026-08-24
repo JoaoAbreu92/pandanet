@@ -59,7 +59,7 @@ const Channels: React.FC = () => {
             pollingInterval = setInterval(async () => {
                 pollingAttempts++;
                 if (pollingAttempts > 15) {
-                    addDebugLog('Timeout: O QR Code demorou muito para ser gerado. O backend Evolution API pode estar fora do ar.', 'error');
+                    addDebugLog('Timeout: O QR Code demorou muito para ser gerado. O backend WhatsPanda (Baileys) pode estar fora do ar.', 'error');
                     setShowDebug(true);
                     clearInterval(pollingInterval);
                     return;
