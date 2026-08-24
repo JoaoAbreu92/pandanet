@@ -59,7 +59,14 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
             const { error } = await supabase
                 .from('crm_contracts')
                 .insert([{
-                    ...formData,
+                    customer_id: formData.customer_id,
+                    subject: formData.subject,
+                    contract_value: formData.contract_value,
+                    contract_type: formData.contract_type,
+                    start_date: formData.start_date,
+                    end_date: formData.end_date || null,
+                    description: formData.description,
+                    status: formData.status,
                     company_id: currentUser.company_id
                 }]);
 

@@ -253,13 +253,7 @@ const CRMDashboard: React.FC = () => {
 
     return (
         <div className="p-4 md:p-8 bg-gray-50 dark:bg-slate-950 min-h-full space-y-6">
-            {/* Header / Alert */}
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 p-4 rounded-xl flex items-center justify-between">
-                <p className="text-emerald-700 dark:text-emerald-400 text-sm">
-                    A demonstração é redefinida a cada 12 horas. Sinta-se à vontade para testar todos os recursos antes de comprar.
-                </p>
-                <span className="text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">Versão CRM: 1.0.0</span>
-            </div>
+
 
             {/* Top Widgets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
