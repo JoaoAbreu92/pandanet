@@ -24,7 +24,8 @@ if (!process.env.JWT_SECRET) {
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
-const port = process.env.PORT || 3000;
+const isVPS = process.env.IS_VPS || process.platform === 'linux';
+const port = isVPS ? (process.env.PORT || 3000) : 3005;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 let evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution-api:8080';
@@ -577,14 +578,19 @@ setupPushNotificationsListener();
 // --- JWT Auth Middleware for Frontend Requests ---
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
     if (global.addDebugLog) {
-      global.addDebugLog('AUTH_WARN', 'No Bearer token provided in Authorization header');
+      global.addDebugLog('AUTH_WARN', 'No Bearer token or query token provided');
     }
     return res.status(401).json({ error: 'Unauthorized' });
   }
-
-  const token = authHeader.split(' ')[1];
   try {
     // 1. Tenta JWT local PRIMEIRO (rápido, sem rede, funciona dentro do Docker)
     if (JWT_SECRET) {
@@ -977,16 +983,30 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             const fileName = cleanUrl.split('/').pop() || 'file';
 
             // Fazer upload de mídias base64 para o Supabase Storage para obter URL pública HTTPS limpa
-            const audioDataUri = mediaUrl.startsWith('data:')
-                ? mediaUrl
-                : `data:${mediaType || 'audio/webm'};base64,${base64Data}`;
+            const cleanMediaType = mediaType ? mediaType.split(';')[0] : 'audio/webm';
+
+            // Se mediaUrl for um Data URI, removemos parâmetros como codecs=opus que podem falhar na Evolution API/ffmpeg
+            let cleanMediaUrl = mediaUrl;
+            if (mediaUrl.startsWith('data:')) {
+                const commaIdx = mediaUrl.indexOf(',');
+                if (commaIdx !== -1) {
+                    const header = mediaUrl.substring(0, commaIdx);
+                    const base64Part = mediaUrl.substring(commaIdx + 1);
+                    const cleanMime = (header.match(/^data:([^;]+)/)?.[1] || 'audio/webm').split(';')[0];
+                    cleanMediaUrl = `data:${cleanMime};base64,${base64Part}`;
+                }
+            }
+
+            const audioDataUri = cleanMediaUrl.startsWith('data:')
+                ? cleanMediaUrl
+                : `data:${cleanMediaType};base64,${base64Data}`;
 
             if (mediaUrl.startsWith('data:')) {
                 const uploadedUrl = await uploadMediaToSupabase(
                     base64Data,
                     isAudio ? 'audio' : (isSticker ? 'sticker' : getEvoMediaType(mediaType)),
                     conv.company_id,
-                    mediaType || 'application/octet-stream',
+                    cleanMediaType || 'application/octet-stream',
                     fileName && fileName !== 'file' ? fileName : (isAudio ? `audio_${Date.now()}.webm` : `file_${Date.now()}`)
                 );
                 if (uploadedUrl) {
@@ -1019,7 +1039,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 number: phoneNumber,
                 mediaMessage: {
                     mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
-                    mimetype: mediaType || 'application/octet-stream',
+                    mimetype: cleanMediaType || 'application/octet-stream',
                     media: mediaSource,
                     fileName: fileName || 'documento',
                     caption: message || ''
@@ -1286,21 +1306,9 @@ router.get('/debug-logs', (req, res) => {
 // API: Proxy de Download de Mídia do Supabase Storage
 // Aceita token via query param (?token=...) OU via header Authorization
 // para permitir navegação direta do browser (window.open) com Content-Disposition: attachment
-router.get('/media/proxy', async (req, res) => {
-    const { url, token: queryToken } = req.query;
+router.get('/media/proxy', authMiddleware, async (req, res) => {
+    const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
-
-    // Verificar autenticação via query param ou header
-    const authHeader = req.headers['authorization'];
-    const headerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = queryToken || headerToken;
-    if (!token) return res.status(401).json({ error: 'Token de autenticação obrigatório' });
-
-    try {
-        jwt.verify(token, JWT_SECRET);
-    } catch (e) {
-        return res.status(401).json({ error: 'Token inválido ou expirado' });
-    }
 
     try {
         const rawUrl = decodeURIComponent(url);
