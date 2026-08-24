@@ -334,7 +334,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [agents, setAgents] = useState<any[]>([]);
   const [userQueues, setUserQueues] = useState<string[] | null>(null);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fetchConversationsRef = useRef(fetchConversations);
+  const fetchConversationsRef = useRef<any>(null);
   useEffect(() => {
     fetchConversationsRef.current = fetchConversations;
   }, [fetchConversations]);
@@ -383,14 +383,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
         // Se for um novo registro (INSERT), atualiza na hora para nao ter delay
         if (payload.eventType === 'INSERT') {
-          fetchConversationsRef.current();
+          fetchConversationsRef.current?.();
           return;
         }
         
         // Debounce: aguardar 600ms antes de refazer o fetch para updates/deletes
         if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = setTimeout(() => {
-          fetchConversationsRef.current();
+          fetchConversationsRef.current?.();
         }, 600);
       })
       .subscribe();
