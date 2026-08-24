@@ -212,8 +212,11 @@ const AppContent: React.FC = () => {
         setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
 
-    const [isImpersonating, setIsImpersonating] = useState(false);
-    const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
+    const [isImpersonating, setIsImpersonating] = useState(() => localStorage.getItem('pixel_is_impersonating') === 'true');
+    const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(() => {
+        const saved = localStorage.getItem('pixel_impersonated_company');
+        return saved ? JSON.parse(saved) : null;
+    });
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
@@ -444,21 +447,28 @@ const AppContent: React.FC = () => {
 
 
     const handleImpersonateStart = (company: Company) => {
-        setGhostData(true, null); // Auditoria de empresa
+        if (!currentUser) return;
+        const ghostUser = {
+            ...currentUser,
+            company_id: company.id,
+            role: 'Super Admin',
+            isCompanyAdmin: true
+        };
+        setGhostData(true, ghostUser); // Define currentUser como o admin desta empresa
         setImpersonatedCompany(company);
-        setCurrentCompany(company);
-        setCompanyData(company.data || { employees: [] } as any);
-        setCompanySettings(company.settings || { companyName: company.name });
-        setIsImpersonating(true);
+        localStorage.setItem('pixel_impersonated_company', JSON.stringify(company));
         localStorage.setItem('pixel_is_impersonating', 'true');
-        setCurrentPage('home');
-        setAuthStage('logged_in');
+        localStorage.setItem('pixel_current_page', 'home');
+        alert(`Entrando em modo fantasma para a empresa: ${company.name}`);
+        setTimeout(() => window.location.reload(), 100);
     };
 
     const handleImpersonateUserStart = (targetEmployee: Employee) => {
         setGhostData(true, targetEmployee); // Auditoria profunda de usuário
         setIsImpersonating(true);
         localStorage.setItem('pixel_is_impersonating', 'true');
+        localStorage.removeItem('pixel_impersonated_company');
+        localStorage.setItem('pixel_current_page', 'home');
         alert(`Entrando em Modo Auditoria: Agora você vê a intranet como ${targetEmployee.name}. Nenhuma ação sua será registrada.`);
         // Force full reload to ensure useAuth and App's useEffect initialize completely as the new user context
         setTimeout(() => window.location.reload(), 100);
@@ -469,6 +479,7 @@ const AppContent: React.FC = () => {
         setIsImpersonating(false);
         setImpersonatedCompany(null);
         localStorage.removeItem('pixel_is_impersonating');
+        localStorage.removeItem('pixel_impersonated_company');
         window.location.reload();
     };
 
