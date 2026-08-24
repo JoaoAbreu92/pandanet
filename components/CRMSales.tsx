@@ -210,7 +210,7 @@ const CRMSales: React.FC<{
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 dark:bg-slate-800/50 text-[10px] uppercase text-gray-400 font-bold border-b border-gray-100 dark:border-slate-800">
                             <tr>
-                                <th className="px-6 py-4">#</th>
+                                <th className="px-6 py-4">{activeTab === 'items' ? 'Nome do Item' : '#'}</th>
                                 {activeTab === 'items' ? (
                                     <>
                                         <th className="px-6 py-4">Descrição</th>
@@ -246,12 +246,12 @@ const CRMSales: React.FC<{
                                         {activeTab === 'invoices' ? `INV-${item.id.slice(0, 6)}` :
                                             activeTab === 'proposals' ? `PROP-${item.id.slice(0, 6)}` :
                                                 activeTab === 'estimates' ? `EST-${item.id.slice(0, 6)}` :
-                                                    activeTab === 'items' ? `ITEM-${item.id.slice(0, 6)}` : item.id.slice(0, 8)}
+                                                    activeTab === 'items' ? item.description : item.id.slice(0, 8)}
                                     </td>
 
                                     {activeTab === 'items' ? (
                                         <>
-                                            <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">{item.description}</td>
+                                            <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">{item.long_description || '-'}</td>
                                             <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
                                                 {Number(item.rate || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </td>

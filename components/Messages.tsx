@@ -102,7 +102,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         fetchMasterAdmin();
     }, []);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
+    const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams' | 'support'>('conversations');
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
 
     // Sync with prop for deep linking/nudges
@@ -534,6 +534,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
                     return {
                         id: conv.id,
+                        company_id: conv.company_id,
                         participantName: displayName,
                         participantAvatarUrl: displayAvatar,
                         participantId: otherPart?.user_id,
@@ -1290,12 +1291,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                         <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'conversations' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Chat</button>
                         <button onClick={() => setActiveTab('contacts')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'contacts' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Contatos</button>
                         <button onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Equipes</button>
+                        {currentUser?.email === 'ti@grupopixel.com.br' && (
+                            <button onClick={() => setActiveTab('support')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'support' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Suporte</button>
+                        )}
                     </div>
                 </div>
                 
-                {/* Suporte VIP para Admins */}
-                {(currentUser.isCompanyAdmin || currentUser.isAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin') && 
-                    currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && masterAdminId && (
+                {/* Suporte VIP para qualquer usuário */}
+                {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && masterAdminId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
                         {masterAdminProfile && (
@@ -1324,10 +1327,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             )}
                             {conversations.filter(c => {
                                 if (c.isGroup) return false;
-                                // Always show support conversations with master admin (even if closed)
-                                const isSupportConv = c.participantId === masterAdminId;
-                                if (isSupportConv) return true;
-                                // Hide regular closed conversations
+                                // For Master Admin, hide cross-company support conversations from the main chat tab
+                                if (currentUser?.email === 'ti@grupopixel.com.br' && c.company_id !== currentUser?.company_id) return false;
+
+                                // Hide ALL closed conversations (including support, so they disappear until reopened)
                                 return c.is_closed !== true;
                             }).map(conv => {
                                 const isSupportConv = conv.participantId === masterAdminId;
@@ -1371,6 +1374,53 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                     {isSupportConv && conv.is_closed
                                                         ? <span className="text-xs text-orange-500 font-semibold">⛔ Suporte Encerrado — clique para reabrir</span>
                                                         : conv.lastMessage}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                    {activeTab === 'support' && (
+                        <ul>
+                            {conversations.filter(c => c.company_id !== currentUser?.company_id).length === 0 && (
+                                <div className="p-4 text-center text-sm text-gray-500">
+                                    Nenhum chamado de suporte pendente.
+                                </div>
+                            )}
+                            {conversations.filter(c => c.company_id !== currentUser?.company_id).map(conv => {
+                                return (
+                                    <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group px-2 py-1">
+                                        <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
+                                            ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
+                                            : conv.is_closed ? 'bg-gray-50 dark:bg-white/3 border-gray-200 dark:border-white/10 opacity-70'
+                                                : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                                            <div className="relative">
+                                                <img
+                                                    src={conv.participantAvatarUrl}
+                                                    alt={conv.participantName}
+                                                    className={`w-10 h-10 rounded-full border-2 transition-colors ${conv.participantId && onlineUsers.has(conv.participantId)
+                                                        ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                                                        : 'border-gray-300'
+                                                        }`}
+                                                />
+                                                {conv.participantId && onlineUsers.has(conv.participantId) && (
+                                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                                )}
+                                                {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-center mb-0.5">
+                                                    <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
+                                                    <div className="flex items-center gap-1">
+                                                        <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm text-brand-subtle-text truncate">
+                                                    {conv.is_closed
+                                                        ? <span className="text-xs text-orange-500 font-semibold">⛔ Suporte Encerrado</span>
+                                                        : conv.lastMessage || 'Nova solicitação de suporte'}
                                                 </p>
                                             </div>
                                         </div>
