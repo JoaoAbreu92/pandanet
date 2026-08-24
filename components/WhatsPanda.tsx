@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  MessageCircle, 
+import {
+  MessageCircle,
   Users,
   PlusCircle,
   QrCode,
   Settings as SettingsIcon,
   LayoutGrid,
-  Lock
+  Lock,
+  MessagesSquare
 } from 'lucide-react';
 import Chat from './whatspanda/Chat';
 import Contacts from './whatspanda/Contacts';
@@ -15,26 +16,94 @@ import Channels from './whatspanda/Channels';
 import Settings from './whatspanda/Settings';
 import WhatsPandaDashboard from './whatspanda/WhatsPandaDashboard';
 import { BarChart3 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 import { useAuth } from './AuthContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'privados' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard';
+type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard';
 
 interface WhatsPandaProps {
   initialSearch?: string;
 }
 
 const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
-  const { profile } = useAuth();
+  const { profile, currentUser } = useAuth();
   const [currentView, setCurrentView] = useState<View>('privados');
   const [isChatActive, setIsChatActive] = useState(false);
   const [internalSearch, setInternalSearch] = useState(initialSearch);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
-  const handleContactChat = (phone: string) => {
-    setInternalSearch(phone);
-    setCurrentView('privados');
+  const handleContactChat = async (phone: string) => {
+    const companyId = currentUser?.company_id || profile?.company_id;
+    if (!companyId) return;
+
+    // 1. Verificar se a conversa já existe
+    const { data: existingConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('contact_phone', phone)
+      .maybeSingle();
+
+    if (existingConv) {
+      // Se existe, selecionamos e direcionamos para a view adequada
+      setSelectedConversationId(existingConv.id);
+      if (existingConv.is_group) {
+        setCurrentView('grupos');
+      } else {
+        setCurrentView('privados');
+      }
+    } else {
+      // Se não existe, vamos criar um novo atendimento
+      // Precisamos de um canal ativo
+      const { data: channels } = await supabase
+        .from('whatsapp_settings')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('is_connected', true)
+        .limit(1);
+
+      const channelId = channels && channels.length > 0 ? channels[0].id : null;
+
+      if (!channelId) {
+        alert('Nenhum canal ativo e conectado encontrado. Conecte um canal nas configurações primeiro.');
+        return;
+      }
+
+      // Buscar nome do contato do banco de contatos
+      const { data: contact } = await supabase
+        .from('whatsapp_contacts')
+        .select('name')
+        .eq('company_id', companyId)
+        .eq('phone', phone)
+        .maybeSingle();
+
+      const contactName = contact?.name || phone;
+
+      const { data: newConv, error } = await supabase
+        .from('whatsapp_conversations')
+        .insert({
+          company_id: companyId,
+          contact_phone: phone,
+          contact_name: contactName,
+          status: 'aberto',
+          unread_count: 0,
+          last_message_at: new Date().toISOString(),
+          connection_id: channelId,
+          is_group: false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao criar atendimento:', error);
+        alert('Erro ao criar atendimento.');
+      } else if (newConv) {
+        setSelectedConversationId(newConv.id);
+        setCurrentView('privados');
+      }
+    }
   };
 
   const permissions: any = {
@@ -61,6 +130,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
 
   const menuItems = React.useMemo(() => [
     ...(permissions.can_view_chats ? [{ id: 'privados', label: 'Privados', icon: Lock, view: 'privados' }] : []),
+    ...(permissions.can_view_chats ? [{ id: 'grupos', label: 'Grupos', icon: MessagesSquare, view: 'grupos' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(isAdmin ? [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3, view: 'dashboard' }] : []),
@@ -98,10 +168,11 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
 
     switch (currentView) {
       case 'privados': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" initialConversationId={selectedConversationId} /> : null;
+      case 'grupos': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" initialConversationId={selectedConversationId} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
       case 'new-ticket': return permissions.can_view_chats ? (
-        <NewTicket 
-          onBack={() => setCurrentView('privados')} 
+        <NewTicket
+          onBack={() => setCurrentView('privados')}
           onConversationSelect={(conv) => {
             setSelectedConversationId(conv.id);
             setCurrentView('privados');
@@ -150,8 +221,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
               onClick={() => setCurrentView(item.view as View)}
               className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group relative border
                 ${currentView === item.view
-                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10'
-                : 'text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
                 }`}
             >
               <div className={`${currentView === item.view ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors duration-200`}>
@@ -189,7 +260,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       </div>
 
       {/* Mobile Menu - Shown only on small screens */}
-      {menuItems.length > 0 && !(currentView === 'privados' && isChatActive) && (
+      {menuItems.length > 0 && !((currentView === 'privados' || currentView === 'grupos') && isChatActive) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
           {menuItems.map((item) => (
             <button

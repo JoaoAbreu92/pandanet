@@ -309,20 +309,24 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             return res.status(400).json({ error: 'WhatsApp instance not found for this conversation' });
         }
 
-        // Garantir que o número está limpo e tem código do país
-        let phoneNumber = (conv.contact_phone || '').replace(/\D/g, '');
-        
-        // Validar tamanho do número (Brasil: 12-13 dígitos com DDI 55)
-        if (phoneNumber.length > 13 || phoneNumber.length < 10) {
-            console.error(`[SEND API] Número inválido: "${phoneNumber}" (${phoneNumber.length} dígitos). Contato pode ter sido importado com erro de sincronização.`);
-            return res.status(400).json({ 
-                error: 'Número de telefone inválido', 
-                details: `O número "${conv.contact_phone}" não é um número WhatsApp válido. Delete este contato/conversa e sincronize novamente.` 
-            });
-        }
-        
-        if (!phoneNumber.startsWith('55') && phoneNumber.length <= 11) {
-            phoneNumber = '55' + phoneNumber;
+        let phoneNumber;
+        if (conv.is_group) {
+            phoneNumber = conv.contact_phone.includes('@g.us') ? conv.contact_phone : `${conv.contact_phone}@g.us`;
+        } else {
+            phoneNumber = (conv.contact_phone || '').replace(/\D/g, '');
+            
+            // Validar tamanho do número (Brasil: 12-13 dígitos com DDI 55)
+            if (phoneNumber.length > 13 || phoneNumber.length < 10) {
+                console.error(`[SEND API] Número inválido: "${phoneNumber}" (${phoneNumber.length} dígitos). Contato pode ter sido importado com erro de sincronização.`);
+                return res.status(400).json({ 
+                    error: 'Número de telefone inválido', 
+                    details: `O número "${conv.contact_phone}" não é um número WhatsApp válido. Delete este contato/conversa e sincronize novamente.` 
+                });
+            }
+            
+            if (!phoneNumber.startsWith('55') && phoneNumber.length <= 11) {
+                phoneNumber = '55' + phoneNumber;
+            }
         }
         console.log(`[SEND API] Enviando para: ${phoneNumber} | Instância: ${instanceName}`);
 
@@ -645,6 +649,44 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
         }
 
+        // Sincronizar Grupos
+        try {
+            console.log(`[SYNC] Sincronizando grupos de ${activeChats.length} chats ativos...`);
+            for (const chat of activeChats) {
+                const jid = chat.remoteJid || chat.jid || chat.id || '';
+                if (jid.includes('@g.us')) {
+                    const phone = jid.split('@')[0];
+                    
+                    // Verificar se já existe a conversa no banco
+                    const { data: convExists } = await supabase
+                        .from('whatsapp_conversations')
+                        .select('id')
+                        .eq('company_id', companyId)
+                        .eq('contact_phone', phone)
+                        .maybeSingle();
+
+                    if (!convExists) {
+                        const groupInfo = await fetchGroupInfo(instanceName, jid);
+                        const groupName = groupInfo?.subject || chat.name || chat.subject || 'Grupo (Sem Nome)';
+                        
+                        await supabase.from('whatsapp_conversations').insert({
+                            company_id: companyId,
+                            connection_id: connectionId,
+                            contact_phone: phone,
+                            contact_name: groupName,
+                            is_group: true,
+                            status: 'fechado',
+                            unread_count: 0,
+                            last_message_at: new Date().toISOString()
+                        });
+                        console.log(`[SYNC] Grupo importado com sucesso: ${groupName} (${phone})`);
+                    }
+                }
+            }
+        } catch (groupSyncErr) {
+            console.error(`[SYNC] Erro ao sincronizar grupos:`, groupSyncErr.message);
+        }
+
         console.log(`[SYNC] Histórico para ${activeChats.length} chats ignorado por configuração (apenas novas mensagens geram atendimentos).`);
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
@@ -881,6 +923,26 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
     }
 }
 
+async function fetchGroupInfo(instanceName, groupJid) {
+    try {
+        console.log(`[EVOLUTION] Buscando info do grupo ${groupJid} na instância ${instanceName}...`);
+        const resp = await fetch(`${evoUrl}/group/findGroupInfos/${instanceName}?groupJid=${groupJid}`, {
+            method: 'GET',
+            headers: { 'apikey': evoKey }
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            return data;
+        } else {
+            const errText = await resp.text();
+            console.error(`[EVO-GROUP-INFO] Erro ${resp.status}: ${errText}`);
+        }
+    } catch (err) {
+        console.error(`[EVO-GROUP-INFO] Exceção ao buscar grupo ${groupJid}:`, err.message);
+    }
+    return null;
+}
+
 const activeCreations = new Map(); // key: `${companyId}_${fromPhone}` -> Promise<conversationId>
 
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
@@ -889,8 +951,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         let remoteJid = message.key?.remoteJid || '';
         
         // Ignorar broadcasts mas permitir grupos e @lid
-        if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@g.us')) return;
-        const isGroup = false;
+        if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) return;
+        const isGroup = remoteJid.includes('@g.us');
         
         // extrair telefone real
         let fromPhone;
@@ -1102,7 +1164,9 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 // Resolver nome amigável do contato/grupo
                 let resolvedName = null;
                 if (isGroup) {
-                    resolvedName = message?.subject || 'Grupo (Sem Nome)';
+                    const instanceName = `conn_${connectionId}`;
+                    const groupInfo = await fetchGroupInfo(instanceName, remoteJid);
+                    resolvedName = groupInfo?.subject || message?.subject || 'Grupo (Sem Nome)';
                 } else {
                     const { data: dbContact } = await supabase
                         .from('whatsapp_contacts')
@@ -1160,9 +1224,17 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     nextStatus = 'aberto';
                 }
                 
-                // Tentar obter um nome melhor se o atual for apenas o número bruto
+                // Tentar obter um nome melhor se o atual for apenas o número bruto ou sem nome
                 let resolvedName = conv.contact_name;
-                if (!isGroup) {
+                if (isGroup) {
+                    if (!resolvedName || resolvedName === 'Grupo (Sem Nome)' || /^\d+$/.test(resolvedName)) {
+                        const instanceName = `conn_${connectionId}`;
+                        const groupInfo = await fetchGroupInfo(instanceName, remoteJid);
+                        if (groupInfo?.subject) {
+                            resolvedName = groupInfo.subject;
+                        }
+                    }
+                } else {
                     if (!resolvedName || /^\d+$/.test(resolvedName) || resolvedName.startsWith('+55')) {
                         const { data: dbContact } = await supabase
                             .from('whatsapp_contacts')
@@ -1212,8 +1284,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 addDebugLog('MSG_INSERT_OK', `Mensagem ${msgId} salva com sucesso na conv ${conversationId}`);
             }
 
-            if (!isHistorical && !isFromMe) {
-                // Chatbot se necessário
+            if (!isHistorical && !isFromMe && !isGroup) {
+                // Chatbot se necessário (apenas para privados, não grupos)
                 runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
             }
         }

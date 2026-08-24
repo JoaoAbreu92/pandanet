@@ -649,8 +649,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     // Filtros de departamento
     if (filterQueue.length > 0) query = query.in('queue_id', filterQueue);
 
-    // Sempre filtra grupos (remove)
-    query = query.neq('is_group', true);
+    // Filtra pelo tipo de chat selecionado
+    if (chatTypeFilter === 'group') {
+      query = query.eq('is_group', true);
+    } else if (chatTypeFilter === 'private') {
+      query = query.neq('is_group', true);
+    }
 
     const { data, error } = await query.order('last_message_at', { ascending: false });
     
