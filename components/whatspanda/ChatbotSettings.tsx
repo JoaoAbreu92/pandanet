@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause } from 'lucide-react';
+import { Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause, RefreshCw, Send, Smartphone, ArrowRight, BookOpen, Layers } from 'lucide-react';
 import { SparklesIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface ChatbotFlow {
@@ -18,6 +18,13 @@ interface ChatbotNode {
     content: any;
 }
 
+interface SimMessage {
+    id: string;
+    sender: 'user' | 'bot' | 'system';
+    text: string;
+    options?: Array<{ label: string; next_node: string }>;
+}
+
 const ChatbotSettings: React.FC = () => {
     const { profile, currentUser } = useAuth();
     const [flows, setFlows] = useState<ChatbotFlow[]>([]);
@@ -31,12 +38,17 @@ const ChatbotSettings: React.FC = () => {
     const [signature, setSignature] = useState(activeProfile?.whatsapp_signature || '');
     const [useSignature, setUseSignature] = useState(activeProfile?.use_whatsapp_signature || false);
 
+    // Simulator State
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [simHistory, setSimHistory] = useState<SimMessage[]>([]);
+    const [currentNode, setCurrentNode] = useState<ChatbotNode | null>(null);
+
     useEffect(() => {
         fetchData();
     }, [currentUser?.company_id]);
 
     const fetchData = async () => {
-        const companyId = currentUser?.company_id;
+        const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
 
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
@@ -56,12 +68,12 @@ const ChatbotSettings: React.FC = () => {
     };
 
     const handleCreateFlow = async () => {
-        const companyId = profile?.company_id;
+        const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
 
         const { data, error } = await supabase.from('whatsapp_chatbot_flows').insert({
             company_id: companyId,
-            name: 'Novo Fluxo',
+            name: 'Novo Fluxo de Chatbot',
             is_active: false
         }).select().single();
 
@@ -73,9 +85,12 @@ const ChatbotSettings: React.FC = () => {
     };
 
     const handleToggleActive = async (flow: ChatbotFlow) => {
+        const companyId = currentUser?.company_id || profile?.company_id;
+        if (!companyId) return;
+
         // Desativar outros fluxos da empresa antes de ativar este
         if (!flow.is_active) {
-            await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', profile?.company_id);
+            await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
         }
 
         const { error } = await supabase.from('whatsapp_chatbot_flows')
@@ -93,6 +108,7 @@ const ChatbotSettings: React.FC = () => {
             if (selectedFlow?.id === flowId) {
                 setSelectedFlow(null);
                 setNodes([]);
+                setIsSimulating(false);
             }
         }
     };
@@ -119,7 +135,7 @@ const ChatbotSettings: React.FC = () => {
     };
 
     const handleSaveGeminiKey = async () => {
-        const companyId = profile?.company_id;
+        const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
         setLoading(true);
         await supabase.from('whatsapp_settings').update({ gemini_api_key: geminiKey }).eq('company_id', companyId);
@@ -128,12 +144,13 @@ const ChatbotSettings: React.FC = () => {
     };
 
     const handleSaveSignature = async () => {
-        if (!profile?.id) return;
+        const profileId = activeProfile?.id;
+        if (!profileId) return;
         setLoading(true);
         const { error } = await supabase.from('profiles').update({ 
             whatsapp_signature: signature,
             use_whatsapp_signature: useSignature
-        }).eq('id', profile.id);
+        }).eq('id', profileId);
         setLoading(false);
         if (error) alert('Erro ao salvar assinatura: ' + error.message);
         else alert('Assinatura salva com sucesso!');
@@ -144,119 +161,336 @@ const ChatbotSettings: React.FC = () => {
         if (!error) setNodes(nodes.filter(n => n.id !== nodeId));
     };
 
+    // Load templates function
+    const loadTemplate = async (templateType: 'support_sales' | 'clinic') => {
+        if (!selectedFlow) return;
+        if (!window.confirm('Atenção: Carregar este modelo irá apagar todas as etapas atuais deste fluxo de chatbot. Deseja continuar?')) return;
+
+        setLoading(true);
+        try {
+            // Delete all existing nodes of the flow
+            await supabase.from('whatsapp_chatbot_nodes').delete().eq('flow_id', selectedFlow.id);
+
+            const q1 = queues[0]?.id || null;
+            const q2 = queues[1]?.id || queues[0]?.id || null;
+
+            if (templateType === 'support_sales') {
+                // Node 1: Greeting
+                const { data: greetingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'greeting',
+                    content: { text: 'Olá! Seja bem-vindo à nossa central de atendimento. Como podemos ajudar você hoje?' }
+                }).select().single();
+
+                // Node 2: Transfer Support
+                const { data: supportNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'transfer_queue',
+                    content: { text: 'Perfeito. Estou transferindo seu atendimento para nossa equipe do Suporte Técnico. Por favor, aguarde.', queue_id: q1 }
+                }).select().single();
+
+                // Node 3: Transfer Sales
+                const { data: salesNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'transfer_queue',
+                    content: { text: 'Certo! Um consultor do Comercial falará com você em instantes.', queue_id: q2 }
+                }).select().single();
+
+                // Node 4: Other messages
+                const { data: msgNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'message',
+                    content: { text: 'Certo! Se precisar de algo mais, estamos à disposição. Tenha um ótimo dia!' }
+                }).select().single();
+
+                // Node 5: Menu options linking to respective nodes
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'menu',
+                    content: {
+                        text: 'Por favor, selecione uma das opções abaixo:',
+                        options: [
+                            { label: '1. Suporte Técnico 🛠️', next_node: supportNode?.id || '' },
+                            { label: '2. Comercial / Vendas 💼', next_node: salesNode?.id || '' },
+                            { label: '3. Outros Assuntos ✨', next_node: msgNode?.id || '' }
+                        ]
+                    }
+                });
+            } else if (templateType === 'clinic') {
+                // Node 1: Greeting
+                const { data: greetingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'greeting',
+                    content: { text: 'Olá! Obrigado por entrar em contato com nossa clínica médica. Como podemos te ajudar hoje?' }
+                }).select().single();
+
+                // Node 2: Web Booking Link
+                const { data: bookingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'message',
+                    content: { text: 'Para agendar sua consulta rapidamente, acesse o link do nosso portal médico: https://agendamentos.exemplo.com.br' }
+                }).select().single();
+
+                // Node 3: Transfer Reception
+                const { data: receptionNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'transfer_queue',
+                    content: { text: 'Aguarde um instante. Estou transferindo você para a nossa Recepção para agendamentos manuais.', queue_id: q1 }
+                }).select().single();
+
+                // Node 4: Clinic Info
+                const { data: infoNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'message',
+                    content: { text: 'Nosso horário de funcionamento é de Segunda a Sexta, das 8h às 18h. Estamos localizados na Av. Paulista, 1000.' }
+                }).select().single();
+
+                // Node 5: Menu
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id,
+                    type: 'menu',
+                    content: {
+                        text: 'Escolha uma opção:',
+                        options: [
+                            { label: '1. Agendamento Online 📅', next_node: bookingNode?.id || '' },
+                            { label: '2. Falar com Recepção ☎️', next_node: receptionNode?.id || '' },
+                            { label: '3. Horários e Localização 📍', next_node: infoNode?.id || '' }
+                        ]
+                    }
+                });
+            }
+
+            fetchNodes(selectedFlow.id);
+            alert('Modelo de fluxo carregado com sucesso!');
+        } catch (err: any) {
+            console.error('Error loading template:', err);
+            alert('Erro ao carregar modelo: ' + err.message);
+        }
+        setLoading(false);
+    };
+
+    // Chatbot Simulator Logic
+    const startSimulation = () => {
+        if (nodes.length === 0) {
+            alert('Adicione passos ao fluxo para poder simular.');
+            return;
+        }
+
+        setIsSimulating(true);
+        // Find Greeting Node
+        const greeting = nodes.find(n => n.type === 'greeting');
+        const first = greeting || nodes[0];
+        
+        if (first) {
+            const initialHistory: SimMessage[] = [
+                { id: '1', sender: 'bot', text: first.content.text }
+            ];
+
+            // If greeting is followed by a menu node immediately, render it
+            const menuNode = nodes.find(n => n.type === 'menu');
+            if (first.type === 'greeting' && menuNode) {
+                initialHistory.push({
+                    id: '2',
+                    sender: 'bot',
+                    text: menuNode.content.text,
+                    options: menuNode.content.options
+                });
+                setCurrentNode(menuNode);
+            } else {
+                setCurrentNode(first);
+            }
+
+            setSimHistory(initialHistory);
+        }
+    };
+
+    const handleSimulateOption = (option: { label: string; next_node: string }) => {
+        const userMsg: SimMessage = {
+            id: `user-${Date.now()}`,
+            sender: 'user',
+            text: option.label
+        };
+
+        const targetNode = nodes.find(n => n.id === option.next_node);
+
+        if (!targetNode) {
+            setSimHistory(prev => [...prev, userMsg, {
+                id: `bot-err-${Date.now()}`,
+                sender: 'bot',
+                text: '🤖 Etapa de destino não configurada ou inexistente.'
+            }]);
+            return;
+        }
+
+        const botMsg: SimMessage = {
+            id: `bot-${Date.now()}`,
+            sender: 'bot',
+            text: targetNode.content.text || ''
+        };
+
+        if (targetNode.type === 'menu') {
+            botMsg.options = targetNode.content.options;
+        }
+
+        let sysMsg: SimMessage | null = null;
+        if (targetNode.type === 'transfer_queue') {
+            const queueName = queues.find(q => q.id === targetNode.content.queue_id)?.name || 'Sem setor';
+            sysMsg = {
+                id: `sys-${Date.now()}`,
+                sender: 'system',
+                text: `Conversa encaminhada para o setor: ${queueName}`
+            };
+        } else if (targetNode.type === 'transfer_user') {
+            const userName = team.find(u => u.id === targetNode.content.user_id)?.full_name || 'Sem atendente';
+            sysMsg = {
+                id: `sys-${Date.now()}`,
+                sender: 'system',
+                text: `Conversa atribuída ao atendente: ${userName}`
+            };
+        }
+
+        setSimHistory(prev => {
+            const current = [...prev, userMsg, botMsg];
+            if (sysMsg) current.push(sysMsg);
+            return current;
+        });
+        setCurrentNode(targetNode);
+    };
+
+    const resetSimulation = () => {
+        setSimHistory([]);
+        setCurrentNode(null);
+        startSimulation();
+    };
+
     return (
-        <div className="space-y-6">
-            {/* Global Settings / Gemini Config */}
-            <div className="bg-white dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-8 max-w-7xl pb-10">
+            {/* Configuração do Google Gemini */}
+            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h2 className="text-lg font-bold flex items-center gap-2">
-                           <SparklesIcon className="w-5 h-5 text-emerald-500" /> Configuração do Google Gemini
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
+                            <SparklesIcon className="w-6 h-6 text-emerald-500" /> Configuração do Google Gemini
                         </h2>
-                        <p className="text-xs text-slate-500">Esta chave é necessária para o bot sugerir transferências inteligentes e analisar conversas.</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest mt-1">
+                            Necessária para transferências inteligentes e análise de sentimentos.
+                        </p>
                     </div>
-                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/20 p-1.5 rounded-xl border border-slate-200 dark:border-white/5 min-w-[300px]">
+                    <div className="flex items-center gap-3 bg-gray-100/50 dark:bg-black/20 p-2 rounded-2xl border border-transparent dark:border-white/5 min-w-[340px]">
                         <input 
                             type="password" 
-                            placeholder="Insira sua Gemini API Key aqui..."
+                            placeholder="Insira sua Gemini API Key..."
                             value={geminiKey}
                             onChange={(e) => setGeminiKey(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm px-3 flex-1"
+                            className="bg-transparent border-none outline-none text-sm px-3 flex-1 dark:text-white"
                         />
                         <button 
                             onClick={handleSaveGeminiKey} 
                             disabled={loading}
-                            className={`flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all text-xs font-bold shadow-md shadow-emerald-500/20 ${loading ? 'opacity-50' : ''}`}
+                            className="flex items-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50"
                         >
-                            {loading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             Salvar Chave
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* User Personal Settings */}
-            <div className="bg-white dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                    <div className="flex-1">
-                        <h2 className="text-lg font-bold flex items-center gap-2">
-                           <MessageSquare className="w-5 h-5 text-emerald-500" /> Minha Assinatura WhatsPanda
+            {/* Minha Assinatura WhatsPanda */}
+            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
+                    <div className="flex-1 space-y-4">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
+                            <MessageSquare className="w-6 h-6 text-indigo-500" /> Minha Assinatura WhatsPanda
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">Este texto será anexado automaticamente às suas mensagens enviadas.</p>
-                        <div className="mt-4 space-y-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest">
+                            Texto anexado automaticamente no rodapé das suas mensagens enviadas.
+                        </p>
+                        <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Texto da Assinatura</label>
                                 <input 
                                     type="text" 
-                                    placeholder="Ex: Att, [Seu Nome]"
+                                    placeholder="Ex: *Att, João Silva* - Comercial"
                                     value={signature}
                                     onChange={(e) => setSignature(e.target.value)}
-                                    className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-3 rounded-xl outline-none text-sm"
+                                    className="w-full bg-gray-100/50 dark:bg-black/20 border border-transparent dark:border-white/5 p-4 rounded-2xl outline-none text-sm dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all"
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <input 
                                     type="checkbox" 
                                     id="use_signature"
                                     checked={useSignature}
                                     onChange={(e) => setUseSignature(e.target.checked)}
-                                    className="w-4 h-4 rounded text-emerald-500"
+                                    className="w-5 h-5 rounded-lg border-gray-300 text-emerald-500 focus:ring-emerald-500/20"
                                 />
-                                <label htmlFor="use_signature" className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer">Habilitar assinatura por padrão</label>
+                                <label htmlFor="use_signature" className="text-sm font-bold text-gray-600 dark:text-gray-300 cursor-pointer">
+                                    Habilitar assinatura por padrão
+                                </label>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-end">
+                    <div className="flex items-end self-end">
                         <button 
                             onClick={handleSaveSignature} 
                             disabled={loading}
-                            className={`flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all text-xs font-bold shadow-lg ${loading ? 'opacity-50' : ''}`}
+                            className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl hover:opacity-90 transition-all text-xs font-bold shadow-xl"
                         >
-                            {loading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                            Salvar Minha Assinatura
+                            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            Salvar Assinatura
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="flex justify-between items-center">
+            {/* Fluxos de Atendimento Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-lg font-bold">Fluxos de Atendimento (Chatbot)</h2>
-                    <p className="text-xs text-slate-500">Configure automações e roteamento por IA</p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                        <Layers className="w-6 h-6 text-emerald-500" /> Fluxos de Atendimento (Chatbot)
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest mt-1">
+                        Configure árvores de automação e roteamento por setor ou agente.
+                    </p>
                 </div>
                 <button 
                     onClick={handleCreateFlow}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
+                    className="flex items-center gap-2 px-6 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20"
                 >
                     <Plus className="w-4 h-4" /> Novo Fluxo
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Lista de Fluxos */}
-                <div className="md:col-span-1 bg-white dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
-                    <div className="p-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 font-bold text-xs uppercase text-slate-500">
+            {/* Flow Builder Columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Column 1: Flows List (Col-3) */}
+                <div className="lg:col-span-3 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-2xl flex flex-col h-fit">
+                    <div className="p-5 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent font-bold text-[10px] uppercase tracking-[0.2em] text-gray-400">
                         Meus Fluxos
                     </div>
-                    <div className="divide-y divide-slate-100 dark:divide-white/5">
+                    <div className="divide-y divide-gray-100 dark:divide-white/5">
                         {flows.map(flow => (
                             <div 
                                 key={flow.id}
-                                onClick={() => { setSelectedFlow(flow); fetchNodes(flow.id); }}
-                                className={`p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedFlow?.id === flow.id ? 'bg-emerald-50 dark:bg-emerald-500/10 border-l-4 border-emerald-500' : ''}`}
+                                onClick={() => { setSelectedFlow(flow); fetchNodes(flow.id); setIsSimulating(false); }}
+                                className={`p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative group/flow ${selectedFlow?.id === flow.id ? 'bg-emerald-50/50 dark:bg-emerald-500/10' : ''}`}
                             >
-                                <div className="flex justify-between items-start group/flow">
-                                    <span className="font-medium text-sm">{flow.name}</span>
+                                {selectedFlow?.id === flow.id && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
+                                )}
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-sm text-gray-800 dark:text-white truncate max-w-[130px]">{flow.name}</span>
                                     <div className="flex items-center gap-2">
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); handleToggleActive(flow); }}
-                                            title={flow.is_active ? "Desativar" : "Ativar"}
+                                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500"
+                                            title={flow.is_active ? "Desativar fluxo" : "Ativar fluxo"}
                                         >
                                             {flow.is_active ? <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" /> : <Pause className="w-4 h-4 text-slate-400" />}
                                         </button>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); handleDeleteFlow(flow.id); }}
-                                            className="opacity-0 group-hover/flow:opacity-100 p-1 text-red-400 hover:text-red-500 transition-all"
+                                            className="opacity-0 group-hover/flow:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
@@ -266,156 +500,285 @@ const ChatbotSettings: React.FC = () => {
                         ))}
                     </div>
 
-                    <div className="m-4 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl space-y-2">
-                        <p className="text-[10px] font-bold text-emerald-600 uppercase">Como funciona?</p>
-                        <ul className="text-[10px] text-slate-500 space-y-1 list-disc pl-3">
-                            <li>Crie um passo do tipo <b>Saudação</b> para ser a primeira mensagem.</li>
-                            <li>Use o <b>Menu</b> para dar opções numeradas ao cliente.</li>
-                            <li>Configure o <b>Próximo Passo</b> em cada opção para levar o cliente adiante.</li>
-                            <li>Use <b>Setor</b> ou <b>Usuário</b> para finalizar o robô e transferir o chat.</li>
+                    <div className="m-4 p-5 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-3">
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <BookOpen className="w-4 h-4" /> Dicas de Fluxo
+                        </p>
+                        <ul className="text-[10px] text-gray-500 dark:text-gray-400 space-y-2 pl-4 list-decimal font-medium leading-relaxed">
+                            <li>Comece sempre com uma <b>Saudação</b>.</li>
+                            <li>Use o <b>Menu</b> para estruturar as opções numeradas.</li>
+                            <li>Vincule o <b>Próximo Passo</b> de cada opção para criar caminhos de conversação.</li>
+                            <li>Finalize os nós usando <b>Transferir</b> para encaminhar ao atendente ou fila.</li>
                         </ul>
                     </div>
                 </div>
 
-                {/* Editor do Fluxo */}
-                <div className="md:col-span-3 space-y-4">
+                {/* Column 2: Editor & Simulator (Col-9) */}
+                <div className="lg:col-span-9 space-y-6">
                     {!selectedFlow ? (
-                        <div className="h-64 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl">
-                            <MessageSquare className="w-12 h-12 mb-2 opacity-20" />
-                            <p>Selecione ou crie um fluxo para começar</p>
+                        <div className="h-96 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-[2.5rem] bg-white/50 dark:bg-white/5 shadow-2xl p-10">
+                            <MessageSquare className="w-16 h-16 mb-4 opacity-20 text-emerald-500" />
+                            <p className="font-bold text-gray-800 dark:text-white uppercase tracking-widest text-xs opacity-65">Nenhum fluxo selecionado</p>
+                            <p className="text-xs text-gray-500 mt-2 text-center">Selecione um fluxo de chatbot na barra lateral ou crie um novo para iniciar.</p>
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                            <div className="flex gap-2 p-2 bg-slate-100 dark:bg-white/5 rounded-xl">
-                                <button onClick={() => handleAddNode('greeting')} className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white dark:bg-white/10 rounded-lg shadow-sm hover:bg-emerald-50 transition-colors">
-                                    <MessageSquare className="w-4 h-4 text-emerald-500" /> Saudação
-                                </button>
-                                <button onClick={() => handleAddNode('menu')} className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white dark:bg-white/10 rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
-                                    <List className="w-4 h-4 text-blue-500" /> Menu
-                                </button>
-                                <button onClick={() => handleAddNode('transfer_queue')} className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white dark:bg-white/10 rounded-lg shadow-sm hover:bg-purple-50 transition-colors">
-                                    <Users className="w-4 h-4 text-purple-500" /> Dep.
-                                </button>
-                                <button onClick={() => handleAddNode('transfer_user')} className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white dark:bg-white/10 rounded-lg shadow-sm hover:bg-orange-50 transition-colors">
-                                    <UserPlus className="w-4 h-4 text-orange-500" /> Usuário
-                                </button>
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                            {/* Node Editor (Col-8) */}
+                            <div className="xl:col-span-8 space-y-6">
+                                {/* Templates and simulator control toolbar */}
+                                <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Modelos Rápidos:</span>
+                                        <button
+                                            onClick={() => loadTemplate('support_sales')}
+                                            className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200/50"
+                                        >
+                                            Suporte & Vendas
+                                        </button>
+                                        <button
+                                            onClick={() => loadTemplate('clinic')}
+                                            className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all border border-purple-200/50"
+                                        >
+                                            Clínica / Agenda
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={isSimulating ? resetSimulation : startSimulation}
+                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20"
+                                    >
+                                        <Smartphone className="w-4 h-4" />
+                                        {isSimulating ? 'Reiniciar Teste' : 'Simular Fluxo'}
+                                    </button>
+                                </div>
+
+                                {/* Node Creation Toolbar */}
+                                <div className="flex gap-2.5 p-2 bg-gray-100 dark:bg-white/5 rounded-2xl border border-transparent dark:border-white/5 shadow-inner">
+                                    <button onClick={() => handleAddNode('greeting')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                        <MessageSquare className="w-4 h-4" /> Saudação
+                                    </button>
+                                    <button onClick={() => handleAddNode('menu')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                                        <List className="w-4 h-4" /> Menu
+                                    </button>
+                                    <button onClick={() => handleAddNode('transfer_queue')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                                        <Users className="w-4 h-4" /> Setor
+                                    </button>
+                                    <button onClick={() => handleAddNode('transfer_user')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                                        <UserPlus className="w-4 h-4" /> Agente
+                                    </button>
+                                </div>
+
+                                {/* Nodes List */}
+                                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    {nodes.map((node, idx) => {
+                                        let borderClass = 'border-l-4 border-slate-300';
+                                        let titleColor = 'text-slate-500';
+                                        if (node.type === 'greeting') { borderClass = 'border-l-4 border-emerald-500'; titleColor = 'text-emerald-500'; }
+                                        else if (node.type === 'menu') { borderClass = 'border-l-4 border-blue-500'; titleColor = 'text-blue-500'; }
+                                        else if (node.type === 'transfer_queue') { borderClass = 'border-l-4 border-purple-500'; titleColor = 'text-purple-500'; }
+                                        else if (node.type === 'transfer_user') { borderClass = 'border-l-4 border-orange-500'; titleColor = 'text-orange-500'; }
+
+                                        return (
+                                            <div key={node.id} className={`bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 relative group shadow-lg transition-all hover:shadow-xl ${borderClass}`}>
+                                                <div className="absolute top-4 right-4 flex gap-2 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handleDeleteNode(node.id)}
+                                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <span className="w-7 h-7 flex items-center justify-center bg-slate-100 dark:bg-white/10 rounded-full text-xs font-bold text-slate-500 dark:text-gray-400">
+                                                        #{idx + 1}
+                                                    </span>
+                                                    <span className={`text-xs font-bold uppercase tracking-widest ${titleColor}`}>
+                                                        {node.type === 'greeting' ? 'Saudação do Robô 🤖' : 
+                                                         node.type === 'menu' ? 'Menu de Opções 📋' : 
+                                                         node.type === 'transfer_queue' ? 'Transferir para Fila/Setor 🏢' : 
+                                                         node.type === 'transfer_user' ? 'Transferir para Atendente 👤' : 'Mensagem'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {(node.type === 'greeting' || node.type === 'menu' || node.type === 'message') && (
+                                                        <textarea 
+                                                            value={node.content.text}
+                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
+                                                            placeholder="Digite a mensagem do robô..."
+                                                            className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
+                                                            rows={3}
+                                                        />
+                                                    )}
+
+                                                    {node.type === 'menu' && (
+                                                        <div className="space-y-3 pl-5 border-l-2 border-blue-200 dark:border-blue-500/20">
+                                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Opções de Roteamento</p>
+                                                            {(node.content.options || []).map((opt: any, optIdx: number) => (
+                                                                <div key={optIdx} className="flex gap-3 items-center animate-in fade-in duration-300">
+                                                                    <input 
+                                                                        value={opt.label}
+                                                                        onChange={(e) => {
+                                                                            const newOpts = [...node.content.options];
+                                                                            newOpts[optIdx].label = e.target.value;
+                                                                            handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                        }}
+                                                                        placeholder={`Ex: 1. Suporte Técnico`}
+                                                                        className="flex-1 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold"
+                                                                    />
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+                                                                        <select 
+                                                                            value={opt.next_node}
+                                                                            onChange={(e) => {
+                                                                                const newOpts = [...node.content.options];
+                                                                                newOpts[optIdx].next_node = e.target.value;
+                                                                                handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                            }}
+                                                                            className="w-40 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold cursor-pointer"
+                                                                        >
+                                                                            <option value="">Próximo Passo</option>
+                                                                            {nodes.filter(n => n.id !== node.id).map((n, i) => (
+                                                                                <option key={n.id} value={n.id} className="dark:bg-slate-900">Passo #{i + 1} ({n.type})</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const newOpts = node.content.options.filter((_: any, i: number) => i !== optIdx);
+                                                                            handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                        }}
+                                                                        className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newOpts = [...(node.content.options || []), { label: '', next_node: '' }];
+                                                                    handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                }}
+                                                                className="text-[10px] text-blue-500 font-bold hover:underline tracking-widest uppercase flex items-center gap-1"
+                                                            >
+                                                                + Adicionar Opção do Menu
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {node.type === 'transfer_queue' && (
+                                                        <select 
+                                                            value={node.content.queue_id}
+                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, queue_id: e.target.value })}
+                                                            className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
+                                                        >
+                                                            <option value="">Selecione o Setor / Fila de Destino...</option>
+                                                            {queues.map(q => <option key={q.id} value={q.id} className="dark:bg-slate-900">{q.name}</option>)}
+                                                        </select>
+                                                    )}
+
+                                                    {node.type === 'transfer_user' && (
+                                                        <select 
+                                                            value={node.content.user_id}
+                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, user_id: e.target.value })}
+                                                            className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
+                                                        >
+                                                            <option value="">Selecione o Atendente de Destino...</option>
+                                                            {team.map(u => <option key={u.id} value={u.id} className="dark:bg-slate-900">{u.full_name}</option>)}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {nodes.length === 0 && (
+                                        <div className="p-10 text-center text-gray-400 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-3xl bg-white/30 dark:bg-white/5">
+                                            Nenhuma etapa configurada neste fluxo. Clique nos botões acima para construir seu chatbot!
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="space-y-4">
-                                {nodes.map((node, idx) => (
-                                    <div key={node.id} className="bg-white dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/10 relative group">
-                                        <div className="absolute top-4 right-4 flex gap-2 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Simulator Sidebar (Col-4) */}
+                            <div className="xl:col-span-4">
+                                {isSimulating ? (
+                                    <div className="bg-slate-900 rounded-[2.5rem] p-4 shadow-2xl border-4 border-slate-800 flex flex-col h-[65vh] animate-in slide-in-from-right duration-500">
+                                        {/* Simulator Header */}
+                                        <div className="px-4 py-3 bg-slate-800 rounded-3xl flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-xs">
+                                                    🤖
+                                                </div>
+                                                <div>
+                                                    <h5 className="text-white text-xs font-bold leading-tight">WhatsPanda Bot</h5>
+                                                    <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Simulador Ativo</span>
+                                                </div>
+                                            </div>
                                             <button 
-                                                onClick={() => handleDeleteNode(node.id)}
-                                                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                                                onClick={() => setIsSimulating(false)}
+                                                className="text-[10px] text-slate-400 hover:text-white font-bold uppercase tracking-wider"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                Fechar
                                             </button>
                                         </div>
 
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <span className="w-6 h-6 flex items-center justify-center bg-slate-100 dark:bg-white/10 rounded-full text-[10px] font-bold text-slate-400">
-                                                #{idx + 1}
-                                            </span>
-                                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                                {node.type === 'greeting' ? 'Saudação do Robô' : 
-                                                 node.type === 'menu' ? 'Menu de Opções' : 
-                                                 node.type === 'transfer_queue' ? 'Transferir para Setor' : 
-                                                 node.type === 'transfer_user' ? 'Transferir para Atendente' : 'Mensagem'}
-                                            </span>
+                                        {/* Chat area */}
+                                        <div className="flex-1 overflow-y-auto px-2 space-y-3 custom-scrollbar flex flex-col justify-end">
+                                            <div className="space-y-3">
+                                                {simHistory.map((msg) => {
+                                                    if (msg.sender === 'system') {
+                                                        return (
+                                                            <div key={msg.id} className="text-center py-1">
+                                                                <span className="bg-indigo-500/10 text-indigo-400 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-indigo-500/20">
+                                                                    {msg.text}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    const isBot = msg.sender === 'bot';
+                                                    return (
+                                                        <div key={msg.id} className={`flex ${isBot ? 'justify-start' : 'justify-end'}`}>
+                                                            <div className={`p-3 rounded-2xl text-xs max-w-[85%] font-medium ${isBot ? 'bg-slate-800 text-slate-100 rounded-tl-sm' : 'bg-emerald-600 text-white rounded-tr-sm'}`}>
+                                                                <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
 
-                                        <div className="space-y-3">
-                                            {(node.type === 'greeting' || node.type === 'menu' || node.type === 'message') && (
-                                                <textarea 
-                                                    value={node.content.text}
-                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
-                                                    placeholder="Digite a mensagem do robô..."
-                                                    className="w-full p-3 text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                                                    rows={3}
-                                                />
-                                            )}
-
-                                            {node.type === 'menu' && (
-                                                <div className="space-y-2 pl-4 border-l-2 border-blue-200 dark:border-blue-500/20">
-                                                    <p className="text-[10px] font-bold text-blue-500 uppercase">Opções do Menu</p>
-                                                    {(node.content.options || []).map((opt: any, optIdx: number) => (
-                                                        <div key={optIdx} className="flex gap-2">
-                                                            <input 
-                                                                value={opt.label}
-                                                                onChange={(e) => {
-                                                                    const newOpts = [...node.content.options];
-                                                                    newOpts[optIdx].label = e.target.value;
-                                                                    handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                }}
-                                                                placeholder={`Opção ${optIdx + 1}`}
-                                                                className="flex-1 p-2 text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg"
-                                                            />
-                                                            <select 
-                                                                value={opt.next_node}
-                                                                onChange={(e) => {
-                                                                    const newOpts = [...node.content.options];
-                                                                    newOpts[optIdx].next_node = e.target.value;
-                                                                    handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                }}
-                                                                className="w-32 p-2 text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg"
-                                                            >
-                                                                <option value="">Próximo Passo</option>
-                                                                {nodes.filter(n => n.id !== node.id).map((n, i) => (
-                                                                    <option key={n.id} value={n.id}>Passo #{i + 1} ({n.type})</option>
-                                                                ))}
-                                                            </select>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    const newOpts = node.content.options.filter((_: any, i: number) => i !== optIdx);
-                                                                    handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                }}
-                                                                className="p-2 text-red-500"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
+                                        {/* Interactive Option Pill Buttons */}
+                                        {currentNode?.type === 'menu' && currentNode.content.options?.length > 0 && (
+                                            <div className="p-3 bg-slate-800/50 rounded-3xl mt-4 space-y-2 border border-slate-800">
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Responda ao Bot:</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {currentNode.content.options.map((opt: any, i: number) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => handleSimulateOption(opt)}
+                                                            className="px-3 py-2 text-[10px] bg-slate-800 hover:bg-slate-700 text-indigo-400 font-bold rounded-xl text-left border border-slate-700/50 transition-colors w-full flex justify-between items-center group"
+                                                        >
+                                                            <span>{opt.label || `Opção ${i + 1}`}</span>
+                                                            <Send className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </button>
                                                     ))}
-                                                    <button 
-                                                        onClick={() => {
-                                                            const newOpts = [...(node.content.options || []), { label: '', next_node: '' }];
-                                                            handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                        }}
-                                                        className="text-[10px] text-blue-500 font-bold hover:underline"
-                                                    >
-                                                        + ADICIONAR OPÇÃO
-                                                    </button>
                                                 </div>
-                                            )}
+                                            </div>
+                                        )}
 
-                                            {node.type === 'transfer_queue' && (
-                                                <select 
-                                                    value={node.content.queue_id}
-                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, queue_id: e.target.value })}
-                                                    className="w-full p-3 text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg"
-                                                >
-                                                    <option value="">Selecione o Setor</option>
-                                                    {queues.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
-                                                </select>
-                                            )}
-
-                                            {node.type === 'transfer_user' && (
-                                                <select 
-                                                    value={node.content.user_id}
-                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, user_id: e.target.value })}
-                                                    className="w-full p-3 text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg"
-                                                >
-                                                    <option value="">Selecione o Atendente</option>
-                                                    {team.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                                                </select>
-                                            )}
+                                        {/* Reset footer */}
+                                        <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
+                                            <span>Simulador Local Client-Side</span>
+                                            <button onClick={resetSimulation} className="text-emerald-500 font-bold hover:underline">Reiniciar</button>
                                         </div>
                                     </div>
-                                ))}
-
-                                {nodes.length === 0 && (
-                                    <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-xl">
-                                        Nenhum passo adicionado. Use os botões acima para começar o fluxo.
+                                ) : (
+                                    <div className="hidden xl:flex flex-col items-center justify-center p-8 bg-slate-950/20 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-white/5 text-gray-400 text-center h-[50vh]">
+                                        <Smartphone className="w-12 h-12 mb-3 text-slate-400 opacity-30" />
+                                        <h5 className="text-xs font-bold uppercase tracking-widest mb-1 text-slate-500">Simulador de Conversa</h5>
+                                        <p className="text-[10px] text-gray-500 leading-relaxed max-w-[200px]">Clique em "Simular Fluxo" acima para carregar o mockup interativo do robô.</p>
                                     </div>
                                 )}
                             </div>

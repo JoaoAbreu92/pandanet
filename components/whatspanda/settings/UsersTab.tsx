@@ -18,7 +18,8 @@ const DEFAULT_PERMISSIONS: WhatsAppPermissions = {
     can_transfer: false,
     can_see_all_departments: false,
     can_manage_tags: false,
-    can_view_groups: false
+    can_view_groups: false,
+    can_start_chats: true
 };
 
 const UsersTab: React.FC = () => {
@@ -63,6 +64,8 @@ const UsersTab: React.FC = () => {
             .from('whatsapp_queues')
             .select('*')
             .eq('company_id', profile.company_id);
+
+        if (queuesData) setQueues(queuesData);
 
         // Fetch Channels
         const { data: channelsData } = await supabase
@@ -348,6 +351,7 @@ const UsersTab: React.FC = () => {
                                         { key: 'can_view_chats', label: 'Acessar Chats', desc: 'Ver conversas e histórico.' },
                                         { key: 'can_send_messages', label: 'Enviar Mensagens', desc: 'Enviar mensagens de texto.' },
                                         { key: 'can_send_media', label: 'Enviar Mídia', desc: 'Enviar fotos, vídeos e áudios.' },
+                                        { key: 'can_start_chats', label: 'Iniciar Conversas', desc: 'Permitir iniciar novos atendimentos / tickets.' },
                                         { key: 'can_transfer', label: 'Transferir Conversas', desc: 'Permitir transferência entre setores/usuários.' },
                                         { key: 'can_see_all_departments', label: 'Ver Todos Departamentos', desc: 'Ver conversas de qualquer departamento.' },
                                         { key: 'can_view_others_chats', label: 'Ver Chats de Terceiros', desc: 'Ver conversas atribuídas a outros usuários.' },

@@ -249,6 +249,7 @@ export interface WhatsAppPermissions {
   allowed_connections?: string[]; // IDs of Allowed connections
   can_view_others_chats?: boolean; // New: Can view chats from other sectors/users
   can_view_groups?: boolean; // New: Can view and send messages in groups
+  can_start_chats?: boolean; // New: Can initiate new conversations
 }
 
 export interface Employee {
@@ -815,6 +816,7 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
   queue?: {
     id: string;
     name: string;
+    color?: string;
   };
   channel?: {
     channel_type?: 'whatsapp' | 'telegram' | 'instagram' | 'messenger';

@@ -176,7 +176,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       case 'privados': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" initialConversationId={selectedConversationId} /> : null;
       case 'grupos': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" initialConversationId={selectedConversationId} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
-      case 'new-ticket': return permissions.can_view_chats ? (
+      case 'new-ticket': return (permissions.can_view_chats && permissions.can_start_chats !== false) ? (
         <NewTicket
           onBack={() => setCurrentView('privados')}
           onConversationSelect={(conv) => {
@@ -210,13 +210,15 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
         </div>
 
         {/* Novo Atendimento Button */}
-        <button
-          onClick={() => setCurrentView('new-ticket')}
-          className="mx-2 mb-6 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 group font-medium"
-        >
-          <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-          <span>Novo Atendimento</span>
-        </button>
+        {permissions.can_start_chats !== false && (
+          <button
+            onClick={() => setCurrentView('new-ticket')}
+            className="mx-2 mb-6 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 group font-medium"
+          >
+            <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+            <span>Novo Atendimento</span>
+          </button>
+        )}
 
         {/* Navigation Menu */}
         <div className="flex flex-col gap-1.5 flex-1 mt-2">

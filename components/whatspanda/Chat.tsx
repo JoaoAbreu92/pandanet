@@ -332,7 +332,6 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [connections, setConnections] = useState<any[]>([]);
   const [queues, setQueues] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
-  const [userQueues, setUserQueues] = useState<string[] | null>(null);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchConversationsRef = useRef<any>(null);
   useEffect(() => {
@@ -517,15 +516,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!companyId) return;
     const userId = activeProfile?.id || profile?.id;
 
-    const [{ data: deps }, { data: cols }, { data: userDeps }, { data: agentsData }] = await Promise.all([
-      supabase.from('departments').select('id, name').eq('company_id', companyId),
+    const [{ data: qData }, { data: cols }, { data: agentsData }] = await Promise.all([
+      supabase.from('whatsapp_queues').select('id, name, color').eq('company_id', companyId).eq('is_active', true).order('name'),
       supabase.from('whatsapp_kanban_columns').select('*').eq('company_id', companyId).order('order_index', { ascending: true }),
-      supabase.from('department_users').select('department_id').eq('company_id', companyId).eq('user_id', userId),
       supabase.from('profiles').select('id, full_name').eq('company_id', companyId)
     ]);
-    if (deps) setQueues(deps);
+    if (qData) setQueues(qData);
     if (cols) setKanbanColumns(cols);
-    if (userDeps) setUserQueues(userDeps.map(d => d.department_id));
     if (agentsData) setAgents(agentsData);
   };
 
@@ -563,7 +560,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .select(`
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-        queue:departments(id, name),
+        queue:whatsapp_queues!queue_id(id, name, color),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
         kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
@@ -642,7 +639,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .select(`
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-        queue:departments(id, name),
+        queue:whatsapp_queues!queue_id(id, name, color),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
         kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
@@ -680,15 +677,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     if (activeTab === 'aguardando') {
       query = query.eq('status', 'aberto').is('assigned_to', null);
-      if (!isAdmin && userQueues && userQueues.length > 0) {
-        query = query.or(`queue_id.in.(${userQueues.join(',')}),queue_id.is.null`);
-      } else if (!isAdmin && userQueues && userQueues.length === 0) {
-        query = query.is('queue_id', null);
-      }
     } else if (activeTab === 'meus') {
       query = query.eq('status', 'aberto').eq('assigned_to', userId);
     } else if (activeTab === 'fechados') {
       query = query.eq('status', 'fechado');
+    }
+
+    // Filtro de filas/setores por permissão (para não administradores)
+    if (!isAdmin) {
+      const allowedQueues = permissions.assigned_queues || [];
+      if (allowedQueues.length > 0) {
+        query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
+      } else {
+        query = query.is('queue_id', null);
+      }
     }
 
     // Pesquisa por nome ou telefone
@@ -959,7 +961,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         ['Telefone', selectedConversation.contact_phone],
         ['Canal', selectedConversation.channel?.connection_name || 'WhatsApp'],
         ['Atendente', selectedConversation.assigned_user?.full_name || 'Não atribuído'],
-        ['Setor', selectedConversation.department?.name || 'Geral'],
+        ['Setor', selectedConversation.queue?.name || 'Geral'],
         ['Status', selectedConversation.status === 'fechado' ? 'Finalizado' : selectedConversation.status === 'pendente' ? 'Aguardando' : 'Aberto'],
       ],
       theme: 'striped',
@@ -1779,10 +1781,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         {conv.assigned_user.full_name.split(' ')[0]}
                       </span>
                     )}
-                    {conv.department && (
-                      <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-500/30 font-bold flex items-center gap-1 shadow-sm">
-                        <LayoutGrid className="w-2.5 h-2.5" />
-                        {conv.department.name}
+                    {conv.queue && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 shadow-sm"
+                        style={{
+                          backgroundColor: `${conv.queue.color}15`,
+                          color: conv.queue.color,
+                          borderColor: `${conv.queue.color}30`
+                        }}
+                      >
+                        <LayoutGrid className="w-2.5 h-2.5" style={{ color: conv.queue.color }} />
+                        {conv.queue.name}
                       </span>
                     )}
                     {conv.kanban_column && (
@@ -1871,9 +1879,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         {selectedConversation.assigned_user.full_name}
                       </span>
                     )}
-                    {selectedConversation.department && (
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-100">
-                        {selectedConversation.department.name}
+                    {selectedConversation.queue && (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border"
+                        style={{
+                          backgroundColor: `${selectedConversation.queue.color}15`,
+                          color: selectedConversation.queue.color,
+                          borderColor: `${selectedConversation.queue.color}30`
+                        }}
+                      >
+                        {selectedConversation.queue.name}
                       </span>
                     )}
                   </div>
