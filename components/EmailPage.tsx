@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { 
     EnvelopeIcon, 
@@ -21,102 +21,158 @@ import {
     XMarkIcon,
     PaperClipIcon,
     FaceSmileIcon,
-    EllipsisVerticalIcon
+    EllipsisVerticalIcon,
+    ArrowUturnLeftIcon,
+    ChatBubbleLeftRightIcon
 } from './icons';
+import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
+import { supabase } from '../supabaseClient';
 
 interface Email {
     id: string;
-    from: {
-        name: string;
-        email: string;
-        avatar?: string;
-    };
+    user_id: string;
+    company_id: string;
+    from_name: string;
+    from_email: string;
     subject: string;
     preview: string;
     content: string;
-    date: string;
-    isRead: boolean;
-    isStarred: boolean;
-    tagId?: string;
+    folder: string;
+    is_read: boolean;
+    is_starred: boolean;
+    created_at: string;
+    tags?: Tag[];
     attachments?: { name: string; size: string; type: string }[];
 }
 
 interface Tag {
     id: string;
+    user_id: string;
+    company_id: string;
     label: string;
     color: string;
-    bgColor: string;
+    bg_color: string;
 }
 
-const EMAIL_TAGS: Tag[] = [
-    { id: 'important', label: 'Importante', color: '#ef4444', bgColor: '#fee2e2' }, // Red
-    { id: 'work', label: 'Trabalho', color: '#3b82f6', bgColor: '#dbeafe' },      // Blue
-    { id: 'personal', label: 'Pessoal', color: '#10b981', bgColor: '#d1fae5' },   // Green
-    { id: 'urgent', label: 'Urgente', color: '#f59e0b', bgColor: '#fef3c7' },     // Amber
-];
-
-const MOCK_EMAILS: Email[] = [
-    {
-        id: '1',
-        from: { name: 'João Silva', email: 'joao.silva@empresa.com', avatar: 'https://i.pravatar.cc/150?u=joao' },
-        subject: 'Relatório Trimestral de Vendas',
-        preview: 'Olá equipe, segue o relatório consolidado do último trimestre para revisão...',
-        content: '<p>Olá equipe,</p><p>Segue o relatório consolidado do último trimestre para revisão. Tivemos um crescimento de 15% em relação ao período anterior.</p><p>Atenciosamente,<br/>João Silva</p>',
-        date: '10:45',
-        isRead: false,
-        isStarred: true
-    },
-    {
-        id: '2',
-        from: { name: 'Mariana Costa', email: 'mariana.c@empresa.com' },
-        subject: 'Atualização da Política de Home Office',
-        preview: 'Prezados, informamos que a partir do próximo mês teremos novos critérios...',
-        content: '<p>Prezados,</p><p>Informamos que a partir do próximo mês teremos novos critérios para o regime de home office.</p><p>Maiores detalhes seguem em anexo.</p>',
-        date: '09:12',
-        isRead: true,
-        isStarred: false,
-        tagId: 'work',
-        attachments: [{ name: 'politica_rh_2024.pdf', size: '1.2 MB', type: 'pdf' }]
-    },
-    {
-        id: '3',
-        from: { name: 'Suporte TI', email: 'suporte@empresa.com', avatar: 'https://i.pravatar.cc/150?u=ti' },
-        subject: 'Manutenção Programada - Servidores',
-        preview: 'Comunicamos que no próximo domingo realizaremos uma manutenção preventiva...',
-        content: '<p>Olá,</p><p>Comunicamos que no próximo domingo realizaremos uma manutenção preventiva nos nossos servidores centrais.</p><p>O sistema poderá ficar instável entre 02:00 e 05:00.</p>',
-        date: 'Ontem',
-        isRead: true,
-        isStarred: false,
-        tagId: 'important'
-    }
-];
-
 const EmailPage: React.FC = () => {
-    const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
-    const [selectedEmail, setSelectedEmail] = useState<Email | null>(MOCK_EMAILS[0]);
+    const { currentUser } = useAuth();
+    const { addNotification } = useNotifications();
+    const [emails, setEmails] = useState<Email[]>([]);
+    const [tags, setTags] = useState<Tag[]>([]);
+    const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'drafts' | 'trash' | 'favorites' | 'settings'>('inbox');
     const [isComposeOpen, setIsComposeOpen] = useState(false);
+    const [composeData, setComposeData] = useState<{ to?: string, subject?: string, body?: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [signature, setSignature] = useState('Atenciosamente,\nEquipe PandaNet');
     const [signatureImage, setSignatureImage] = useState('https://raw.githubusercontent.com/JoaoAbreu92/pandanet/main/public/logo-pandanet.png');
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, emailId: string } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, emailId: string, type?: 'main' | 'tags' } | null>(null);
+    const [mobileView, setMobileView] = useState<'folders' | 'list' | 'reading'>('list');
+    const [showPreview, setShowPreview] = useState(true);
+    const [groupThreads, setGroupThreads] = useState(false);
+
+    const isAdmin = currentUser?.isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'Super Admin';
+
+    // Fetch E-mails e Tags
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch Tags
+                const { data: tagsData } = await supabase
+                    .from('email_tags')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                if (tagsData) setTags(tagsData);
+
+                // Fetch E-mails (simplificado por enquanto)
+                const { data: emailsData, error } = await supabase
+                    .from('emails')
+                    .select('*, tags:email_tag_relations(tag:email_tags(*))')
+                    .eq('company_id', currentUser.company_id)
+                    .order('created_at', { ascending: false });
+
+                if (emailsData) {
+                    const formattedEmails = emailsData.map((e: any) => ({
+                        ...e,
+                        tags: e.tags?.map((t: any) => t.tag).filter(Boolean) || []
+                    }));
+                    setEmails(formattedEmails);
+                    if (formattedEmails.length > 0) setSelectedEmail(formattedEmails[0]);
+                }
+            } catch (err) {
+                console.error('Erro ao buscar dados:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+
+        // Real-time Canal
+        const channel = supabase
+            .channel('email_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    const newEmail = payload.new as Email;
+                    setEmails(prev => [newEmail, ...prev]);
+                    addNotification({
+                        title: 'Novo E-mail',
+                        message: `De: ${newEmail.from_name}`,
+                        type: 'message',
+                        user_id: currentUser.id
+                    });
+                } else if (payload.eventType === 'UPDATE') {
+                    setEmails(prev => prev.map(e => e.id === payload.new.id ? { ...e, ...payload.new } : e));
+                } else if (payload.eventType === 'DELETE') {
+                    setEmails(prev => prev.filter(e => e.id === payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [currentUser]);
 
     const handleContextMenu = (e: React.MouseEvent, emailId: string) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, emailId });
     };
 
-    const toggleStar = (emailId: string) => {
-        setEmails(prev => prev.map(email =>
-            email.id === emailId ? { ...email, isStarred: !email.isStarred } : email
+    const toggleStar = async (emailId: string) => {
+        const email = emails.find(e => e.id === emailId);
+        if (!email) return;
+
+        setEmails(prev => prev.map(e =>
+            e.id === emailId ? { ...e, is_starred: !e.is_starred } : e
         ));
+
+        await supabase
+            .from('emails')
+            .update({ is_starred: !email.is_starred })
+            .eq('id', emailId);
     };
 
-    const setTag = (emailId: string, tagId?: string) => {
-        setEmails(prev => prev.map(email =>
-            email.id === emailId ? { ...email, tagId } : email
-        ));
+    const setTag = async (emailId: string, tagId?: string) => {
+        if (tagId) {
+            await supabase
+                .from('email_tag_relations')
+                .upsert({ email_id: emailId, tag_id: tagId });
+        } else {
+            await supabase
+                .from('email_tag_relations')
+                .delete()
+                .eq('email_id', emailId);
+        }
+
         setContextMenu(null);
+        // Recarregar tags localmente ou via real-time
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,14 +186,73 @@ const EmailPage: React.FC = () => {
         }
     };
 
+    const handleReply = (email: Email, all: boolean = false) => {
+        setComposeData({
+            to: email.from_email,
+            subject: `Re: ${email.subject}`,
+            body: `\n\n\n--- On ${new Date(email.created_at).toLocaleString()}, ${email.from_name} wrote:\n> ${email.preview}`
+        });
+        setIsComposeOpen(true);
+        setContextMenu(null);
+    };
+
+    const handleSelectEmail = async (email: Email) => {
+        setSelectedEmail(email);
+        setMobileView('reading');
+
+        if (!email.is_read) {
+            setEmails(prev => prev.map(e => e.id === email.id ? { ...e, is_read: true } : e));
+            await supabase.from('emails').update({ is_read: true }).eq('id', email.id);
+        }
+    };
+
+    const handleSendEmail = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentUser || !composeData?.to) return;
+
+        const newEmail = {
+            user_id: currentUser.id,
+            company_id: currentUser.company_id,
+            from_name: currentUser.name,
+            from_email: currentUser.email,
+            subject: composeData.subject || '(Sem assunto)',
+            content: composeData.body || '',
+            preview: composeData.body?.substring(0, 100) || '',
+            folder: 'sent',
+            is_read: true,
+            is_starred: false
+        };
+
+        const { data, error } = await supabase
+            .from('emails')
+            .insert(newEmail)
+            .select()
+            .single();
+
+        if (!error && data) {
+            setEmails(prev => [data, ...prev]);
+            setIsComposeOpen(false);
+            setComposeData(null);
+            addNotification({
+                title: 'E-mail Enviado',
+                message: 'Sua mensagem foi enviada com sucesso.',
+                type: 'success',
+                user_id: currentUser.id
+            });
+        }
+    };
+
     const filteredEmails = emails.filter(email => {
-        if (activeTab === 'favorites') return email.isStarred;
-        // In a real app, you'd filter by folder/folderId. For mock, just show inbox/sent/etc.
+        if (activeTab === 'favorites') return email.is_starred;
+        if (activeTab === 'inbox') return email.folder === 'inbox';
+        if (activeTab === 'sent') return email.folder === 'sent';
+        if (activeTab === 'trash') return email.folder === 'trash';
         return true;
     }).filter(email =>
         email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.name.toLowerCase().includes(searchQuery.toLowerCase())
+        email.from_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-4">
@@ -157,10 +272,13 @@ const EmailPage: React.FC = () => {
 
             <div className="flex-1 flex gap-4 overflow-hidden">
                 {/* Coluna 1: Pastas */}
-                <div className="w-64 flex flex-col gap-2">
+                <div className={`w-64 flex flex-col gap-2 ${mobileView !== 'folders' ? 'hidden md:flex' : 'flex w-full'}`}>
                     <Card className="p-3 flex flex-col gap-1">
                         <button 
-                            onClick={() => setActiveTab('inbox')}
+                            onClick={() => {
+                                setActiveTab('inbox');
+                                if (window.innerWidth < 768) setMobileView('list');
+                            }}
                             className={`flex items-center justify-between p-3 rounded-xl transition-all ${activeTab === 'inbox' ? 'bg-brand-primary/10 text-brand-primary font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -214,75 +332,87 @@ const EmailPage: React.FC = () => {
                         <div className="flex flex-col gap-3">
                             <div className="flex justify-between items-center text-xs text-gray-400 uppercase font-bold tracking-wider">
                                 <span>Contas</span>
-                                <PlusIcon className="w-4 h-4 cursor-pointer hover:text-brand-primary" />
+                                {isAdmin && <PlusIcon className="w-4 h-4 cursor-pointer hover:text-brand-primary" />}
                             </div>
                             <div className="flex items-center gap-3 p-2 rounded-lg border border-emerald-100 bg-emerald-50/30">
                                 <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center text-white text-xs font-bold">
-                                    PA
+                                    {currentUser?.name?.charAt(0) || 'U'}
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
-                                    <span className="text-xs font-bold truncate">suporte@pandanet.com</span>
+                                    <span className="text-xs font-bold truncate">{currentUser?.email || 'usuario@empresa.com'}</span>
                                     <span className="text-[10px] text-brand-primary">Conectado (SMTP/IMAP)</span>
                                 </div>
                             </div>
+                            {!isAdmin && (
+                                <p className="text-[9px] text-gray-400 italic">Usuários comuns podem ter apenas uma conta vinculada.</p>
+                            )}
                         </div>
                     </Card>
                 </div>
 
                 {/* Coluna 2: Lista de E-mails */}
-                <div className="w-1/3 flex flex-col gap-4 overflow-hidden">
+                <div className={`w-full md:w-1/3 flex flex-col gap-4 overflow-hidden ${mobileView !== 'list' && activeTab !== 'settings' ? 'hidden md:flex' : 'flex'}`}>
                     <Card className="p-3">
-                        <div className="relative">
+                        <div className="relative flex items-center gap-2">
+                            <button
+                                onClick={() => setMobileView('folders')}
+                                className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-500"
+                            >
+                                <Bars3Icon className="w-5 h-5" />
+                            </button>
+                            <div className="relative flex-1">
                             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input 
+                                <input
                                 type="text"
-                                placeholder="Pesquisar mensagens..."
+                                    placeholder="Pesquisar..."
                                 className="w-full bg-gray-50 border-none rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand-primary transition-all"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
+                        </div>
                         </div>
                     </Card>
 
                     <Card className="flex-1 overflow-y-auto no-scrollbar p-1">
                         <div className="divide-y divide-gray-100">
                             {filteredEmails.map((email) => {
-                                const tag = EMAIL_TAGS.find(t => t.id === email.tagId);
+                                const mainTag = email.tags?.[0];
                                 return (
                                     <div
                                         key={email.id}
-                                        onClick={() => setSelectedEmail(email)}
+                                        onClick={() => handleSelectEmail(email)}
                                         onContextMenu={(e) => handleContextMenu(e, email.id)}
                                         className={`p-4 cursor-pointer transition-all hover:bg-gray-50 group border-l-4 ${selectedEmail?.id === email.id ? 'bg-emerald-50/50 border-brand-primary' : 'border-transparent'}`}
-                                        style={tag ? { backgroundColor: tag.bgColor + '40', borderLeftColor: tag.color } : {}}
+                                        style={mainTag ? { backgroundColor: mainTag.color + '15', borderLeftColor: mainTag.color } : {}}
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="flex items-center gap-2">
-                                                <span className={`text-sm ${!email.isRead ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
-                                                    {email.from.name}
+                                                <span className={`text-sm ${!email.is_read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                                    {email.from_name}
                                                 </span>
-                                                {tag && (
+                                                {email.tags && email.tags.length > 0 && email.tags.map(tag => (
                                                     <span
+                                                        key={tag.id}
                                                         className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
                                                         style={{ backgroundColor: tag.color, color: '#fff' }}
                                                     >
                                                         {tag.label}
                                                     </span>
-                                                )}
+                                                ))}
                                             </div>
                                             <span className="text-[10px] text-gray-400 font-medium">
-                                                {email.date}
+                                                {new Date(email.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
-                                        <h3 className={`text-sm truncate mb-1 ${!email.isRead ? 'font-bold' : 'text-gray-700'}`}>
+                                        <h3 className={`text-sm truncate mb-1 ${!email.is_read ? 'font-bold' : 'text-gray-700'}`}>
                                             {email.subject}
                                         </h3>
                                         <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
-                                            {email.preview}
+                                            {showPreview ? email.preview : '...'}
                                         </p>
                                         <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }}>
-                                                {email.isStarred ? (
+                                                {email.is_starred ? (
                                                     <StarIcon className="w-4 h-4 text-amber-400 fill-amber-400" />
                                                 ) : (
                                                     <StarIcon className="w-4 h-4 text-gray-300 hover:text-amber-400" />
@@ -298,7 +428,7 @@ const EmailPage: React.FC = () => {
                 </div>
 
                 {/* Coluna 3: Leitura ou Configurações */}
-                <div className="flex-1 overflow-hidden">
+                <div className={`flex-1 overflow-hidden ${mobileView !== 'reading' && activeTab !== 'settings' ? 'hidden md:flex' : 'flex'}`}>
                     {activeTab === 'settings' ? (
                         <Card className="h-full flex flex-col overflow-hidden bg-gray-50/10">
                             <div className="p-8 space-y-8 overflow-y-auto no-scrollbar">
@@ -331,16 +461,9 @@ const EmailPage: React.FC = () => {
                                                 <label className="text-xs font-bold text-gray-400 uppercase">Imagem da Assinatura</label>
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={signatureImage}
-                                                            onChange={(e) => setSignatureImage(e.target.value)}
-                                                            className="flex-1 p-2 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50"
-                                                            placeholder="Cole a URL ou suba um arquivo..."
-                                                        />
-                                                        <label className="cursor-pointer bg-white border border-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all flex items-center gap-2 shadow-sm">
-                                                            <PlusIcon className="w-4 h-4" />
-                                                            Upload
+                                                        <label className="w-full cursor-pointer bg-white border border-gray-100 px-4 py-3 rounded-xl text-sm font-bold text-gray-400 hover:text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5 transition-all flex items-center justify-center gap-3 shadow-sm border-dashed border-2">
+                                                            <PlusIcon className="w-5 h-5" />
+                                                            Clique para Selecionar Imagem da Assinatura
                                                             <input
                                                                 type="file"
                                                                 className="hidden"
@@ -367,7 +490,7 @@ const EmailPage: React.FC = () => {
                                             Gerenciar Marcadores
                                         </h3>
                                         <div className="space-y-2">
-                                            {EMAIL_TAGS.map(tag => (
+                                            {tags.map(tag => (
                                                 <div key={tag.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-50">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-4 h-4 rounded" style={{ backgroundColor: tag.color }} />
@@ -391,11 +514,21 @@ const EmailPage: React.FC = () => {
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm text-gray-600">Mostrar visualização da mensagem</span>
-                                                <div className="w-10 h-5 bg-brand-primary rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute right-0.5 top-0.5" /></div>
+                                                <button
+                                                    onClick={() => setShowPreview(!showPreview)}
+                                                    className={`w-10 h-5 rounded-full relative transition-colors ${showPreview ? 'bg-brand-primary' : 'bg-gray-200'}`}
+                                                >
+                                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${showPreview ? 'right-0.5' : 'left-0.5'}`} />
+                                                </button>
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm text-gray-600">Agrupar por conversas (Threads)</span>
-                                                <div className="w-10 h-5 bg-gray-200 rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5" /></div>
+                                                <button
+                                                    onClick={() => setGroupThreads(!groupThreads)}
+                                                    className={`w-10 h-5 rounded-full relative transition-colors ${groupThreads ? 'bg-brand-primary' : 'bg-gray-200'}`}
+                                                >
+                                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${groupThreads ? 'right-0.5' : 'left-0.5'}`} />
+                                                </button>
                                             </div>
                                         </div>
                                     </Card>
@@ -407,6 +540,12 @@ const EmailPage: React.FC = () => {
                             {/* Toolbar */}
                             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
                                 <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setMobileView('list')}
+                                            className="md:hidden p-2 hover:bg-white rounded-lg transition-all text-gray-500 mr-2"
+                                        >
+                                            <ChevronLeftIcon className="w-5 h-5" />
+                                        </button>
                                     <button className="p-2 hover:bg-white rounded-lg transition-all text-gray-500 hover:text-brand-primary shadow-sm border border-transparent hover:border-gray-100">
                                         <ArchiveBoxIcon className="w-5 h-5" />
                                     </button>
@@ -431,22 +570,40 @@ const EmailPage: React.FC = () => {
                             <div className="flex-1 overflow-y-auto p-8 space-y-6">
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-900 mb-6">{selectedEmail.subject}</h2>
-                                    <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-4">
-                                            {selectedEmail.from.avatar ? (
-                                                <img src={selectedEmail.from.avatar} alt="" className="w-12 h-12 rounded-2xl object-cover shadow-md" />
+                                                {selectedEmail.from_email ? (
+                                                    <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-lg shadow-sm border border-brand-primary/20">
+                                                        {selectedEmail.from_name.charAt(0)}
+                                                    </div>
                                             ) : (
                                                 <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-lg shadow-sm border border-brand-primary/20">
-                                                    {selectedEmail.from.name.charAt(0)}
+                                                            ?
                                                 </div>
                                             )}
                                             <div className="flex flex-col">
-                                                <span className="font-bold text-gray-900">{selectedEmail.from.name}</span>
-                                                <span className="text-xs text-gray-400">{selectedEmail.from.email}</span>
+                                                    <span className="font-bold text-gray-900">{selectedEmail.from_name}</span>
+                                                    <span className="text-xs text-gray-400">{selectedEmail.from_email}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                            <span className="text-sm font-medium text-gray-500">{selectedEmail.date}</span>
+                                            <div className="text-right flex flex-col items-end gap-3">
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleReply(selectedEmail)}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-brand-primary/10 text-brand-primary rounded-lg text-xs font-bold hover:bg-brand-primary/20 transition-all border border-brand-primary/20"
+                                                    >
+                                                        <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+                                                        Responder
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReply(selectedEmail, true)}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-all border border-gray-200"
+                                                    >
+                                                        <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
+                                                        Responder Todos
+                                                    </button>
+                                                </div>
+                                                <span className="text-sm font-medium text-gray-500">{new Date(selectedEmail.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             <span className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Via Servidor Corporativo</span>
                                         </div>
                                     </div>
@@ -500,18 +657,23 @@ const EmailPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Menu de Contexto */}
+            {/* Menu de Contexto Expandido */}
             {contextMenu && (
                 <>
                     <div className="fixed inset-0 z-[140]" onClick={() => setContextMenu(null)} />
                     <div
-                        className="fixed z-[150] bg-white shadow-2xl rounded-xl border border-gray-100 p-2 min-w-[200px] animate-in fade-in zoom-in duration-200"
+                        className="fixed z-[150] bg-white shadow-2xl rounded-xl border border-gray-100 p-2 min-w-[220px] animate-in fade-in zoom-in duration-200"
                         style={{ top: contextMenu.y, left: contextMenu.x }}
                     >
-                        <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 mb-1">
-                            Marcar como
+                        {contextMenu.type === 'tags' ? (
+                            <>
+                                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-50 mb-1">
+                                    <button onClick={() => setContextMenu({ ...contextMenu, type: 'main' })} className="p-1 hover:bg-gray-100 rounded">
+                                        <ChevronLeftIcon className="w-4 h-4 text-gray-400" />
+                                    </button>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Etiquetas</span>
                         </div>
-                        {EMAIL_TAGS.map(tag => (
+                                {tags.map(tag => (
                             <button
                                 key={tag.id}
                                 onClick={() => setTag(contextMenu.emailId, tag.id)}
@@ -523,11 +685,80 @@ const EmailPage: React.FC = () => {
                         ))}
                         <button
                             onClick={() => setTag(contextMenu.emailId, undefined)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500 transition-all text-sm mt-1"
-                        >
-                            <TrashIcon className="w-4 h-4" />
-                            <span>Remover Marcação</span>
-                        </button>
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500 transition-all text-sm mt-1 border-t border-gray-50 pt-2"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                    <span>Remover Etiqueta</span>
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 mb-1">
+                                    Ações
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const email = emails.find(e => e.id === contextMenu.emailId);
+                                        if (email) handleReply(email);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-primary/10 hover:text-brand-primary transition-all text-sm"
+                                >
+                                    <ArrowUturnLeftIcon className="w-4 h-4" />
+                                    <span>Responder</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const email = emails.find(e => e.id === contextMenu.emailId);
+                                        if (email) handleReply(email, true);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-primary/10 hover:text-brand-primary transition-all text-sm"
+                                >
+                                    <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                                    <span>Responder Todos</span>
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        const email = emails.find(e => e.id === contextMenu.emailId);
+                                        if (email) {
+                                            const newStatus = !email.is_read;
+                                            setEmails(prev => prev.map(ev => ev.id === email.id ? { ...ev, is_read: newStatus } : ev));
+                                            await supabase.from('emails').update({ is_read: newStatus }).eq('id', email.id);
+                                        }
+                                        setContextMenu(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all text-sm"
+                                >
+                                    <EnvelopeIcon className="w-4 h-4 text-gray-400" />
+                                    <span>Marcar como {emails.find(e => e.id === contextMenu.emailId)?.is_read ? 'Não Lida' : 'Lida'}</span>
+                                </button>
+
+                                <div className="my-1 border-t border-gray-50" />
+
+                                <button
+                                    onClick={() => setContextMenu({ ...contextMenu, type: 'tags' })}
+                                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50 transition-all text-sm"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <PaintBrushIcon className="w-4 h-4 text-gray-400" />
+                                        <span>Marcar como...</span>
+                                    </div>
+                                    <ChevronRightIcon className="w-4 h-4 text-gray-300" />
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        await supabase.from('emails').update({ folder: 'trash' }).eq('id', contextMenu.emailId);
+                                        setEmails(prev => prev.map(e => e.id === contextMenu.emailId ? { ...e, folder: 'trash' } : e));
+                                        setContextMenu(null);
+                                    }}
+                                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500 transition-all text-sm mt-1"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                        <span>Mover para Lixeira</span>
+                                    </button>
+                            </>
+                        )}
                     </div>
                 </>
             )}
@@ -536,50 +767,70 @@ const EmailPage: React.FC = () => {
             {isComposeOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-end p-6 pointer-events-none">
                     <Card className="w-full max-w-2xl h-[600px] shadow-2xl flex flex-col overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
-                        <div className="p-4 bg-brand-primary text-white flex justify-between items-center">
-                            <h3 className="font-bold">Nova Mensagem</h3>
-                            <div className="flex items-center gap-2">
-                                <button className="p-1 hover:bg-white/20 rounded transition-all"><XMarkIcon className="w-5 h-5" onClick={() => setIsComposeOpen(false)} /></button>
-                            </div>
-                        </div>
-                        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-                            <span className="text-gray-400 text-sm font-bold min-w-[60px]">Para:</span>
-                            <input type="text" className="flex-1 border-none focus:ring-0 text-sm" placeholder="nome@exemplo.com" />
-                        </div>
-                        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-                            <span className="text-gray-400 text-sm font-bold min-w-[60px]">Assunto:</span>
-                            <input type="text" className="flex-1 border-none focus:ring-0 text-sm" placeholder="Digite o assunto" />
-                        </div>
-                        <div className="flex-1 p-6 overflow-y-auto no-scrollbar">
-                            <textarea 
-                                className="w-full h-40 border-none focus:ring-0 resize-none text-sm placeholder:text-gray-300" 
-                                placeholder="Escreva sua mensagem aqui..."
-                                defaultValue={`\n\n\n--\n${signature}`}
-                            />
-                            {signatureImage && (
-                                <div className="mt-4 opacity-80 grayscale hover:grayscale-0 transition-all border-t border-gray-50 pt-4">
-                                    <img src={signatureImage} alt="Assinatura" className="max-h-16 object-contain" />
+                        <form onSubmit={handleSendEmail} className="flex flex-col h-full bg-white relative">
+                            <div className="p-4 bg-brand-primary text-white flex justify-between items-center">
+                                <h3 className="font-bold">Nova Mensagem</h3>
+                                <div className="flex items-center gap-2">
+                                    <button type="button" className="p-1 hover:bg-white/20 rounded transition-all" onClick={() => setIsComposeOpen(false)}><XMarkIcon className="w-5 h-5" /></button>
                                 </div>
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <button className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-brand-primary transition-all"><PaperClipIcon className="w-5 h-5" /></button>
-                                <button className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-brand-primary transition-all"><FaceSmileIcon className="w-5 h-5" /></button>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={() => setIsComposeOpen(false)}
-                                    className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-white rounded-xl transition-all"
-                                >
-                                    Descartar
-                                </button>
-                                <button className="flex items-center gap-2 bg-brand-primary text-white px-8 py-2.5 rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-brand-primary/20">
-                                    Enviar
-                                    <PaperAirplaneIcon className="w-5 h-5" />
-                                </button>
+                            <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+                                <span className="text-gray-400 text-sm font-bold min-w-[60px]">Para:</span>
+                                <input
+                                    type="text"
+                                    className="flex-1 border-none focus:ring-0 text-sm"
+                                    placeholder="nome@exemplo.com"
+                                    value={composeData?.to || ''}
+                                    onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
+                                />
                             </div>
-                        </div>
+                            <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+                                <span className="text-gray-400 text-sm font-bold min-w-[60px]">Assunto:</span>
+                                <input
+                                    type="text"
+                                    className="flex-1 border-none focus:ring-0 text-sm"
+                                    placeholder="Digite o assunto"
+                                    value={composeData?.subject || ''}
+                                    onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
+                                />
+                            </div>
+                            <div className="flex-1 p-6 overflow-y-auto no-scrollbar">
+                                <textarea
+                                    className="w-full h-40 border-none focus:ring-0 resize-none text-sm placeholder:text-gray-300"
+                                    placeholder="Escreva sua mensagem aqui..."
+                                    value={composeData?.body || ''}
+                                    onChange={(e) => setComposeData(prev => ({ ...prev, body: e.target.value }))}
+                                />
+                                {signatureImage && (
+                                    <div className="mt-4 opacity-80 grayscale hover:grayscale-0 transition-all border-t border-gray-50 pt-4">
+                                        <div className="text-sm text-gray-500 mb-2 whitespace-pre-wrap">{signature}</div>
+                                        <img src={signatureImage} alt="Assinatura" className="max-h-16 object-contain" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <button type="button" className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-brand-primary transition-all"><PaperClipIcon className="w-5 h-5" /></button>
+                                    <button type="button" className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-brand-primary transition-all"><FaceSmileIcon className="w-5 h-5" /></button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setIsComposeOpen(false);
+                                            setComposeData(null);
+                                        }}
+                                        className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-white rounded-xl transition-all"
+                                    >
+                                        Descartar
+                                    </button>
+                                    <button type="submit" className="flex items-center gap-2 bg-brand-primary text-white px-8 py-2.5 rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-brand-primary/20">
+                                        Enviar
+                                        <PaperAirplaneIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </Card>
                 </div>
             )}
