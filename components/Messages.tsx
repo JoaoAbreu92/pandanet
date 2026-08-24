@@ -900,7 +900,7 @@ const Messages: React.FC<MessagesProps> = () => {
                             className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-red-700 transition-all shadow-lg active:scale-95 group-hover:shadow-red-200"
                         >
                             <SparklesIcon className="w-5 h-5 animate-pulse" />
-                            SOLICITAR SUPORTE VIP (MASTER TI)
+                            SOLICITAR SUPORTE MASTER ADMIN
                         </button>
                     </div>
                 )}
@@ -915,8 +915,8 @@ const Messages: React.FC<MessagesProps> = () => {
                             )}
                             {conversations.filter(c => {
                                 const shouldShow = !c.isGroup && c.is_closed !== true;
-                                if (c.participantName === 'Master TI') {
-                                    console.log('Filtrando Master TI:', { id: c.id, is_closed: c.is_closed, shouldShow });
+                                if (c.participantName === 'Master Admin') {
+                                    console.log('Filtrando Master Admin:', { id: c.id, is_closed: c.is_closed, shouldShow });
                                 }
                                 return shouldShow;
                             }).map(conv => {
@@ -1014,7 +1014,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                {currentUser.id === MASTER_ADMIN_ID && !selectedConversation?.is_closed && (
+                                {(currentUser.id === MASTER_ADMIN_ID || selectedConversation?.participantId === MASTER_ADMIN_ID) && !selectedConversation?.is_closed && (
                                     <button 
                                         onClick={handleCloseConversation}
                                         className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all border border-slate-200 hover:border-red-200"

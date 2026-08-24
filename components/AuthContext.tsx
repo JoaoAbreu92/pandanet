@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                     const masterAdmin: Employee = {
                         id: userId,
-                        name: 'Master TI',
+                        name: 'Master Admin',
                         email: email || 'ti@grupopixel.com.br',
                         role: 'Super Admin',
                         team: 'Admin',
@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 const employee: Employee = {
                     id: data.id,
-                    name: isMasterAdmin ? 'Master TI' : (data.full_name || 'Usuário'),
+                    name: isMasterAdmin ? 'Master Admin' : (data.full_name || 'Usuário'),
                     email: email || '',
                     role: isMasterAdmin ? 'Super Admin' : (data.role || 'Visitante'),
                     team: isMasterAdmin ? 'Admin' : (data.team || 'Geral'),
@@ -159,10 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = async () => {
-        await supabase.auth.signOut();
         setProfile(null);
         setSession(null);
         setUser(null);
+        await supabase.auth.signOut();
     };
 
     return (

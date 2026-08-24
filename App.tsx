@@ -39,7 +39,7 @@ import StatusPage from './components/StatusPage';
 import InfoSecPage from './components/InfoSecPage';
 
 const AppContent: React.FC = () => {
-    const { session, profile, loading } = useAuth();
+    const { session, profile, loading, signOut } = useAuth();
 
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -251,8 +251,22 @@ const AppContent: React.FC = () => {
     }, [profile]);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        window.location.reload();
+        try {
+            await signOut();
+            // Aggressive Cleanup
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Give a tiny moment for storage events to propogate
+            setTimeout(() => {
+                window.location.href = window.location.origin;
+            }, 100);
+        } catch (error) {
+            console.error("Erro ao deslogar:", error);
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.href = window.location.origin;
+        }
     };
 
     const handleImpersonateStart = (company: Company) => {
