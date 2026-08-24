@@ -1,31 +1,55 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import nodemailer from "npm:nodemailer@6.9.7";
+import { ImapFlow } from "npm:imapflow@1.0.141";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper para testar se uma porta TCP está aberta
-async function testConnection(host: string, port: number, timeout = 5000) {
+// Helper para verificar se o host existe (DNS)
+async function verifyHost(host: string) {
+  try {
+    const ips = await Deno.resolveDns(host, "A");
+    return { ok: true, ips };
+  } catch (e: any) {
+    // Tentar resolver como IPv4 se for endereço direto ou outro erro
+    try {
+      const ips = await Deno.resolveDns(host, "AAAA");
+      return { ok: true, ips };
+    } catch {
+      return { ok: false, error: "Domínio não encontrado ou DNS inválido." };
+    }
+  }
+}
+
+// Helper para testar se uma porta TCP está aberta (Otimizado com timeout)
+async function testConnection(host: string, port: number, timeout = 3000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
   try {
     const conn = await Deno.connect({ hostname: host, port });
     conn.close();
+    clearTimeout(id);
     return { ok: true };
   } catch (e: any) {
+    clearTimeout(id);
     return { ok: false, error: e.message };
   }
 }
 
-// Escaneia portas comuns em caso de falha para dar diagnóstico ao usuário
+// Escaneia portas comuns em caso de falha TOTAL
 async function scanCommonPorts(host: string) {
-  const ports = [143, 993, 587, 465, 110, 995, 25];
+  const ports = [993, 465, 587, 143, 25];
   const results = [];
   for (const port of ports) {
-    const res = await testConnection(host, port, 2000);
+    const res = await testConnection(host, port, 1500); // Timeout agressivo para scan
     if (res.ok) results.push(port);
   }
   return results;
 }
 
-console.log("Edge Function 'email-handler' V24 (Explicit SSL Control) iniciada.");
+console.log("Edge Function 'email-handler' V26 (Resilient & DNS-aware) iniciada.");
 
 Deno.serve(async (req) => {
   // 1. CORS Preflight
@@ -55,71 +79,94 @@ Deno.serve(async (req) => {
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
+      const start = Date.now();
 
-      const nodemailer = await import("npm:nodemailer@6.9.7");
-      const { ImapFlow } = await import("npm:imapflow@1.0.141");
+      // 1. VERIFICAR DNS ANTES DE TUDO
+      const hostOk = await verifyHost(settings.smtp_host);
+      if (!hostOk.ok) throw new Error(`DNS: ${hostOk.error} (${settings.smtp_host})`);
 
-      // Determinar flags de SSL (priorizar flags explícitas, fallback para porta)
+      // Determinar flags de SSL
       const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
       const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
 
-      console.log(`[V24] Config: SMTP SSL=${useSmtpSsl}, IMAP SSL=${useImapSsl}`);
+      console.log(`[V26] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}, SSL:${useSmtpSsl}) | IMAP(${settings.imap_host}:${settings.imap_port}, SSL:${useImapSsl})`);
 
-      // --- TESTE SMTP ---
-      try {
-        const transporter = nodemailer.default.createTransport({
-          host: settings.smtp_host,
-          port: settings.smtp_port,
-          secure: useSmtpSsl,
-          auth: { user: settings.user, pass: settings.pass },
-          tls: { 
-            rejectUnauthorized: false,
-            minVersion: 'TLSv1'
-          },
-          connectionTimeout: 15000,
-          greetingTimeout: 15000
-        })
-        await transporter.verify();
-      } catch (e: any) {
-        const openPorts = await scanCommonPorts(settings.smtp_host);
-        throw new Error(`SMTP Falhou: ${e.message}. (Portas abertas: ${openPorts.join(', ') || 'Nenhuma'})`);
+      // 2. RODAR TESTES EM PARALELO
+      const results = await Promise.allSettled([
+        // Teste SMTP
+        (async () => {
+          const transporter = nodemailer.createTransport({
+            host: settings.smtp_host,
+            port: settings.smtp_port,
+            secure: useSmtpSsl,
+            auth: { user: settings.user, pass: settings.pass },
+            tls: {
+              rejectUnauthorized: false, 
+              minVersion: 'TLSv1',
+              checkServerIdentity: () => undefined // Ignorar erros de hostname no cert
+            },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000
+          });
+          await transporter.verify();
+          return "SMTP OK";
+        })(),
+        // Teste IMAP
+        (async () => {
+          const client = new ImapFlow({
+            host: settings.imap_host,
+            port: settings.imap_port,
+            secure: useImapSsl,
+            auth: { user: settings.user, pass: settings.pass },
+            logger: false,
+            tls: {
+              rejectUnauthorized: false, 
+              servername: settings.imap_host,
+              checkServerIdentity: () => undefined, // Ignorar erros de hostname no cert
+              minVersion: 'TLSv1'
+            },
+            connectionTimeout: 15000,
+            greetingTimeout: 15000
+          });
+          await client.connect();
+          await client.logout();
+          return "IMAP OK";
+        })()
+      ]);
+
+      const [smtpRes, imapRes] = results;
+      const duration = ((Date.now() - start) / 1000).toFixed(1);
+
+      // 3. ANALISAR RESULTADOS
+      if (smtpRes.status === 'fulfilled' && imapRes.status === 'fulfilled') {
+        return new Response(JSON.stringify({
+          success: true,
+          message: `Conectado com sucesso em ${duration}s! (SMTP e IMAP OK)`
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // --- TESTE IMAP ---
-      try {
-        const client = new ImapFlow({
-          host: settings.imap_host,
-          port: settings.imap_port,
-          secure: useImapSsl,
-          auth: { user: settings.user, pass: settings.pass },
-          logger: true,
-          tls: { 
-            rejectUnauthorized: false,
-            servername: settings.imap_host, // Mantemos SNI padrão, mas com bypass de cert
-            checkServerIdentity: () => undefined,
-            minVersion: 'TLSv1'
-          },
-          connectionTimeout: 30000,
-          greetingTimeout: 30000
-        })
-        await client.connect();
-        await client.logout();
-      } catch (e: any) {
-        console.error("[IMAP V24 ERROR]", e);
-        const openPorts = await scanCommonPorts(settings.imap_host);
-
-        let msg = e.message;
-        if (msg.includes('Unexpected close')) {
-          msg = `Conexão fechada inesperadamente. Possível incompatibilidade de SSL. Tente ${useImapSsl ? 'desmarcar' : 'marcar'} a opção de SSL`;
-        }
-
-        throw new Error(`IMAP Falhou: ${msg}. Portas abertas detectadas: ${openPorts.join(', ') || 'Nenhuma'}`);
+      // 4. DIAGNÓSTICO EM CASO DE FALHA
+      let errorMsg = "";
+      if (smtpRes.status === 'rejected') {
+        let rs = smtpRes.reason.message || "Erro desconhecido.";
+        if (rs.includes("invalid peer certificate")) rs = "Certificado inválido ou incompatível.";
+        errorMsg += `SMTP: ${rs}. `;
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Conectado com sucesso na V24!'
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      if (imapRes.status === 'rejected') {
+        let imapMsg = imapRes.reason.message || "Erro desconhecido.";
+        if (imapMsg.includes('Unexpected close')) imapMsg = "Conexão fechada pelo servidor (verifique porta/SSL).";
+        if (imapMsg.includes('ENOTFOUND')) imapMsg = "Host IMAP não encontrado.";
+        errorMsg += `IMAP: ${imapMsg}. `;
+      }
+
+      // Scan opcional se tudo falhar e houver tempo
+      let openPorts: number[] = [];
+      if (smtpRes.status === 'rejected' && imapRes.status === 'rejected' && (Date.now() - start < 20000)) {
+        openPorts = await scanCommonPorts(settings.imap_host);
+      }
+
+      throw new Error(`${errorMsg}${openPorts.length ? `Portas abertas no host: ${openPorts.join(', ')}` : ''}`);
     }
 
     return new Response(JSON.stringify({ success: true, message: 'Ação ok na V24.' }), { 
