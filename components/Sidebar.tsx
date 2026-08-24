@@ -82,9 +82,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (!isAdmin && !hasPermission) {
             return null;
         }
-        // Se a feature não foi aprovada pelo SaaS (explicitamente ou ausente), não exibir (especialmente CRM)
+        // Se a feature não foi aprovada pelo SaaS, não exibir
         if (featureId && customFeatures) {
-            if (customFeatures[featureId] === false || (featureId === 'crm' && typeof customFeatures[featureId] === 'undefined')) {
+            if (customFeatures[featureId] === false) {
                 return null;
             }
         }

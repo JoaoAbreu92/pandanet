@@ -348,15 +348,21 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 />;
             case 'hr':
                 return <HRManager />;
+
             case 'crm_settings':
-                return <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Configurações do CRM</h3>
-                    <p className="text-sm text-gray-500 mb-6">O módulo de CRM está ativo para sua empresa. Você pode gerenciar clientes e vendas através do menu lateral.</p>
-                    <div className="flex gap-4">
-                        <button onClick={() => onNavigate?.('crm-dashboard')} className="px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-bold">Ir para Dashboard CRM</button>
-                        <button onClick={() => onNavigate?.('crm-customers')} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold">Gerenciar Clientes</button>
-                    </div>
-                </div>;
+                return <SupabaseGenericManager<any>
+                    title="Configurações CRM / Vendas"
+                    tableName="crm_settings"
+                    newItemTemplate={{ name: 'Perfex CRM', url: '', api_key: '', active: true }}
+                    fields={[
+                        { key: 'name', label: 'Nome da Integração' },
+                        { key: 'url', label: 'URL do CRM (ex: https://crm.dominio.com)' },
+                        { key: 'api_key', label: 'Token/Chave API' },
+                        { key: 'active', label: 'Ativo', type: 'select', options: ['true', 'false'] as any }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.url}</p></div>}
+                />;
+
             default:
                 return null;
         }
