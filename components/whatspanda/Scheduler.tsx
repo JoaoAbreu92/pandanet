@@ -66,6 +66,117 @@ const Scheduler: React.FC = () => {
   const [searchContact, setSearchContact] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Record<string, boolean>>({});
 
+  // Detalhes da Campanha e Alvos (Dashboard/Edição)
+  const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<Campaign | null>(null);
+  const [campaignTargets, setCampaignTargets] = useState<any[]>([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+  const [newTargetsText, setNewTargetsText] = useState('');
+  const [isTargetsModalOpen, setIsTargetsModalOpen] = useState(false);
+  const [addingTargets, setAddingTargets] = useState(false);
+  const [showAddTargetsArea, setShowAddTargetsArea] = useState(false);
+
+  const fetchCampaignTargets = async (campaignId: string) => {
+    setLoadingTargets(true);
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_scheduled_targets')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (data) setCampaignTargets(data);
+    } catch (err) {
+      console.error('[TARGETS] Erro ao carregar alvos da campanha:', err);
+    } finally {
+      setLoadingTargets(false);
+    }
+  };
+
+  const handleOpenCampaignDetails = (camp: Campaign) => {
+    setSelectedCampaignDetails(camp);
+    setIsTargetsModalOpen(true);
+    fetchCampaignTargets(camp.id);
+  };
+
+  const handleDeleteTarget = async (targetId: string) => {
+    if (!window.confirm('Tem certeza que deseja remover este contato da fila de disparos?')) return;
+    try {
+      const { error } = await supabase
+        .from('whatsapp_scheduled_targets')
+        .delete()
+        .eq('id', targetId);
+
+      if (error) throw error;
+
+      setCampaignTargets(prev => prev.filter(t => t.id !== targetId));
+      fetchCampaigns();
+    } catch (err: any) {
+      alert('Erro ao remover contato: ' + err.message);
+    }
+  };
+
+  const handleClearPendingTargets = async () => {
+    if (!selectedCampaignDetails) return;
+    if (!window.confirm('Tem certeza que deseja remover TODOS os contatos PENDENTES desta campanha? Isso não afetará os já enviados ou com erro.')) return;
+    try {
+      const { error } = await supabase
+        .from('whatsapp_scheduled_targets')
+        .delete()
+        .eq('campaign_id', selectedCampaignDetails.id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      fetchCampaignTargets(selectedCampaignDetails.id);
+      fetchCampaigns();
+    } catch (err: any) {
+      alert('Erro ao limpar contatos pendentes: ' + err.message);
+    }
+  };
+
+  const handleAddTargetsToCampaign = async () => {
+    if (!selectedCampaignDetails) return;
+    if (!newTargetsText.trim()) {
+      alert('Por favor, insira pelo menos um número de telefone.');
+      return;
+    }
+
+    const phones = newTargetsText
+      .split(/[\n,]/)
+      .map(p => p.trim().replace(/\D/g, ''))
+      .filter(p => p.length >= 10);
+
+    if (phones.length === 0) {
+      alert('Por favor, insira telefones válidos com DDI e DDD (ex: 5541999999999).');
+      return;
+    }
+
+    setAddingTargets(true);
+    try {
+      const targetInserts = phones.map(phone => ({
+        campaign_id: selectedCampaignDetails.id,
+        contact_phone: phone,
+        status: 'pending'
+      }));
+
+      const { error } = await supabase
+        .from('whatsapp_scheduled_targets')
+        .insert(targetInserts);
+
+      if (error) throw error;
+
+      setNewTargetsText('');
+      setShowAddTargetsArea(false);
+      fetchCampaignTargets(selectedCampaignDetails.id);
+      fetchCampaigns();
+    } catch (err: any) {
+      alert('Erro ao adicionar novos contatos: ' + err.message);
+    } finally {
+      setAddingTargets(false);
+    }
+  };
+
   const fetchAgendaContacts = async () => {
     const companyId = activeProfile?.company_id;
     if (!companyId) return;
@@ -470,15 +581,21 @@ const Scheduler: React.FC = () => {
                       </p>
                     )}
                   </div>
-                </div>
-
-                {/* Ações da Campanha */}
+                        {/* Ações da Campanha */}
                 <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                  <button
+                    onClick={() => handleOpenCampaignDetails(camp)}
+                    className="p-3 bg-slate-500/10 text-slate-650 dark:bg-slate-500/20 dark:text-slate-300 hover:bg-slate-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
+                    title="Gerenciar Alvos e Envios"
+                  >
+                    <Users className="w-4.5 h-4.5 shrink-0" />
+                  </button>
+
                   {camp.status === 'pending' || camp.status === 'paused' ? (
                     <button
                       onClick={() => handleUpdateStatus(camp.id, 'running')}
                       disabled={actionLoading === camp.id}
-                      className="p-3 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all font-bold text-xs"
+                      className="p-3 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
                       title="Iniciar Disparos"
                     >
                       <Play className="w-4 h-4 text-emerald-500 hover:text-inherit fill-emerald-500 hover:fill-inherit shrink-0" />
@@ -487,7 +604,7 @@ const Scheduler: React.FC = () => {
                     <button
                       onClick={() => handleUpdateStatus(camp.id, 'paused')}
                       disabled={actionLoading === camp.id}
-                      className="p-3 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all font-bold text-xs"
+                      className="p-3 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
                       title="Pausar Disparos"
                     >
                       <Pause className="w-4 h-4 shrink-0" />
@@ -497,12 +614,12 @@ const Scheduler: React.FC = () => {
                   <button
                     onClick={() => handleDeleteCampaign(camp.id)}
                     disabled={actionLoading === camp.id}
-                    className="p-3 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all font-bold text-xs"
+                    className="p-3 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
                     title="Excluir Campanha"
                   >
                     <Trash2 className="w-4 h-4 shrink-0" />
                   </button>
-                </div>
+                </div>            </div>
               </div>
             );
           })}
@@ -888,6 +1005,212 @@ const Scheduler: React.FC = () => {
                 className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-white rounded-2xl transition-all font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20"
               >
                 Importar Contatos ({Object.values(selectedContacts).filter(Boolean).length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal - Detalhes da Campanha e Gerenciamento de Alvos */}
+      {isTargetsModalOpen && selectedCampaignDetails && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-all duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-white/5">
+            <div className="p-6 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight truncate max-w-[400px]">
+                  📊 Campanha: {selectedCampaignDetails.name}
+                </h3>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-widest mt-1 opacity-70">
+                  Dashboard de status de envios e gerenciamento de contatos.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => { setIsTargetsModalOpen(false); setSelectedCampaignDetails(null); setShowAddTargetsArea(false); setNewTargetsText(''); }} 
+                className="p-2 hover:bg-gray-150 dark:hover:bg-white/10 rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Dashboard de Estatísticas */}
+            {(() => {
+              const total = campaignTargets.length;
+              const sent = campaignTargets.filter(t => t.status === 'sent').length;
+              const failed = campaignTargets.filter(t => t.status === 'failed').length;
+              const pending = campaignTargets.filter(t => t.status === 'pending').length;
+              const sending = campaignTargets.filter(t => t.status === 'sending').length;
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-6 bg-slate-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 text-center">
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                    <span className="block text-2xl font-black text-gray-900 dark:text-white">{total}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                    <span className="block text-2xl font-black text-emerald-500">{sent}</span>
+                    <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Enviadas</span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                    <span className="block text-2xl font-black text-red-500">{failed}</span>
+                    <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider">Falhas</span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                    <span className="block text-2xl font-black text-amber-500">{pending}</span>
+                    <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Pendentes</span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm col-span-2 sm:col-span-1">
+                    <span className={`block text-2xl font-black text-blue-500 ${sending > 0 ? 'animate-pulse' : ''}`}>{sending}</span>
+                    <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">Disparando</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Corpo do Modal */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 max-h-[45vh]">
+              {/* Área de Ações Rápidas de Edição */}
+              <div className="flex flex-wrap justify-between items-center gap-3 bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-gray-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTargetsArea(prev => !prev)}
+                  className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Adicionar Números
+                </button>
+
+                {campaignTargets.some(t => t.status === 'pending') && (
+                  <button
+                    type="button"
+                    onClick={handleClearPendingTargets}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" /> Limpar Fila Pendente
+                  </button>
+                )}
+              </div>
+
+              {/* Form de Adicionar Alvos */}
+              {showAddTargetsArea && (
+                <div className="bg-slate-50/50 dark:bg-white/5 p-5 rounded-3xl border border-dashed border-gray-200 dark:border-white/10 space-y-3 animate-in slide-in-from-top-4 duration-200">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Inserir novos números para disparo
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newTargetsText}
+                    onChange={(e) => setNewTargetsText(e.target.value)}
+                    placeholder={`5541999999999\n5511988888888`}
+                    className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-transparent rounded-2xl text-xs focus:ring-2 focus:ring-emerald-500/20 dark:text-white"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddTargetsArea(false); setNewTargetsText(''); }}
+                      className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddTargetsToCampaign}
+                      disabled={addingTargets}
+                      className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                    >
+                      {addingTargets ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      Salvar na Fila
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Listagem de Alvos */}
+              <div className="border border-gray-100 dark:border-white/5 rounded-3xl overflow-hidden bg-white dark:bg-slate-900/40">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-medium border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 dark:bg-white/5 text-[9px] font-bold uppercase text-gray-400 tracking-wider border-b border-gray-100 dark:border-white/5">
+                        <th className="px-5 py-3.5">Telefone</th>
+                        <th className="px-5 py-3.5">Status</th>
+                        <th className="px-5 py-3.5">Envio / Detalhes</th>
+                        <th className="px-5 py-3.5 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                      {loadingTargets ? (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-12 text-center text-gray-400">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
+                            <span>Buscando lista de contatos...</span>
+                          </td>
+                        </tr>
+                      ) : campaignTargets.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-12 text-center text-gray-450 font-bold uppercase tracking-wider opacity-60">
+                            Nenhum contato cadastrado nesta campanha.
+                          </td>
+                        </tr>
+                      ) : (
+                        campaignTargets.map(t => {
+                          let badgeClass = 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+                          let badgeText = 'Pendente';
+                          if (t.status === 'sent') {
+                            badgeClass = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                            badgeText = 'Enviado';
+                          } else if (t.status === 'failed') {
+                            badgeClass = 'bg-red-500/10 text-red-500 border-red-500/20';
+                            badgeText = 'Falhou';
+                          } else if (t.status === 'sending') {
+                            badgeClass = 'bg-blue-500/10 text-blue-500 border-blue-500/20 animate-pulse';
+                            badgeText = 'Disparando';
+                          }
+
+                          return (
+                            <tr key={t.id} className="hover:bg-slate-50/30 dark:hover:bg-white/5 transition-all">
+                              <td className="px-5 py-4 font-bold text-gray-800 dark:text-gray-200">{t.contact_phone}</td>
+                              <td className="px-5 py-4">
+                                <span className={`border px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                                  {badgeText}
+                                </span>
+                              </td>
+                              <td className="px-5 py-4 text-[10px] text-gray-500 dark:text-gray-400 max-w-[200px] truncate">
+                                {t.sent_at ? new Date(t.sent_at).toLocaleString('pt-BR') : '-'}
+                                {t.error_message && (
+                                  <span className="block text-[9px] text-red-500 font-semibold mt-0.5 truncate" title={t.error_message}>
+                                    Erro: {t.error_message}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-5 py-4 text-center">
+                                {t.status === 'pending' ? (
+                                  <button
+                                    onClick={() => handleDeleteTarget(t.id)}
+                                    className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"
+                                    title="Remover Contato"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400 font-bold opacity-60">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Rodapé */}
+            <div className="p-6 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setIsTargetsModalOpen(false); setSelectedCampaignDetails(null); setShowAddTargetsArea(false); setNewTargetsText(''); }}
+                className="px-8 py-3 bg-gray-150 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest"
+              >
+                Fechar
               </button>
             </div>
           </div>

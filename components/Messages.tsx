@@ -18,7 +18,7 @@ import {
     ChevronDownIcon,
 } from './icons';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { usePresence } from './PresenceContext';
@@ -249,10 +249,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                 return (
                                     <div className="rounded-lg overflow-hidden border bg-gray-50 bg-opacity-50">
                                         <img
-                                            src={message.text}
+                                            src={getCleanImageUrl(message.text)}
                                             alt="Imagem enviada"
                                             className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
-                                            onClick={() => window.open(message.text)}
+                                            onClick={() => downloadFile(message.text, 'imagem.png')}
                                             onError={(e) => {
                                                 e.currentTarget.style.display = 'none';
                                                 e.currentTarget.parentElement?.classList.add('hidden');
@@ -266,14 +266,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
                         {message.file && (message.file.type?.startsWith('image/') || message.file.type === 'sticker') ? (
                             <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
-                                <img src={message.file.url} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => window.open(message.file?.url)} />
+                                <img src={getCleanImageUrl(message.file.url)} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => downloadFile(message.file.url, message.file.name || 'imagem.png')} />
                             </div>
                         ) : message.file ? (
                             <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
                                 <PaperClipIcon className="w-4 h-4 shrink-0" />
-                                <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
+                                <button onClick={() => downloadFile(message.file.url, message.file.name || 'arquivo')} className="text-sm underline truncate hover:text-brand-primary transition-all font-semibold text-left">
                                     {message.file.name}
-                                </a>
+                                </button>
                             </div>
                         ) : null}
                     </div>

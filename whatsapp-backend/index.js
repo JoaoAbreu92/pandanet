@@ -890,11 +890,11 @@ async function getBase64FromUrl(url) {
         console.log(`[BASE64-FETCH] Original URL: ${url}`);
         let targetUrl = url;
         
-        if (supabaseUrl) {
+        if (internalSupabaseUrl) {
             const storageIndex = url.indexOf('/storage/v1/object/public/');
             if (storageIndex !== -1) {
                 const storagePath = url.substring(storageIndex);
-                const base = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
+                const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
                 targetUrl = `${base}${storagePath}`;
                 console.log(`[BASE64-FETCH] Rewrote URL to internal Supabase: ${targetUrl}`);
             }
@@ -2480,11 +2480,12 @@ async function processScheduledCampaigns() {
         // 1. Obter campanhas ativas (running) ou pendentes (pending) cuja data agendada seja hoje ou anterior
         const todayStr = new Date().toISOString().split('T')[0];
         
+        // Se a campanha já estiver 'running' (play ativo manual), rodamos independente da data.
+        // Se estiver 'pending', só roda se a scheduled_date for hoje ou anterior.
         const { data: campaigns, error: campErr } = await supabase
             .from('whatsapp_scheduled_campaigns')
             .select('*')
-            .in('status', ['running', 'pending'])
-            .lte('scheduled_date', todayStr);
+            .or(`status.eq.running,and(status.eq.pending,scheduled_date.lte.${todayStr})`);
 
         if (campErr) throw campErr;
         if (!campaigns || campaigns.length === 0) return;
@@ -2533,17 +2534,38 @@ async function processScheduledCampaigns() {
                 continue;
             }
 
-            // Se não houver mais alvos pendentes, a campanha está finalizada!
+            // Se não houver mais alvos pendentes (e nenhum 'sending' em andamento), a campanha está finalizada!
             if (!targets || targets.length === 0) {
-                console.log(`[CAMPANHA] Campanha "${camp.name}" finalizada com sucesso!`);
-                await supabase
-                    .from('whatsapp_scheduled_campaigns')
-                    .update({ status: 'completed' })
-                    .eq('id', camp.id);
+                // Verificar se há algum alvo no status 'sending' ainda sendo processado nesta campanha
+                const { data: sendingTargets } = await supabase
+                    .from('whatsapp_scheduled_targets')
+                    .select('id')
+                    .eq('campaign_id', camp.id)
+                    .eq('status', 'sending')
+                    .limit(1);
+
+                if (!sendingTargets || sendingTargets.length === 0) {
+                    console.log(`[CAMPANHA] Campanha "${camp.name}" finalizada com sucesso!`);
+                    await supabase
+                        .from('whatsapp_scheduled_campaigns')
+                        .update({ status: 'completed' })
+                        .eq('id', camp.id);
+                }
                 continue;
             }
 
             const target = targets[0];
+
+            // Marcar IMEDIATAMENTE como 'sending' no banco de dados para evitar duplicidade de concorrência
+            const { error: markErr } = await supabase
+                .from('whatsapp_scheduled_targets')
+                .update({ status: 'sending' })
+                .eq('id', target.id);
+
+            if (markErr) {
+                console.error(`[CAMPANHA] Erro ao marcar alvo ${target.id} como sending:`, markErr.message);
+                continue;
+            }
 
             // 3. Obter uma conexão conectada da empresa para disparar
             const { data: connection } = await supabase
