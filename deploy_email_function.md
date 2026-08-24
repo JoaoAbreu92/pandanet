@@ -1,72 +1,48 @@
-# Como Implantar a Função de E-mail no VPS
+# Guia de Deploy em Produção (VPS)
 
-Como você está usando um Supabase Self-Hosted (VPS), a função `email-handler` precisa rodar nesse servidor para que o sistema consiga acessá-la.
+Siga estes passos exatos para colocar o serviço de e-mail no ar de forma definitiva.
 
-## Opção 1: Usando Deno (Recomendado)
-
-Se você tiver o Deno instalado no VPS, pode rodar o serviço diretamente.
-
-1.  **Instale as dependências (unzip):**
-    ```bash
-    # Debian/Ubuntu
-    apt-get update && apt-get install unzip -y
-    
-    # CentOS/RHEL
-    # yum install unzip -y
-    ```
-
-2.  **Instale o Deno:**
-    ```bash
-    curl -fsSL https://deno.land/x/install/install.sh | sh
-    ```
-
-2.  **Rode a função:**
-    Navegue até a pasta do projeto e execute:
-    ```bash
-    ```bash
-    # Opção A: Usando o comando direto (se estiver no PATH)
-    deno run --allow-net --allow-env --allow-sys --watch supabase/functions/email-handler/index.ts
-
-    # Opção B: Usando o caminho absoluto (Recomendado se der erro "command not found")
-    /root/.deno/bin/deno run --allow-net --allow-env --allow-sys --watch supabase/functions/email-handler/index.ts
-    ```
-    *A função rodará na porta **9999**.*
-
-3.  **Mantenha rodando:**
-    Use `pm2` ou `systemd` para manter o processo ativo em produção.
-
-## Opção 2: Usando Supabase CLI no VPS
-
-Se você tiver o CLI do Supabase no VPS:
+## Passo 1: Atualizar o Código
+No terminal do VPS (pode parar o comando atual com `Ctrl+C` se estiver rodando):
 
 ```bash
-supabase functions serve email-handler --no-verify-jwt --env-file .env
+git pull
 ```
 
-## Configuração no Frontend (Importante!)
+## Passo 2: Iniciar o Serviço de E-mail (Background)
+Criei um script para facilitar. Ele roda o serviço "escondido" (background), então você pode fechar o terminal sem derrubar o site.
 
-O frontend (React) precisa saber onde a função está rodando.
-Edite o arquivo `.env` (ou `.env.local`) no servidor onde está o Frontend e adicione:
+```bash
+# Dar permissão de execução (só precisa fazer uma vez)
+chmod +x run_email_service.sh
+
+# Rodar o serviço
+./run_email_service.sh
+```
+*Se der tudo certo, ele vai dizer que iniciou na porta 9999.*
+
+## Passo 3: Configurar o Redirecionamento (Nginx)
+Isso faz com que o app acesse `https://seusite.com/functions` ao invés de `localhost:9999`.
+
+1.  Certifique-se de que o arquivo `nginx.conf` foi atualizado pelo `git pull`.
+2.  Reinicie o Nginx para aplicar as mudanças:
+
+Se estiver usando Docker:
+```bash
+docker-compose restart nginx
+```
+
+Se estiver usando Nginx instalado no sistema:
+```bash
+systemctl reload nginx
+```
+
+## Passo 4: Configurar o Frontend
+Edite o arquivo `.env` (ou `.env.local`) onde o site está rodando:
 
 ```env
-VITE_SUPABASE_FUNCTION_URL=http://localhost:9999/email-handler
+# Aponte para a URL pública do seu Nginx
+VITE_SUPABASE_FUNCTION_URL=https://pandanet.grupopixel.com.br/functions/v1
 ```
-*(Substitua `http://localhost:9999` pelo IP/Porta onde você rodou a função)*
 
-
-## Opção 3: Usando Nginx (Recomendado para Produção)
-
-Para não precisar abrir a porta 9999 no Firewall, configurei o Nginx para redirecionar `/functions/v1/email-handler`.
-
-1.  **No VPS**, rode o Deno normalmente na porta 9999.
-2.  **Atualize o Nginx** (o arquivo `nginx.conf` já foi atualizado no git):
-    ```bash
-    docker-compose restart
-    # ou se usar nginx nativo:
-    systemctl reload nginx
-    ```
-3.  **Atualize o .env do Frontend**:
-    ```env
-    VITE_SUPABASE_FUNCTION_URL=https://pandanet.grupopixel.com.br/functions/v1
-    ```
-    *Assim o frontend usa a URL segura (HTTPS) padrão.*
+Depois de editar o .env, se estiver rodando o build de produção, reinicie o container ou serviço do frontend.
