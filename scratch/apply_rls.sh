@@ -354,7 +354,30 @@ END;
 GRANT EXECUTE ON FUNCTION public.delete_user_admin(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.create_user_admin(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN, JSONB, TEXT, UUID, TEXT, TEXT, BOOLEAN, INTEGER, BOOLEAN, JSONB, JSONB, DATE, UUID, UUID, BOOLEAN) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.update_user_profile(UUID, TEXT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, INTEGER, BOOLEAN, JSONB, JSONB, UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN) TO authenticated, service_role;
+
+-- Adicionar coluna guest_cpf na tabela scheduling_bookings se não existir
+ALTER TABLE public.scheduling_bookings ADD COLUMN IF NOT EXISTS guest_cpf TEXT;
+
+-- Criar tabela de configurações do relatório de agendamento se não existir
+CREATE TABLE IF NOT EXISTS public.scheduling_settings (
+    company_id UUID PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE,
+    company_name TEXT,
+    logo_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Habilitar RLS e criar políticas
+ALTER TABLE public.scheduling_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso completo de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Acesso completo de configurações por empresa" ON public.scheduling_settings
+    FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Leitura pública de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Leitura pública de configurações por empresa" ON public.scheduling_settings
+    FOR SELECT USING (true);
 "
+
 
 echo "Executando SQL..."
 docker exec -i $CONTAINER_ID $PSQL_PATH -U postgres -d postgres -c "$SQL_COMMANDS"

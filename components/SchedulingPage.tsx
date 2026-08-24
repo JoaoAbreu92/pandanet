@@ -19,8 +19,14 @@ import type { SchedulingEventType, SchedulingBooking, SchedulingTemplate } from 
 const SchedulingPage: React.FC = () => {
     const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
-    const [activeTab, setActiveTab] = useState<'events' | 'bookings' | 'templates'>('events');
+    const [activeTab, setActiveTab] = useState<'events' | 'bookings' | 'templates' | 'settings'>('events');
     const [bookingFilter, setBookingFilter] = useState<'pending' | 'confirmed' | 'past_cancelled'>('pending');
+
+    // Report and Settings states
+    const [reportEventTypeId, setReportEventTypeId] = useState<string>('all');
+    const [settingsCompanyName, setSettingsCompanyName] = useState('');
+    const [settingsLogoUrl, setSettingsLogoUrl] = useState('');
+    const [uploadingLogo, setUploadingLogo] = useState(false);
 
     // Data lists
     const [eventTypes, setEventTypes] = useState<SchedulingEventType[]>([]);
@@ -50,7 +56,8 @@ const SchedulingPage: React.FC = () => {
         requirements: {
             phone: true,
             cnpj: false,
-            company_name: false
+            company_name: false,
+            cpf: false
         },
         availability: {
             days: [1, 2, 3, 4, 5],
@@ -87,6 +94,7 @@ const SchedulingPage: React.FC = () => {
         fetchBookings();
         fetchTemplates();
         fetchEmailAccounts();
+        fetchSettings();
     }, [currentUser]);
 
     const fetchEventTypes = async () => {
@@ -150,6 +158,313 @@ const SchedulingPage: React.FC = () => {
         }
     };
 
+    const fetchSettings = async () => {
+        if (!currentUser?.company_id) return;
+        try {
+            const { data, error } = await supabase
+                .from('scheduling_settings')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (data) {
+                setSettingsCompanyName(data.company_name || '');
+                setSettingsLogoUrl(data.logo_url || '');
+            } else {
+                const { data: compData } = await supabase
+                    .from('companies')
+                    .select('name')
+                    .eq('id', currentUser.company_id)
+                    .maybeSingle();
+                setSettingsCompanyName(compData?.name || '');
+            }
+        } catch (err) {
+            console.error('Erro ao buscar configurações de agendamentos:', err);
+        }
+    };
+
+    const handleSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setActionLoading(true);
+        try {
+            const payload = {
+                company_id: currentUser.company_id,
+                company_name: settingsCompanyName,
+                logo_url: settingsLogoUrl
+            };
+
+            const { error } = await supabase
+                .from('scheduling_settings')
+                .upsert(payload, { onConflict: 'company_id' });
+
+            if (error) throw error;
+
+            addNotification({
+                type: 'system',
+                title: 'Configurações Salvas',
+                description: 'As configurações de relatório da empresa foram atualizadas.'
+            });
+            fetchSettings();
+        } catch (err: any) {
+            alert('Erro ao salvar configurações: ' + err.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setUploadingLogo(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `scheduling_report_logo_${currentUser.company_id}_${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('feed-media')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+            setSettingsLogoUrl(data.publicUrl);
+        } catch (err: any) {
+            alert('Erro ao fazer upload da logo: ' + err.message);
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
+    const handleGenerateReport = () => {
+        const selectedId = reportEventTypeId;
+        const filtered = selectedId === 'all' 
+            ? bookings 
+            : bookings.filter(b => b.event_type_id === selectedId);
+
+        if (filtered.length === 0) {
+            alert('Não há reservas registradas para gerar o relatório.');
+            return;
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!doc) return;
+
+        const companyName = settingsCompanyName || 'PandaNet Empresa';
+        const logoUrl = settingsLogoUrl || '';
+        const reportTitle = selectedId === 'all' 
+            ? 'Relatório Geral de Reservas' 
+            : `Relatório de Reservas - ${eventTypes.find(e => e.id === selectedId)?.name || ''}`;
+
+        const rowsHtml = filtered.map(booking => {
+            const bDate = new Date(booking.booking_date + 'T00:00:00');
+            const formattedDate = bDate.toLocaleDateString('pt-BR');
+            const documents = [
+                booking.guest_cpf ? `CPF: ${booking.guest_cpf}` : '',
+                booking.guest_cnpj ? `CNPJ: ${booking.guest_cnpj}` : ''
+            ].filter(Boolean).join(' / ') || '-';
+            
+            return `
+                <tr>
+                    <td>${booking.guest_name}</td>
+                    <td>${booking.guest_email}</td>
+                    <td>${booking.guest_phone || '-'}</td>
+                    <td>${documents}</td>
+                    <td>${formattedDate} às ${booking.booking_time}</td>
+                    <td>${booking.status === 'confirmed' ? 'Confirmado' : booking.status === 'pending' ? 'Pendente' : 'Cancelado/Recusado'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const pandanetLogoUrl = window.location.origin + '/logo.png';
+
+        const printHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>${reportTitle}</title>
+                <style>
+                    body {
+                        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                        color: #1e293b;
+                        margin: 0;
+                        padding: 40px;
+                        line-height: 1.5;
+                        background-color: #fff;
+                    }
+                    .header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        border-bottom: 2px solid #e2e8f0;
+                        padding-bottom: 20px;
+                        margin-bottom: 30px;
+                    }
+                    .header-left {
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                    }
+                    .company-logo {
+                        max-height: 60px;
+                        max-width: 150px;
+                        object-fit: contain;
+                    }
+                    .company-name {
+                        font-size: 20px;
+                        font-weight: 800;
+                        color: #0f172a;
+                    }
+                    .header-right {
+                        text-align: right;
+                    }
+                    .report-date {
+                        font-size: 11px;
+                        color: #64748b;
+                        margin-top: 4px;
+                    }
+                    h1 {
+                        font-size: 18px;
+                        font-weight: 900;
+                        margin: 0 0 10px 0;
+                        color: #0f172a;
+                    }
+                    .summary {
+                        background-color: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 12px;
+                        padding: 15px;
+                        margin-bottom: 25px;
+                        font-size: 12px;
+                        display: flex;
+                        gap: 30px;
+                    }
+                    .summary-item strong {
+                        color: #475569;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 60px;
+                        font-size: 11px;
+                    }
+                    th {
+                        background-color: #f1f5f9;
+                        color: #475569;
+                        text-align: left;
+                        padding: 10px 12px;
+                        font-weight: 700;
+                        border-bottom: 2px solid #cbd5e1;
+                    }
+                    td {
+                        padding: 10px 12px;
+                        border-bottom: 1px solid #e2e8f0;
+                        color: #334155;
+                    }
+                    tr:nth-child(even) {
+                        background-color: #fafafa;
+                    }
+                    .footer {
+                        position: fixed;
+                        bottom: 40px;
+                        left: 40px;
+                        right: 40px;
+                        border-top: 1px solid #e2e8f0;
+                        padding-top: 15px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 5px;
+                        background: #fff;
+                    }
+                    .pandanet-logo {
+                        height: 25px;
+                        object-fit: contain;
+                    }
+                    .pandanet-site {
+                        font-size: 10px;
+                        color: #94a3b8;
+                        text-decoration: none;
+                        font-weight: 600;
+                    }
+                    @media print {
+                        body {
+                            padding: 0;
+                        }
+                        .footer {
+                            position: fixed;
+                            bottom: 0;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="header-left">
+                        ${logoUrl ? `<img src="${logoUrl}" class="company-logo" alt="${companyName}" />` : ''}
+                        <span class="company-name">${companyName}</span>
+                    </div>
+                    <div class="header-right">
+                        <h1>${reportTitle}</h1>
+                        <div class="report-date">Emitido em: ${new Date().toLocaleString('pt-BR')}</div>
+                    </div>
+                </div>
+
+                <div class="summary">
+                    <div class="summary-item"><strong>Total de Reservas:</strong> ${filtered.length}</div>
+                    <div class="summary-item"><strong>Confirmadas:</strong> ${filtered.filter(b => b.status === 'confirmed').length}</div>
+                    <div class="summary-item"><strong>Pendentes:</strong> ${filtered.filter(b => b.status === 'pending').length}</div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>E-mail</th>
+                            <th>Telefone</th>
+                            <th>CPF/CNPJ</th>
+                            <th>Data e Horário</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <img src="${pandanetLogoUrl}" class="pandanet-logo" alt="PandaNet" />
+                    <a href="https://www.pandanet.com.br" class="pandanet-site" target="_blank">www.pandanet.com.br</a>
+                </div>
+            </body>
+            </html>
+        `;
+
+        doc.write(printHtml);
+        doc.close();
+
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+            iframe.contentWindow?.print();
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+        }, 800);
+    };
+
     // Actions for Event Types
     const handleSaveEvent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -196,7 +511,7 @@ const SchedulingPage: React.FC = () => {
             fetchEventTypes();
             setEventForm({
                 name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
-                requirements: { phone: true, cnpj: false, company_name: false },
+                requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
                 availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
                 is_active: true,
                 has_capacity_limit: false,
@@ -225,7 +540,8 @@ const SchedulingPage: React.FC = () => {
             requirements: {
                 phone: event.requirements?.phone ?? true,
                 cnpj: event.requirements?.cnpj ?? false,
-                company_name: event.requirements?.company_name ?? false
+                company_name: event.requirements?.company_name ?? false,
+                cpf: event.requirements?.cpf ?? false
             },
             availability: {
                 days: event.availability?.days ?? [1, 2, 3, 4, 5],
@@ -509,7 +825,7 @@ const SchedulingPage: React.FC = () => {
                                 setEditingEvent(null);
                                 setEventForm({
                                     name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
-                                    requirements: { phone: true, cnpj: false, company_name: false },
+                                    requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
                                     availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
                                     is_active: true,
                                     has_capacity_limit: false,
@@ -590,6 +906,16 @@ const SchedulingPage: React.FC = () => {
                 >
                     Modelos de E-mail
                 </button>
+                <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`px-5 py-3 border-b-2 font-bold text-sm transition-all ${
+                        activeTab === 'settings' 
+                            ? 'border-brand-primary text-brand-primary' 
+                            : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                    }`}
+                >
+                    Configurações
+                </button>
             </div>
 
             {/* Content Tabs */}
@@ -636,6 +962,7 @@ const SchedulingPage: React.FC = () => {
                                                     {event.requirements?.phone && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Telefone</span>}
                                                     {event.requirements?.cnpj && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CNPJ</span>}
                                                     {event.requirements?.company_name && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Empresa</span>}
+                                                    {event.requirements?.cpf && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CPF</span>}
                                                 </div>
                                             </div>
 
@@ -686,6 +1013,32 @@ const SchedulingPage: React.FC = () => {
                     {/* Tab: Bookings */}
                     {activeTab === 'bookings' && (
                         <div className="space-y-4">
+                            {/* Report Generator Widget */}
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-950/40 rounded-2xl p-5 border border-slate-200/60 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div className="space-y-1 text-center md:text-left">
+                                    <h4 className="font-extrabold text-slate-800 dark:text-white text-sm">Relatório de Reservas</h4>
+                                    <p className="text-slate-500 dark:text-slate-400 text-xs">Gere um documento profissional para impressão ou PDF das suas reservas.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto text-slate-700 dark:text-slate-350">
+                                    <select
+                                        value={reportEventTypeId}
+                                        onChange={e => setReportEventTypeId(e.target.value)}
+                                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-brand-primary"
+                                    >
+                                        <option value="all">Todos os Agendamentos</option>
+                                        {eventTypes.map(et => (
+                                            <option key={et.id} value={et.id}>{et.name}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => handleGenerateReport()}
+                                        className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-brand-primary/10"
+                                    >
+                                        <DocumentTextIcon className="w-4 h-4" />
+                                        Gerar Relatório
+                                    </button>
+                                </div>
+                            </div>
                             {/* Filter Sub-Tabs */}
                             <div className="flex gap-2 bg-slate-100 dark:bg-slate-950 p-1.5 rounded-xl max-w-md">
                                 <button
@@ -760,6 +1113,9 @@ const SchedulingPage: React.FC = () => {
                                                         )}
                                                         {booking.guest_cnpj && (
                                                             <div><span className="font-semibold">CNPJ:</span> {booking.guest_cnpj}</div>
+                                                        )}
+                                                        {booking.guest_cpf && (
+                                                            <div><span className="font-semibold">CPF:</span> {booking.guest_cpf}</div>
                                                         )}
                                                         <div><span className="font-semibold">Data:</span> {bDate.toLocaleDateString('pt-BR')} às {booking.booking_time}</div>
                                                     </div>
@@ -860,6 +1216,78 @@ const SchedulingPage: React.FC = () => {
                                     ))
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Tab: Settings */}
+                    {activeTab === 'settings' && (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Configurações de Relatório</h3>
+                                <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">Configure o cabeçalho personalizado que sairá nos relatórios de agendamentos da sua empresa.</p>
+                            </div>
+
+                            <form onSubmit={handleSaveSettings} className="space-y-6 max-w-xl">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block">Nome da Empresa para Relatórios</label>
+                                    <input 
+                                        type="text" 
+                                        value={settingsCompanyName}
+                                        onChange={e => setSettingsCompanyName(e.target.value)}
+                                        placeholder="Ex: Minha Empresa LTDA"
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block">Logotipo da Empresa</label>
+                                    <div className="flex items-center gap-5">
+                                        {settingsLogoUrl ? (
+                                            <div className="relative group w-32 h-20 bg-slate-50 dark:bg-slate-950 border rounded-xl overflow-hidden flex items-center justify-center p-2">
+                                                <img src={settingsLogoUrl} alt="Logo da Empresa" className="max-h-full max-w-full object-contain" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSettingsLogoUrl('')}
+                                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                                                >
+                                                    Remover
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="w-32 h-20 bg-slate-50 dark:bg-slate-950 border border-dashed rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold">
+                                                Sem Logo
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                            <input 
+                                                type="file" 
+                                                accept="image/*"
+                                                onChange={handleLogoUpload}
+                                                disabled={uploadingLogo}
+                                                id="report-logo-file"
+                                                className="hidden"
+                                            />
+                                            <label 
+                                                htmlFor="report-logo-file"
+                                                className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 font-bold px-4 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-800 cursor-pointer inline-block transition-all"
+                                            >
+                                                {uploadingLogo ? 'Enviando...' : 'Fazer Upload de Logo'}
+                                            </label>
+                                            <p className="text-[10px] text-slate-400 mt-1">Recomendado: Imagem PNG com fundo transparente ou JPG.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                                    <button
+                                        type="submit"
+                                        disabled={actionLoading || uploadingLogo}
+                                        className="bg-brand-primary hover:bg-emerald-600 disabled:opacity-50 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-md shadow-brand-primary/10"
+                                    >
+                                        {actionLoading ? 'Salvando...' : 'Salvar Configurações'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     )}
                 </>

@@ -118,3 +118,24 @@ CREATE POLICY "Admins e anfitriões leem templates" ON public.scheduling_templat
             AND (profiles.is_admin = true OR profiles.is_company_admin = true)
         )
     );
+
+-- 4. Extensões para Relatórios de Agendamentos e CPF
+ALTER TABLE public.scheduling_bookings ADD COLUMN IF NOT EXISTS guest_cpf TEXT;
+
+CREATE TABLE IF NOT EXISTS public.scheduling_settings (
+    company_id UUID PRIMARY KEY REFERENCES public.companies(id) ON DELETE CASCADE,
+    company_name TEXT,
+    logo_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+ALTER TABLE public.scheduling_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acesso completo de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Acesso completo de configurações por empresa" ON public.scheduling_settings
+    FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Leitura pública de configurações por empresa" ON public.scheduling_settings;
+CREATE POLICY "Leitura pública de configurações por empresa" ON public.scheduling_settings
+    FOR SELECT USING (true);
+

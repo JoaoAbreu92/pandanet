@@ -858,6 +858,7 @@ export interface SchedulingEventType {
     phone?: boolean;
     cnpj?: boolean;
     company_name?: boolean;
+    cpf?: boolean;
   };
   availability: {
     days: number[]; // ex: [1, 2, 3, 4, 5]
@@ -888,6 +889,7 @@ export interface SchedulingBooking {
   guest_phone: string;
   guest_company_name?: string;
   guest_cnpj?: string;
+  guest_cpf?: string;
   booking_date: string; // YYYY-MM-DD
   booking_time: string; // HH:MM
   status: 'pending' | 'confirmed' | 'rejected' | 'cancelled';
@@ -896,6 +898,13 @@ export interface SchedulingBooking {
   notes?: string;
   created_at?: string;
   event_types?: SchedulingEventType;
+}
+
+export interface SchedulingSettings {
+  company_id: string;
+  company_name?: string;
+  logo_url?: string;
+  created_at?: string;
 }
 
 export interface SchedulingTemplate {

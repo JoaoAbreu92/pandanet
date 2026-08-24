@@ -34,6 +34,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
     const [guestPhone, setGuestPhone] = useState('');
     const [guestCompany, setGuestCompany] = useState('');
     const [guestCnpj, setGuestCnpj] = useState('');
+    const [guestCpf, setGuestCpf] = useState('');
     const [notes, setNotes] = useState('');
 
     // Calendar view state
@@ -195,6 +196,10 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             alert('Por favor, informe o CNPJ.');
             return;
         }
+        if (eventType?.requirements?.cpf && !guestCpf.trim()) {
+            alert('Por favor, informe o CPF.');
+            return;
+        }
 
         if (eventType?.is_paid) {
             setStep('payment');
@@ -236,6 +241,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                 guest_phone: guestPhone,
                 guest_company_name: guestCompany || null,
                 guest_cnpj: guestCnpj || null,
+                guest_cpf: guestCpf || null,
                 booking_date: selectedDate,
                 booking_time: selectedTime,
                 status: 'pending', // host needs to confirm
@@ -528,17 +534,30 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                                 )}
                             </div>
 
-                            {eventType.requirements?.cnpj && (
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">CNPJ da Empresa *</label>
-                                    <input 
-                                        type="text" required
-                                        value={guestCnpj} onChange={e => setGuestCnpj(e.target.value)}
-                                        placeholder="Ex: 00.000.000/0001-00"
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
-                                    />
-                                </div>
-                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {eventType.requirements?.cnpj && (
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">CNPJ da Empresa *</label>
+                                        <input 
+                                            type="text" required
+                                            value={guestCnpj} onChange={e => setGuestCnpj(e.target.value)}
+                                            placeholder="Ex: 00.000.000/0001-00"
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                        />
+                                    </div>
+                                )}
+                                {eventType.requirements?.cpf && (
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">CPF *</label>
+                                        <input 
+                                            type="text" required
+                                            value={guestCpf} onChange={e => setGuestCpf(e.target.value)}
+                                            placeholder="Ex: 000.000.000-00"
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                        />
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Notas / Detalhes adicionais</label>
