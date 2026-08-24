@@ -197,6 +197,7 @@ export interface Employee {
   following: string[]; // Array de IDs de usuários que este funcionário segue
   department_id?: string;
   department_name?: string;
+  address?: string; // Localização para previsão do tempo
 }
 
 export interface Task {

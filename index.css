@@ -33,4 +33,20 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-gray-300 rounded-full border-2 border-transparent bg-clip-content hover:bg-gray-400;
   }
+
+  /* Utility to prevent horizontal overflow */
+  .no-horizontal-scroll {
+    overflow-x: hidden;
+  }
+
+  /* 720p/13" MacBook adjustments */
+  @media (max-width: 1280px) {
+    .container-responsive {
+      @apply max-w-full px-4;
+    }
+    
+    .text-responsive {
+      font-size: clamp(0.875rem, 2vw, 1rem);
+    }
+  }
 }

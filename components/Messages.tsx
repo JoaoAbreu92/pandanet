@@ -29,22 +29,21 @@ const availableEmojis = [
     '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
     '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
     '🥴', '🤢', '🤮', 'sneezing_face', 'mask', 'thermometer', 'head_bandage',
-    'money_mouth_face', 'cowboy_hat_face', 'smiling_imp', 'imp', 'skull', 'skull_and_crossbones',
     'poop', 'clown_face', 'ogre', 'goblin', 'ghost', 'alien', 'space_invader', 'robot',
     'jack_o_lantern', 'smiley_cat', 'smile_cat', 'joy_cat', 'heart_eyes_cat', 'smirk_cat',
     'kissing_cat', 'scream_cat', 'crying_cat_face', 'pouting_cat', 'open_hands', 'raised_hands',
-    'clap', 'thumbsup', 'thumbsdown', 'punch', 'fist', 'left_facing_fist', 'right_facing_fist',
-    'fingers_crossed', 'v', 'love_you_gesture', 'metal', 'ok_hand', 'pinching_hand', 'pinched_fingers',
-    'muscle', 'mechanical_arm', 'leg', 'mechanical_leg', 'foot', 'ear', 'ear_with_hearing_aid',
-    'nose', 'brain', 'anatomical_heart', 'lungs', 'tooth', 'bone', 'eyes', 'eye', 'tongue',
-    'mouth', 'lips', 'baby', 'child', 'boy', 'girl', 'person', 'blond_haired_person', 'man',
-    'bearded_person', 'red_haired_person', 'woman', 'older_person', 'old_man', 'old_woman',
-    'frown', 'person_pouting', 'person_gesturing_no', 'person_gesturing_ok', 'person_tipping_hand',
-    'person_raising_hand', 'deaf_person', 'person_bowing', 'person_facepalming', 'person_shrugging',
-    'health_worker', 'student', 'teacher', 'judge', 'farmer', 'cook', 'mechanic', 'factory_worker',
-    'office_worker', 'scientist', 'technologist', 'singer', 'artist', 'pilot', 'astronaut',
-    'firefighter', 'police_officer', 'detective', 'guard', 'ninja', 'construction_worker', 'prince',
-    'princess', 'person_wearing_turban', 'person_with_skullcap', 'woman_with_headscarf'
+    'clap', '👍', '👎', '👊', '✊', '🤛', '🤜',
+    '🤞', '✌️', '🤟', '🤘', '👌', '🤏', '🤌',
+    '💪', '🦾', '🦵', '🦿', '🦶', '👂', '🦻',
+    '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅',
+    '👄', '👄', '👶', '🧒', '👦', '👧', '👤', '👱', '👨',
+    '🧔', '🧑', '👩', '🧓', '👴', '👵',
+    '☹️', '😮‍💨', '🙅', '🙆', '💁',
+    '🙋', '🧏', '🙇', '🤦', '🤷',
+    '🧑‍⚕️', '🧑‍🎓', '🧑‍🏫', '🧑‍⚖️', '🧑‍🌾', '🧑‍🍳', '🧑‍🔧', '🧑‍🏭',
+    '🧑‍💼', '🧑‍🔬', '🧑‍💻', '🧑‍🎤', '🧑‍🎨', '🧑‍✈️', '🧑‍🚀',
+    '🧑‍🚒', '👮', '🕵️', '💂', '🥷', '👷', '🤴',
+    '👸', '👳', '👲', '🧕'
 ];
 
 const NOTE_COLORS = [
@@ -103,14 +102,14 @@ const Messages: React.FC<MessagesProps> = () => {
         if (stickerTimeoutRef.current) clearTimeout(stickerTimeoutRef.current);
         stickerTimeoutRef.current = setTimeout(() => {
             setShowReactionPicker(msgId);
-        }, 1500); // 1.5s delay
+        }, 1000); // 1.0s delay
     };
 
     const handleMouseLeaveReaction = () => {
         if (stickerTimeoutRef.current) clearTimeout(stickerTimeoutRef.current);
         stickerTimeoutRef.current = setTimeout(() => {
             setShowReactionPicker(null);
-        }, 800);
+        }, 1500); // Increased stay time
     };
 
     const stickers = [
@@ -397,7 +396,26 @@ const Messages: React.FC<MessagesProps> = () => {
 
     const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { if (file.size > 10 * 1024 * 1024) { alert('O arquivo excede o limite de 10MB.'); return; } setAttachedFile(file); }
+        if (file) {
+            if (file.size > 10 * 1024 * 1024) { alert('O arquivo excede o limite de 10MB.'); return; }
+            setAttachedFile(file);
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('file') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('O arquivo colado excede o limite de 10MB.');
+                        return;
+                    }
+                    setAttachedFile(file);
+                }
+            }
+        }
     };
 
     const handleReact = async (messageId: string, emoji: string) => { // Alterado messageId para string
@@ -544,14 +562,35 @@ const Messages: React.FC<MessagesProps> = () => {
                             </div>
                         )}
                         <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-sm border border-gray-100`}>
-                            <p className="text-sm break-words">{message.text}</p>
-                            {message.file && (<div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2"> <PaperClipIcon className="w-4 h-4" /> <a href={message.file.url} className="text-sm underline" target="_blank" rel="noopener noreferrer">{message.file.name}</a> </div>)}
+                            <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>
+                            {message.file && (
+                                <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
+                                    <PaperClipIcon className="w-4 h-4 shrink-0" />
+                                    <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
+                                        {message.file.name}
+                                    </a>
+                                </div>
+                            )}
                         </div>
-                        <div className={`absolute top-0 -mt-4 flex items-center bg-white shadow-md rounded-full border transition-all duration-300 opacity-0 delay-1000 group-hover:opacity-100 group-hover:delay-0 ${isMe ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'}`}>
-                            <div className="flex items-center p-0.5">
-                                {availableReactions.map(emoji => (<button key={emoji} onClick={() => handleReact(message.id as string, emoji)} className="p-1 text-lg hover:scale-125 transition-transform">{emoji}</button>))}
+                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                            <div className="flex items-center p-1 space-x-0.5">
+                                {availableReactions.map(emoji => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => handleReact(message.id as string, emoji)}
+                                        className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-gray-100 rounded-full"
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                                <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                                <button
+                                    onClick={() => setReplyingToMessage(message)}
+                                    className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <ArrowUturnLeftIcon className="w-4 h-4" />
+                                </button>
                             </div>
-                            <button onClick={() => setReplyingToMessage(message)} className="p-1.5 text-gray-500 hover:text-brand-primary"> <ArrowUturnLeftIcon className="w-4 h-4" /> </button>
                         </div>
                     </div>
                     <div className="flex justify-between items-center w-full">
@@ -740,7 +779,14 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
                                     <PaperClipIcon className="w-6 h-6" />
                                 </button>
-                                <input type="text" value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} placeholder="Digite uma mensagem..." className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                                <input
+                                    type="text"
+                                    value={newMessageText}
+                                    onChange={(e) => setNewMessageText(e.target.value)}
+                                    onPaste={handlePaste}
+                                    placeholder="Digite uma mensagem..."
+                                    className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary h-10"
+                                />
                                 <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessageText.trim() && !attachedFile)}>
                                     <PaperAirplaneIcon className="w-6 h-6" />
                                 </button>
