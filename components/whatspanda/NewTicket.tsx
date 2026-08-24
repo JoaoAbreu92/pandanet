@@ -127,9 +127,11 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
             .maybeSingle();
 
         let conversationId = existingConv?.id;
-        const userId = profile?.id || user?.id || currentUser?.id;
 
         // 2. If not, create new one
+        // IMPORTANT: assigned_to is intentionally null so the ticket goes to
+        // the "Aguardando" queue and is not auto-assigned to the agent who
+        // created it. The agent can self-assign after taking over the ticket.
         if (!conversationId) {
             const { data: newConv, error } = await supabase
                 .from('whatsapp_conversations')
@@ -142,7 +144,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
                     queue_id: selectedQueue || null,
-                    assigned_to: userId,
+                    assigned_to: null,
                     is_group: false
                 })
                 .select()
@@ -155,7 +157,8 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
             }
             conversationId = newConv.id;
         } else {
-            // Re-open and update queue/channel/assignment if needed
+            // Re-open conversation: always reset assigned_to to null so the
+            // ticket enters "Aguardando" without inheriting the previous agent.
             await supabase
                 .from('whatsapp_conversations')
                 .update({ 
@@ -163,7 +166,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
                     queue_id: selectedQueue || null,
-                    assigned_to: userId,
+                    assigned_to: null,
                     is_group: false
                 })
                 .eq('id', conversationId);

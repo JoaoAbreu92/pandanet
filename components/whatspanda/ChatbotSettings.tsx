@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause, RefreshCw, Send, Smartphone, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import {
+    Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause,
+    RefreshCw, Send, Smartphone, BookOpen, Layers, GripVertical, Zap,
+    AlertCircle, CheckCircle, ArrowDown
+} from 'lucide-react';
 import { SparklesIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface ChatbotFlow {
@@ -16,6 +20,7 @@ interface ChatbotNode {
     flow_id: string;
     type: 'greeting' | 'menu' | 'transfer_queue' | 'transfer_user' | 'message';
     content: any;
+    sort_order: number;
 }
 
 interface SimMessage {
@@ -38,6 +43,15 @@ const ChatbotSettings: React.FC = () => {
     const [signature, setSignature] = useState('');
     const [useSignature, setUseSignature] = useState(false);
 
+    // Dirty tracking and save state
+    const [dirtyNodeIds, setDirtyNodeIds] = useState<Set<string>>(new Set());
+    const [isSavingFlow, setIsSavingFlow] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Drag-and-drop state
+    const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+
     // Simulator State
     const [isSimulating, setIsSimulating] = useState(false);
     const [simHistory, setSimHistory] = useState<SimMessage[]>([]);
@@ -56,24 +70,15 @@ const ChatbotSettings: React.FC = () => {
         
         let formatted = '';
         switch (format) {
-            case 'bold':
-                formatted = `*${selectedText}*`;
-                break;
-            case 'italic':
-                formatted = `_${selectedText}_`;
-                break;
-            case 'strike':
-                formatted = `~${selectedText}~`;
-                break;
-            case 'mono':
-                formatted = `\`\`\`${selectedText}\`\`\``;
-                break;
+            case 'bold': formatted = `*${selectedText}*`; break;
+            case 'italic': formatted = `_${selectedText}_`; break;
+            case 'strike': formatted = `~${selectedText}~`; break;
+            case 'mono': formatted = `\`\`\`${selectedText}\`\`\``; break;
         }
 
         const newValue = text.substring(0, start) + formatted + text.substring(end);
         setSignature(newValue);
         
-        // Refocus textarea and select the formatted text
         setTimeout(() => {
             textarea.focus();
             const newCursorPos = start + formatted.length;
@@ -89,19 +94,10 @@ const ChatbotSettings: React.FC = () => {
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // Monospace: ```text```
         formatted = formatted.replace(/```([^`]+)```/g, '<span style="font-family: monospace;" class="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-500">$1</span>');
-        
-        // Bold: *text*
         formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
-        
-        // Italic: _text_
         formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
-        
-        // Strikethrough: ~text~
         formatted = formatted.replace(/~([^~]+)~/g, '<del>$1</del>');
-        
-        // New lines to br
         formatted = formatted.replace(/\n/g, '<br/>');
 
         return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
@@ -144,8 +140,14 @@ const ChatbotSettings: React.FC = () => {
     };
 
     const fetchNodes = async (flowId: string) => {
-        const { data } = await supabase.from('whatsapp_chatbot_nodes').select('*').eq('flow_id', flowId);
+        const { data } = await supabase
+            .from('whatsapp_chatbot_nodes')
+            .select('*')
+            .eq('flow_id', flowId)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true });
         if (data) setNodes(data);
+        setDirtyNodeIds(new Set());
     };
 
     const handleCreateFlow = async () => {
@@ -169,7 +171,6 @@ const ChatbotSettings: React.FC = () => {
         const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
 
-        // Desativar outros fluxos da empresa antes de ativar este
         if (!flow.is_active) {
             await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
         }
@@ -190,6 +191,7 @@ const ChatbotSettings: React.FC = () => {
                 setSelectedFlow(null);
                 setNodes([]);
                 setIsSimulating(false);
+                setDirtyNodeIds(new Set());
             }
         }
     };
@@ -198,20 +200,47 @@ const ChatbotSettings: React.FC = () => {
         if (!selectedFlow) return;
 
         const content = type === 'menu' ? { text: '', options: [] } : { text: '' };
+        const nextSortOrder = nodes.length;
         
         const { data, error } = await supabase.from('whatsapp_chatbot_nodes').insert({
             flow_id: selectedFlow.id,
             type,
-            content
+            content,
+            sort_order: nextSortOrder
         }).select().single();
 
         if (data) setNodes([...nodes, data]);
     };
 
-    const handleUpdateNode = async (nodeId: string, content: any) => {
-        const { error } = await supabase.from('whatsapp_chatbot_nodes').update({ content }).eq('id', nodeId);
-        if (!error) {
-            setNodes(nodes.map(n => n.id === nodeId ? { ...n, content } : n));
+    // Update node LOCAL state only — does NOT save to DB immediately
+    const handleUpdateNode = (nodeId: string, content: any) => {
+        setNodes(nodes.map(n => n.id === nodeId ? { ...n, content } : n));
+        setDirtyNodeIds(prev => new Set([...prev, nodeId]));
+    };
+
+    // Explicit save — batch saves all dirty nodes to Supabase
+    const handleSaveFlow = async () => {
+        if (dirtyNodeIds.size === 0) return;
+        setIsSavingFlow(true);
+        setSaveSuccess(false);
+
+        const dirtyNodes = nodes.filter(n => dirtyNodeIds.has(n.id));
+        
+        try {
+            for (const node of dirtyNodes) {
+                await supabase
+                    .from('whatsapp_chatbot_nodes')
+                    .update({ content: node.content, sort_order: node.sort_order })
+                    .eq('id', node.id);
+            }
+            setDirtyNodeIds(new Set());
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (err) {
+            console.error('Erro ao salvar fluxo:', err);
+            alert('Erro ao salvar fluxo. Tente novamente.');
+        } finally {
+            setIsSavingFlow(false);
         }
     };
 
@@ -239,55 +268,89 @@ const ChatbotSettings: React.FC = () => {
 
     const handleDeleteNode = async (nodeId: string) => {
         const { error } = await supabase.from('whatsapp_chatbot_nodes').delete().eq('id', nodeId);
-        if (!error) setNodes(nodes.filter(n => n.id !== nodeId));
+        if (!error) {
+            setNodes(nodes.filter(n => n.id !== nodeId));
+            setDirtyNodeIds(prev => {
+                const next = new Set(prev);
+                next.delete(nodeId);
+                return next;
+            });
+        }
     };
 
-    // Load templates function
+    // ── Drag-and-Drop Handlers ──────────────────────────────────────────────
+    const handleDragStart = (e: React.DragEvent, nodeId: string) => {
+        setDragSourceId(nodeId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', nodeId);
+    };
+
+    const handleDragOver = (e: React.DragEvent, nodeId: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverId !== nodeId) setDragOverId(nodeId);
+    };
+
+    const handleDrop = (e: React.DragEvent, targetNodeId: string) => {
+        e.preventDefault();
+        const sourceNodeId = e.dataTransfer.getData('text/plain');
+        if (!sourceNodeId || sourceNodeId === targetNodeId) {
+            setDragOverId(null);
+            setDragSourceId(null);
+            return;
+        }
+
+        const newNodes = [...nodes];
+        const sourceIdx = newNodes.findIndex(n => n.id === sourceNodeId);
+        const targetIdx = newNodes.findIndex(n => n.id === targetNodeId);
+        if (sourceIdx === -1 || targetIdx === -1) return;
+
+        const [removed] = newNodes.splice(sourceIdx, 1);
+        newNodes.splice(targetIdx, 0, removed);
+
+        const updatedNodes = newNodes.map((n, idx) => ({ ...n, sort_order: idx }));
+        setNodes(updatedNodes);
+        setDragOverId(null);
+        setDragSourceId(null);
+        // Mark all as dirty so sort_order gets persisted
+        setDirtyNodeIds(new Set(updatedNodes.map(n => n.id)));
+    };
+
+    const handleDragEnd = () => {
+        setDragOverId(null);
+        setDragSourceId(null);
+    };
+
+    // ── Templates ─────────────────────────────────────────────────────────────
     const loadTemplate = async (templateType: 'support_sales' | 'clinic') => {
         if (!selectedFlow) return;
         if (!window.confirm('Atenção: Carregar este modelo irá apagar todas as etapas atuais deste fluxo de chatbot. Deseja continuar?')) return;
 
         setLoading(true);
         try {
-            // Delete all existing nodes of the flow
             await supabase.from('whatsapp_chatbot_nodes').delete().eq('flow_id', selectedFlow.id);
 
             const q1 = queues[0]?.id || null;
             const q2 = queues[1]?.id || queues[0]?.id || null;
 
             if (templateType === 'support_sales') {
-                // Node 1: Greeting
-                const { data: greetingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'greeting',
-                    content: { text: 'Olá! Seja bem-vindo à nossa central de atendimento. Como podemos ajudar você hoje?' }
-                }).select().single();
-
-                // Node 2: Transfer Support
                 const { data: supportNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'transfer_queue',
+                    flow_id: selectedFlow.id, type: 'transfer_queue', sort_order: 2,
                     content: { text: 'Perfeito. Estou transferindo seu atendimento para nossa equipe do Suporte Técnico. Por favor, aguarde.', queue_id: q1 }
                 }).select().single();
 
-                // Node 3: Transfer Sales
                 const { data: salesNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'transfer_queue',
+                    flow_id: selectedFlow.id, type: 'transfer_queue', sort_order: 3,
                     content: { text: 'Certo! Um consultor do Comercial falará com você em instantes.', queue_id: q2 }
                 }).select().single();
 
-                // Node 4: Other messages
                 const { data: msgNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'message',
+                    flow_id: selectedFlow.id, type: 'message', sort_order: 4,
                     content: { text: 'Certo! Se precisar de algo mais, estamos à disposição. Tenha um ótimo dia!' }
                 }).select().single();
 
-                // Node 5: Menu options linking to respective nodes
                 await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'menu',
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 1,
                     content: {
                         text: 'Por favor, selecione uma das opções abaixo:',
                         options: [
@@ -297,39 +360,30 @@ const ChatbotSettings: React.FC = () => {
                         ]
                     }
                 });
-            } else if (templateType === 'clinic') {
-                // Node 1: Greeting
-                const { data: greetingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'greeting',
-                    content: { text: 'Olá! Obrigado por entrar em contato com nossa clínica médica. Como podemos te ajudar hoje?' }
-                }).select().single();
 
-                // Node 2: Web Booking Link
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'greeting', sort_order: 0,
+                    content: { text: 'Olá! Seja bem-vindo à nossa central de atendimento. Como podemos ajudar você hoje?' }
+                });
+
+            } else if (templateType === 'clinic') {
                 const { data: bookingNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'message',
+                    flow_id: selectedFlow.id, type: 'message', sort_order: 2,
                     content: { text: 'Para agendar sua consulta rapidamente, acesse o link do nosso portal médico: https://agendamentos.exemplo.com.br' }
                 }).select().single();
 
-                // Node 3: Transfer Reception
                 const { data: receptionNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'transfer_queue',
+                    flow_id: selectedFlow.id, type: 'transfer_queue', sort_order: 3,
                     content: { text: 'Aguarde um instante. Estou transferindo você para a nossa Recepção para agendamentos manuais.', queue_id: q1 }
                 }).select().single();
 
-                // Node 4: Clinic Info
                 const { data: infoNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'message',
+                    flow_id: selectedFlow.id, type: 'message', sort_order: 4,
                     content: { text: 'Nosso horário de funcionamento é de Segunda a Sexta, das 8h às 18h. Estamos localizados na Av. Paulista, 1000.' }
                 }).select().single();
 
-                // Node 5: Menu
                 await supabase.from('whatsapp_chatbot_nodes').insert({
-                    flow_id: selectedFlow.id,
-                    type: 'menu',
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 1,
                     content: {
                         text: 'Escolha uma opção:',
                         options: [
@@ -338,6 +392,11 @@ const ChatbotSettings: React.FC = () => {
                             { label: '3. Horários e Localização 📍', next_node: infoNode?.id || '' }
                         ]
                     }
+                });
+
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'greeting', sort_order: 0,
+                    content: { text: 'Olá! Obrigado por entrar em contato com nossa clínica médica. Como podemos te ajudar hoje?' }
                 });
             }
 
@@ -350,7 +409,7 @@ const ChatbotSettings: React.FC = () => {
         setLoading(false);
     };
 
-    // Chatbot Simulator Logic
+    // ── Simulator ─────────────────────────────────────────────────────────────
     const startSimulation = () => {
         if (nodes.length === 0) {
             alert('Adicione passos ao fluxo para poder simular.');
@@ -358,7 +417,6 @@ const ChatbotSettings: React.FC = () => {
         }
 
         setIsSimulating(true);
-        // Find Greeting Node
         const greeting = nodes.find(n => n.type === 'greeting');
         const first = greeting || nodes[0];
         
@@ -367,7 +425,6 @@ const ChatbotSettings: React.FC = () => {
                 { id: '1', sender: 'bot', text: first.content.text }
             ];
 
-            // If greeting is followed by a menu node immediately, render it
             const menuNode = nodes.find(n => n.type === 'menu');
             if (first.type === 'greeting' && menuNode) {
                 initialHistory.push({
@@ -444,6 +501,65 @@ const ChatbotSettings: React.FC = () => {
         startSimulation();
     };
 
+    // ── Node type helpers ──────────────────────────────────────────────────────
+    const getNodeMeta = (type: ChatbotNode['type']) => {
+        switch (type) {
+            case 'greeting': return { label: 'Saudação do Robô 🤖', borderClass: 'border-l-4 border-emerald-500', titleColor: 'text-emerald-500', bgDot: 'bg-emerald-500' };
+            case 'menu': return { label: 'Menu de Opções 📋', borderClass: 'border-l-4 border-blue-500', titleColor: 'text-blue-500', bgDot: 'bg-blue-500' };
+            case 'transfer_queue': return { label: 'Transferir para Setor 🏢', borderClass: 'border-l-4 border-purple-500', titleColor: 'text-purple-500', bgDot: 'bg-purple-500' };
+            case 'transfer_user': return { label: 'Transferir para Atendente 👤', borderClass: 'border-l-4 border-orange-500', titleColor: 'text-orange-500', bgDot: 'bg-orange-500' };
+            default: return { label: 'Mensagem', borderClass: 'border-l-4 border-slate-400', titleColor: 'text-slate-400', bgDot: 'bg-slate-400' };
+        }
+    };
+
+    const translateType = (type: string) => {
+        switch (type) {
+            case 'greeting': return 'Saudação';
+            case 'menu': return 'Menu';
+            case 'transfer_queue': return 'Setor';
+            case 'transfer_user': return 'Agente';
+            case 'message': return 'Mensagem';
+            default: return type;
+        }
+    };
+
+    // ── SVG Node Connector ─────────────────────────────────────────────────────
+    const getNodeConnectorColor = (type?: ChatbotNode['type']) => {
+        switch (type) {
+            case 'greeting': return '#10b981';   // emerald
+            case 'menu': return '#3b82f6';        // blue
+            case 'transfer_queue': return '#a855f7'; // purple
+            case 'transfer_user': return '#f97316'; // orange
+            default: return '#94a3b8';             // slate
+        }
+    };
+
+    const NodeConnector = ({ fromNode, label }: { fromNode?: ChatbotNode; label?: string }) => {
+        const color = getNodeConnectorColor(fromNode?.type);
+        return (
+            <div className="flex flex-col items-center my-0 select-none pointer-events-none" style={{ height: 44 }}>
+                <svg width="60" height="44" viewBox="0 0 60 44" fill="none">
+                    {/* Vertical dashed line */}
+                    <line x1="30" y1="0" x2="30" y2="28" stroke={color} strokeWidth="2.5" strokeDasharray="5 3" />
+                    {/* Arrowhead */}
+                    <polygon points="30,44 22,28 38,28" fill={color} opacity="0.85" />
+                </svg>
+                {label && (
+                    <span
+                        className="text-[9px] font-bold px-2 py-0.5 rounded-full border -mt-1"
+                        style={{
+                            color,
+                            backgroundColor: color + '18',
+                            borderColor: color + '40'
+                        }}
+                    >
+                        {label}
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-8 max-w-7xl pb-10">
             {/* Configuração do Google Gemini */}
@@ -489,70 +605,33 @@ const ChatbotSettings: React.FC = () => {
                         </p>
                         
                         <div className="space-y-4">
-                            {/* Editor Toolbar */}
                             <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-100/50 dark:bg-black/20 rounded-xl border border-transparent dark:border-white/5 w-fit">
-                                <button 
-                                    type="button"
-                                    onClick={() => applyFormatting('bold')}
-                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-bold text-xs shadow-sm"
-                                    title="Negrito"
-                                >
-                                    <b>B</b>
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={() => applyFormatting('italic')}
-                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-italic text-xs shadow-sm"
-                                    title="Itálico"
-                                >
-                                    <i>I</i>
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={() => applyFormatting('strike')}
-                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all line-through text-xs shadow-sm"
-                                    title="Tachado"
-                                >
-                                    S
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={() => applyFormatting('mono')}
-                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-mono text-xs shadow-sm"
-                                    title="Monofásico (Código)"
-                                >
-                                    M
-                                </button>
+                                <button type="button" onClick={() => applyFormatting('bold')} className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-bold text-xs shadow-sm" title="Negrito"><b>B</b></button>
+                                <button type="button" onClick={() => applyFormatting('italic')} className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-italic text-xs shadow-sm" title="Itálico"><i>I</i></button>
+                                <button type="button" onClick={() => applyFormatting('strike')} className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all line-through text-xs shadow-sm" title="Tachado">S</button>
+                                <button type="button" onClick={() => applyFormatting('mono')} className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-mono text-xs shadow-sm" title="Monofásico">M</button>
                                 <div className="h-4 w-px bg-slate-300 dark:bg-white/10 mx-1" />
-                                {/* Quick Emojis */}
                                 {['💼', '🛠️', '✨', '👍', '☕', '📞', '💬'].map(emoji => (
-                                    <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => {
-                                            const textarea = textareaRef.current;
-                                            if (!textarea) return;
-                                            const start = textarea.selectionStart;
-                                            const end = textarea.selectionEnd;
-                                            const text = textarea.value;
-                                            const newValue = text.substring(0, start) + emoji + text.substring(end);
-                                            setSignature(newValue);
-                                            setTimeout(() => {
-                                                textarea.focus();
-                                                textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-                                            }, 50);
-                                        }}
-                                        className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-all text-sm"
-                                    >
-                                        {emoji}
-                                    </button>
+                                    <button key={emoji} type="button" onClick={() => {
+                                        const textarea = textareaRef.current;
+                                        if (!textarea) return;
+                                        const start = textarea.selectionStart;
+                                        const end = textarea.selectionEnd;
+                                        const text = textarea.value;
+                                        const newValue = text.substring(0, start) + emoji + text.substring(end);
+                                        setSignature(newValue);
+                                        setTimeout(() => {
+                                            textarea.focus();
+                                            textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+                                        }, 50);
+                                    }} className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-all text-sm">{emoji}</button>
                                 ))}
                             </div>
 
                             <div>
                                 <textarea 
                                     ref={textareaRef}
-                                    placeholder="Ex: &#10;*Att, João Silva*&#10;_Comercial Pixel_&#10;📞 (11) 99999-9999"
+                                    placeholder={`Ex: &#10;*Att, João Silva*&#10;_Comercial Pixel_&#10;📞 (11) 99999-9999`}
                                     value={signature}
                                     onChange={(e) => setSignature(e.target.value)}
                                     className="w-full bg-gray-100/50 dark:bg-black/20 border border-transparent dark:border-white/5 p-4 rounded-2xl outline-none text-sm dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all font-medium min-h-[100px]"
@@ -575,12 +654,10 @@ const ChatbotSettings: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* WhatsApp Device Preview Box */}
                     <div className="w-full xl:w-80 space-y-2">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Pré-visualização no WhatsApp:</span>
                         <div className="bg-[#efeae2] dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-4 shadow-inner relative overflow-hidden h-[150px] flex flex-col justify-end">
                             <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#fff_1px,transparent_1px)]" />
-                            {/* Message bubble wrapper */}
                             <div className="bg-white dark:bg-[#0b141a] text-slate-800 dark:text-gray-100 p-3 rounded-2xl rounded-tr-none shadow-md text-xs relative max-w-[90%] self-end">
                                 <p className="text-slate-500 dark:text-gray-400 italic mb-1 opacity-70">Texto da sua mensagem...</p>
                                 <div className="border-t border-slate-100 dark:border-white/5 my-1.5" />
@@ -640,9 +717,17 @@ const ChatbotSettings: React.FC = () => {
                                 {selectedFlow?.id === flow.id && (
                                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
                                 )}
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-sm text-gray-800 dark:text-white truncate max-w-[130px]">{flow.name}</span>
-                                    <div className="flex items-center gap-2">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="font-bold text-sm text-gray-800 dark:text-white truncate block">{flow.name}</span>
+                                        {/* Badge ATIVO */}
+                                        {flow.is_active && (
+                                            <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                <Zap className="w-2.5 h-2.5 fill-white" /> ATIVO
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); handleToggleActive(flow); }}
                                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500"
@@ -654,12 +739,18 @@ const ChatbotSettings: React.FC = () => {
                                             onClick={(e) => { e.stopPropagation(); handleDeleteFlow(flow.id); }}
                                             className="opacity-0 group-hover/flow:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         ))}
+
+                        {flows.length === 0 && (
+                            <div className="p-8 text-center text-gray-400 text-xs">
+                                Nenhum fluxo criado ainda.
+                            </div>
+                        )}
                     </div>
 
                     <div className="m-4 p-5 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-3">
@@ -669,8 +760,9 @@ const ChatbotSettings: React.FC = () => {
                         <ul className="text-[10px] text-gray-500 dark:text-gray-400 space-y-2 pl-4 list-decimal font-medium leading-relaxed">
                             <li>Comece sempre com uma <b>Saudação</b>.</li>
                             <li>Use o <b>Menu</b> para estruturar as opções numeradas.</li>
-                            <li>Vincule o <b>Próximo Passo</b> de cada opção para criar caminhos de conversação.</li>
+                            <li>Vincule o <b>Próximo Passo</b> de cada opção para criar caminhos.</li>
                             <li>Finalize os nós usando <b>Transferir</b> para encaminhar ao atendente ou fila.</li>
+                            <li>Arraste os nós pelo <b>handle</b> ⠿ para reordenar.</li>
                         </ul>
                     </div>
                 </div>
@@ -687,30 +779,52 @@ const ChatbotSettings: React.FC = () => {
                         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                             {/* Node Editor (Col-8) */}
                             <div className="xl:col-span-8 space-y-6">
-                                {/* Templates and simulator control toolbar */}
-                                <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Modelos Rápidos:</span>
-                                        <button
-                                            onClick={() => loadTemplate('support_sales')}
-                                            className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200/50"
-                                        >
+                                {/* Toolbar: Templates + Save + Simulator */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Modelos:</span>
+                                        <button onClick={() => loadTemplate('support_sales')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200/50">
                                             Suporte & Vendas
                                         </button>
-                                        <button
-                                            onClick={() => loadTemplate('clinic')}
-                                            className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all border border-purple-200/50"
-                                        >
+                                        <button onClick={() => loadTemplate('clinic')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all border border-purple-200/50">
                                             Clínica / Agenda
                                         </button>
                                     </div>
-                                    <button
-                                        onClick={isSimulating ? resetSimulation : startSimulation}
-                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20"
-                                    >
-                                        <Smartphone className="w-4 h-4" />
-                                        {isSimulating ? 'Reiniciar Teste' : 'Simular Fluxo'}
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {/* Dirty state indicator */}
+                                        {dirtyNodeIds.size > 0 && !saveSuccess && (
+                                            <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-500/20">
+                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                {dirtyNodeIds.size} alteração{dirtyNodeIds.size > 1 ? 'ões' : ''} não salva{dirtyNodeIds.size > 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                        {saveSuccess && (
+                                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                                                <CheckCircle className="w-3.5 h-3.5" />
+                                                Salvo!
+                                            </span>
+                                        )}
+                                        {/* Save Flow Button */}
+                                        <button
+                                            onClick={handleSaveFlow}
+                                            disabled={dirtyNodeIds.size === 0 || isSavingFlow}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all
+                                                ${dirtyNodeIds.size > 0
+                                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 cursor-pointer'
+                                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed opacity-50'
+                                                }`}
+                                        >
+                                            {isSavingFlow ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Salvar Fluxo
+                                        </button>
+                                        <button
+                                            onClick={isSimulating ? resetSimulation : startSimulation}
+                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20"
+                                        >
+                                            <Smartphone className="w-4 h-4" />
+                                            {isSimulating ? 'Reiniciar' : 'Simular'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Node Creation Toolbar */}
@@ -727,91 +841,127 @@ const ChatbotSettings: React.FC = () => {
                                     <button onClick={() => handleAddNode('transfer_user')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors uppercase tracking-wider text-orange-600 dark:text-orange-400">
                                         <UserPlus className="w-4 h-4" /> Agente
                                     </button>
+                                    <button onClick={() => handleAddNode('message')} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold bg-white dark:bg-white/10 rounded-xl shadow-md hover:bg-slate-50 dark:hover:bg-slate-500/10 transition-colors uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                        <Send className="w-4 h-4" /> Mensagem
+                                    </button>
                                 </div>
 
-                                {/* Nodes List */}
-                                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {/* Active Flow Header in Editor */}
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-base font-bold text-gray-800 dark:text-white truncate max-w-[280px]">
+                                            {selectedFlow.name}
+                                        </h3>
+                                        {selectedFlow.is_active ? (
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-500 text-white px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md shadow-emerald-500/30">
+                                                <Zap className="w-2.5 h-2.5 fill-white" /> ATIVO
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400 px-2.5 py-1 rounded-full uppercase tracking-wide">
+                                                Inativo
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 font-medium">{nodes.length} etapa{nodes.length !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                {/* Nodes List with Drag-and-Drop + SVG Connectors */}
+                                <div className="space-y-0 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
                                     {nodes.map((node, idx) => {
-                                        let borderClass = 'border-l-4 border-slate-300';
-                                        let titleColor = 'text-slate-500';
-                                        if (node.type === 'greeting') { borderClass = 'border-l-4 border-emerald-500'; titleColor = 'text-emerald-500'; }
-                                        else if (node.type === 'menu') { borderClass = 'border-l-4 border-blue-500'; titleColor = 'text-blue-500'; }
-                                        else if (node.type === 'transfer_queue') { borderClass = 'border-l-4 border-purple-500'; titleColor = 'text-purple-500'; }
-                                        else if (node.type === 'transfer_user') { borderClass = 'border-l-4 border-orange-500'; titleColor = 'text-orange-500'; }
+                                        const meta = getNodeMeta(node.type);
+                                        const isDragging = dragSourceId === node.id;
+                                        const isOver = dragOverId === node.id && dragSourceId !== node.id;
+                                        const isDirty = dirtyNodeIds.has(node.id);
+                                        const prevNode = idx > 0 ? nodes[idx - 1] : undefined;
 
                                         return (
-                                            <div key={node.id} className={`bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 relative group shadow-lg transition-all hover:shadow-xl ${borderClass}`}>
-                                                <div className="absolute top-4 right-4 flex gap-2 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button 
-                                                        onClick={() => handleDeleteNode(node.id)}
-                                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                            <div key={node.id}>
+                                                {/* SVG connector above each node (except first), colored by previous node type */}
+                                                {idx > 0 && <NodeConnector fromNode={prevNode} />}
 
-                                                <div className="flex items-center gap-3 mb-4">
-                                                    <span className="w-7 h-7 flex items-center justify-center bg-slate-100 dark:bg-white/10 rounded-full text-xs font-bold text-slate-500 dark:text-gray-400">
-                                                        #{idx + 1}
-                                                    </span>
-                                                    <span className={`text-xs font-bold uppercase tracking-widest ${titleColor}`}>
-                                                        {node.type === 'greeting' ? 'Saudação do Robô 🤖' : 
-                                                         node.type === 'menu' ? 'Menu de Opções 📋' : 
-                                                         node.type === 'transfer_queue' ? 'Transferir para Fila/Setor 🏢' : 
-                                                         node.type === 'transfer_user' ? 'Transferir para Atendente 👤' : 'Mensagem'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="space-y-4">
-                                                    {(node.type === 'greeting' || node.type === 'menu' || node.type === 'message') && (
-                                                        <textarea 
-                                                            value={node.content.text}
-                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
-                                                            placeholder="Digite a mensagem do robô..."
-                                                            className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
-                                                            rows={3}
-                                                        />
+                                                <div
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(e, node.id)}
+                                                    onDragOver={(e) => handleDragOver(e, node.id)}
+                                                    onDrop={(e) => handleDrop(e, node.id)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={`
+                                                        bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 
+                                                        relative group shadow-lg transition-all hover:shadow-xl ${meta.borderClass}
+                                                        ${isDragging ? 'opacity-40 scale-95' : ''}
+                                                        ${isOver ? 'ring-2 ring-emerald-400 dark:ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900' : ''}
+                                                    `}
+                                                >
+                                                    {/* Dirty indicator dot */}
+                                                    {isDirty && (
+                                                        <div className="absolute top-3 right-12 w-2 h-2 bg-amber-400 rounded-full" title="Alteração não salva" />
                                                     )}
 
-                                                    {node.type === 'menu' && (
-                                                        <div className="space-y-3 pl-5 border-l-2 border-blue-200 dark:border-blue-500/20">
-                                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Opções de Roteamento</p>
-                                                            {(node.content.options || []).map((opt: any, optIdx: number) => (
-                                                                <div key={optIdx} className="flex gap-3 items-center animate-in fade-in duration-300">
-                                                                    <input 
-                                                                        value={opt.label}
-                                                                        onChange={(e) => {
-                                                                            const newOpts = [...node.content.options];
-                                                                            newOpts[optIdx].label = e.target.value;
-                                                                            handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                        }}
-                                                                        placeholder={`Ex: 1. Suporte Técnico`}
-                                                                        className="flex-1 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold"
-                                                                    />
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
-                                                                        <select 
+                                                    {/* Action buttons */}
+                                                    <div className="absolute top-4 right-4 flex gap-2 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => handleDeleteNode(node.id)}
+                                                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        {/* Drag handle */}
+                                                        <div
+                                                            className="cursor-grab active:cursor-grabbing p-1.5 text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors touch-none"
+                                                            title="Arraste para reordenar"
+                                                        >
+                                                            <GripVertical className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="w-7 h-7 flex items-center justify-center bg-slate-100 dark:bg-white/10 rounded-full text-xs font-bold text-slate-500 dark:text-gray-400">
+                                                            #{idx + 1}
+                                                        </span>
+                                                        <span className={`text-xs font-bold uppercase tracking-widest ${meta.titleColor}`}>
+                                                            {meta.label}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="space-y-4 ml-10">
+                                                        {(node.type === 'greeting' || node.type === 'menu' || node.type === 'message') && (
+                                                            <textarea 
+                                                                value={node.content.text}
+                                                                onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
+                                                                placeholder="Digite a mensagem do robô..."
+                                                                className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
+                                                                rows={3}
+                                                            />
+                                                        )}
+
+                                                        {node.type === 'menu' && (
+                                                            <div className="space-y-3 pl-5 border-l-2 border-blue-200 dark:border-blue-500/20">
+                                                                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Opções de Roteamento</p>
+                                                                {(node.content.options || []).map((opt: any, optIdx: number) => (
+                                                                    <div key={optIdx} className="flex gap-3 items-center animate-in fade-in duration-200">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={opt.label}
+                                                                            onChange={(e) => {
+                                                                                const newOpts = [...node.content.options];
+                                                                                newOpts[optIdx] = { ...opt, label: e.target.value };
+                                                                                handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                            }}
+                                                                            placeholder={`Opção ${optIdx + 1}`}
+                                                                            className="flex-1 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold"
+                                                                        />
+                                                                        <select
                                                                             value={opt.next_node}
                                                                             onChange={(e) => {
                                                                                 const newOpts = [...node.content.options];
-                                                                                newOpts[optIdx].next_node = e.target.value;
+                                                                                newOpts[optIdx] = { ...opt, next_node: e.target.value };
                                                                                 handleUpdateNode(node.id, { ...node.content, options: newOpts });
                                                                             }}
                                                                             className="w-40 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold cursor-pointer"
                                                                         >
                                                                             <option value="">Próximo Passo</option>
                                                                             {nodes.filter(n => n.id !== node.id).map((n) => {
-                                                                                const originalIdx = nodes.findIndex(orgNode => orgNode.id === n.id);
-                                                                                const translateType = (type: string) => {
-                                                                                    switch (type) {
-                                                                                        case 'greeting': return 'Saudação';
-                                                                                        case 'menu': return 'Menu';
-                                                                                        case 'transfer_queue': return 'Setor';
-                                                                                        case 'transfer_user': return 'Agente';
-                                                                                        case 'message': return 'Mensagem';
-                                                                                        default: return type;
-                                                                                    }
-                                                                                };
+                                                                                const originalIdx = nodes.findIndex(org => org.id === n.id);
                                                                                 return (
                                                                                     <option key={n.id} value={n.id} className="dark:bg-slate-900">
                                                                                         Passo #{originalIdx + 1} ({translateType(n.type)})
@@ -819,51 +969,87 @@ const ChatbotSettings: React.FC = () => {
                                                                                 );
                                                                             })}
                                                                         </select>
+                                                                        <button 
+                                                                            onClick={() => {
+                                                                                const newOpts = node.content.options.filter((_: any, i: number) => i !== optIdx);
+                                                                                handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                            }}
+                                                                            className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl"
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                        </button>
                                                                     </div>
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            const newOpts = node.content.options.filter((_: any, i: number) => i !== optIdx);
-                                                                            handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                        }}
-                                                                        className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                            <button 
-                                                                onClick={() => {
-                                                                    const newOpts = [...(node.content.options || []), { label: '', next_node: '' }];
-                                                                    handleUpdateNode(node.id, { ...node.content, options: newOpts });
-                                                                }}
-                                                                className="text-[10px] text-blue-500 font-bold hover:underline tracking-widest uppercase flex items-center gap-1"
-                                                            >
-                                                                + Adicionar Opção do Menu
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                                ))}
 
-                                                    {node.type === 'transfer_queue' && (
-                                                        <select 
-                                                            value={node.content.queue_id}
-                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, queue_id: e.target.value })}
-                                                            className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
-                                                        >
-                                                            <option value="">Selecione o Setor / Fila de Destino...</option>
-                                                            {queues.map(q => <option key={q.id} value={q.id} className="dark:bg-slate-900">{q.name}</option>)}
-                                                        </select>
-                                                    )}
+                                                                {/* Visual hint for menu connections */}
+                                                                {(node.content.options || []).length > 0 && (
+                                                                    <div className="flex flex-wrap gap-2 pt-1">
+                                                                        {(node.content.options || []).map((opt: any, optIdx: number) => {
+                                                                            const targetNode = nodes.find(n => n.id === opt.next_node);
+                                                                            const targetIdx = targetNode ? nodes.findIndex(n => n.id === opt.next_node) : -1;
+                                                                            if (!targetNode) return null;
+                                                                            return (
+                                                                                <span key={optIdx} className="text-[9px] bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold px-2 py-1 rounded-full border border-blue-200 dark:border-blue-500/20 flex items-center gap-1">
+                                                                                    <ArrowDown className="w-2.5 h-2.5" />
+                                                                                    Op {optIdx + 1} → Passo #{targetIdx + 1}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
 
-                                                    {node.type === 'transfer_user' && (
-                                                        <select 
-                                                            value={node.content.user_id}
-                                                            onChange={(e) => handleUpdateNode(node.id, { ...node.content, user_id: e.target.value })}
-                                                            className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
-                                                        >
-                                                            <option value="">Selecione o Atendente de Destino...</option>
-                                                            {team.map(u => <option key={u.id} value={u.id} className="dark:bg-slate-900">{u.full_name}</option>)}
-                                                        </select>
-                                                    )}
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        const newOpts = [...(node.content.options || []), { label: '', next_node: '' }];
+                                                                        handleUpdateNode(node.id, { ...node.content, options: newOpts });
+                                                                    }}
+                                                                    className="text-[10px] text-blue-500 font-bold hover:underline tracking-widest uppercase flex items-center gap-1"
+                                                                >
+                                                                    + Adicionar Opção do Menu
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {node.type === 'transfer_queue' && (
+                                                            <div className="space-y-3">
+                                                                <textarea 
+                                                                    value={node.content.text || ''}
+                                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
+                                                                    placeholder="Mensagem antes de transferir..."
+                                                                    className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
+                                                                    rows={2}
+                                                                />
+                                                                <select 
+                                                                    value={node.content.queue_id || ''}
+                                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, queue_id: e.target.value })}
+                                                                    className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
+                                                                >
+                                                                    <option value="">Selecione o Setor / Fila de Destino...</option>
+                                                                    {queues.map(q => <option key={q.id} value={q.id} className="dark:bg-slate-900">{q.name}</option>)}
+                                                                </select>
+                                                            </div>
+                                                        )}
+
+                                                        {node.type === 'transfer_user' && (
+                                                            <div className="space-y-3">
+                                                                <textarea 
+                                                                    value={node.content.text || ''}
+                                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
+                                                                    placeholder="Mensagem antes de transferir..."
+                                                                    className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
+                                                                    rows={2}
+                                                                />
+                                                                <select 
+                                                                    value={node.content.user_id || ''}
+                                                                    onChange={(e) => handleUpdateNode(node.id, { ...node.content, user_id: e.target.value })}
+                                                                    className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
+                                                                >
+                                                                    <option value="">Selecione o Atendente de Destino...</option>
+                                                                    {team.map(u => <option key={u.id} value={u.id} className="dark:bg-slate-900">{u.full_name}</option>)}
+                                                                </select>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -875,32 +1061,39 @@ const ChatbotSettings: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Bottom save button if there are dirty nodes */}
+                                {dirtyNodeIds.size > 0 && (
+                                    <div className="sticky bottom-4 flex justify-center z-10">
+                                        <button
+                                            onClick={handleSaveFlow}
+                                            disabled={isSavingFlow}
+                                            className="flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-2xl shadow-emerald-500/30 transition-all transform hover:scale-105 active:scale-100"
+                                        >
+                                            {isSavingFlow ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Salvar {dirtyNodeIds.size} alteração{dirtyNodeIds.size > 1 ? 'ões' : ''}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Simulator Sidebar (Col-4) */}
                             <div className="xl:col-span-4">
                                 {isSimulating ? (
                                     <div className="bg-slate-900 rounded-[2.5rem] p-4 shadow-2xl border-4 border-slate-800 flex flex-col h-[65vh] animate-in slide-in-from-right duration-500">
-                                        {/* Simulator Header */}
                                         <div className="px-4 py-3 bg-slate-800 rounded-3xl flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-xs">
-                                                    🤖
-                                                </div>
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-xs">🤖</div>
                                                 <div>
                                                     <h5 className="text-white text-xs font-bold leading-tight">WhatsPanda Bot</h5>
                                                     <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Simulador Ativo</span>
                                                 </div>
                                             </div>
-                                            <button 
-                                                onClick={() => setIsSimulating(false)}
-                                                className="text-[10px] text-slate-400 hover:text-white font-bold uppercase tracking-wider"
-                                            >
+                                            <button onClick={() => setIsSimulating(false)} className="text-[10px] text-slate-400 hover:text-white font-bold uppercase tracking-wider">
                                                 Fechar
                                             </button>
                                         </div>
 
-                                        {/* Chat area */}
                                         <div className="flex-1 overflow-y-auto px-2 space-y-3 custom-scrollbar flex flex-col justify-end">
                                             <div className="space-y-3">
                                                 {simHistory.map((msg) => {
@@ -926,7 +1119,6 @@ const ChatbotSettings: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Interactive Option Pill Buttons */}
                                         {currentNode?.type === 'menu' && currentNode.content.options?.length > 0 && (
                                             <div className="p-3 bg-slate-800/50 rounded-3xl mt-4 space-y-2 border border-slate-800">
                                                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Responda ao Bot:</p>
@@ -945,7 +1137,6 @@ const ChatbotSettings: React.FC = () => {
                                             </div>
                                         )}
 
-                                        {/* Reset footer */}
                                         <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
                                             <span>Simulador Local Client-Side</span>
                                             <button onClick={resetSimulation} className="text-emerald-500 font-bold hover:underline">Reiniciar</button>
@@ -955,7 +1146,7 @@ const ChatbotSettings: React.FC = () => {
                                     <div className="hidden xl:flex flex-col items-center justify-center p-8 bg-slate-950/20 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-white/5 text-gray-400 text-center h-[50vh]">
                                         <Smartphone className="w-12 h-12 mb-3 text-slate-400 opacity-30" />
                                         <h5 className="text-xs font-bold uppercase tracking-widest mb-1 text-slate-500">Simulador de Conversa</h5>
-                                        <p className="text-[10px] text-gray-500 leading-relaxed max-w-[200px]">Clique em "Simular Fluxo" acima para carregar o mockup interativo do robô.</p>
+                                        <p className="text-[10px] text-gray-500 leading-relaxed max-w-[200px]">Clique em "Simular" acima para carregar o mockup interativo do robô.</p>
                                     </div>
                                 )}
                             </div>

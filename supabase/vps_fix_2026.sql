@@ -907,8 +907,22 @@ ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS last_away_mes
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 
+-- ==========================================
+-- 15. CHATBOT NODES SORT ORDER (DRAG-AND-DROP)
+-- Permite reordenação visual dos passos do chatbot
+-- ==========================================
+ALTER TABLE public.whatsapp_chatbot_nodes ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
+-- Inicializar sort_order para nós existentes baseado na data de criação
+UPDATE public.whatsapp_chatbot_nodes n
+SET sort_order = sub.row_number - 1
+FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY flow_id ORDER BY created_at ASC) AS row_number
+    FROM public.whatsapp_chatbot_nodes
+) sub
+WHERE n.id = sub.id AND n.sort_order = 0;
 
-
+-- Final Force Schema Cache Reload
+NOTIFY pgrst, 'reload schema';
 
 
