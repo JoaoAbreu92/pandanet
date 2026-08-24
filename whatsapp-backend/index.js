@@ -2776,7 +2776,7 @@ async function processScheduledCampaigns() {
                         }
                     }
 
-                    const res = await fetch(`${evoUrl}/messages/sendMedia/${instanceName}`, {
+                    const res = await fetch(`${evoUrl}/message/sendMedia/${instanceName}`, {
                         method: 'POST',
                         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                         body: JSON.stringify({

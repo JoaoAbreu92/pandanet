@@ -1078,7 +1078,7 @@ const Scheduler: React.FC = () => {
       {/* Modal - Detalhes da Campanha e Gerenciamento de Alvos */}
       {isTargetsModalOpen && selectedCampaignDetails && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-all duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-white/5">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] border border-gray-100 dark:border-white/5">
             <div className="p-6 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight truncate max-w-[400px]">
@@ -1106,24 +1106,24 @@ const Scheduler: React.FC = () => {
               const sending = campaignTargets.filter(t => t.status === 'sending').length;
 
               return (
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-6 bg-slate-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 text-center">
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 p-4 sm:p-6 bg-slate-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 text-center">
+                  <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
                     <span className="block text-2xl font-black text-gray-900 dark:text-white">{total}</span>
                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
                     <span className="block text-2xl font-black text-emerald-500">{sent}</span>
                     <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Enviadas</span>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
                     <span className="block text-2xl font-black text-red-500">{failed}</span>
                     <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider">Falhas</span>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
                     <span className="block text-2xl font-black text-amber-500">{pending}</span>
                     <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Pendentes</span>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm col-span-2 sm:col-span-1">
+                  <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm col-span-2 sm:col-span-1">
                     <span className={`block text-2xl font-black text-blue-500 ${sending > 0 ? 'animate-pulse' : ''}`}>{sending}</span>
                     <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">Disparando</span>
                   </div>
@@ -1136,7 +1136,7 @@ const Scheduler: React.FC = () => {
               if (!currentCamp || currentCamp.status !== 'running') return null;
 
               return (
-                <div className="mx-6 mt-4 p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-3xl flex items-center justify-between text-left">
+                <div className="mx-4 sm:mx-6 mt-4 p-3 sm:p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-3xl flex items-center justify-between text-left">
                   <div className="flex items-center gap-3">
                     <div className="w-3.5 h-3.5 bg-emerald-500 rounded-full animate-ping" />
                     <div>
@@ -1155,7 +1155,7 @@ const Scheduler: React.FC = () => {
             })()}
 
             {/* Corpo do Modal */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 max-h-[45vh]">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-6">
               {/* Área de Ações Rápidas de Edição */}
               <div className="flex flex-wrap justify-between items-center gap-3 bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-gray-100 dark:border-white/5">
                 <button
