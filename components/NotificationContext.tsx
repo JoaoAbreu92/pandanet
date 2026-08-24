@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Notification, NotificationType } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 
 // Audio assets
 // Audio assets - Base64 encoded for reliability
@@ -298,10 +300,67 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, [currentUser?.id, currentUser?.company_id, setModuleUnreadCount]);
 
+    const registerPushNotifications = useCallback(async (userId: string) => {
+        if (!Capacitor.isNativePlatform()) {
+            console.log('[PandaNet] Not running on a native platform, skipping Push Notifications setup.');
+            return;
+        }
+
+        try {
+            let permStatus = await PushNotifications.checkPermissions();
+
+            if (permStatus.receive === 'prompt') {
+                permStatus = await PushNotifications.requestPermissions();
+            }
+
+            if (permStatus.receive !== 'granted') {
+                console.warn('[PandaNet] Push notification permission not granted.');
+                return;
+            }
+
+            // Register with Apple / Google to receive push via APNS/FCM
+            await PushNotifications.register();
+
+            // On success, save token to profile in Supabase
+            await PushNotifications.addListener('registration', async (token) => {
+                console.log('[PandaNet] Push registration success, token: ' + token.value);
+                try {
+                    const { error } = await supabase
+                        .from('profiles')
+                        .update({ push_token: token.value })
+                        .eq('id', userId);
+                    if (error) throw error;
+                    console.log('[PandaNet] Push token successfully saved to profile.');
+                } catch (dbErr) {
+                    console.error('[PandaNet] Error saving push token to profile:', dbErr);
+                }
+            });
+
+            // Handle registration errors
+            await PushNotifications.addListener('registrationError', (error) => {
+                console.error('[PandaNet] Push registration error:', JSON.stringify(error));
+            });
+
+            // Handle push notifications received when app is open (foreground)
+            await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                console.log('[PandaNet] Push received in foreground:', JSON.stringify(notification));
+            });
+
+            // Handle tapping on push notifications
+            await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+                console.log('[PandaNet] Push action performed:', JSON.stringify(action));
+            });
+
+        } catch (err) {
+            console.error('[PandaNet] Fatal error in registerPushNotifications:', err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchNotifications();
 
         if (currentUser?.id) {
+            registerPushNotifications(currentUser.id);
             console.log('--- TESTE REALTIME: Iniciando para usuário:', currentUser.id);
             const channel = supabase
                 .channel(`user-notifications-${currentUser.id}`)

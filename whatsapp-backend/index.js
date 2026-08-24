@@ -8,6 +8,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { analyzeMessageForTransfer } = require('./utils/geminiService');
+const pushService = require('./utils/pushService');
 
 // Robust .env loading
 dotenv.config(); // Default
@@ -97,6 +98,195 @@ function parseMessageTimestamp(ts) {
 
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
+
+// --- CONFIGURAÇÃO DO REALTIME PARA NOTIFICAÇÕES PUSH EM SEGUNDO PLANO ---
+function setupPushNotificationsListener() {
+    console.log('[FCM] Inicializando ouvintes do Supabase Realtime para notificações...');
+
+    // 1. Ouvinte para a tabela: notifications
+    supabase
+        .channel('fcm-notifications-insert')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications'
+        }, async (payload) => {
+            try {
+                const notif = payload.new;
+                if (!notif || !notif.user_id) return;
+
+                console.log(`[FCM] Nova notificação detectada no banco para o usuário: ${notif.user_id}`);
+
+                // Buscar token push do usuário destinatário
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('push_token')
+                    .eq('id', notif.user_id)
+                    .single();
+
+                if (error || !profile?.push_token) {
+                    if (error) console.error('[FCM] Erro ao buscar token push do perfil:', error.message);
+                    return;
+                }
+
+                await pushService.sendPushNotification(
+                    profile.push_token,
+                    notif.title || 'PandaNet',
+                    notif.description || '',
+                    {
+                        type: notif.type || 'notification',
+                        link: notif.link || ''
+                    }
+                );
+            } catch (err) {
+                console.error('[FCM] Erro crítico no ouvinte de notifications:', err.message);
+            }
+        })
+        .subscribe((status) => {
+            console.log(`[FCM] Status do canal de notifications: ${status}`);
+        });
+
+    // 2. Ouvinte para a tabela: messages (Chat Interno)
+    supabase
+        .channel('fcm-messages-insert')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+        }, async (payload) => {
+            try {
+                const msg = payload.new;
+                if (!msg || !msg.conversation_id || !msg.sender_id) return;
+
+                console.log(`[FCM] Nova mensagem de chat na conversa: ${msg.conversation_id}`);
+
+                // 2.1 Buscar remetente
+                const { data: senderProf } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', msg.sender_id)
+                    .maybeSingle();
+
+                const senderName = senderProf?.full_name || 'Alguém';
+
+                // 2.2 Buscar outros participantes da conversa
+                const { data: participants, error: pError } = await supabase
+                    .from('conversation_participants')
+                    .select('user_id')
+                    .eq('conversation_id', msg.conversation_id)
+                    .neq('user_id', msg.sender_id);
+
+                if (pError || !participants || participants.length === 0) return;
+
+                for (const p of participants) {
+                    // Buscar o token push de cada participante
+                    const { data: prof } = await supabase
+                        .from('profiles')
+                        .select('push_token')
+                        .eq('id', p.user_id)
+                        .maybeSingle();
+
+                    if (prof?.push_token) {
+                        await pushService.sendPushNotification(
+                            prof.push_token,
+                            senderName,
+                            msg.text || (msg.file_url ? 'Enviou um arquivo' : 'Nova mensagem'),
+                            {
+                                type: 'chat',
+                                conversationId: msg.conversation_id,
+                                link: `/chat/${msg.conversation_id}`
+                            }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error('[FCM] Erro no ouvinte de messages:', err.message);
+            }
+        })
+        .subscribe((status) => {
+            console.log(`[FCM] Status do canal de messages: ${status}`);
+        });
+
+    // 3. Ouvinte para a tabela: whatsapp_messages (WhatsPanda)
+    supabase
+        .channel('fcm-whatsapp-messages-insert')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'whatsapp_messages'
+        }, async (payload) => {
+            try {
+                const newMsg = payload.new;
+                if (!newMsg || !newMsg.is_from_customer || !newMsg.conversation_id) return;
+
+                console.log(`[FCM] Nova mensagem de cliente recebida no WhatsPanda. Conversa: ${newMsg.conversation_id}`);
+
+                // 3.1 Buscar informações da conversa (atendente responsável e nome do cliente)
+                const { data: convInfo } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('contact_name, assigned_to, company_id')
+                    .eq('id', newMsg.conversation_id)
+                    .maybeSingle();
+
+                const contactName = convInfo?.contact_name || 'Cliente';
+                const bodyText = newMsg.message_text || (newMsg.media_url ? 'Enviou uma mídia' : 'Nova mensagem do WhatsApp');
+
+                if (convInfo?.assigned_to) {
+                    // Se estiver atribuído a um atendente específico, notifica ele
+                    const { data: agent } = await supabase
+                        .from('profiles')
+                        .select('push_token')
+                        .eq('id', convInfo.assigned_to)
+                        .maybeSingle();
+
+                    if (agent?.push_token) {
+                        await pushService.sendPushNotification(
+                            agent.push_token,
+                            `WhatsPanda: ${contactName}`,
+                            bodyText,
+                            {
+                                type: 'whatsapp',
+                                conversationId: newMsg.conversation_id,
+                                link: `/whatspanda`
+                            }
+                        );
+                    }
+                } else if (convInfo?.company_id) {
+                    // Se não estiver atribuído, notifica administradores da mesma empresa
+                    const { data: admins } = await supabase
+                        .from('profiles')
+                        .select('push_token')
+                        .eq('company_id', convInfo.company_id)
+                        .or('role.eq.Super Admin,is_admin.eq.true,is_company_admin.eq.true');
+
+                    if (admins && admins.length > 0) {
+                        for (const adminProf of admins) {
+                            if (adminProf.push_token) {
+                                await pushService.sendPushNotification(
+                                    adminProf.push_token,
+                                    `WhatsPanda (Não Atribuído): ${contactName}`,
+                                    bodyText,
+                                    {
+                                        type: 'whatsapp',
+                                        conversationId: newMsg.conversation_id,
+                                        link: `/whatspanda`
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[FCM] Erro no ouvinte de whatsapp_messages:', err.message);
+            }
+        })
+        .subscribe((status) => {
+            console.log(`[FCM] Status do canal de whatsapp_messages: ${status}`);
+        });
+}
+
+// Inicializa os ouvintes
+setupPushNotificationsListener();
 
 // --- JWT Auth Middleware for Frontend Requests ---
 async function authMiddleware(req, res, next) {
