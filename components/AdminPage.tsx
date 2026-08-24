@@ -23,6 +23,7 @@ interface AdminPageProps {
 
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeCategory, setActiveCategory] = useState('Conteúdo');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
 
@@ -122,25 +123,37 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         console.log("[AdminPage] ========== SALVAMENTO CONCLUÍDO ==========");
     };
 
-    const tabs = [
-        { id: 'ti-requests', label: 'T.I.' },
-        { id: 'dashboard', label: 'Conteúdo', featureId: 'feed' },
-        { id: 'users', label: 'Usuários' },
-        { id: 'departments', label: 'Departamentos' },
-        { id: 'teams', label: 'Equipes' },
-        { id: 'forms', label: 'Formulários' },
-        { id: 'marketplace', label: 'Marketplace', featureId: 'marketplace' },
-        { id: 'events', label: 'Eventos', featureId: 'events' },
-        { id: 'training', label: 'Treinamentos' },
-        { id: 'kb', label: 'Base de Con.', featureId: 'kb' },
-        { id: 'status', label: 'Status TI' },
-        { id: 'infosec', label: 'Segurança' },
-        { id: 'policies', label: 'Políticas', featureId: 'policies' },
-        { id: 'polls', label: 'Enquetes' },
-        { id: 'bem-estar', label: 'Bem Estar', featureId: 'wellness' },
-        { id: 'settings', label: 'Geral' },
-        { id: 'mural', label: 'Mural' },
-    ].filter(tab => {
+    const allTabs = [
+        { id: 'dashboard', label: 'Feed/Mural', category: 'Conteúdo', featureId: 'feed' },
+        { id: 'mural', label: 'Reconhecimentos', category: 'Conteúdo' },
+        { id: 'polls', label: 'Enquetes', category: 'Conteúdo' },
+        { id: 'events', label: 'Eventos', category: 'Conteúdo', featureId: 'events' },
+
+        { id: 'users', label: 'Usuários', category: 'Pessoas' },
+        { id: 'departments', label: 'Departamentos', category: 'Pessoas' },
+        { id: 'teams', label: 'Equipes', category: 'Pessoas' },
+        { id: 'training', label: 'Treinamentos', category: 'Pessoas' },
+        { id: 'jobs', label: 'Gestão de Vagas', category: 'Pessoas', featureId: 'jobs' },
+
+        { id: 'forms', label: 'Formulários', category: 'Operações' },
+        { id: 'marketplace', label: 'Marketplace', category: 'Operações', featureId: 'marketplace' },
+        { id: 'bem-estar', label: 'Bem Estar', category: 'Operações', featureId: 'wellness' },
+        { id: 'kpis', label: 'Metas/KPIs', category: 'Operações', featureId: 'kpis' },
+
+        { id: 'ti-requests', label: 'Chamados T.I.', category: 'Suporte & TI' },
+        { id: 'status', label: 'Status TI', category: 'Suporte & TI' },
+        { id: 'kb', label: 'Base de Con.', category: 'Suporte & TI', featureId: 'kb' },
+        { id: 'infosec', label: 'Segurança', category: 'Suporte & TI' },
+        { id: 'policies', label: 'Políticas', category: 'Suporte & TI', featureId: 'policies' },
+
+        { id: 'settings', label: 'Geral', category: 'Configurações' },
+    ];
+
+    const categories = ['Conteúdo', 'Pessoas', 'Operações', 'Suporte & TI', 'Configurações'];
+
+    const tabs = allTabs.filter(tab => {
+        if (tab.category !== activeCategory) return false;
+        if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
         // Permissões granulares para não-Super Admins
@@ -298,6 +311,38 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                         </div>
                     )}
                 />;
+            case 'jobs':
+                return <SupabaseGenericManager<any>
+                    title="Gestão de Vagas Internas"
+                    tableName="jobs"
+                    newItemTemplate={{ title: '', description: '', requirements: [], location: '', type: 'Full-time', status: 'open', salary_range: '' }}
+                    fields={[
+                        { key: 'title', label: 'Título da Vaga' },
+                        { key: 'status', label: 'Status', type: 'select', options: ['open', 'closed'] },
+                        { key: 'type', label: 'Tipo', type: 'select', options: ['Full-time', 'Part-time', 'Internship', 'Freelance'] },
+                        { key: 'location', label: 'Localização' },
+                        { key: 'salary_range', label: 'Faixa Salarial' },
+                        { key: 'description', label: 'Descrição', type: 'textarea' },
+                        { key: 'requirements', label: 'Requisitos (um por linha)', type: 'textarea' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-xs">{i.location} • {i.status}</p></div>}
+                />;
+            case 'kpis':
+                return <SupabaseGenericManager<any>
+                    title="Gestão de Metas e KPIs"
+                    tableName="kpis"
+                    newItemTemplate={{ name: '', target: 100, current: 0, unit: '%', category: 'Geral', period: 'Mensal', powerbi_url: '' }}
+                    fields={[
+                        { key: 'name', label: 'Nome do Indicador' },
+                        { key: 'category', label: 'Categoria' },
+                        { key: 'unit', label: 'Unidade (ex: %, R$, un)' },
+                        { key: 'target', label: 'Meta (Valor)', type: 'text' },
+                        { key: 'current', label: 'Valor Atual', type: 'text' },
+                        { key: 'period', label: 'Período', type: 'select', options: ['Mensal', 'Trimestral', 'Anual'] },
+                        { key: 'powerbi_url', label: 'Power BI URL (Opcional)', type: 'text' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.current} / {i.target} {i.unit}</p></div>}
+                />;
             default:
                 return null;
         }
@@ -307,21 +352,39 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-brand-text">Painel do Administrador</h1>
 
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-                    {tabs.map(tab => (
+            <div className="space-y-4">
+                <div className="flex space-x-2 border-b border-gray-100 pb-2 overflow-x-auto no-scrollbar">
+                    {categories.map(cat => (
                         <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`${activeTab === tab.id
-                                ? 'border-brand-primary text-brand-primary'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                            key={cat}
+                            onClick={() => {
+                                setActiveCategory(cat);
+                                const firstTabOfCat = allTabs.find(t => t.category === cat);
+                                if (firstTabOfCat) setActiveTab(firstTabOfCat.id);
+                            }}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${activeCategory === cat ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                         >
-                            {tab.label}
+                            {cat}
                         </button>
                     ))}
-                </nav>
+                </div>
+
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-6 overflow-x-auto no-scrollbar" aria-label="Tabs">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`${activeTab === tab.id
+                                    ? 'border-brand-primary text-brand-primary'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
             </div>
 
             <div>

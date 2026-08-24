@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XCircleIcon, UsersIcon, CalendarIcon, GiftIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XCircleIcon, UsersIcon, CalendarIcon, GiftIcon, VideoCameraIcon } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -570,7 +570,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 <div><label className="block text-sm font-medium text-brand-subtle-text">Início</label><input type="time" name="startTime" value={newEventData.startTime} onChange={handleInputChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                                 <div><label className="block text-sm font-medium text-brand-subtle-text">Fim</label><input type="time" name="endTime" value={newEventData.endTime} onChange={handleInputChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                             </div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Local</label><input type="text" name="location" value={newEventData.location} onChange={handleInputChange} placeholder="Ex: Sala de Reunião 1 ou Virtual" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div className="relative">
+                                <label className="block text-sm font-medium text-brand-subtle-text">Local</label>
+                                <input type="text" name="location" value={newEventData.location} onChange={handleInputChange} placeholder="Ex: Sala de Reunião 1 ou Virtual" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text pr-24" />
+                                <button
+                                    type="button"
+                                    onClick={() => setNewEventData(prev => ({ ...prev, location: `https://meet.google.com/new-${Math.random().toString(36).substring(7)}` }))}
+                                    className="absolute right-2 top-[30px] p-1.5 bg-brand-primary/10 text-brand-primary rounded-md hover:bg-brand-primary hover:text-white transition-all flex items-center text-[10px] font-bold"
+                                >
+                                    <VideoCameraIcon className="w-3 h-3 mr-1" />
+                                    Google Meet
+                                </button>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-brand-subtle-text">Convidar Departamento Inteiro (Opcional)</label>
                                 <select

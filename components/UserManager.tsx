@@ -350,7 +350,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         health_insurance: (userData as any).health_insurance || null,
                         blood_type: (userData as any).blood_type || null,
                         marital_status: (userData as any).marital_status || null,
-                        education_level: (userData as any).education_level || null
+                        education_level: (userData as any).education_level || null,
+                        status: 'active'
                     })
                     .eq('id', userData.id);
 
@@ -387,7 +388,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         health_insurance: (userData as any).health_insurance || null,
                         blood_type: (userData as any).blood_type || null,
                         marital_status: (userData as any).marital_status || null,
-                        education_level: (userData as any).education_level || null
+                        education_level: (userData as any).education_level || null,
+                        status: 'active'
                     }])
                     .select();
 
@@ -461,9 +463,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
 
     const handleDelete = async (userId: string, userName: string) => {
         if (window.confirm(`AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente e afetará todo o banco de dados. \n\nUm PDF com o histórico de conversas será gerado antes da exclusão. Continuar?`)) {
-
             await generatePDFHistory(userId, userName);
-
             try {
                 const { error } = await supabase.from('profiles').delete().eq('id', userId);
                 if (error) throw error;
@@ -474,12 +474,83 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         }
     };
 
+    const handleApprove = async (userId: string) => {
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ status: 'active' })
+                .eq('id', userId);
+            if (error) throw error;
+            setUsers(users.map(u => u.id === userId ? { ...u, status: 'active' } : u));
+        } catch (err: any) {
+            alert("Erro ao aprovar: " + err.message);
+        }
+    };
+
+    const handleReject = async (userId: string) => {
+        if (!window.confirm("Tem certeza que deseja rejeitar este usuário? Ele será removido do sistema.")) return;
+        try {
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            if (error) throw error;
+            setUsers(users.filter(u => u.id !== userId));
+        } catch (err: any) {
+            alert("Erro ao rejeitar: " + err.message);
+        }
+    };
+
+    const pendingUsers = users.filter(u => u.status === 'pending');
+    const activeUsers = users.filter(u => u.status !== 'pending');
+
     return (
-        <>
+        <div className="space-y-6">
+            {pendingUsers.length > 0 && (
+                <Card title="Solicitações de Acesso (Pendentes)" icon={<div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left text-gray-500">
+                            <thead className="text-xs text-gray-700 uppercase bg-amber-50">
+                                <tr>
+                                    <th className="px-6 py-3">Nome / E-mail</th>
+                                    <th className="px-6 py-3 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {pendingUsers.map(user => (
+                                    <tr key={user.id} className="bg-white hover:bg-amber-50/50">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center space-x-3">
+                                                <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{user.name}</p>
+                                                    <p className="text-xs text-gray-400">{user.email}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right space-x-2">
+                                            <button
+                                                onClick={() => handleApprove(user.id)}
+                                                className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-md hover:bg-emerald-200 text-xs font-bold"
+                                            >
+                                                APROVAR
+                                            </button>
+                                            <button
+                                                onClick={() => handleReject(user.id)}
+                                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-xs font-bold"
+                                            >
+                                                REJEITAR
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
             <Card title={t('users.title')} headerAction={
                 <div className="flex items-center space-x-4">
-                    <span className="text-sm text-brand-subtle-text">{users.length} de {plan.userLimit} usuários</span>
-                    <button onClick={() => { setEditingUser(null); setModalOpen(true); }} className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600 disabled:opacity-50" disabled={users.length >= plan.userLimit}>
+                    <span className="text-sm text-brand-subtle-text">{activeUsers.length} de {plan.userLimit} usuários ativos</span>
+                    <button onClick={() => { setEditingUser(null); setModalOpen(true); }} className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600 disabled:opacity-50" disabled={activeUsers.length >= plan.userLimit}>
                         <PlusIcon className="w-4 h-4" />
                         <span>{t('generic.new_item')}</span>
                     </button>
@@ -497,7 +568,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {users.map(user => (
+                            {activeUsers.map(user => (
                                 <tr key={user.id} className="bg-white hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                                         <div className="flex items-center space-x-3">
@@ -522,7 +593,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 </div>
             </Card>
             {isModalOpen && <UserFormModal user={editingUser} departments={departments} onClose={() => setModalOpen(false)} onSave={handleSave} />}
-        </>
+        </div>
     );
 };
 

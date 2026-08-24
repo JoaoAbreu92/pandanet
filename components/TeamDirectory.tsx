@@ -118,7 +118,8 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate }) 
 
   const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.team.toLowerCase().includes(searchTerm.toLowerCase())
+      e.team.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e as any).skills?.some((s: string) => s.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -128,7 +129,7 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate }) 
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
                 type="text"
-                placeholder="Buscar por nome ou equipe..."
+                      placeholder="Buscar por nome, equipe ou competência..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="pl-9 pr-3 py-2 w-full border rounded-md bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
@@ -157,6 +158,13 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate }) 
                                 <p className="font-semibold text-sm text-brand-text truncate">{employee.name}</p>
                                 <p className="text-xs text-brand-subtle-text truncate">{employee.role}</p>
                                 <p className="text-xs text-gray-400">{employee.team}</p>
+                                {(employee as any).skills && (employee as any).skills.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {(employee as any).skills.slice(0, 3).map((s: string) => (
+                                            <span key={s} className="px-1.5 py-0.5 bg-gray-100 text-[10px] text-gray-500 rounded-md truncate max-w-[60px]">{s}</span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         

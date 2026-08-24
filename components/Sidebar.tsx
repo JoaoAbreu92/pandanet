@@ -18,8 +18,9 @@ import {
     QuestionMarkCircleIcon,
     ArrowPathIcon,
     PlusIcon,
-    NewspaperIcon, // Importado
-    BuildingOfficeIcon
+    NewspaperIcon,
+    BuildingOfficeIcon,
+    StarIcon
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
@@ -36,9 +37,9 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, customFeatures }) => {
-    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false });
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
 
-    const toggleMenu = (menu: 'rh' | 'ti') => {
+    const toggleMenu = (menu: 'rh' | 'ti' | 'portal') => {
         setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
     };
 
@@ -61,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti'; children: React.ReactNode, permission: boolean }> = ({ label, icon: Icon, menuKey, children, permission }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal'; children: React.ReactNode, permission: boolean }> = ({ label, icon: Icon, menuKey, children, permission }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
         if (!permission && !isAdmin) return null;
 
@@ -104,36 +105,41 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
-                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                 <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
-                <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
-                <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
 
-                <hr className="my-4 border-gray-200 dark:border-gray-700" />
+                <hr className="my-2 border-gray-100 dark:border-gray-700" />
 
-                <NavMenu label="RH" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
+                <NavMenu label="Interativo" icon={StarIcon} menuKey="portal" permission={true}>
+                    <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
+                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" featureId="wall" />
+                    <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
+                    <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
+                    <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
+                    <NavItem page="kpi-dashboard" label="Métricas Grupo" icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
+                </NavMenu>
+
+                <NavMenu label="RH & Gestão" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
                     <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" />
+                    <NavItem page="org-chart" label="Organograma" icon={UsersIcon} permission="viewOrgChart" />
+                    <NavItem page="meu-rh" label="Portal Meu RH" icon={UsersIcon} permission="viewMeuRH" />
+                    <NavItem page="jobs" label="Portal de Vagas" icon={RocketLaunchIcon} permission="viewJobs" />
+                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
+                    <NavItem page="surveys" label="Pesquisas Internas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
                     <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
-                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" featureId="wall" />
-                    <NavItem page="documentos" label={t('sidebar.documents')} icon={FolderIcon} permission="viewDocuments" />
-                    {/* New RH Menus */}
-                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
-                    <NavItem page="surveys" label="Pesquisas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
+                    <NavItem page="documentos" label="Biblioteca Corp." icon={FolderIcon} permission="viewDocuments" />
                     <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
                 </NavMenu>
 
-                <NavMenu label="T.I." icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
+                <NavMenu label="T.I. & Suporte" icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
                     <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" />
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
-                    {/* New TI Menus */}
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
-                    <NavItem page="infosec" label="Segurança da Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
+                    <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
                 </NavMenu>
 
                 {/* SaaS Super Admin Button */}

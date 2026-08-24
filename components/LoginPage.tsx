@@ -11,6 +11,7 @@ const LoginPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [name, setName] = useState('');
+    const [domain, setDomain] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +30,7 @@ const LoginPage: React.FC = () => {
                 return;
             }
             // Sign Up Logic
-            const { error: signUpError } = await supabase.auth.signUp({
+            const { data: authData, error: signUpError } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
@@ -41,12 +42,33 @@ const LoginPage: React.FC = () => {
 
             if (signUpError) {
                 setError(signUpError.message);
-            } else {
+            } else if (authData.user) {
+                // Try to find company by domain
+                const { data: companyData } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .ilike('domain', domain.trim())
+                    .single();
+
+                // Profile is usually created by a database trigger on auth.users insert.
+                // We will try to update it here with the company_id and status pending
+                setTimeout(async () => {
+                    const { error: updateError } = await supabase
+                        .from('profiles')
+                        .update({
+                            company_id: companyData?.id || null,
+                            status: 'pending'
+                        })
+                        .eq('id', authData.user!.id);
+
+                    if (updateError) console.error("Error updating profile with company:", updateError);
+                }, 1000); // Small delay to let trigger finish
+
                 setMessage(language === 'pt'
-                    ? 'Cadastro realizado! Verifique seu email para confirmar.'
+                    ? 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação.'
                     : language === 'en'
-                        ? 'Sign up successful! Please check your email to confirm.'
-                        : '¡Registro exitoso! Verifique su correo para confirmar.');
+                        ? 'Sign up successful! Please check your email to confirm. Your account will undergo approval.'
+                        : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.');
                 setIsSignUp(false); // Switch back to login for UX
             }
         } else {
@@ -167,6 +189,21 @@ const LoginPage: React.FC = () => {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
                                     placeholder={language === 'pt' ? 'Confirmar Senha' : language === 'en' ? 'Confirm Password' : 'Confirmar Contraseña'}
+                                />
+                            </div>
+                        )}
+                        {isSignUp && (
+                            <div>
+                                <label htmlFor="domain" className="sr-only">Domínio da Empresa</label>
+                                <input
+                                    id="domain"
+                                    name="domain"
+                                    type="text"
+                                    required={isSignUp}
+                                    value={domain}
+                                    onChange={(e) => setDomain(e.target.value)}
+                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
+                                    placeholder={language === 'pt' ? 'Domínio da Empresa (ex: empresa.com)' : language === 'en' ? 'Company Domain (ex: company.com)' : 'Dominio de la Empresa'}
                                 />
                             </div>
                         )}

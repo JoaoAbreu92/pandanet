@@ -30,7 +30,13 @@ export type Page =
   // New TI Pages
   | 'knowledge-base'
   | 'service-status'
-  | 'infosec';
+  | 'infosec'
+  // New Expansion Pages
+  | 'jobs'
+  | 'meu-rh'
+  | 'org-chart'
+  | 'kpi-dashboard'
+  | 'job-manager';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -173,6 +179,14 @@ export interface EmployeePermissions {
   viewServiceStatus: boolean;
   viewInfoSec: boolean;
 
+  // Expansion Permissions
+  viewJobs: boolean;
+  manageJobs: boolean;
+  viewMeuRH: boolean;
+  viewOrgChart: boolean;
+  viewKPIDashboard: boolean;
+  manageKPIs: boolean;
+
   // RH Management
   viewEmployeeDetails: boolean;
   editEmployeeProfile: boolean;
@@ -219,6 +233,7 @@ export interface Employee {
   blood_type?: string;
   marital_status?: string;
   education_level?: string;
+  status?: 'pending' | 'active' | 'rejected';
 }
 
 export interface Task {
@@ -476,6 +491,41 @@ export interface WellnessItem {
   videoUrl?: string;
   linkUrl?: string;
   linkText?: string;
+}
+
+export interface Job {
+  id: string;
+  company_id: string;
+  title: string;
+  description: string;
+  requirements: string[];
+  location: string;
+  salary_range?: string;
+  type: 'Full-time' | 'Part-time' | 'Contract' | 'Internship';
+  status: 'open' | 'closed';
+  created_at: string;
+}
+
+export interface JobApplication {
+  id: string;
+  job_id: string;
+  employee_id: string;
+  applied_at: string;
+  status: 'pending' | 'reviewing' | 'interviewing' | 'accepted' | 'rejected';
+  notes?: string;
+}
+
+export interface KPI {
+  id: string;
+  company_id: string;
+  name: string;
+  target: number;
+  current: number;
+  unit: string; // %, R$, qtd, etc.
+  category: string;
+  period: string; // Mês/Ano
+  powerbi_url?: string;
+  updated_at: string;
 }
 
 export interface CompanySettings {

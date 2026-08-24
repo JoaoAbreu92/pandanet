@@ -38,6 +38,10 @@ import PoliciesPage from './components/PoliciesPage';
 import KnowledgeBasePage from './components/KnowledgeBasePage';
 import StatusPage from './components/StatusPage';
 import InfoSecPage from './components/InfoSecPage';
+import JobsPage from './components/JobsPage';
+import EmployeePortal from './components/EmployeePortal';
+import OrgChartPage from './components/OrgChartPage';
+import KPIDashboard from './components/KPIDashboard';
 
 const AppContent: React.FC = () => {
     const { session, profile, loading, signOut } = useAuth();
@@ -553,6 +557,10 @@ const AppContent: React.FC = () => {
             case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage /> : null;
             case 'events': return <EventsPage />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
+            case 'jobs': return <JobsPage />;
+            case 'meu-rh': return <EmployeePortal />;
+            case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
+            case 'kpi-dashboard': return <KPIDashboard />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };
@@ -589,6 +597,30 @@ const AppContent: React.FC = () => {
 
     if (!session) {
         return <LoginPage />;
+    }
+
+    // Pending Approval Block
+    if (currentUser && currentUser.status === 'pending') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-amber-100">
+                    <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Aguardando Aprovação</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed">
+                        Sua conta foi criada com sucesso! Agora, o administrador da sua empresa precisa aprovar seu acesso.
+                        Você receberá um e-mail assim que estiver tudo pronto.
+                    </p>
+                    <button onClick={handleLogout} className="w-full px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all shadow-md mb-4">Voltar ao Login</button>
+                    <div className="text-sm text-gray-400">
+                        Empresa: {currentCompany?.name || 'Não vinculada'}
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     // Success Block
