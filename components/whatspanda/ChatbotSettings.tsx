@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
 import { Plus, Trash2, Save, MessageSquare, List, UserPlus, Users, Play, Pause, RefreshCw, Send, Smartphone, ArrowRight, BookOpen, Layers } from 'lucide-react';
@@ -42,6 +42,70 @@ const ChatbotSettings: React.FC = () => {
     const [isSimulating, setIsSimulating] = useState(false);
     const [simHistory, setSimHistory] = useState<SimMessage[]>([]);
     const [currentNode, setCurrentNode] = useState<ChatbotNode | null>(null);
+
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const applyFormatting = (format: 'bold' | 'italic' | 'strike' | 'mono') => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selectedText = text.substring(start, end);
+        
+        let formatted = '';
+        switch (format) {
+            case 'bold':
+                formatted = `*${selectedText}*`;
+                break;
+            case 'italic':
+                formatted = `_${selectedText}_`;
+                break;
+            case 'strike':
+                formatted = `~${selectedText}~`;
+                break;
+            case 'mono':
+                formatted = `\`\`\`${selectedText}\`\`\``;
+                break;
+        }
+
+        const newValue = text.substring(0, start) + formatted + text.substring(end);
+        setSignature(newValue);
+        
+        // Refocus textarea and select the formatted text
+        setTimeout(() => {
+            textarea.focus();
+            const newCursorPos = start + formatted.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 50);
+    };
+
+    const renderWhatsAppMarkdown = (text: string) => {
+        if (!text) return <span className="text-slate-400 dark:text-gray-500 italic">Sua assinatura aparecerá aqui...</span>;
+        
+        let formatted = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        // Monospace: ```text```
+        formatted = formatted.replace(/```([^`]+)```/g, '<span style="font-family: monospace;" class="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-indigo-500">$1</span>');
+        
+        // Bold: *text*
+        formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+        
+        // Italic: _text_
+        formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+        
+        // Strikethrough: ~text~
+        formatted = formatted.replace(/~([^~]+)~/g, '<del>$1</del>');
+        
+        // New lines to br
+        formatted = formatted.replace(/\n/g, '<br/>');
+
+        return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+    };
 
     useEffect(() => {
         fetchData();
@@ -415,7 +479,7 @@ const ChatbotSettings: React.FC = () => {
 
             {/* Minha Assinatura WhatsPanda */}
             <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
+                <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-8">
                     <div className="flex-1 space-y-4">
                         <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
                             <MessageSquare className="w-6 h-6 text-indigo-500" /> Minha Assinatura WhatsPanda
@@ -423,16 +487,79 @@ const ChatbotSettings: React.FC = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest">
                             Texto anexado automaticamente no rodapé das suas mensagens enviadas.
                         </p>
+                        
                         <div className="space-y-4">
+                            {/* Editor Toolbar */}
+                            <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-100/50 dark:bg-black/20 rounded-xl border border-transparent dark:border-white/5 w-fit">
+                                <button 
+                                    type="button"
+                                    onClick={() => applyFormatting('bold')}
+                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-bold text-xs shadow-sm"
+                                    title="Negrito"
+                                >
+                                    <b>B</b>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => applyFormatting('italic')}
+                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-italic text-xs shadow-sm"
+                                    title="Itálico"
+                                >
+                                    <i>I</i>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => applyFormatting('strike')}
+                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all line-through text-xs shadow-sm"
+                                    title="Tachado"
+                                >
+                                    S
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => applyFormatting('mono')}
+                                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-mono text-xs shadow-sm"
+                                    title="Monofásico (Código)"
+                                >
+                                    M
+                                </button>
+                                <div className="h-4 w-px bg-slate-300 dark:bg-white/10 mx-1" />
+                                {/* Quick Emojis */}
+                                {['💼', '🛠️', '✨', '👍', '☕', '📞', '💬'].map(emoji => (
+                                    <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => {
+                                            const textarea = textareaRef.current;
+                                            if (!textarea) return;
+                                            const start = textarea.selectionStart;
+                                            const end = textarea.selectionEnd;
+                                            const text = textarea.value;
+                                            const newValue = text.substring(0, start) + emoji + text.substring(end);
+                                            setSignature(newValue);
+                                            setTimeout(() => {
+                                                textarea.focus();
+                                                textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+                                            }, 50);
+                                        }}
+                                        className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-all text-sm"
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+
                             <div>
-                                <input 
-                                    type="text" 
-                                    placeholder="Ex: *Att, João Silva* - Comercial"
+                                <textarea 
+                                    ref={textareaRef}
+                                    placeholder="Ex: &#10;*Att, João Silva*&#10;_Comercial Pixel_&#10;📞 (11) 99999-9999"
                                     value={signature}
                                     onChange={(e) => setSignature(e.target.value)}
-                                    className="w-full bg-gray-100/50 dark:bg-black/20 border border-transparent dark:border-white/5 p-4 rounded-2xl outline-none text-sm dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all"
+                                    className="w-full bg-gray-100/50 dark:bg-black/20 border border-transparent dark:border-white/5 p-4 rounded-2xl outline-none text-sm dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all font-medium min-h-[100px]"
+                                    rows={3}
                                 />
                             </div>
+
                             <div className="flex items-center gap-3">
                                 <input 
                                     type="checkbox" 
@@ -447,7 +574,25 @@ const ChatbotSettings: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-end self-end">
+
+                    {/* WhatsApp Device Preview Box */}
+                    <div className="w-full xl:w-80 space-y-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Pré-visualização no WhatsApp:</span>
+                        <div className="bg-[#efeae2] dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-3xl p-4 shadow-inner relative overflow-hidden h-[150px] flex flex-col justify-end">
+                            <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#fff_1px,transparent_1px)]" />
+                            {/* Message bubble wrapper */}
+                            <div className="bg-white dark:bg-[#0b141a] text-slate-800 dark:text-gray-100 p-3 rounded-2xl rounded-tr-none shadow-md text-xs relative max-w-[90%] self-end">
+                                <p className="text-slate-500 dark:text-gray-400 italic mb-1 opacity-70">Texto da sua mensagem...</p>
+                                <div className="border-t border-slate-100 dark:border-white/5 my-1.5" />
+                                <div className="leading-relaxed break-words whitespace-pre-wrap text-left">
+                                    {renderWhatsAppMarkdown(signature)}
+                                </div>
+                                <span className="text-[9px] text-slate-400 dark:text-gray-500 block text-right mt-1.5 font-medium">16:45 ✔️✔️</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-end self-end shrink-0">
                         <button 
                             onClick={handleSaveSignature} 
                             disabled={loading}
