@@ -656,15 +656,15 @@ const UserFormModal: React.FC<{
                                                                 <label key={ch.id} className="flex items-center space-x-3 p-2 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-emerald-55 dark:hover:bg-emerald-950/20 cursor-pointer transition-colors">
                                                                     <input 
                                                                         type="checkbox" 
-                                                                        checked={((formData.whatspanda_permissions as any)?.allowed_channels || []).includes(ch.id)}
+                                                                        checked={((formData.whatspanda_permissions as any)?.allowed_connections || []).includes(ch.id)}
                                                                         onChange={(e) => {
-                                                                            const current = (formData.whatspanda_permissions as any)?.allowed_channels || [];
+                                                                            const current = (formData.whatspanda_permissions as any)?.allowed_connections || [];
                                                                             const updated = e.target.checked ? [...current, ch.id] : current.filter((id: string) => id !== ch.id);
                                                                             setFormData(prev => ({
                                                                                 ...prev,
                                                                                 whatspanda_permissions: {
                                                                                     ...(prev.whatspanda_permissions as any),
-                                                                                    allowed_channels: updated
+                                                                                    allowed_connections: updated
                                                                                 }
                                                                             }));
                                                                         }}
