@@ -128,8 +128,17 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
         if (!activeElement) return;
 
         if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
-            const inputEl = activeElement as HTMLInputElement;
-            inputEl.value = corrected;
+            const inputEl = activeElement as HTMLInputElement | HTMLTextAreaElement;
+            
+            // Truque de Native Value Setter do React para forçar a atualização do estado do componente
+            const prototype = Object.getPrototypeOf(inputEl);
+            const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+            
+            if (valueSetter) {
+                valueSetter.call(inputEl, corrected);
+            } else {
+                inputEl.value = corrected;
+            }
         } else {
             activeElement.innerText = corrected;
         }
