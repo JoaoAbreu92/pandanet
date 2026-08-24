@@ -385,3 +385,144 @@ ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS checklist_items JSONB 
 
 -- Force Schema Cache Reload (Standard trick)
 NOTIFY pgrst, 'reload schema';
+
+-- ==========================================
+-- 6. RESET PASSWORD FIX (GEN_SALT SCHEMA BUGS)
+-- ==========================================
+CREATE OR REPLACE FUNCTION public.admin_reset_user_password(p_user_id uuid, p_new_password text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth', 'extensions'
+AS $function$
+DECLARE
+    v_caller_role text;
+    v_caller_is_company_admin boolean;
+    v_caller_company_id uuid;
+    v_target_company_id uuid;
+BEGIN
+    -- Get caller info
+    SELECT role, is_company_admin, company_id 
+    INTO v_caller_role, v_caller_is_company_admin, v_caller_company_id
+    FROM public.profiles WHERE id = auth.uid();
+
+    -- Get target user info
+    SELECT company_id INTO v_target_company_id
+    FROM public.profiles WHERE id = p_user_id;
+
+    -- Authorization Check: Super Admin OR (Company Admin of the same company)
+    IF v_caller_role != 'Super Admin' AND NOT (v_caller_is_company_admin AND v_caller_company_id = v_target_company_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Permission denied');
+    END IF;
+
+    -- Update the password in auth.users using explicit extensions schema prefix
+    UPDATE auth.users
+    SET encrypted_password = extensions.crypt(p_new_password, extensions.gen_salt('bf')),
+        updated_at = now()
+    WHERE id = p_user_id;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$function$;
+
+-- ==========================================
+-- 7. CHAT GROUP SYNC RLS POLICIES FOR TEAMS
+-- ==========================================
+-- 7.1 Helper function to check company admin status
+CREATE OR REPLACE FUNCTION public.is_company_admin(comp_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND company_id = comp_id
+    AND is_admin = true
+  );
+END;
+$function$;
+
+-- 7.2 Clear legacy policies
+DROP POLICY IF EXISTS "Company admins can view conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Company admins can update conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Company admins can delete conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Creators can delete conversations" ON public.conversations;
+
+DROP POLICY IF EXISTS "Company admins can view participants" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Company admins can delete participants" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Conversation creators can view participants" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Conversation creators can delete participants" ON public.conversation_participants;
+
+-- 7.3 Create new policies for conversations
+CREATE POLICY "Company admins can view conversations" 
+ON public.conversations 
+FOR SELECT 
+TO authenticated 
+USING (
+  is_company_admin(company_id)
+);
+
+CREATE POLICY "Company admins can update conversations" 
+ON public.conversations 
+FOR UPDATE 
+TO authenticated 
+USING (
+  is_company_admin(company_id)
+);
+
+CREATE POLICY "Company admins can delete conversations" 
+ON public.conversations 
+FOR DELETE 
+TO authenticated 
+USING (
+  is_company_admin(company_id)
+);
+
+CREATE POLICY "Creators can delete conversations" 
+ON public.conversations 
+FOR DELETE 
+TO authenticated 
+USING (
+  created_by = auth.uid()
+);
+
+-- 7.4 Create new policies for conversation_participants
+CREATE POLICY "Company admins can view participants" 
+ON public.conversation_participants 
+FOR SELECT 
+TO authenticated 
+USING (
+  is_company_admin(company_id)
+);
+
+CREATE POLICY "Company admins can delete participants" 
+ON public.conversation_participants 
+FOR DELETE 
+TO authenticated 
+USING (
+  is_company_admin(company_id)
+);
+
+CREATE POLICY "Conversation creators can view participants" 
+ON public.conversation_participants 
+FOR SELECT 
+TO authenticated 
+USING (
+  conversation_id IN (SELECT id FROM public.conversations WHERE created_by = auth.uid())
+);
+
+CREATE POLICY "Conversation creators can delete participants" 
+ON public.conversation_participants 
+FOR DELETE 
+TO authenticated 
+USING (
+  conversation_id IN (SELECT id FROM public.conversations WHERE created_by = auth.uid())
+);
+
+-- Final Force Schema Cache Reload
+NOTIFY pgrst, 'reload schema';
