@@ -63,58 +63,66 @@ async function connectToWhatsApp(companyId, connectionId) {
             // Save QR status to DB
             await updateCompanySettings(connectionId, { qr_code: qr, is_connected: false });
             console.log('[QR CODE] QR Code saved to DB successfully');
+
+            // Timeout de 60 segundos para forçar refresh do QR Code se não for lido
+            if (sessions.has(connectionId + '_timer')) {
+                clearTimeout(sessions.get(connectionId + '_timer'));
+            }
+
+            const timer = setTimeout(async () => {
+                console.log(`[TIMEOUT] QR Code expiro para a conexao ${connectionId}. Reiniciando sessão para gerar novo QR...`);
+                await updateCompanySettings(connectionId, { qr_code: null, is_connected: false });
+                sock.ev.removeAllListeners();
+                sock.end(new Error('QR_TIMEOUT'));
+                sessions.delete(connectionId);
+                sessions.delete(connectionId + '_timer');
+
+                // Força reconexão após 2 segundos
+                setTimeout(() => {
+                    connectToWhatsApp(companyId, connectionId);
+                }, 2000);
+            }, 60000); // 60 segundos
+
+            sessions.set(connectionId + '_timer', timer);
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            await updateCompanySettings(connectionId, { is_connected: false });
 
-            // Remove from sessions map on close
+            // Set as disconnected immediately
+            await updateCompanySettings(connectionId, { is_connected: false });
             sessions.delete(connectionId);
 
             if (shouldReconnect) {
-                // Check reconnection attempts
-                const attempts = reconnectionAttempts.get(connectionId) || 0;
-                if (attempts < MAX_RECONNECTION_ATTEMPTS) {
-                    reconnectionAttempts.set(connectionId, attempts + 1);
-                    console.log(`[RECONNECTION] Attempt ${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS} for connection ${connectionId}`);
-                    connectToWhatsApp(companyId, connectionId);
-                } else {
-                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for connection ${connectionId}. Stopping.`);
-                    // Do NOT clear QR code here, so user has time to scan it even if backend stops retrying temporarily
-                    await updateCompanySettings(connectionId, { is_connected: false });
-                    reconnectionAttempts.delete(connectionId);
-                }
-            } else {
-                console.log('Connection closed. You are logged out (or session corrupted).');
-
-                // 1. Force cleanup of auth folder to prevent loop
+                // Se foi um erro de expiração de QR Code ou queda anormal:
+                // 1. Limpa a pasta auth para forçar um novo login do zero
                 try {
                     const authPath = `auth_info_baileys/${connectionId}`;
                     if (fs.existsSync(authPath)) {
                         fs.rmSync(authPath, { recursive: true, force: true });
-                        console.log(`[AUTO-FIX] Deleted corrupted auth folder: ${authPath}`);
+                        console.log(`[AUTO-FIX] Deleted auth folder to force fresh QR code: ${authPath}`);
                     }
                 } catch (err) {
                     console.error('[AUTO-FIX] Failed to delete auth folder:', err);
                 }
 
-                // 2. Set Disconnected but DO NOT CLEAR QR CODE
-                await updateCompanySettings(connectionId, { is_connected: false });
-
-                sessions.delete(connectionId);
-
-                // 3. Retry connection as if it were a normal drop (since we cleaned the folder, next one is fresh)
+                // 2. Tenta reconectar (agora que a pasta sumiu, ele vai gerar um QR novo)
                 const attempts = reconnectionAttempts.get(connectionId) || 0;
                 if (attempts < MAX_RECONNECTION_ATTEMPTS) {
                     reconnectionAttempts.set(connectionId, attempts + 1);
-                    console.log(`[AUTO-RETRY] Restarting fresh session after cleanup (${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS})`);
-                    connectToWhatsApp(companyId, connectionId);
+                    console.log(`[RECONNECTION] Attempt ${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS} for connection ${connectionId}`);
+
+                    // Delay para evitar loopings infernais instantâneos
+                    setTimeout(() => {
+                        connectToWhatsApp(companyId, connectionId);
+                    }, 5000); // 5 segundos antes de tentar gerar novo QR ou reconectar
                 } else {
-                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached even after cleanup. Stopping.`);
-                    // We stopped, but the LAST generated QR code stays in DB for user to see/debug
+                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for connection ${connectionId}. Stopping.`);
+                    reconnectionAttempts.delete(connectionId);
                 }
+            } else {
+                console.log('Connection closed. You are logged out (or session corrupted). Action required by user.');
             }
         } else if (connection === 'open') {
             console.log('opened connection for connection', connectionId);
