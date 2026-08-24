@@ -1745,7 +1745,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     } catch (err: any) {
       console.warn('Download falhou:', err);
-      alert('Não foi possível baixar o arquivo no momento. Verifique sua conexão e tente novamente.');
+      alert('Não foi possível baixar o arquivo no momento.\n\nDetalhe do erro: ' + (err.message || err));
     }
   };
 
