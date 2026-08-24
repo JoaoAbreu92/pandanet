@@ -151,7 +151,7 @@ const MasterBanner: React.FC = () => {
                 .from('chat-media')
                 .upload(path, file, { upsert: true });
             if (upErr) throw upErr;
-            const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(path);
+            const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${path}`);
             if (isVideo) {
                 setEditForm(prev => ({ ...prev, videoUrl: publicUrl, imageUrl: '' }));
             } else {

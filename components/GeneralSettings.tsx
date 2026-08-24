@@ -38,7 +38,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                 }
 
                 console.log("[GeneralSettings] Upload bem-sucedido:", data);
-                const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
                 console.log("[GeneralSettings] URL pública:", publicUrl);
                 
                 finalSettings.logoUrl = publicUrl;

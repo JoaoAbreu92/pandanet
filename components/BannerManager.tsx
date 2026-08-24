@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Card from './Card';
 import type { Banner } from '../types';
 import { PencilIcon, PlusIcon, XCircleIcon, TrashIcon } from './icons';
-import { supabase, getCleanImageUrl } from '../supabaseClient';
+import { supabase, getCleanImageUrl, getSignedStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 // --- Image Cropper Component ---
