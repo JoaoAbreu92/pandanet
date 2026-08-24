@@ -507,15 +507,26 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
 
-        // 2. Buscar TODOS os Grupos
+        // 2. Buscar TODOS os Grupos (Tenta primeiro endpoint V2, depois V1)
         try {
-            const respG = await fetch(`${evoUrl}/group/findAll/${instanceName}`, { headers });
+            console.log(`[SYNC] Buscando grupos via Evolution API para ${instanceName}...`);
+            let respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
+            
+            // Fallback se o endpoint v2 falhar
+            if (!respG.ok) {
+                console.warn(`[SYNC] fetchAllGroups falhou (Status ${respG.status}). Tentando group/findAll...`);
+                respG = await fetch(`${evoUrl}/group/findAll/${instanceName}`, { headers });
+            }
+
             if (respG.ok) {
                 const groups = await respG.json();
-                console.log(`[SYNC] ${groups.length} grupos encontrados.`);
-                for (const g of groups) {
-                    const jid = g.jid || g.id || '';
+                const groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
+                console.log(`[SYNC] ${groupList.length} grupos encontrados na Evolution API.`);
+                
+                for (const g of groupList) {
+                    const jid = g.jid || g.id || g.remoteJid || '';
                     if (!jid || !jid.includes('@g.us')) continue;
+                    
                     const phone = jid.split('@')[0];
                     if (processedJids.has(phone)) continue;
                     processedJids.add(phone);
@@ -529,7 +540,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     });
                 }
             }
-        } catch(e) { console.error(`[SYNC] Erro grupos:`, e.message); }
+        } catch(e) { console.error(`[SYNC] Erro busca grupos:`, e.message); }
 
         if (contactsToUpsert.length > 0) {
             console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas (contatos/grupos)...`);
