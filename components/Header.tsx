@@ -104,22 +104,21 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                     )}
 
                     {/* Botão de Ativar Sons + Selector */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center">
                         <button
                             onClick={testNotifications}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border border-emerald-200"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border-y border-l border-emerald-200"
                             title="Testar Sons e Notificações"
                         >
                             <PlayCircleIcon className="w-4 h-4" />
                             <span className="hidden sm:inline">Ativar Toques</span>
                         </button>
-
                         <div
                             className="relative"
                             onMouseEnter={handleSoundMenuEnter}
                             onMouseLeave={handleSoundMenuLeave}
                         >
-                            <button className="px-2 py-1.5 bg-emerald-50 text-emerald-600 rounded-r-full hover:bg-emerald-100 border-t border-b border-r border-emerald-200">
+                            <button className="px-2 py-1.5 bg-emerald-50 text-emerald-600 rounded-r-full hover:bg-emerald-100 border border-emerald-200">
                                 <span className="text-xs">▼</span>
                             </button>
                             {/* Dropdown de Sons */}

@@ -48,9 +48,17 @@ export const PostCard: React.FC<{
     const getEmbedUrl = (content: string) => {
         const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
         const vimeoRegex = /(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/)([0-9]+)/;
+        const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com)\/(?:p|reels|reel)\/([a-zA-Z0-9_-]+)/;
+        const tiktokRegex = /(?:https?:\/\/)?(?:www\.)?(?:tiktok\.com)\/(?:@[\w.-]+\/video\/|v\/|embed\/v3\/)([0-9]+)/;
 
         const ytMatch = content.match(youtubeRegex);
         if (ytMatch) return { type: 'youtube', id: ytMatch[1], url: `https://www.youtube.com/embed/${ytMatch[1]}` };
+
+        const igMatch = content.match(instagramRegex);
+        if (igMatch) return { type: 'instagram', id: igMatch[1], url: `https://www.instagram.com/p/${igMatch[1]}/embed/` };
+
+        const ttMatch = content.match(tiktokRegex);
+        if (ttMatch) return { type: 'tiktok', id: ttMatch[1], url: `https://www.tiktok.com/embed/v3/${ttMatch[1]}` };
 
         const vimeoMatch = content.match(vimeoRegex);
         if (vimeoMatch) return { type: 'vimeo', id: vimeoMatch[1], url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
@@ -100,7 +108,7 @@ export const PostCard: React.FC<{
             )}
 
             {!post.mediaUrl && getEmbedUrl(post.content) && (
-                <div className="mb-4 rounded-lg overflow-hidden bg-black aspect-video shadow-inner">
+                <div className={`mb-4 rounded-lg overflow-hidden bg-black shadow-inner ${getEmbedUrl(post.content)?.type === 'youtube' || getEmbedUrl(post.content)?.type === 'vimeo' ? 'aspect-video' : 'aspect-[9/16] max-h-[600px] w-full max-w-[400px] mx-auto'}`}>
                     <iframe
                         width="100%"
                         height="100%"
