@@ -118,7 +118,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         console.log("[AdminPage] ========== SALVANDO SETTINGS DA EMPRESA ==========");
         console.log("[AdminPage] Company ID:", company.id);
         console.log("[AdminPage] Novos settings:", settings);
-        
+
         setCompany({ ...company, settings });
 
         console.log("[AdminPage] Atualizando no Supabase...");
@@ -261,7 +261,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         if (categories.length > 0) {
             const firstCat = categories[0];
             setActiveCategory(firstCat);
-            
+
             const firstTab = allTabs.find(t => {
                 if (t.category !== firstCat) return false;
                 if (t.featureId && customFeatures && customFeatures[t.featureId] === false) return false;
@@ -303,7 +303,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 }
                 return true;
             });
-            
+
             if (firstTab) {
                 setActiveTab(firstTab.id);
             }
@@ -323,8 +323,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'teams':
                 return <TeamManager users={employees} setUsers={setEmployees} onNavigate={onNavigate} />;
             case 'org-flow':
-                return <OrgFlowEditor 
-                    employees={employees} 
+                return <OrgFlowEditor
+                    employees={employees}
                     onUpdateEmployees={setEmployees}
                 />;
             case 'forms':
@@ -495,19 +495,19 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                         { key: 'type', label: 'Tipo de Arquivo', type: 'select', options: ['PDF', 'DOCX', 'PPTX', 'XLSX', 'OUTRO'] },
                         { key: 'url', label: 'Arquivo (Upload)', type: 'file' },
                         { key: 'target_type', label: 'Tipo de Destinatário', type: 'select', options: ['all', 'departments', 'users'] },
-                        { 
-                            key: 'target_departments', 
-                            label: 'Departamentos Destinatários', 
-                            type: 'department_list', 
-                            optional: true, 
-                            condition: (formData) => formData.target_type === 'departments' 
+                        {
+                            key: 'target_departments',
+                            label: 'Departamentos Destinatários',
+                            type: 'department_list',
+                            optional: true,
+                            condition: (formData) => formData.target_type === 'departments'
                         },
-                        { 
-                            key: 'target_users', 
-                            label: 'Usuários Destinatários', 
-                            type: 'user_list', 
-                            optional: true, 
-                            condition: (formData) => formData.target_type === 'users' 
+                        {
+                            key: 'target_users',
+                            label: 'Usuários Destinatários',
+                            type: 'user_list',
+                            optional: true,
+                            condition: (formData) => formData.target_type === 'users'
                         }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
@@ -596,11 +596,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                                     setActiveTab('');
                                 }
                             }}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${
-                                activeCategory === cat 
-                                ? 'bg-brand-primary text-white' 
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                            }`}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${activeCategory === cat
+                                    ? 'bg-brand-primary text-white'
+                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }`}
                         >
                             {cat}
                         </button>
@@ -613,11 +612,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`${
-                                    activeTab === tab.id
+                                className={`${activeTab === tab.id
                                         ? 'border-brand-primary text-brand-primary'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all`}
+                                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all`}
                             >
                                 {tab.label}
                             </button>
