@@ -137,6 +137,11 @@ const UserFormModal: React.FC<{
             can_send_media: true,
             can_manage_settings: false,
             can_view_groups: true,
+        },
+        email_permissions: user?.email_permissions || {
+            can_manage_accounts: false,
+            can_view_all_accounts: false,
+            allowed_accounts: [], // IDs das contas permitidas
         }
     });
 
@@ -317,6 +322,35 @@ const UserFormModal: React.FC<{
                                     </div>
                                 </div>
                             </section>
+
+                            {/* Grupo: PandaMail */}
+                            <section className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
+                                <h5 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <EnvelopeIcon className="w-3 h-3" /> PandaMail (E-mail Corporativo)
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle 
+                                        icon={<Cog6ToothIcon className="w-4 h-4" />} 
+                                        label="Pode Adicionar/Remover Contas" 
+                                        name="can_manage_accounts" 
+                                        checked={formData.email_permissions.can_manage_accounts} 
+                                        onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
+                                    />
+                                    <PermissionToggle 
+                                        icon={<ShieldCheckIcon className="w-4 h-4" />} 
+                                        label="Ver Todas as Contas da Empresa" 
+                                        name="can_view_all_accounts" 
+                                        checked={formData.email_permissions.can_view_all_accounts} 
+                                        onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
+                                    />
+                                    <div className="sm:col-span-2 p-3 bg-white/50 rounded-xl border border-dashed border-slate-200">
+                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <p className="text-[10px] text-slate-400 italic">As contas disponíveis aparecerão aqui para seleção após serem cadastradas no PandaMail.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </div>
 
@@ -412,7 +446,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_can_nudge: !!(userData as any).can_nudge,
                     p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
                     p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
-                    p_whatspanda_permissions: (userData as any).whatspanda_permissions || {}
+                    p_whatspanda_permissions: (userData as any).whatspanda_permissions || {},
+                    p_email_permissions: (userData as any).email_permissions || {}
                 });
 
                 // Manual password update if field is provided
@@ -460,7 +495,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_can_nudge: !!(userData as any).can_nudge,
                         p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
                         p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
-                        p_whatspanda_permissions: (userData as any).whatspanda_permissions || {}
+                        p_whatspanda_permissions: (userData as any).whatspanda_permissions || {},
+                        p_email_permissions: (userData as any).email_permissions || {}
                     });
 
                     if (error) {

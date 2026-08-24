@@ -254,6 +254,7 @@ export interface Employee {
   isOnline?: boolean;
   permissions: EmployeePermissions;
   whatspanda_permissions?: WhatsAppPermissions; // New field
+  email_permissions?: any; // New field for multi-email support
   phone?: string;
   officeLocation?: string;
   bio?: string;
@@ -641,6 +642,7 @@ export interface Plan {
   name: string;
   userLimit: number;
   whatsappLimit: number; // Novo campo
+  emailLimit: number; // Novo campo
   features: PlanFeatures;
   price?: number; // Added to match migration
 }

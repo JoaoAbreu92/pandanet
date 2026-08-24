@@ -142,6 +142,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [showEmailPass, setShowEmailPass] = useState(false);
     const [loadingBody, setLoadingBody] = useState(false);
     const [bodyError, setBodyError] = useState<string | null>(null);
+
+    // --- State: Multi-Account ---
+    const [accounts, setAccounts] = useState<any[]>([]);
+    const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+    const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+    const [accountUnseenCounts, setAccountUnseenCounts] = useState<Record<string, number>>({});
+
     const [folders, setFolders] = useState<any[]>([]);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
     const [showFolderModal, setShowFolderModal] = useState(false);
@@ -249,6 +256,53 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         }
     }, [savedImapUser, view, selectedEmail]);
 
+    const refreshAllAccountBadges = async () => {
+        if (!accounts || accounts.length === 0) return;
+        
+        console.log("[EmailPage] Refreshing all account badges...");
+        const newCounts: Record<string, number> = {};
+        
+        // Use Promise.all to fetch counts in parallel
+        await Promise.all(accounts.map(async (acc) => {
+            try {
+                const { data } = await callEmailServer('status', {
+                    config: acc,
+                    folder: 'INBOX'
+                });
+                if (data && typeof data.unseen === 'number') {
+                    newCounts[acc.id] = data.unseen;
+                }
+            } catch (err) {
+                console.error(`[EmailPage] Error fetching status for account ${acc.imap_user}:`, err);
+            }
+        }));
+        
+        setAccountUnseenCounts(newCounts);
+        
+        // Also update main unseenCount if the active account is among them
+        if (activeAccountId && newCounts[activeAccountId] !== undefined) {
+            setUnseenCount(newCounts[activeAccountId]);
+        }
+    };
+
+    // --- Polling and Refresh ---
+    useEffect(() => {
+        // Initial badge refresh
+        if (accounts.length > 0) refreshAllAccountBadges();
+
+        const badgeInterval = setInterval(refreshAllAccountBadges, 60000); // Every minute
+        const activeAccountInterval = setInterval(() => {
+            if (activeAccountId && view === 'inbox' && !loading) {
+                fetchEmails(false);
+            }
+        }, 30000); // Every 30s for active account
+
+        return () => {
+            clearInterval(badgeInterval);
+            clearInterval(activeAccountInterval);
+        };
+    }, [accounts.length, activeAccountId, view]);
+
     useEffect(() => {
         if (!currentUser?.id) return;
         localStorage.setItem(`panda_email_view_${currentUser.id}`, view);
@@ -273,11 +327,43 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // --- Effects ---
 
     useEffect(() => {
-        loadSettings();
+        const initialize = async () => {
+            await fetchAccounts();
+        };
+        initialize();
         return () => {
             if (pollingRef.current) clearInterval(pollingRef.current);
         };
     }, [currentUser]);
+
+    // Load settings when active account changes
+    useEffect(() => {
+        if (activeAccountId) {
+            const activeAccount = accounts.find(a => a.id === activeAccountId);
+            if (activeAccount) {
+                setSettings({
+                    imap_host: activeAccount.imap_host,
+                    imap_port: activeAccount.imap_port,
+                    imap_user: activeAccount.imap_user,
+                    imap_pass: activeAccount.imap_pass,
+                    imap_ssl: activeAccount.imap_ssl ?? true,
+                    smtp_host: activeAccount.smtp_host,
+                    smtp_port: activeAccount.smtp_port,
+                    smtp_user: activeAccount.smtp_user,
+                    smtp_pass: activeAccount.smtp_pass,
+                    smtp_ssl: activeAccount.smtp_ssl ?? true,
+                    signature: activeAccount.signature || ''
+                });
+                setSavedImapUser(activeAccount.imap_user || '');
+                // Clear state for new account
+                setEmails([]);
+                setTotalEmails(0);
+                setUnseenCount(0);
+                setFolders([]);
+                setPage(1);
+            }
+        }
+    }, [activeAccountId, accounts]);
 
     // Auto-load emails when settings are ready (fixes "Refresh Required" bug)
     // Uses savedImapUser (set only by loadSettings) to avoid triggering on every keystroke in the settings form
@@ -298,39 +384,106 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // --- Actions ---
 
-    const loadSettings = async () => {
-        // maybeSingle() returns null (not 406 error) when no row exists
-        const { data } = await supabase.from('email_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
-        if (data) {
-            setSettings({
-                imap_host: data.imap_host,
-                imap_port: data.imap_port,
-                imap_user: data.imap_user,
-                imap_pass: data.imap_pass,
-                imap_ssl: data.imap_ssl ?? true,
-                smtp_host: data.smtp_host,
-                smtp_port: data.smtp_port,
-                smtp_user: data.smtp_user,
-                smtp_pass: data.smtp_pass,
-                smtp_ssl: data.smtp_ssl ?? true,
-                signature: data.signature || ''
-            });
-            // Only update savedImapUser if there's a valid saved configuration
-            setSavedImapUser(data.imap_user || '');
+    const fetchAccounts = async () => {
+        if (!currentUser?.company_id) return;
+        
+        let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
+        
+        // Se não for admin e não tiver permissão de ver tudo, filtrar pelas contas permitidas
+        const perms = currentUser.email_permissions;
+        if (!currentUser.is_company_admin && perms && !perms.can_view_all_accounts) {
+            if (perms.allowed_accounts && perms.allowed_accounts.length > 0) {
+                query = query.in('id', perms.allowed_accounts);
+            } else {
+                // Se não tem permissão explícita, ele só vê a dele (legado) ou nada
+                query = query.eq('user_id', currentUser.id);
+            }
+        }
+
+        const { data, error } = await query;
+        
+        if (data && !error) {
+            setAccounts(data);
+            if (data.length > 0) {
+                // Tenta restaurar a última conta ativa do localStorage ou usa a primeira
+                const lastAccountId = localStorage.getItem(`panda_active_email_account_${currentUser.id}`);
+                if (lastAccountId && data.find(a => a.id === lastAccountId)) {
+                    setActiveAccountId(lastAccountId);
+                    setExpandedAccounts(new Set([lastAccountId]));
+                } else {
+                    setActiveAccountId(data[0].id);
+                    setExpandedAccounts(new Set([data[0].id]));
+                }
+            }
         }
     };
 
+    const toggleAccountExpansion = (accountId: string) => {
+        setExpandedAccounts(new Set([accountId]));
+        setActiveAccountId(accountId);
+        if (currentUser?.id) {
+            localStorage.setItem(`panda_active_email_account_${currentUser.id}`, accountId);
+        }
+    };
+
+    const loadSettings = async () => {
+        // Now handled by fetchAccounts and useEffect(activeAccountId)
+    };
+
     const saveSettings = async () => {
-        const payload = { user_id: currentUser.id, ...settings };
-        const { error } = await supabase.from('email_settings').upsert(payload, { onConflict: 'user_id' });
+        if (!currentUser?.company_id) return;
+        
+        const payload = { 
+            id: activeAccountId || undefined, // undefined gera novo UUID se for insert
+            company_id: currentUser.company_id,
+            user_id: currentUser.id, 
+            ...settings 
+        };
+        
+        const { data, error } = await supabase.from('email_settings').upsert(payload).select();
+        
         if (error) {
             showToast('Erro ao salvar as configurações: ' + error.message, 'error');
         } else {
             showToast('Configurações salvas com sucesso!', 'success');
+            await fetchAccounts(); // Recarrega a lista
             setView('inbox');
-            setSavedImapUser(settings.imap_user); // Update savedImapUser so polling uses new config
-            fetchEmails(true); // Force refresh with new settings
+            if (data && data.length > 0) {
+                setActiveAccountId(data[0].id);
+                setSavedImapUser(data[0].imap_user);
+            }
         }
+    };
+
+    const deleteAccount = async (accountId: string) => {
+        if (!currentUser.email_permissions?.can_manage_accounts) {
+            showToast('Você não tem permissão para remover contas.', 'error');
+            return;
+        }
+
+        openConfirm(
+            'Remover Conta',
+            'Tem certeza que deseja remover esta conta de e-mail? Todos os metadados e tags associados serão excluídos.',
+            async () => {
+                closeConfirm();
+                const { error } = await supabase.from('email_settings').delete().eq('id', accountId);
+                if (error) {
+                    showToast('Erro ao excluir conta: ' + error.message, 'error');
+                } else {
+                    showToast('Conta removida com sucesso.', 'success');
+                    await fetchAccounts();
+                    if (activeAccountId === accountId) {
+                        setActiveAccountId(null);
+                        setSettings({
+                            imap_host: 'imap.gmail.com', imap_port: 993, imap_user: '', imap_pass: '', imap_ssl: true,
+                            smtp_host: 'smtp.gmail.com', smtp_port: 465, smtp_user: '', smtp_pass: '', smtp_ssl: true,
+                            signature: ''
+                        });
+                    }
+                }
+            },
+            'danger'
+        );
     };
 
     // Calls the Node.js email server (bypasses Deno edge function which cannot do TLS/IMAP)
@@ -633,24 +786,27 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const fetchTags = async () => {
-        const { data } = await supabase.from('email_tags').select('*').eq('user_id', currentUser.id);
-        if (data) setAvailableTags(data);
+        if (!activeAccountId) return;
+        const { data } = await supabase.from('email_tags').select('*').eq('account_id', activeAccountId);
+        if (data) {
+            // Map 'name' from DB to 'label' for UI compatibility
+            setAvailableTags(data.map((t: any) => ({ ...t, label: t.name })));
+        }
     };
 
     const createTag = async () => {
-        if (!newTagLabel) return;
+        if (!newTagLabel || !activeAccountId) return;
         const { data, error } = await supabase.from('email_tags').insert({
-            user_id: currentUser.id,
-            label: newTagLabel,
+            account_id: activeAccountId,
+            name: newTagLabel,
             color: newTagColor
         }).select();
 
         if (error) {
             showToast('Erro ao criar tag: ' + error.message, 'error');
         } else if (data) {
-            setAvailableTags(prev => [...prev, data[0]]);
+            setAvailableTags(prev => [...prev, { ...data[0], label: data[0].name }]);
             setNewTagLabel('');
-            // Optional: Close modal if intended, but keeping open for multiple adds
         }
     };
 
@@ -872,11 +1028,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setTotalEmails(total);
             if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(unseen);
 
-            // Fetch Local Metadata (Tags/Notes)
+            // Fetch local metadata (tags, notes) from Supabase
             const { data: metadataList } = await supabase
                 .from('email_metadata')
                 .select('*')
-                .eq('user_id', currentUser.id);
+                .eq('account_id', activeAccountId)
+                .in('message_id', emailList.map((e: any) => e.messageId || e.uid));
 
             // Merge metadata and override Seen status from local state
             const mergedEmails = emailList.map((email: any) => {
@@ -1233,10 +1390,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         const messageId = email.messageId || email.uid;
 
         const { error } = await supabase.from('email_metadata').upsert({
-            user_id: currentUser.id,
+            account_id: activeAccountId,
             message_id: messageId,
             tags: newTags
-        }, { onConflict: 'user_id,message_id' });
+        }, { onConflict: 'account_id,message_id' });
 
         if (error) {
             console.error('[EmailPage] Error saving tags:', error);
@@ -1285,68 +1442,104 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         {t('email.write')}
                     </button>
 
-                    <nav className="space-y-1">
-                        {/* Always show INBOX first */}
-                        <button
-                            onClick={() => { 
-                                setView('inbox'); 
-                                setCurrentFolder('INBOX'); 
-                                setFilterTag(null); 
-                                setPage(1); 
-                                if (window.innerWidth < 768) setSidebarOpen(false);
-                            }} 
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => handleDrop(e, 'INBOX')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
-                        >
-                            <InboxIcon className="w-5 h-5" />
-                            {t('sidebar.inbox') || 'Caixa de Entrada'}
-                            {unseenCount > 0 && (
-                                <span className="ml-auto bg-red-500 text-white py-0.5 px-2.5 rounded-full text-[10px] font-black shadow-lg border border-white dark:border-slate-900">
-                                    {unseenCount}
-                                </span>
-                            )}
-                        </button>
+                    <nav className="space-y-4">
+                        {accounts.map(account => {
+                            const isExpanded = expandedAccounts.has(account.id);
+                            const isActive = activeAccountId === account.id;
+                            const unseen = accountUnseenCounts[account.id] || 0;
 
-                        {/* Render other folders */}
-                        {folders
-                            .filter((f: any) => f.path !== 'INBOX')
-                            .map((folder: any) => {
-                                const isSpecial = folder.specialUse;
-                                let Icon = FolderIcon;
-                                if (isSpecial === '\\Sent' || folder.path.toLowerCase().includes('sent')) Icon = PaperAirplaneIcon;
-                                if (isSpecial === '\\Trash' || folder.path.toLowerCase().includes('trash') || folder.path.toLowerCase().includes('deleted')) Icon = TrashIcon;
-                                if (isSpecial === '\\Drafts' || folder.path.toLowerCase().includes('draft')) Icon = PencilSquareIcon;
-                                if (isSpecial === '\\Junk' || folder.path.toLowerCase().includes('junk') || folder.path.toLowerCase().includes('spam')) Icon = NoSymbolIcon;
-
-                                // Calculate depth for indentation
-                                const depth = (folder.path.split(/[\./]/).length) - (folder.path.startsWith('INBOX') ? 1 : 0);
-                                const paddingLeft = Math.max(0, (depth - 1) * 16);
-
-                                return (
+                            return (
+                                <div key={account.id} className="space-y-1">
+                                    {/* Account Accordion Header */}
                                     <button
-                                        key={folder.path}
-                                        onClick={() => { 
-                                            setView('inbox'); 
-                                            setCurrentFolder(folder.path); 
-                                            setFilterTag(null); 
-                                            setPage(1); 
-                                            if (window.innerWidth < 768) setSidebarOpen(false);
-                                        }}
-                                        onDragOver={handleDragOver}
-                                        onDrop={(e) => handleDrop(e, folder.path)}
-                                        style={{ paddingLeft: `${16 + paddingLeft}px` }}
-                                        className={`w-full flex items-center gap-3 py-2.5 text-sm font-bold rounded-xl transition-all ${view === 'inbox' && currentFolder === folder.path ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
+                                        onClick={() => toggleAccountExpansion(account.id)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 border ${isActive ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 shadow-sm' : 'hover:bg-gray-100 border-transparent text-gray-500 dark:text-gray-400 dark:hover:bg-white/5'}`}
                                     >
-                                        <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${view === 'inbox' && currentFolder === folder.path ? 'text-brand-primary' : 'text-gray-400 opacity-60'}`} />
-                                        <span className="truncate">{getFolderName(folder.path)}</span>
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-sm transition-all duration-300 ${isActive ? 'bg-brand-primary text-white scale-110' : 'bg-gray-200 text-gray-500'}`}>
+                                                {account.imap_user.substring(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="flex flex-col items-start min-w-0">
+                                                <span className={`text-xs font-bold truncate w-full ${isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                    {account.imap_user}
+                                                </span>
+                                                <span className="text-[9px] opacity-60 truncate w-full">Corporativo</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {unseen > 0 && (
+                                                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                                    {unseen}
+                                                </span>
+                                            )}
+                                            {isExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronRightIcon className="w-3 h-3" />}
+                                        </div>
                                     </button>
-                                );
-                            })}
 
-                        <button onClick={() => setShowFolderModal(true)} className="w-full text-left px-3 py-2 text-xs text-brand-primary hover:bg-gray-100 rounded flex items-center gap-2 mt-2 font-semibold">
-                            {t('email.new_folder')}
-                        </button>
+                                    {/* Account Content (Folders) */}
+                                    {isExpanded && (
+                                        <div className="pl-4 pr-1 py-1 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                                            {/* Folder: INBOX */}
+                                            <button
+                                                onClick={() => { 
+                                                    setView('inbox'); 
+                                                    setCurrentFolder('INBOX'); 
+                                                    setFilterTag(null); 
+                                                    setPage(1); 
+                                                    if (window.innerWidth < 768) setSidebarOpen(false);
+                                                }} 
+                                                onDragOver={handleDragOver}
+                                                onDrop={(e) => handleDrop(e, 'INBOX')}
+                                                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold rounded-lg transition-all ${currentFolder === 'INBOX' && !filterTag ? 'bg-brand-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
+                                            >
+                                                <InboxIcon className="w-4 h-4" />
+                                                {t('sidebar.inbox') || 'Entrada'}
+                                                {unseenCount > 0 && isActive && (
+                                                    <span className="ml-auto bg-red-500 text-white text-[10px] px-1.5 rounded-full">{unseenCount}</span>
+                                                )}
+                                            </button>
+
+                                            {/* Render other folders for this account */}
+                                            {isActive && folders
+                                                .filter((f: any) => f.path !== 'INBOX')
+                                                .map((folder: any) => {
+                                                    const isSpecial = folder.specialUse;
+                                                    let Icon = FolderIcon;
+                                                    if (isSpecial === '\\Sent' || folder.path.toLowerCase().includes('sent')) Icon = PaperAirplaneIcon;
+                                                    if (isSpecial === '\\Trash' || folder.path.toLowerCase().includes('trash') || folder.path.toLowerCase().includes('deleted')) Icon = TrashIcon;
+                                                    if (isSpecial === '\\Drafts' || folder.path.toLowerCase().includes('draft')) Icon = PencilSquareIcon;
+                                                    if (isSpecial === '\\Junk' || folder.path.toLowerCase().includes('junk') || folder.path.toLowerCase().includes('spam')) Icon = NoSymbolIcon;
+
+                                                    return (
+                                                        <button
+                                                            key={folder.path}
+                                                            onClick={() => { 
+                                                                setView('inbox'); 
+                                                                setCurrentFolder(folder.path); 
+                                                                setFilterTag(null); 
+                                                                setPage(1); 
+                                                                if (window.innerWidth < 768) setSidebarOpen(false);
+                                                            }}
+                                                            onDragOver={handleDragOver}
+                                                            onDrop={(e) => handleDrop(e, folder.path)}
+                                                            className={`w-full flex items-center gap-3 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${currentFolder === folder.path ? 'bg-brand-primary/10 text-brand-primary' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'}`}
+                                                        >
+                                                            <Icon className={`w-4 h-4 ${currentFolder === folder.path ? 'text-brand-primary' : 'text-gray-400'}`} />
+                                                            <span className="truncate">{getFolderName(folder.path)}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            
+                                            {isActive && (
+                                                <button onClick={() => setShowFolderModal(true)} className="w-full text-left px-3 py-1.5 text-[10px] text-brand-primary hover:bg-gray-100 rounded-lg flex items-center gap-2 font-bold opacity-80">
+                                                    + {t('email.new_folder')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </nav>
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
@@ -2209,91 +2402,129 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 </div>
                             </div>
                         ) : view === 'settings' ? (
-                            <div className="flex-1 p-8 overflow-y-auto">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">{t('email.settings_title')}</h2>
+                            <div className="flex-1 p-8 overflow-y-auto bg-gray-50/30">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="flex justify-between items-center mb-8">
+                                        <div>
+                                            <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Gerenciar Contas</h2>
+                                            <p className="text-gray-500 text-sm mt-1">Configure múltiplos e-mails para sua empresa.</p>
+                                        </div>
+                                        {currentUser.email_permissions?.can_manage_accounts && (
+                                            <button 
+                                                onClick={() => {
+                                                    setActiveAccountId(null);
+                                                    setSettings({
+                                                        imap_host: 'imap.gmail.com', imap_port: 993, imap_user: '', imap_pass: '', imap_ssl: true,
+                                                        smtp_host: 'smtp.gmail.com', smtp_port: 465, smtp_user: '', smtp_pass: '', smtp_ssl: true,
+                                                        signature: ''
+                                                    });
+                                                }}
+                                                className="bg-brand-primary text-white px-4 py-2 rounded-xl font-bold shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2"
+                                            >
+                                                <EnvelopeIcon className="w-5 h-5" />
+                                                Adicionar Nova Conta
+                                            </button>
+                                        )}
+                                    </div>
 
-                                    <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                                        <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl">
-                                            <h3 className="font-bold text-gray-900 dark:text-white mb-6 text-xl tracking-tight">{t('email.incoming_server')}</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.host_imap')}</label>
-                                                    <input value={settings.imap_host} onChange={e => setSettings(s => ({ ...s, imap_host: e.target.value }))} className="w-full mt-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="imap.gmail.com" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.port')}</label>
-                                                    <input type="number" value={settings.imap_port} onChange={e => setSettings(s => ({ ...s, imap_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" placeholder="993" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.user')}</label>
-                                                    <input value={settings.imap_user} onChange={e => setSettings(s => ({ ...s, imap_user: e.target.value, smtp_user: e.target.value }))} className="w-full mt-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.pass')}</label>
-                                                    <div className="relative mt-1">
-                                                        <input type={showEmailPass ? 'text' : 'password'} value={settings.imap_pass} onChange={e => setSettings(s => ({ ...s, imap_pass: e.target.value, smtp_pass: e.target.value }))} className="w-full mt-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white pr-10" />
-                                                        <button type="button" onClick={() => setShowEmailPass(p => !p)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-                                                            {showEmailPass ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                                        {accounts.map(acc => (
+                                            <div key={acc.id} className={`p-6 rounded-3xl border transition-all cursor-pointer group ${activeAccountId === acc.id ? 'bg-white border-emerald-200 shadow-xl ring-2 ring-emerald-500/20' : 'bg-white/50 border-gray-100 hover:border-gray-200 shadow-sm'}`} onClick={() => setActiveAccountId(acc.id)}>
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${activeAccountId === acc.id ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                        {acc.imap_user.substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={(e) => { e.stopPropagation(); deleteAccount(acc.id); }} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                                            <TrashIcon className="w-4 h-4" />
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <input type="checkbox" checked={settings.imap_ssl} onChange={e => setSettings(s => ({ ...s, imap_ssl: e.target.checked }))} />
-                                                    <label className="text-sm">{t('email.use_ssl')}</label>
+                                                <div className="font-bold text-gray-900 truncate mb-1">{acc.imap_user}</div>
+                                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{acc.imap_host}</div>
+                                                {activeAccountId === acc.id && (
+                                                    <div className="mt-4 flex items-center gap-2 text-emerald-600 text-[10px] font-black uppercase">
+                                                        <CheckIcon className="w-3 h-3" /> Editando Agora
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+                                            <h3 className="font-black text-gray-900 mb-6 text-xl tracking-tight flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-50 rounded-lg text-brand-primary"><InboxIcon className="w-5 h-5" /></div>
+                                                {t('email.incoming_server')}
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.host_imap')}</label>
+                                                    <input value={settings.imap_host} onChange={e => setSettings(s => ({ ...s, imap_host: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="imap.gmail.com" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.port')}</label>
+                                                    <input type="number" value={settings.imap_port} onChange={e => setSettings(s => ({ ...s, imap_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="993" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.user')}</label>
+                                                    <input value={settings.imap_user} onChange={e => setSettings(s => ({ ...s, imap_user: e.target.value, smtp_user: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.pass')}</label>
+                                                    <div className="relative mt-2">
+                                                        <input type={showEmailPass ? 'text' : 'password'} value={settings.imap_pass} onChange={e => setSettings(s => ({ ...s, imap_pass: e.target.value, smtp_pass: e.target.value }))} className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all pr-10" />
+                                                        <button type="button" onClick={() => setShowEmailPass(p => !p)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                                                            {showEmailPass ? <XMarkIcon className="w-5 h-5" /> : <MagnifyingGlassIcon className="w-5 h-5" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                                    <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" checked={settings.imap_ssl} onChange={e => setSettings(s => ({ ...s, imap_ssl: e.target.checked }))} />
+                                                    <label className="text-sm font-bold text-gray-700">{t('email.use_ssl')}</label>
                                                 </div>
                                             </div>
 
-                                            <h3 className="font-semibold text-gray-700 mb-4 mt-6">{t('email.outgoing_server')}</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <h3 className="font-black text-gray-900 mb-6 mt-12 text-xl tracking-tight flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><PaperAirplaneIcon className="w-5 h-5" /></div>
+                                                {t('email.outgoing_server')}
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.host_smtp')}</label>
-                                                    <input value={settings.smtp_host} onChange={e => setSettings(s => ({ ...s, smtp_host: e.target.value }))} className="w-full mt-1 border rounded p-2" placeholder="smtp.gmail.com" />
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.host_smtp')}</label>
+                                                    <input value={settings.smtp_host} onChange={e => setSettings(s => ({ ...s, smtp_host: e.target.value }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="smtp.gmail.com" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.port')}</label>
-                                                    <input type="number" value={settings.smtp_port} onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))} className="w-full mt-1 border rounded p-2" placeholder="465" />
+                                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('email.port')}</label>
+                                                    <input type="number" value={settings.smtp_port} onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))} className="w-full mt-2 bg-gray-50 border border-gray-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" placeholder="465" />
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <input type="checkbox" checked={settings.smtp_ssl} onChange={e => setSettings(s => ({ ...s, smtp_ssl: e.target.checked }))} />
-                                                    <label className="text-sm">{t('email.use_ssl')}</label>
+                                                <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                                    <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" checked={settings.smtp_ssl} onChange={e => setSettings(s => ({ ...s, smtp_ssl: e.target.checked }))} />
+                                                    <label className="text-sm font-bold text-gray-700">{t('email.use_ssl')}</label>
                                                 </div>
-                                            </div>
-
-                                            <h3 className="font-semibold text-gray-700 mb-4 mt-6">Preferências de Visualização</h3>
-                                            <div className="bg-white p-4 rounded border border-gray-200 flex items-center justify-between">
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-700">Abrir e-mail em tela cheia</div>
-                                                    <div className="text-xs text-gray-500">Esconde a lista de e-mails ao abrir uma mensagem.</div>
-                                                </div>
-                                                <button
-                                                    onClick={() => setIsFullScreen(!isFullScreen)}
-                                                    className={`w-12 h-6 rounded-full transition-colors relative ${isFullScreen ? 'bg-brand-primary' : 'bg-gray-300'}`}
-                                                >
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isFullScreen ? 'left-7' : 'left-1'}`} />
-                                                </button>
                                             </div>
                                         </div>
 
-                                        {/* Signature Editor */}
-                                        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                                            <h3 className="font-semibold text-gray-700 mb-4">{t('email.signature_title')}</h3>
-                                            <p className="text-sm text-gray-500 mb-2">{t('email.signature_desc')}</p>
-                                            <div className="h-48 mb-12">
+                                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+                                            <h3 className="font-black text-gray-900 mb-2 text-xl tracking-tight">{t('email.signature_title')}</h3>
+                                            <p className="text-sm text-gray-500 mb-6">{t('email.signature_desc')}</p>
+                                            <div className="min-h-[250px] mb-8">
                                                 <ReactQuill
                                                     theme="snow"
                                                     value={settings.signature}
                                                     onChange={val => setSettings(s => ({ ...s, signature: val }))}
-                                                    style={{ height: '150px' }}
+                                                    className="h-48"
                                                 />
                                             </div>
                                         </div>
 
-                                        <div className="flex justify-end gap-3 pt-4 border-t">
-                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600">{t('generic.cancel')}</button>
-                                            <button onClick={saveSettings} className="px-6 py-2 bg-brand-primary text-white rounded font-medium shadow">{t('email.save_settings')}</button>
+                                        <div className="flex justify-end gap-4 p-8 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                                            <button onClick={() => setView('inbox')} className="px-6 py-3 text-gray-500 font-bold hover:text-gray-700 transition-colors">{t('generic.cancel')}</button>
+                                            <button onClick={saveSettings} className="px-10 py-3 bg-brand-primary text-white rounded-2xl font-black shadow-lg hover:bg-emerald-600 transition-all active:scale-95">{t('email.save_settings')}</button>
                                         </div>
                                     </div>
-                    </div>
+                                </div>
+                            </div>
                 ) : null}
             </div>
 
