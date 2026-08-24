@@ -1036,9 +1036,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 finalMediaUrl = savedMediaUrl;
             }
 
-            // Se for URL do Supabase da empresa, converter para o host interno do Docker para ser ultra-rápido e evitar SSL
+            // Se for URL do Supabase da empresa, converter para o IP da VPS para ser ultra-rápido e evitar SSL
             if (finalMediaUrl && finalMediaUrl.includes('/storage/v1/object/public/')) {
-                finalMediaUrl = finalMediaUrl.replace('https://pandanet.grupopixel.com.br', 'http://supabase-kong:8000');
+                finalMediaUrl = finalMediaUrl.replace('https://pandanet.grupopixel.com.br', 'http://77.37.43.60:8000');
             }
 
             const audioSource = finalMediaUrl || audioDataUri;
