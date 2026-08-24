@@ -133,34 +133,34 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 const formattedEvents: CalendarEvent[] = evts
                     .filter((e: any) => !e.is_private || e.creator_id === currentUser.id)
                     .map((e: any) => ({
-                    id: e.id,
-                    title: e.title,
-                    date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
-                    startTime: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
-                    endTime: e.end_time ? new Date(e.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
-                    category: (e.category as CalendarEventCategory) || 'Reunião',
-                    location: e.location || '',
-                    attendees: (empsMap || []).filter((emp: any) => (e.attendees || []).includes(emp.id)).map((emp: any) => ({
-                        id: emp.id,
-                        name: emp.full_name,
-                        avatarUrl: emp.avatar_url
-                    } as Employee)),
-                    invitedIds: e.invited_ids || [],
-                    notes: e.description || '',
+                        id: e.id,
+                        title: e.title,
+                        date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
+                        startTime: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
+                        endTime: e.end_time ? new Date(e.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
+                        category: (e.category as CalendarEventCategory) || 'Reunião',
+                        location: e.location || '',
+                        attendees: (empsMap || []).filter((emp: any) => (e.attendees || []).includes(emp.id)).map((emp: any) => ({
+                            id: emp.id,
+                            name: emp.full_name,
+                            avatarUrl: emp.avatar_url
+                        } as Employee)),
+                        invitedIds: e.invited_ids || [],
+                        notes: e.description || '',
                         isPrivate: e.is_private,
-                    invites: (e.calendar_invites || []).map((inv: any) => {
-                        const invitee = empsMap.find((emp: any) => emp.id === inv.user_id);
-                        return {
-                            id: inv.id,
-                            event_id: inv.event_id,
-                            user_id: inv.user_id,
-                            status: inv.status,
-                            decline_reason: inv.decline_reason,
-                            invitee_name: invitee?.full_name,
-                            invitee_avatar: invitee?.avatar_url
-                        };
-                    })
-                }));
+                        invites: (e.calendar_invites || []).map((inv: any) => {
+                            const invitee = empsMap.find((emp: any) => emp.id === inv.user_id);
+                            return {
+                                id: inv.id,
+                                event_id: inv.event_id,
+                                user_id: inv.user_id,
+                                status: inv.status,
+                                decline_reason: inv.decline_reason,
+                                invitee_name: invitee?.full_name,
+                                invitee_avatar: invitee?.avatar_url
+                            };
+                        })
+                    }));
                 setEvents(formattedEvents);
             }
         };
@@ -442,9 +442,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         const isToday = day && day.toDateString() === new Date().toDateString();
                         const isPast = day && (() => {
                             const today = new Date();
-                            today.setHours(0,0,0,0);
+                            today.setHours(0, 0, 0, 0);
                             const checkDay = new Date(day);
-                            checkDay.setHours(0,0,0,0);
+                            checkDay.setHours(0, 0, 0, 0);
                             return checkDay.getTime() < today.getTime();
                         })();
                         const evs = day ? allCalendarEvents.filter(e => {
@@ -453,28 +453,28 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         }) : [];
 
                         return (
-                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-all duration-300 ${day ? (isPast ? 'bg-slate-100/50 dark:bg-slate-950/30 hover:bg-slate-100/80 dark:hover:bg-slate-900/60 cursor-pointer opacity-50 hover:opacity-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer') : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
-                                  onClick={() => { if (day) { setSelectedDayOptionsDate(day); setDayOptionsOpen(true); } }}>
+                            <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-all duration-300 ${day ? (isPast ? 'bg-slate-100/50 dark:bg-slate-950/30 hover:bg-slate-100/80 dark:hover:bg-slate-900/60 cursor-pointer opacity-50 hover:opacity-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer') : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
+                                onClick={() => { if (day) { setSelectedDayOptionsDate(day); setDayOptionsOpen(true); } }}>
                                 {day && (
                                     <>
-                                         <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
-                                         {isPast && (
-                                             <span className="text-[10px] text-gray-400 dark:text-gray-600 absolute top-2 right-2 select-none" title="Dia passado">✕</span>
-                                         )}
-                                         {(() => {
-                                             const hasPendingInvite = evs.some(e => 
-                                                 e.invites?.some(inv => inv.user_id === currentUser?.id && inv.status === 'pending')
-                                             );
-                                             if (hasPendingInvite) {
-                                                 return (
-                                                     <div className="absolute top-2 left-9 flex h-2 w-2" title="Você tem um convite pendente para este dia!">
-                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                                     </div>
-                                                 );
-                                             }
-                                             return null;
-                                         })()}
+                                        <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
+                                        {isPast && (
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-600 absolute top-2 right-2 select-none" title="Dia passado">✕</span>
+                                        )}
+                                        {(() => {
+                                            const hasPendingInvite = evs.some(e =>
+                                                e.invites?.some(inv => inv.user_id === currentUser?.id && inv.status === 'pending')
+                                            );
+                                            if (hasPendingInvite) {
+                                                return (
+                                                    <div className="absolute top-2 left-9 flex h-2 w-2" title="Você tem um convite pendente para este dia!">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                         <div className="mt-8 space-y-1 overflow-y-auto max-h-[calc(100%-2rem)]">
                                             {evs.map(e => (
                                                 <button key={e.id} onClick={(evt) => { evt.stopPropagation(); setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>
@@ -505,7 +505,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         });
 
         const allDayEvents = dayEvents.filter(e => e.category === 'Aniversário' || e.category === 'Feriado');
-        
+
         const getEventHour = (e: CalendarEvent) => {
             if (!e.startTime) return 0;
             const [h] = e.startTime.split(':');
@@ -627,7 +627,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                 const formattedDate = `${year}-${clickedMonth}-${clickedDay}`;
                                                 const hourStr = String(h).padStart(2, '0');
                                                 const nextHourStr = String((h + 1) % 24).padStart(2, '0');
-                                                
+
                                                 setNewEventData(prev => ({
                                                     ...prev,
                                                     date: formattedDate,
@@ -997,7 +997,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
                                     const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
                                     const formattedDate = `${year}-${month}-${day}`;
-                                    
+
                                     setNewEventData(prev => ({
                                         ...prev,
                                         date: formattedDate,
