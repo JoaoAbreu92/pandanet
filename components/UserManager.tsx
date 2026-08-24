@@ -343,6 +343,23 @@ const UserFormModal: React.FC<{
                                         checked={formData.email_permissions.can_view_all_accounts} 
                                         onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
                                     />
+                                    <div className="flex flex-col gap-1.5 p-3 bg-white/50 rounded-xl border border-slate-200">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Limite de Contas de E-mail</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Ex: 2"
+                                            value={formData.email_permissions.account_limit || ''} 
+                                            onChange={(e) => setFormData(p => ({ 
+                                                ...p, 
+                                                email_permissions: { 
+                                                    ...p.email_permissions, 
+                                                    account_limit: parseInt(e.target.value) || 0 
+                                                } 
+                                            }))} 
+                                            className="w-full bg-white border-slate-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" 
+                                        />
+                                        <p className="text-[9px] text-slate-400 italic px-1 leading-tight">Máximo de contas que este usuário pode cadastrar.</p>
+                                    </div>
                                     <div className="sm:col-span-2 p-3 bg-white/50 rounded-xl border border-dashed border-slate-200">
                                         <p className="text-[10px] text-gray-500 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
                                         <div className="flex flex-wrap gap-2">

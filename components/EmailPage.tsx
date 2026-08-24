@@ -433,8 +433,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const saveSettings = async () => {
         if (!currentUser?.company_id) return;
         
+        // Verificação de limite individual ou do plano
+        const currentLimit = currentUser.email_permissions?.account_limit || 1;
+        if (!activeAccountId && accounts.length >= currentLimit) {
+            showToast(`Você atingiu o seu limite de ${currentLimit} conta(s) de e-mail.`, 'warning');
+            return;
+        }
+        
         const payload = { 
-            id: activeAccountId || undefined, // undefined gera novo UUID se for insert
+            id: activeAccountId || undefined, 
             company_id: currentUser.company_id,
             user_id: currentUser.id, 
             ...settings 
@@ -446,7 +453,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             showToast('Erro ao salvar as configurações: ' + error.message, 'error');
         } else {
             showToast('Configurações salvas com sucesso!', 'success');
-            await fetchAccounts(); // Recarrega a lista
+            await fetchAccounts();
             setView('inbox');
             if (data && data.length > 0) {
                 setActiveAccountId(data[0].id);
@@ -2409,22 +2416,30 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Gerenciar Contas</h2>
                                             <p className="text-gray-500 text-sm mt-1">Configure múltiplos e-mails para sua empresa.</p>
                                         </div>
-                                        {currentUser.email_permissions?.can_manage_accounts && (
-                                            <button 
-                                                onClick={() => {
-                                                    setActiveAccountId(null);
-                                                    setSettings({
-                                                        imap_host: 'imap.gmail.com', imap_port: 993, imap_user: '', imap_pass: '', imap_ssl: true,
-                                                        smtp_host: 'smtp.gmail.com', smtp_port: 465, smtp_user: '', smtp_pass: '', smtp_ssl: true,
-                                                        signature: ''
-                                                    });
-                                                }}
-                                                className="bg-brand-primary text-white px-4 py-2 rounded-xl font-bold shadow-lg hover:bg-emerald-600 transition-all flex items-center gap-2"
-                                            >
-                                                <EnvelopeIcon className="w-5 h-5" />
-                                                Adicionar Nova Conta
-                                            </button>
-                                        )}
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Suas Contas</p>
+                                                <p className="text-sm font-black text-gray-900">{accounts.length} / {currentUser.email_permissions?.account_limit || 1}</p>
+                                            </div>
+                                            {currentUser.email_permissions?.can_manage_accounts && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setActiveAccountId(null);
+                                                        setSettings({
+                                                            imap_host: '', imap_port: 993, imap_user: '', imap_pass: '', imap_ssl: true,
+                                                            smtp_host: '', smtp_port: 465, smtp_user: '', smtp_pass: '', smtp_ssl: true,
+                                                            signature: ''
+                                                        });
+                                                        showToast('Formulário pronto para nova conta.', 'info');
+                                                    }}
+                                                    className={`px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${accounts.length >= (currentUser.email_permissions?.account_limit || 1) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-brand-primary text-white hover:bg-emerald-600 active:scale-95'}`}
+                                                    disabled={accounts.length >= (currentUser.email_permissions?.account_limit || 1)}
+                                                >
+                                                    <UserPlusIcon className="w-5 h-5" />
+                                                    Adicionar Nova Conta
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
