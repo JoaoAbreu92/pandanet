@@ -41,7 +41,10 @@ import {
   Edit2,
   RefreshCw,
   Bell,
-  BellOff
+  BellOff,
+  Share,
+  Share2,
+  CornerUpRight
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -102,6 +105,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, conversationId: string, isMuted: boolean } | null>(null);
   const [nudgeCooldowns, setNudgeCooldowns] = useState<{ [key: string]: number }>({});
   const [cooldownTimeouts, setCooldownTimeouts] = useState<{ [key: string]: number }>({});
+  const [forwardingMessage, setForwardingMessage] = useState<WhatsAppMessage | null>(null);
+  const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
+  const [forwardTargetSearch, setForwardTargetSearch] = useState('');
+  const [forwardLoading, setForwardLoading] = useState(false);
 
   // Efeito para gerenciar o contador visual de cooldown do Nudge
   useEffect(() => {
@@ -904,6 +911,48 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   };
 
+  const handleForward = async (targetConversationId: string) => {
+    if (!forwardingMessage || isGhostMode) return;
+    setForwardLoading(true);
+    
+    try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error("No active session");
+
+        const response = await fetch(`/api/whatsapp/messages/send/${targetConversationId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+                message: forwardingMessage.message_text,
+                mediaUrl: forwardingMessage.media_url,
+                mediaType: forwardingMessage.media_type
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to forward message');
+        }
+
+        setIsForwardModalOpen(false);
+        setForwardingMessage(null);
+        alert('Mensagem encaminhada com sucesso!');
+        
+        if (selectedConversation?.id === targetConversationId) {
+            fetchMessages(targetConversationId);
+        }
+    } catch (error: any) {
+        console.error('Error forwarding message:', error);
+        alert('Erro ao encaminhar: ' + error.message);
+    } finally {
+        setForwardLoading(false);
+    }
+  };
+
   const filteredConversations = conversations; // Already filtered by fetchConversations
 
   return (
@@ -1377,13 +1426,25 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           </a>
                         </div>
                       ) : msg.media_type?.includes('audio') ? (
-                        <div className="flex flex-col gap-1 min-w-[200px]">
-                          <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            <Volume2 className="w-4 h-4" />
-                            <span>Mensagem de Áudio</span>
+                        <div className="flex flex-col gap-1 min-w-[200px] p-1">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Áudio</span>
+                            </div>
+                            <a 
+                              href={msg.media_url || ''} 
+                              download 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[10px] text-slate-400 hover:text-emerald-500 transition-colors"
+                            >
+                              <Download className="w-3 h-3" />
+                            </a>
                           </div>
-                          <audio controls className="w-full h-10">
-                            <source src={msg.media_url || ''} type="audio/mpeg" />
+                          <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity">
+                            <source src={msg.media_url || ''} />
+                            Seu navegador não suporta áudio.
                           </audio>
                         </div>
                       ) : msg.media_type?.includes('video') ? (
@@ -1431,6 +1492,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       {!msg.is_from_customer && (
                         <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
                       )}
+                      
+                      <button 
+                        onClick={() => {
+                          setForwardingMessage(msg);
+                          setIsForwardModalOpen(true);
+                        }}
+                        className="ml-2 p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
+                        title="Encaminhar"
+                      >
+                        <Share2 className="w-3 h-3 text-slate-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1781,6 +1853,75 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         </>
       )}
 
+      {/* Forward Message Modal */}
+      {isForwardModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Encaminhar Mensagem</h3>
+                <p className="text-xs text-slate-500 mt-1">Selecione o destino da mensagem</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsForwardModalOpen(false);
+                  setForwardingMessage(null);
+                }}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-4 bg-slate-50 dark:bg-white/5">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Buscar contato ou grupo..."
+                  value={forwardTargetSearch}
+                  onChange={(e) => setForwardTargetSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+            
+            <div className="max-h-[400px] overflow-y-auto p-2">
+              {conversations
+                .filter(c => 
+                  c.contact_name?.toLowerCase().includes(forwardTargetSearch.toLowerCase()) || 
+                  c.contact_phone?.includes(forwardTargetSearch)
+                )
+                .map(conv => (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleForward(conv.id)}
+                    disabled={forwardLoading}
+                    className="w-full flex items-center gap-4 p-3 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-2xl transition-all group"
+                  >
+                    <img
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(conv.contact_name || 'User')}&background=random`}
+                      className="w-10 h-10 rounded-full border border-slate-200 group-hover:scale-110 transition-transform"
+                      alt={conv.contact_name}
+                    />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{conv.contact_name}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{conv.contact_phone}</p>
+                    </div>
+                    <CornerUpRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                  </button>
+                ))
+              }
+            </div>
+            
+            {forwardLoading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center backdrop-blur-[1px]">
+                <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

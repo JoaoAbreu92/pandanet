@@ -766,6 +766,75 @@ async function runChatbot(message, conversation, companyId, connectionId) {
     }
 }
 
+/**
+ * Baixa mídia da Evolution API (Base64)
+ */
+async function downloadEvolutionMedia(instanceName, message, mediatype) {
+    try {
+        console.log(`[MEDIA] Baixando ${mediatype} da mensagem ${message.key.id}...`);
+        
+        const endpoint = mediatype === 'sticker' ? 'getBase64FromSticker' : 'getBase64FromMediaMessage';
+        
+        const resp = await fetch(`${evoUrl}/chat/${endpoint}/${instanceName}`, {
+            method: 'POST',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: message
+            })
+        });
+
+        if (!resp.ok) {
+            const errLog = await resp.text();
+            console.error(`[MEDIA] Erro ao baixar (Status ${resp.status}):`, errLog);
+            return null;
+        }
+
+        const data = await resp.json();
+        return typeof data === 'string' ? data : (data.base64 || data.data || null);
+    } catch (e) {
+        console.error(`[MEDIA] Erro no download:`, e.message);
+        return null;
+    }
+}
+
+/**
+ * Sobe Buffer/Base64 para o Supabase Storage
+ */
+async function uploadMediaToSupabase(base64, mediatype, companyId) {
+    try {
+        if (!base64) return null;
+        
+        let ext = 'bin';
+        let contentType = 'application/octet-stream';
+        
+        if (mediatype === 'image') { ext = 'jpg'; contentType = 'image/jpeg'; }
+        else if (mediatype === 'audio') { ext = 'mp3'; contentType = 'audio/mpeg'; }
+        else if (mediatype === 'video') { ext = 'mp4'; contentType = 'video/mp4'; }
+        else if (mediatype === 'sticker') { ext = 'webp'; contentType = 'image/webp'; }
+
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const filePath = `received/${companyId}/${fileName}`;
+        
+        const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        const { data, error } = await supabase.storage
+            .from('chat-media')
+            .upload(filePath, buffer, { contentType, upsert: true });
+
+        if (error) {
+            console.error(`[STORAGE] Erro no upload:`, error.message);
+            return null;
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        return publicUrl;
+    } catch (e) {
+        console.error(`[STORAGE] Erro fatal no upload:`, e.message);
+        return null;
+    }
+}
+
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
     try {
         const isFromMe = message.key?.fromMe;
@@ -838,8 +907,16 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
 
         if (mediaMsg) {
-            mediaType = m.imageMessage ? 'image' : m.audioMessage ? 'audio' : m.videoMessage ? 'video' : 'file';
+            mediaType = m.imageMessage ? 'image' : m.audioMessage ? 'audio' : m.videoMessage ? 'video' : m.stickerMessage ? 'sticker' : 'file';
             if (!text) text = `[Mídia: ${mediaType}]`;
+            
+            // DOWNLOAD E UPLOAD DE MÍDIA
+            const instanceName = `conn_${connectionId}`;
+            const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
+            if (base64) {
+                mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId);
+                console.log(`[MEDIA] Mídia processada e salva: ${mediaUrl}`);
+            }
         }
 
         if (!text && !mediaMsg) return;
