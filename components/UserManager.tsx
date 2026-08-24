@@ -126,6 +126,8 @@ const UserFormModal: React.FC<{
         blood_type: user?.blood_type || '',
         marital_status: user?.marital_status || '',
         education_level: user?.education_level || '',
+        can_nudge: user?.can_nudge ?? true,
+        nudge_cooldown: user?.nudge_cooldown ?? 30,
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,6 +236,32 @@ const UserFormModal: React.FC<{
                                     <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aprovar/Rejeitar Férias" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                 </div>
                             </section>
+                            
+                            <section className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50">
+                                <h5 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <SparklesIcon className="w-3 h-3" /> Comunicação Avançada
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                                    <PermissionToggle 
+                                        icon={<SparklesIcon className="w-4 h-4" />} 
+                                        label="Poder Chamar Atenção (Nudge)" 
+                                        name="can_nudge" 
+                                        checked={formData.can_nudge} 
+                                        onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                    />
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Cooldown Nudge (segundos)</label>
+                                        <input 
+                                            type="number" 
+                                            name="nudge_cooldown" 
+                                            value={formData.nudge_cooldown} 
+                                            onChange={handleChange} 
+                                            min="0"
+                                            className="w-full bg-white border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                        />
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </div>
 
@@ -322,7 +350,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_health_insurance: (userData as any).health_insurance || null,
                     p_blood_type: (userData as any).blood_type || null,
                     p_marital_status: (userData as any).marital_status || null,
-                    p_education_level: (userData as any).education_level || null
+                    p_education_level: (userData as any).education_level || null,
+                    p_can_nudge: !!(userData as any).can_nudge,
+                    p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30
                 });
 
                 if (error) {
@@ -353,7 +383,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_avatar_url: userData.avatarUrl || null,
                         p_department_id: (userData as any).department_id || null,
                         p_rg: (userData as any).rg || null,
-                        p_cpf: (userData as any).cpf || null
+                        p_cpf: (userData as any).cpf || null,
+                        p_can_nudge: !!(userData as any).can_nudge,
+                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30
                     });
 
                     if (error) {

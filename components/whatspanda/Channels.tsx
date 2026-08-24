@@ -134,6 +134,7 @@ const Channels: React.FC = () => {
             .from('whatsapp_settings')
             .select('*')
             .eq('company_id', companyId)
+            .eq('user_id', currentUser.id)
             .order('created_at', { ascending: true });
 
         if (!error && data) {
@@ -292,6 +293,7 @@ const Channels: React.FC = () => {
 
         const updates: Partial<WhatsAppSettings> = {
             company_id: companyId,
+            user_id: currentUser.id,
             connection_name: connectionName,
             channel_type: channelType,
             phone_number: phoneNumber,
@@ -345,7 +347,7 @@ const Channels: React.FC = () => {
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Canais de Atendimento</h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie seus números de WhatsApp e redes sociais.</p>
                         </div>
-                        {!isGhostMode && (
+                        {!isGhostMode && channels.length === 0 && (
                             <button
                                 onClick={handleNew}
                                 className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"

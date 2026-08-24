@@ -48,10 +48,10 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
-    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, crm: false });
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
     const navRef = useRef<HTMLDivElement>(null);
 
-    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'crm') => {
+    const toggleMenu = (menu: 'rh' | 'ti' | 'portal') => {
         setOpenMenus(prev => {
             const newState = { ...prev, [menu]: !prev[menu] };
             // Se estamos abrindo o menu, vamos rolar para ele
@@ -151,14 +151,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'crm'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
-        // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito como o crm
+        // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
         if (featureId) {
             const isExplicitlyDisabled = customFeatures && customFeatures[featureId] === false;
-            const isImplicitlyDisabled = customFeatures && typeof customFeatures[featureId] === 'undefined' && featureId === 'crm';
-            if (isExplicitlyDisabled || isImplicitlyDisabled) {
+            if (isExplicitlyDisabled) {
                 return null;
             }
         }
@@ -175,8 +174,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'ticket' || (n.link && n.link.includes('ticket')))).length;
         } else if (menuKey === 'rh') {
             menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'event' || (n.link && (n.link.includes('survey') || n.link.includes('training') || n.link.includes('form'))))).length;
-        } else if (menuKey === 'crm') {
-            menuBadgeCount = notifications.filter(n => !n.isRead && (n.type && (n.type.includes('invoice') || n.type.includes('lead') || n.type.includes('crm_task')))).length;
         }
 
         return (
@@ -278,13 +275,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>
 
-                <NavMenu label="CRM & Vendas" icon={BuildingOfficeIcon} menuKey="crm" permission={!!customFeatures?.crm} featureId="crm">
-                    <NavItem page="crm-dashboard" label="Dashboard CRM" icon={ChartBarIcon} permission={true} />
-                    <NavItem page="crm-customers" label="Clientes" icon={UserGroupIcon} permission={true} />
-                    <NavItem page="crm-proposals" label="Propostas" icon={DocumentTextIcon} permission={true} />
-                    <NavItem page="crm-tasks" label="Minhas Tarefas" icon={FolderIcon} permission={true} />
-                    <NavItem page="crm-calendar" label="Calendário CRM" icon={CalendarDaysIcon} permission={true} />
-                </NavMenu>
 
                 {/* SaaS Super Admin Button */}
                 {currentUser.role === 'Super Admin' && (

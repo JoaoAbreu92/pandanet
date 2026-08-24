@@ -42,21 +42,11 @@ export type Page =
   | 'job-manager'
   | 'whatspanda'
   | 'manual-usuario'
-  // CRM Pages
-  | 'crm-dashboard'
-  | 'crm-customers'
-  | 'crm-sales'
-  | 'crm-proposals'
-  | 'crm-estimates'
-  | 'crm-invoices'
-  | 'crm-payments'
-  | 'crm-credit-notes'
-  | 'crm-items'
-  | 'crm-subscriptions'
-  | 'crm-contracts'
-  | 'crm-tasks'
-  | 'crm-calendar'
-  | 'crm-customer-detail';
+  | 'org-chart'
+  | 'kpi-dashboard'
+  | 'job-manager'
+  | 'whatspanda'
+  | 'manual-usuario';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -288,6 +278,8 @@ export interface Employee {
   ai_behavior?: 'popup' | 'sidebar' | 'tab' | null;
   whatsapp_signature?: string;
   use_whatsapp_signature?: boolean;
+  can_nudge?: boolean;
+  nudge_cooldown?: number; // In seconds
 }
 
 export interface AIMessage {
@@ -714,6 +706,7 @@ export interface WhatsAppContact {
 export interface WhatsAppSettings {
   id: string;
   company_id: string;
+  user_id?: string; // New: vincula a conexão a um usuário específico
   phone_number?: string;
   connection_name?: string;
   reject_calls?: boolean;
@@ -789,128 +782,7 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
   tags?: WhatsAppConversationTag[];
   kanban_column?: WhatsAppKanbanColumn;
   notes_count?: number;
-}
-
-// CRM Specific Types
-export interface CRMCustomer {
-  id: string;
-  company_id: string;
-  name: string;
-  email?: string;
-  vat?: string;
-  phone?: string;
-  website?: string;
-  groups?: string[];
-  currency: string;
-  default_language: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
-  billing_address: any;
-  shipping_address: any;
-  status: 'active' | 'inactive';
-  created_at: string;
-}
-
-export interface CRMTask {
-  id: string;
-  company_id: string;
-  title: string;
-  description?: string;
-  status: 'not_started' | 'in_progress' | 'testing' | 'awaiting_feedback' | 'completed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  start_date?: string;
-  due_date?: string;
-  created_by?: string;
-  assigned_to?: string[];
-  followers?: string[];
-  tags?: string[];
-  rel_id?: string;
-  rel_type?: string;
-  is_public: boolean;
   is_billable: boolean;
   hourly_rate?: number;
-  created_at: string;
-}
-
-export interface CRMInvoice {
-  id: string;
-  company_id: string;
-  customer_id: string;
-  number: string;
-  status: 'unpaid' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'draft';
-  date: string;
-  due_date: string;
-  total: number;
-  currency: string;
-  created_at: string;
-}
-
-export interface CRMProposal {
-  id: string;
-  company_id: string;
-  rel_id: string;
-  rel_type: string;
-  subject: string;
-  status: 'draft' | 'sent' | 'open' | 'revised' | 'declined' | 'accepted';
-  date: string;
-  open_till: string;
-  total: number;
-  currency: string;
-  created_at: string;
-}
-
-export interface CRMLead {
-  id: string;
-  company_id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  source?: string;
-  status: 'new' | 'contacted' | 'qualified' | 'working' | 'proposal_sent' | 'customer' | 'lost';
-  assigned_to?: string;
-  created_at: string;
-}
-
-export interface CRMProject {
-  id: string;
-  company_id: string;
-  name: string;
-  customer_id: string;
-  status: 'not_started' | 'in_progress' | 'on_hold' | 'cancelled' | 'finished';
-  start_date?: string;
-  deadline?: string;
-  created_at: string;
-}
-
-
-export interface CRMItem {
-  id: string;
-  company_id: string;
-  name: string;
-  description?: string;
-  rate: number;
-  tax_1?: number;
-  tax_2?: number;
-  unit?: string;
-  item_group?: string;
-  status: 'active' | 'inactive';
-  created_at: string;
-}
-
-export interface CRMSubscription {
-  id: string;
-  company_id: string;
-  customer_id: string;
-  name: string;
-  description?: string;
-  quantity: number;
-  currency: string;
-  stripe_plan_id?: string;
-  terms?: string;
-  next_billing_cycle?: string;
-  status: 'active' | 'inactive';
   created_at: string;
 }

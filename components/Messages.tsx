@@ -359,7 +359,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
             Object.entries(nudgeCooldowns).forEach(([id, ts]) => {
                 const diff = now - (ts as number);
-                const remaining = Math.max(0, (5 * 60 * 1000) - diff);
+                const cooldownSeconds = profile?.nudge_cooldown ?? 30;
+                const remaining = Math.max(0, (cooldownSeconds * 1000) - diff);
                 if (remaining > 0) {
                     newTimeouts[id] = Math.ceil(remaining / 1000);
                     hasChanges = true;

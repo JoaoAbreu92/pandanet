@@ -43,23 +43,11 @@ import EmployeePortal from './components/EmployeePortal.tsx';
 import OrgChartPage from './components/OrgChartPage.tsx';
 import KPIDashboard from './components/KPIDashboard.tsx';
 import ManualPage from './components/ManualPage.tsx';
-import CRMDashboard from './components/CRMDashboard';
-import CRMCustomers from './components/CRMCustomers';
-import CRMCustomerDetail from './components/CRMCustomerDetail';
-import CRMNewCustomerForm from './components/CRMNewCustomerForm';
-import CRMFinanceForm from './components/CRMFinanceForm';
-import CRMItemForm from './components/CRMItemForm';
-import CRMSubscriptionForm from './components/CRMSubscriptionForm';
-import CRMContractForm from './components/CRMContractForm';
-import CRMCalendar from './components/CRMCalendar';
-import CRMSales from './components/CRMSales';
 import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
-import CRMTasks from './components/CRMTasks';
 import AIAssistant from './components/AIAssistant';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
-import { CRMCustomer } from './types';
 
 
 const AppContent: React.FC = () => {
@@ -238,7 +226,6 @@ const AppContent: React.FC = () => {
     const [companySettings, setCompanySettings] = useState<any>(null);
 
     // Trigger to reload CRMSales data when modals close
-    const [crmRefreshTrigger, setCrmRefreshTrigger] = useState(0);
 
     // Global Search State
     const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -598,56 +585,8 @@ const AppContent: React.FC = () => {
         setCompanyData({ ...companyData, recognitions: [rec, ...(companyData.recognitions || [])] });
     };
 
-    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
-    const [selectedCustomer, setSelectedCustomer] = useState<CRMCustomer | null>(null);
-    const [financeFormType, setFinanceFormType] = useState<'invoice' | 'proposal' | 'estimate' | null>(null);
-    const [showItemForm, setShowItemForm] = useState(false);
-    const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
-    const [showContractForm, setShowContractForm] = useState(false);
-    const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>([]);
-    const [editingItem, setEditingItem] = useState<any>(null);
     const [isReadOnly, setIsReadOnly] = useState(false);
 
-    const fetchCRMCustomers = useCallback(async () => {
-        if (!currentUser?.company_id) return;
-        try {
-            const { data, error } = await supabase
-                .from('crm_customers')
-                .select('*')
-                .eq('company_id', currentUser.company_id)
-                .order('name');
-            if (error) throw error;
-            setCrmCustomers(data || []);
-        } catch (error) {
-            console.error('Error fetching CRM customers:', error);
-        }
-    }, [currentUser?.company_id]);
-
-    useEffect(() => {
-        if (currentUser?.company_id) {
-            fetchCRMCustomers();
-        }
-    }, [currentUser?.company_id, fetchCRMCustomers]);
-
-    const handleViewCustomer = async (customerOrId: CRMCustomer | string) => {
-        console.log('[App] handleViewCustomer called with:', customerOrId);
-        if (typeof customerOrId === 'string') {
-            // Se receber apenas o ID (ex: do módulo de Vendas), busca os dados completos
-            const { data, error } = await supabase
-                .from('crm_customers')
-                .select('*')
-                .eq('id', customerOrId)
-                .single();
-
-            if (!error && data) {
-                setSelectedCustomer(data);
-                setCurrentPage('crm-customer-detail');
-            }
-        } else {
-            setSelectedCustomer(customerOrId);
-            setCurrentPage('crm-customer-detail');
-        }
-    };
 
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
@@ -676,16 +615,7 @@ const AppContent: React.FC = () => {
                 'viewMeuRH': 'meu-rh',
                 'viewDirectory': 'org-chart',
                 'viewInfoSec': 'infosec',
-                'viewKPIDashboard': 'kpis',
-                'crm-dashboard': 'crm',
-                'crm-customers': 'crm',
-                'crm-sales': 'crm',
-                'crm-invoices': 'crm',
-                'crm-proposals': 'crm',
-                'crm-estimates': 'crm',
-                'crm-payments': 'crm',
-                'crm-subscriptions': 'crm',
-                'crm-contracts': 'crm'
+                'viewKPIDashboard': 'kpis'
             };
 
             const featureId = featureMap[permission];
@@ -697,70 +627,6 @@ const AppContent: React.FC = () => {
         };
 
         switch (currentPage) {
-            case 'crm-dashboard':
-                return <CRMDashboard />;
-            case 'crm-customers':
-                return <CRMCustomers
-                    onNewCustomer={() => setIsNewCustomerModalOpen(true)}
-                    onViewCustomer={handleViewCustomer}
-                />;
-            case 'crm-customer-detail':
-                return selectedCustomer ? (
-                    <CRMCustomerDetail
-                        customer={selectedCustomer}
-                        onClose={() => setCurrentPage('crm-customers')}
-                        onUpdate={() => { }}
-                    />
-                ) : <CRMCustomers onNewCustomer={() => setIsNewCustomerModalOpen(true)} onViewCustomer={handleViewCustomer} />;
-            case 'crm-calendar':
-                return <CRMCalendar />;
-            case 'crm-tasks':
-                return <CRMTasks />;
-            case 'crm-sales':
-            case 'crm-invoices':
-            case 'crm-proposals':
-            case 'crm-estimates':
-            case 'crm-payments':
-            case 'crm-credit-notes':
-            case 'crm-items':
-                return (
-                    <CRMSales
-                        initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any}
-                        onViewCustomer={handleViewCustomer}
-                        refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type, item) => {
-                            setEditingItem(item || null);
-                            setIsReadOnly(false); // Default to edit mode
-                            if (type === 'item') setShowItemForm(true);
-                            else if (type === 'subscription') setShowSubscriptionForm(true);
-                            else setFinanceFormType(type as any);
-                        }}
-                    />
-                );
-            case 'crm-subscriptions':
-                return (
-                    <CRMSales
-                        initialTab="subscriptions"
-                        onViewCustomer={handleViewCustomer}
-                        refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type, item) => {
-                            setEditingItem(item || null);
-                            setShowSubscriptionForm(true);
-                        }}
-                    />
-                );
-            case 'crm-contracts':
-                return (
-                    <CRMSales
-                        initialTab="contracts"
-                        onViewCustomer={handleViewCustomer}
-                        refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type, item) => {
-                            setEditingItem(item || null);
-                            setShowContractForm(true);
-                        }}
-                    />
-                );
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
@@ -909,75 +775,6 @@ const AppContent: React.FC = () => {
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
 
-                {isNewCustomerModalOpen && (
-                    <CRMNewCustomerForm
-                        onClose={() => setIsNewCustomerModalOpen(false)}
-                        onSuccess={() => {
-                            setIsNewCustomerModalOpen(false);
-                            fetchCRMCustomers();
-                        }}
-                    />
-                )}
-
-                {financeFormType && (
-                    <CRMFinanceForm
-                        type={financeFormType}
-                        initialData={editingItem}
-                        readOnly={isReadOnly}
-                        customers={crmCustomers}
-                        currentUser={currentUser}
-                        onClose={() => {
-                            setFinanceFormType(null);
-                            setEditingItem(null);
-                            setIsReadOnly(false);
-                        }}
-                        onSuccess={() => {
-                            setFinanceFormType(null);
-                            setEditingItem(null);
-                            setCrmRefreshTrigger(prev => prev + 1);
-                        }}
-                    />
-                )}
-
-                {showItemForm && (
-                    <CRMItemForm
-                        onClose={() => setShowItemForm(false)}
-                        onSave={() => {
-                            setShowItemForm(false);
-                            setCrmRefreshTrigger(prev => prev + 1);
-                        }}
-                    />
-                )}
-
-                {showSubscriptionForm && (
-                    <CRMSubscriptionForm
-                        initialData={editingItem}
-                        onClose={() => {
-                            setShowSubscriptionForm(false);
-                            setEditingItem(null);
-                        }}
-                        onSave={() => {
-                            setShowSubscriptionForm(false);
-                            setEditingItem(null);
-                            setCrmRefreshTrigger(prev => prev + 1);
-                        }}
-                    />
-                )}
-
-                {showContractForm && (
-                    <CRMContractForm
-                        initialData={editingItem}
-                        onClose={() => {
-                            setShowContractForm(false);
-                            setEditingItem(null);
-                        }}
-                        onSave={() => {
-                            setShowContractForm(false);
-                            setEditingItem(null);
-                            setCrmRefreshTrigger(prev => prev + 1);
-                        }}
-                    />
-                )}
             </Layout>
         );
     }
