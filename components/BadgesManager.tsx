@@ -1445,13 +1445,18 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
         if (showBadgeFrame) {
             const bx = 458;
             const by = 458;
+            const angle = Math.PI / 4;
+            const midRadius = outerRadius - ringThickness / 2;
+            const startX = cx + midRadius * Math.cos(angle);
+            const startY = cy + midRadius * Math.sin(angle);
+
             ctx.save();
             if (glowBlur > 0) {
                 ctx.shadowColor = glowColor;
                 ctx.shadowBlur = glowBlur;
             }
             ctx.beginPath();
-            ctx.moveTo(cx, cy);
+            ctx.moveTo(startX, startY);
             ctx.lineTo(bx, by);
             ctx.strokeStyle = color2;
             ctx.lineWidth = ringThickness * 0.8;
@@ -1461,7 +1466,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
             ctx.save();
             ctx.beginPath();
-            ctx.moveTo(cx, cy);
+            ctx.moveTo(startX, startY);
             ctx.lineTo(bx, by);
             ctx.strokeStyle = borderColor;
             ctx.lineWidth = ringThickness * 0.8 + borderWidth;
@@ -1559,11 +1564,11 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
             ctx.fillStyle = borderColor || '#ffffff';
             ctx.shadowColor = glowColor;
             ctx.shadowBlur = 10;
-            const starRadius = 40;
-            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.22;
+            const starRadius = 24;
+            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.18;
             for (let i = 0; i < starsCount; i++) {
-                const angle = startAngle + i * 0.44;
-                const dist = outerRadius + 38;
+                const angle = startAngle + i * 0.36;
+                const dist = outerRadius + 22;
                 const sx = cx + dist * Math.cos(angle);
                 const sy = cy + dist * Math.sin(angle);
                 drawStar(ctx, sx, sy, 5, starRadius, starRadius / 2);
