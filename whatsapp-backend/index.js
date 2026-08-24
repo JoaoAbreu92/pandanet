@@ -1700,7 +1700,11 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     const instance = body.instance || body.instanceName || connectionId;
 
     console.log(`[WEBHOOK] ===== Evento recebido: "${event}" | Instância: ${instance} | Empresa: ${companyId} =====`);
-    addDebugLog('WEBHOOK_EVENT', `Evento: ${event} | Instância: ${instance} | Empresa: ${companyId}`, body);
+    if (event !== 'qrcode.updated' && event !== 'qrcode_updated' && event !== 'qr') {
+        addDebugLog('WEBHOOK_EVENT', `Evento: ${event} | Instância: ${instance} | Empresa: ${companyId}`, body);
+    } else {
+        addDebugLog('WEBHOOK_EVENT_QR', `Evento: ${event} | Instância: ${instance} | Empresa: ${companyId} (Base64 Omitido)`);
+    }
 
     if (!event) {
         console.log(`[WEBHOOK] Payload sem campo 'event'. Body keys: ${Object.keys(body).join(', ')}`);
