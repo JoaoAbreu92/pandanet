@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from './LanguageContext';
+import { useNotifications } from './NotificationContext';
 import { supabase } from '../supabaseClient';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -27,7 +28,6 @@ import {
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
-import { useNotifications } from './NotificationContext';
 
 // --- Types ---
 
@@ -82,7 +82,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentUser, pageContext }) => {
     const { t, language } = useLanguage();
     const { showToast } = useToast();
-    const { setModuleUnreadCount } = useNotifications();
+    const { setModuleUnreadCount, notifications, markAsRead } = useNotifications();
 
     // --- State: Confirm Modal ---
     const [confirmState, setConfirmState] = useState<{
@@ -181,6 +181,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // --- State: Context Menu ---
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, email: EmailMessage } | null>(null);
     const [selectedEmailUids, setSelectedEmailUids] = useState<string[]>([]);
+    const [locallySeenUids, setLocallySeenUids] = useState<Set<string>>(new Set());
 
     // --- Actions: Context Menu ---
     const handleContextMenu = (e: React.MouseEvent, email: EmailMessage) => {
@@ -339,10 +340,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setEmails(prev => prev.map(e => {
                 const flags = e.flags || [];
                 if (e.uid === uid && !flags.includes('\\Seen')) {
+                    setLocallySeenUids(prevSet => new Set(prevSet).add(uid));
                     return { ...e, flags: [...flags, '\\Seen'] };
                 }
                 return e;
             }));
+
+            // Integration: Mark related notifications as read
+            const relatedNotifs = notifications.filter(n => !n.isRead && (n.link?.includes(`uid=${uid}`) || (n.link === '/email' && n.title.toLowerCase().includes('e-mail'))));
+            relatedNotifs.forEach(n => markAsRead(n.id));
 
             // Update selected e-mail
             setSelectedEmail(prev => {
@@ -434,6 +440,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         setEmails(prev => prev.map(e => e.uid === email.uid ? { ...e, flags: newFlags } : e));
         if (selectedEmail?.uid === email.uid) {
             setSelectedEmail(prev => prev ? { ...prev, flags: newFlags } : null);
+        }
+
+        if (flag === '\\Seen') {
+            setLocallySeenUids(prev => {
+                const next = new Set(prev);
+                if (add) next.add(email.uid);
+                else next.delete(email.uid);
+                return next;
+            });
         }
 
         // Update unseen count badge immediately when marking as read/unread
@@ -712,11 +727,18 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 .select('*')
                 .eq('user_id', currentUser.id);
 
-            // Merge metadata
+            // Merge metadata and override Seen status from local state
             const mergedEmails = emailList.map((email: any) => {
                 const meta = metadataList?.find((m: any) => m.message_id === (email.messageId || email.uid));
+                const isLocallySeen = locallySeenUids.has(email.uid);
+                const currentFlags = email.flags || [];
+                const finalFlags = isLocallySeen && !currentFlags.includes('\\Seen')
+                    ? [...currentFlags, '\\Seen']
+                    : currentFlags;
+
                 return {
                     ...email,
+                    flags: finalFlags,
                     metadata: meta ? { id: meta.id, tags: meta.tags || [], notes: meta.notes } : { tags: [] }
                 };
             });
@@ -1113,10 +1135,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 ) : (
                                     <button
                                         onClick={() => setIsSelectionMode(true)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand-primary transition-all"
+                                            className="p-1 px-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand-primary transition-all flex items-center gap-1.5"
                                         title="Selecionar e-mails"
                                     >
                                         <TagIcon className="w-4 h-4" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Selecionar</span>
                                     </button>
                                 )}
                                 <h2 className="font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>

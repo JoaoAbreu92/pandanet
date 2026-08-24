@@ -90,13 +90,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     }, [hasAIEnabled, currentUser.id]);
 
     useEffect(() => {
-        if (!isOpen && !tooltipDismissed && !showTooltip) {
+        if (!isOpen && !tooltipDismissed) {
             const timer = setInterval(() => {
-                setShowTooltip(true);
+                setShowTooltip(prev => !prev); // Toggle or re-trigger to catch attention
+                setTimeout(() => setShowTooltip(true), 100);
             }, 10000);
             return () => clearInterval(timer);
         }
-    }, [isOpen, tooltipDismissed, showTooltip]);
+    }, [isOpen, tooltipDismissed]);
 
     const fetchAgents = async () => {
         const { data } = await supabase
@@ -489,16 +490,18 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 <button
                     onClick={() => { if (!isDragging) toggleOpen(); }}
                     onMouseDown={handleMouseDown}
-                    className="w-16 h-16 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 bg-white border-2 border-emerald-500 overflow-hidden flex items-center justify-center p-1 group cursor-grab"
+                    className="w-16 h-16 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all duration-500 bg-white border-4 border-emerald-50/50 overflow-hidden flex items-center justify-center p-0 group cursor-grab"
                 >
-                    <img 
-                        src="/logo.png"
-                        alt="Panda IA" 
-                        className="w-12 h-12 object-contain group-hover:rotate-12 transition-transform"
-                    />
+                    <div className="w-full h-full flex items-center justify-center bg-white rounded-full">
+                        <img
+                            src="/logo.png"
+                            alt="Panda IA" 
+                            className="w-11 h-11 object-contain group-hover:scale-110 transition-transform duration-500"
+                        />
+                    </div>
                     <span className="absolute -top-1 -right-1 flex h-4 w-4">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white shadow-sm"></span>
                     </span>
                 </button>
             </div>
