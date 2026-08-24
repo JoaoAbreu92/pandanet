@@ -566,15 +566,25 @@ BEGIN
         AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I', t);
-        EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
-                        USING (company_id = public.get_user_company_id() OR EXISTS (
-                            SELECT 1 FROM public.profiles 
-                            WHERE id = auth.uid() AND is_admin = TRUE
-                        )) 
-                        WITH CHECK (company_id = public.get_user_company_id() OR EXISTS (
-                            SELECT 1 FROM public.profiles 
-                            WHERE id = auth.uid() AND is_admin = TRUE
-                        ))', t);
+        
+        -- Apenas criar política se a tabela possuir a coluna company_id
+        IF EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+              AND table_name = t 
+              AND column_name = 'company_id'
+        ) THEN
+            EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
+                            USING (company_id = public.get_user_company_id() OR EXISTS (
+                                SELECT 1 FROM public.profiles 
+                                WHERE id = auth.uid() AND is_admin = TRUE
+                            )) 
+                            WITH CHECK (company_id = public.get_user_company_id() OR EXISTS (
+                                SELECT 1 FROM public.profiles 
+                                WHERE id = auth.uid() AND is_admin = TRUE
+                            ))', t);
+        END IF;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
