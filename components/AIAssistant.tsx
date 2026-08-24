@@ -107,21 +107,33 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
         if (data) setAgents(data);
     };
 
-    const createAgent = async () => {
-        if (!newAgentName) return;
-        const { data, error } = await supabase.from('ai_agents').insert({
-            user_id: currentUser.id,
-            name: newAgentName,
-            system_prompt: newAgentPrompt,
-            avatar_url: '/logo.png'
-        }).select().single();
+    const [isCreating, setIsCreating] = useState(false);
 
-        if (data) {
-            setAgents(prev => [...prev, data]);
-            setNewAgentName('');
-            setNewAgentPrompt('');
-            setShowAgentManager(false);
-            setCurrentAgent(data);
+    const createAgent = async () => {
+        if (!newAgentName || isCreating) return;
+        setIsCreating(true);
+        try {
+            const { data, error } = await supabase.from('ai_agents').insert({
+                user_id: currentUser.id,
+                name: newAgentName,
+                system_prompt: newAgentPrompt,
+                avatar_url: '/logo.png'
+            }).select().single();
+
+            if (error) throw error;
+
+            if (data) {
+                setAgents(prev => [...prev, data]);
+                setNewAgentName('');
+                setNewAgentPrompt('');
+                setShowAgentManager(false);
+                setCurrentAgent(data);
+            }
+        } catch (err: any) {
+            console.error("Error creating AI agent:", err);
+            alert("Erro ao criar agente: " + (err.message || "Tente novamente."));
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -367,10 +379,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                             />
                             <button
                                 onClick={createAgent}
-                                disabled={!newAgentName}
-                                className="w-full bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                                disabled={!newAgentName || isCreating}
+                                className="w-full bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                                Criar Agente
+                                {isCreating ? (
+                                    <>
+                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Criando...
+                                    </>
+                                ) : 'Criar Agente'}
                             </button>
                         </div>
                     </div>
