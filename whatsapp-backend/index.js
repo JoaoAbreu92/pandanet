@@ -1340,7 +1340,9 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
     try {
         const rawUrl = decodeURIComponent(url);
         console.log(`[MEDIA-PROXY] Requisição de download para: ${rawUrl}`);
-
+        if (global.addDebugLog) {
+            global.addDebugLog('MEDIA_PROXY_REQ', `Iniciando download da url: ${rawUrl}`);
+        }
         let fileBuffer = null;
         let contentType = 'application/octet-stream';
 
@@ -1451,6 +1453,9 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
         return res.send(fileBuffer);
     } catch (err) {
         console.error('[MEDIA-PROXY] Erro geral no proxy:', err.message);
+        if (global.addDebugLog) {
+            global.addDebugLog('MEDIA_PROXY_ERR', `Erro geral: ${err.message}`, { url });
+        }
         return res.status(500).json({ error: `Erro ao baixar mídia: ${err.message}` });
     }
 });
@@ -1463,10 +1468,16 @@ router.get('/conversations/profile-picture/:phone', async (req, res) => {
     const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanPhone)}&background=random&color=fff`;
 
     if (!token) {
+        if (global.addDebugLog) {
+            global.addDebugLog('PROFILE_PIC_WARN', `Sem token para o telefone: ${phone}`);
+        }
         return res.redirect(defaultAvatar);
     }
 
     try {
+        if (global.addDebugLog) {
+            global.addDebugLog('PROFILE_PIC_REQ', `Buscando foto para: ${cleanPhone}`);
+        }
         // Validar token JWT ou do Supabase
         let userId = null;
         if (JWT_SECRET) {
@@ -1475,15 +1486,24 @@ router.get('/conversations/profile-picture/:phone', async (req, res) => {
                 userId = decoded.sub;
             } catch (e) {
                 // Tenta Supabase getUser
-                const { data: { user } } = await supabaseAnon.auth.getUser(token);
+                const { data: { user }, error: authErr } = await supabaseAnon.auth.getUser(token);
                 if (user) userId = user.id;
+                if (authErr && global.addDebugLog) {
+                    global.addDebugLog('PROFILE_PIC_AUTH_ERR', `getUser falhou: ${authErr.message}`);
+                }
             }
         } else {
-            const { data: { user } } = await supabaseAnon.auth.getUser(token);
+            const { data: { user }, error: authErr } = await supabaseAnon.auth.getUser(token);
             if (user) userId = user.id;
+            if (authErr && global.addDebugLog) {
+                global.addDebugLog('PROFILE_PIC_AUTH_ERR', `getUser sem secret falhou: ${authErr.message}`);
+            }
         }
 
         if (!userId) {
+            if (global.addDebugLog) {
+                global.addDebugLog('PROFILE_PIC_UNAUTHORIZED', `Token inválido para telefone: ${cleanPhone}`);
+            }
             return res.redirect(defaultAvatar);
         }
 
@@ -1526,6 +1546,9 @@ router.get('/conversations/profile-picture/:phone', async (req, res) => {
         return res.redirect(fallback);
     } catch (err) {
         console.error('[PROFILE-PICTURE] Erro:', err.message);
+        if (global.addDebugLog) {
+            global.addDebugLog('PROFILE_PIC_ERR', `Erro geral para ${cleanPhone}: ${err.message}`);
+        }
         return res.redirect(defaultAvatar);
     }
 });
