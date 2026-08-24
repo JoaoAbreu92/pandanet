@@ -21,7 +21,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution_api:8080';
+const evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution-api:8080';
 const evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
 // Public URL or internal Docker network URL so Evolution can reach us
 // For internal docker network:
