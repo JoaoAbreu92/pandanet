@@ -17,7 +17,7 @@ import {
     CheckIcon,
     XMarkIcon,
     UserPlusIcon,
-    UserGroupIcon as HeroUserGroupIcon
+    ArrowUturnLeftIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
 import { supabase } from '../supabaseClient';
@@ -282,6 +282,14 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const handleNextYear = () => setCurrentDate(new Date(currentDate.getFullYear() + 1, 0, 1));
     const handlePrevYear = () => setCurrentDate(new Date(currentDate.getFullYear() - 1, 0, 1));
 
+    const handleNextMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    };
+
+    const handlePrevMonth = () => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    };
+
     const YearView = () => (
         <div className="p-6 bg-white rounded-b-xl animate-fade-in-down">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -352,11 +360,34 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         return (
             <div className={`animate-scale-in transition-all duration-500`}>
                 <div className={`p-4 ${theme.bg} border-b ${theme.border} flex items-center justify-between`}>
-                    <div className="flex items-center space-x-4">
-                        <button onClick={() => setView('year')} className="p-2 hover:bg-white/50 rounded-full text-gray-500"><ChevronLeftIcon className="w-5 h-5" /></button>
-                        <div>
-                            <h3 className={`text-2xl font-black ${theme.text}`}>{theme.name} <span className="opacity-40">{year}</span></h3>
-                            <p className="text-xs font-medium text-gray-500 italic mt-0.5">{theme.phrase}</p>
+                    <div className="flex items-center space-x-6">
+                        <button
+                            onClick={() => setView('year')}
+                            className="p-2 hover:bg-white/50 rounded-xl text-gray-400 hover:text-gray-600 transition-all border border-transparent hover:border-white/50"
+                            title="Voltar para Visão Anual"
+                        >
+                            <ArrowUturnLeftIcon className="w-5 h-5" />
+                        </button>
+
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={handlePrevMonth}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 hover:bg-white shadow-sm text-gray-500`}
+                            >
+                                <ChevronLeftIcon className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center min-w-[200px]">
+                                <h3 className={`text-2xl font-black ${theme.text}`}>{theme.name} <span className="opacity-40">{year}</span></h3>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 italic mt-0.5">{theme.phrase}</p>
+                            </div>
+
+                            <button
+                                onClick={handleNextMonth}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 hover:bg-white shadow-sm text-gray-500`}
+                            >
+                                <ChevronRightIcon className="w-5 h-5" />
+                            </button>
                         </div>
                     </div>
                     <div className="flex items-center space-x-3">
