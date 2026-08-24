@@ -139,7 +139,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
         const now = Date.now();
         const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
-        // DISABLED FOR TESTING: if (now - lastNudge < 5 * 60 * 1000) return;
+        if (now - lastNudge < 5 * 60 * 1000) return; // 5 minute cooldown
 
         try {
             const compId = currentUser?.company_id;
@@ -173,7 +173,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 last_message_at: new Date().toISOString()
             }).eq('id', selectedConversationId);
 
-            // DISABLED FOR TESTING: setNudgeCooldowns(prev => ({ ...prev, [selectedConversationId]: now }));
+            // Update cooldown state
+            setNudgeCooldowns(prev => ({ ...prev, [selectedConversationId]: now }));
 
             if (selectedConversation.participantId) {
                 addNotification({
@@ -1339,18 +1340,20 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                 <button
                                                     type="button"
                                                     onClick={handleSendNudge}
-                                                    // disabled={!!cooldownTimeouts[selectedConversationId || '']}
-                                                    className={`p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95`}
+                                                    disabled={!!cooldownTimeouts[selectedConversationId || '']}
+                                                    className={`p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
+                                                            ? 'text-gray-400 cursor-not-allowed'
+                                                            : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
+                                                        }`}
                                                     title="Chamar Atenção (MSN Nudge)"
                                                 >
-                                                    <BellIcon className={`w-6 h-6 animate-bounce`} />
-                                                    {/* TIMER REMOVED FOR TESTING
+                                                    <BellIcon className={`w-6 h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
+                                                        }`} />
                                                     {cooldownTimeouts[selectedConversationId || ''] && (
                                                         <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[28px] text-center border border-white">
                                                             {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
                                                         </span>
                                                     )}
-                                                    */}
                                                 </button>
                                             </div>
                                         <input

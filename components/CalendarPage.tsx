@@ -45,11 +45,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     });
 
     useEffect(() => {
-        // Allow fetch even if no company_id (Super Admin might see all)
-        if (!currentUser) return;
+        // Ensure currentUser is fully loaded with company_id
+        if (!currentUser || !currentUser.company_id) {
+            console.warn('[CalendarPage] Waiting for currentUser with company_id...', {
+                hasUser: !!currentUser,
+                userId: currentUser?.id,
+                companyId: currentUser?.company_id
+            });
+            return;
+        }
 
         const fetchData = async () => {
-            console.log('Fetching calendar data for user:', currentUser.id);
+            console.log('Fetching calendar data for user:', currentUser.id, 'company:', currentUser.company_id);
 
             // Fetch Employees - Filter by company_id
             const { data: emps, error: empError } = await supabase
