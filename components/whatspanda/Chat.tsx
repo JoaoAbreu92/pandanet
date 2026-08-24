@@ -358,12 +358,24 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .eq('user_id', userId)
       .eq('company_id', companyId)
       .then(({ data }) => {
-        if (data) {
+        const profileAllowed = permissions?.allowed_connections || [];
+        if (data && data.length > 0) {
           setChannelAccess(data);
           setAccessibleChannelIds(data.map((d: any) => d.channel_id));
+        } else if (profileAllowed.length > 0) {
+          setChannelAccess(profileAllowed.map((id: string) => ({ 
+            channel_id: id, 
+            can_send_messages: true, 
+            can_send_media: true, 
+            force_signature: false 
+          })));
+          setAccessibleChannelIds(profileAllowed);
+        } else {
+          setChannelAccess([]);
+          setAccessibleChannelIds(null); // No connection restrictions, show all
         }
       });
-  }, [activeProfile?.id, profile?.id, isAdmin]);
+  }, [activeProfile?.id, profile?.id, isAdmin, permissions?.allowed_connections]);
 
   useEffect(() => {
     if (onConversationSelect) {
@@ -693,13 +705,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       query = query.eq('status', 'fechado');
     }
 
-    // Filtro de filas/setores por permissão (para não administradores)
-    if (!isAdmin) {
-      const allowedQueues = permissions.assigned_queues || [];
-      if (allowedQueues.length > 0) {
-        query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
-      } else {
-        query = query.is('queue_id', null);
+    // Filtro de filas/setores por permissão (para não administradores e apenas fora de "Meus")
+    if (!isAdmin && activeTab !== 'meus') {
+      const canSeeAll = permissions.can_see_all_departments === true;
+      if (!canSeeAll) {
+        const allowedQueues = permissions.assigned_queues || [];
+        if (allowedQueues.length > 0) {
+          query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
+        } else {
+          query = query.is('queue_id', null);
+        }
       }
     }
 
