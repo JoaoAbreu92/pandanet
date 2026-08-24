@@ -946,17 +946,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     .eq('user_id', contactId);
 
                 if (commonPart && commonPart.length > 0) {
-                    // Verificar se não é grupo
-                    const { data: convs } = await supabase
+                    // Verificar se alguma dessas conversas em comum NÃO é grupo (é 1:1)
+                    const sharedConvIds = commonPart.map(c => c.conversation_id);
+                    
+                    const { data: convs, error: checkConvError } = await supabase
                         .from('conversations')
-                        .select('id')
-                        .eq('id', commonPart[0].conversation_id)
+                        .select('id, is_closed')
+                        .in('id', sharedConvIds)
                         .eq('is_group', false)
-                        .single();
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (checkConvError) {
+                         console.error("Erro verificando conversas em comum:", checkConvError);
+                    }
 
                     if (convs) {
                         // Se for suporte VIP e estiver fechado, reabre
-                        if (contactId === masterAdminId) {
+                        if (contactId === masterAdminId && convs.is_closed) {
                             await supabase
                                 .from('conversations')
                                 .update({ is_closed: false })
@@ -978,7 +985,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     company_id: currentUser.company_id,
                     is_group: false,
                     last_message: 'Conversa iniciada',
-                    last_message_at: new Date().toISOString()
+                    last_message_at: new Date().toISOString(),
+                    created_by: currentUser.id
                 })
                 .select()
                 .single();
