@@ -44,6 +44,7 @@ import OrgChartPage from './components/OrgChartPage.tsx';
 import KPIDashboard from './components/KPIDashboard.tsx';
 import ManualPage from './components/ManualPage.tsx';
 import WhatsPanda from './components/WhatsPanda.tsx';
+import EmailPage from './components/EmailPage';
 
 
 const AppContent: React.FC = () => {
@@ -598,6 +599,7 @@ const AppContent: React.FC = () => {
             case 'manual-usuario': return <ManualPage />;
             case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda /> : null;
 
+            case 'email': return <EmailPage currentUser={currentUser} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };
