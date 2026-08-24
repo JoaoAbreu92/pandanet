@@ -4,6 +4,7 @@ const pino = require('pino');
 const dotenv = require('dotenv');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 dotenv.config();
@@ -86,11 +87,34 @@ async function connectToWhatsApp(companyId) {
                     reconnectionAttempts.delete(companyId);
                 }
             } else {
-                console.log('Connection closed. You are logged out.');
-                // delete auth info if needed
-                await updateCompanySettings(companyId, { is_connected: false, qr_code: null });
+                console.log('Connection closed. You are logged out (or session corrupted).');
+
+                // 1. Force cleanup of auth folder to prevent loop
+                try {
+                    const authPath = `auth_info_baileys/${companyId}`;
+                    if (fs.existsSync(authPath)) {
+                        fs.rmSync(authPath, { recursive: true, force: true });
+                        console.log(`[AUTO-FIX] Deleted corrupted auth folder: ${authPath}`);
+                    }
+                } catch (err) {
+                    console.error('[AUTO-FIX] Failed to delete auth folder:', err);
+                }
+
+                // 2. Set Disconnected but DO NOT CLEAR QR CODE
+                await updateCompanySettings(companyId, { is_connected: false });
+
                 sessions.delete(companyId);
-                reconnectionAttempts.delete(companyId);
+
+                // 3. Retry connection as if it were a normal drop (since we cleaned the folder, next one is fresh)
+                const attempts = reconnectionAttempts.get(companyId) || 0;
+                if (attempts < MAX_RECONNECTION_ATTEMPTS) {
+                    reconnectionAttempts.set(companyId, attempts + 1);
+                    console.log(`[AUTO-RETRY] Restarting fresh session after cleanup (${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS})`);
+                    connectToWhatsApp(companyId);
+                } else {
+                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached even after cleanup. Stopping.`);
+                    // We stopped, but the LAST generated QR code stays in DB for user to see/debug
+                }
             }
         } else if (connection === 'open') {
             console.log('opened connection for company', companyId);
@@ -272,14 +296,14 @@ async function syncHistory(companyId, contacts, messages) {
 
 // Helper to update settings in DB
 async function updateCompanySettings(companyId, updates) {
-    if (!companyId) {
-        console.log('[updateCompanySettings] No company ID provided');
-        return false;
+    console.log(`[updateCompanySettings] Company ID: ${companyId}`);
+
+    // Trap for debugging
+    if (updates.hasOwnProperty('qr_code') && updates.qr_code === null) {
+        console.warn('⚠️ [updateCompanySettings] WARNING: Setting qr_code to NULL!');
     }
 
-    console.log('=== UPDATE COMPANY SETTINGS START ===');
-    console.log('[updateCompanySettings] Company ID:', companyId);
-    console.log('[updateCompanySettings] Updates:', JSON.stringify(updates, null, 2));
+    console.log(`[updateCompanySettings] Updates:`, JSON.stringify(updates, null, 2));
 
     try {
         const { data, error } = await supabase
@@ -289,17 +313,12 @@ async function updateCompanySettings(companyId, updates) {
             .select();
 
         if (error) {
-            console.error('[updateCompanySettings] ❌ SUPABASE ERROR:', JSON.stringify(error, null, 2));
-            return false;
+            console.error('[updateCompanySettings] ❌ SUPABASE ERROR:', error);
+        } else {
+            console.log('[updateCompanySettings] ✅ SUPABASE SUCCESS:', JSON.stringify(data));
         }
-
-        console.log('[updateCompanySettings] ✅ SUPABASE SUCCESS:', JSON.stringify(data, null, 2));
-        console.log('=== UPDATE COMPANY SETTINGS END ===');
-        return true;
     } catch (err) {
-        console.error('[updateCompanySettings] ❌ EXCEPTION:', err);
-        console.log('=== UPDATE COMPANY SETTINGS END ===');
-        return false;
+        console.error('[updateCompanySettings] ⚠️ UNEXPECTED ERROR:', err);
     }
 }
 
