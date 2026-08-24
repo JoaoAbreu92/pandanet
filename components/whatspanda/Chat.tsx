@@ -631,7 +631,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     return processedUrl;
   };
 
-  const fetchConversations = async () => {
+  async function fetchConversations() {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
 
@@ -716,7 +716,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setConversations(data as WhatsAppConversationWithDetails[]);
     }
     setLoading(false);
-  };
+  }
 
   const handleMuteToggle = async (conversationId: string, currentMuteStatus: boolean) => {
     try {
