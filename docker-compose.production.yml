@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      - SUPABASE_URL=http://host.docker.internal:8000
+      - SUPABASE_URL=http://supabase-kong:8000
       - PUBLIC_SUPABASE_URL=http://77.37.43.60:8000
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - JWT_SECRET=${JWT_SECRET}
@@ -41,7 +41,7 @@ services:
     environment:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}
-      - SUPABASE_URL=http://host.docker.internal:8000
+      - SUPABASE_URL=http://supabase-kong:8000
       - PUBLIC_SUPABASE_URL=http://77.37.43.60:8000
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - SERVICE_ROLE_KEY=${SUPABASE_SERVICE_KEY}
