@@ -199,7 +199,10 @@ const TicketPage: React.FC = () => {
     return (
         <>
             <Card title="Central de Suporte (Chamados)" headerAction={
-                <button onClick={handleRepairForm} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-30">
+                <button
+                    onClick={() => { console.log('Button CLICKED'); handleRepairForm(); }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-50 cursor-pointer"
+                >
                     Abrir Novo Chamado
                 </button>
             }>

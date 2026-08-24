@@ -8,8 +8,14 @@ interface RecognitionWidgetProps {
 }
 
 const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onRecognize }) => {
-    // Show last 3
-    const recentRecognitions = [...recognitions].sort((a, b) => b.id - a.id).slice(0, 3);
+    // Show last 3, sort safely (newer first)
+    const recentRecognitions = [...recognitions].sort((a, b) => {
+        // Simple comparison if IDs are strings, or try numeric if they are numbers
+        if (!isNaN(Number(a.id)) && !isNaN(Number(b.id))) {
+            return Number(b.id) - Number(a.id);
+        }
+        return b.id.toString().localeCompare(a.id.toString());
+    }).slice(0, 3);
 
     return (
         <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">

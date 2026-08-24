@@ -385,10 +385,16 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         }
     };
 
+    const recentRecognitions = [...recognitions].sort((a, b) => {
+        const idA = parseInt(a.id) || 0;
+        const idB = parseInt(b.id) || 0;
+        return idB - idA;
+    }).slice(0, 3);
+
     return (
-        <div className="max-w-full mx-auto px-4 py-8 px-6 lg:px-10">
+        <div className="max-w-full mx-auto py-8 px-4 lg:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-2 space-y-6">
                     <Card title="" className="text-center pb-6">
                         <div className="relative mb-4">
                             <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-10"></div>
@@ -405,10 +411,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div><p className="font-bold text-brand-text">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p><p className="text-[10px] text-brand-subtle-text uppercase">Interações</p></div>
                         </div>
                     </Card>
-                    <RecognitionWidget recognitions={recognitions} onRecognize={() => setShowRecognitionModal(true)} />
+                    <RecognitionWidget recognitions={recentRecognitions} onRecognize={() => setShowRecognitionModal(true)} />
                 </div>
 
-                <div className="lg:col-span-7 space-y-6">
+                <div className="lg:col-span-8 space-y-6">
                     <Card title="" className="p-0 border-none shadow-sm overflow-visible">
                         <div className="p-4 bg-white rounded-xl shadow-sm border relative">
                             <div className="flex space-x-4 mb-4">
