@@ -4,6 +4,7 @@ import type { Employee, Page } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
 import { useEffect } from 'react';
+import { UserAvatar } from './UserAvatar';
 
 interface HeaderProps {
     onToggleSidebar: () => void;
@@ -295,7 +296,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     </button>
                     <div className="relative">
                         <button onClick={() => setDropdownOpen(!isDropdownOpen)} className="flex items-center space-x-2">
-                            <img src={currentUser.avatarUrl} alt="User" className="w-10 h-10 rounded-full flex-shrink-0 object-cover" />
+                            <UserAvatar src={currentUser.avatarUrl} name={currentUser.name} level={currentUser.level} size="sm" />
                             <div className="hidden lg:block text-left">
                                 <p className="font-semibold text-sm text-brand-text dark:text-gray-100">{currentUser.name}</p>
                                 <p className="text-xs text-brand-subtle-text dark:text-gray-400">{currentUser.role}</p>

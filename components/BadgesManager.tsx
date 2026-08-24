@@ -65,47 +65,244 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('');
 
     // Gamification config states
-    const [level2XP, setLevel2XP] = useState(100);
-    const [level3XP, setLevel3XP] = useState(300);
-    const [level4XP, setLevel4XP] = useState(600);
-    const [level5XP, setLevel5XP] = useState(1000);
+    const [companyLevels, setCompanyLevels] = useState<any[]>([]);
+    const [isSavingLevels, setIsSavingLevels] = useState(false);
+    const [uploadingLevelNum, setUploadingLevelNum] = useState<number | null>(null);
 
     const [userProfiles, setUserProfiles] = useState<any[]>([]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const levelRingInputRef = useRef<HTMLInputElement>(null);
 
-    // Carregar configurações de metas de XP do localStorage
-    useEffect(() => {
-        const saved = localStorage.getItem('pixel_gamification_thresholds');
-        if (saved) {
-            try {
-                const [l2, l3, l4, l5] = JSON.parse(saved);
-                setLevel2XP(l2 || 100);
-                setLevel3XP(l3 || 300);
-                setLevel4XP(l4 || 600);
-                setLevel5XP(l5 || 1000);
-            } catch (e) {}
+    const fetchCompanyLevels = async () => {
+        if (!company?.id) return;
+        const { data, error } = await supabase
+            .from('company_levels')
+            .select('*')
+            .eq('company_id', company.id)
+            .order('level_number', { ascending: true });
+        if (data && data.length > 0) {
+            setCompanyLevels(data);
+            localStorage.setItem('pixel_company_levels', JSON.stringify(data));
         }
-    }, []);
-
-    const saveThresholds = (l2: number, l3: number, l4: number, l5: number) => {
-        localStorage.setItem('pixel_gamification_thresholds', JSON.stringify([l2, l3, l4, l5]));
     };
 
-    const getThresholds = () => {
-        return [level2XP, level3XP, level4XP, level5XP];
-    };
-
-    const getLevelForXP = (xp: number, thresholds: number[]) => {
-        let lvl = 1;
-        for (let i = 0; i < thresholds.length; i++) {
-            if (xp >= thresholds[i]) {
-                lvl = i + 2;
-            } else {
-                break;
+    const getLevelForXP = (xp: number, levels: any[]) => {
+        if (!levels || levels.length === 0) return 1;
+        let currentLvl = 1;
+        const sorted = [...levels].sort((a, b) => a.level_number - b.level_number);
+        for (let i = 0; i < sorted.length; i++) {
+            if (xp >= sorted[i].required_xp) {
+                currentLvl = sorted[i].level_number;
             }
         }
-        return Math.min(lvl, 5);
+        return currentLvl;
+    };
+
+    const recalculateAllUsersXPAndLevels = async () => {
+        try {
+            // 1. Obter todos os badges da empresa para mapear seus XPs atualizados
+            const { data: badgesData } = await supabase
+                .from('company_badges')
+                .select('id, xp')
+                .eq('company_id', company.id);
+
+            if (!badgesData) return;
+            const badgeXpMap = new Map<string, number>();
+            badgesData.forEach(b => {
+                badgeXpMap.set(b.id, b.xp || 0);
+            });
+
+            // 2. Obter todas as concessões de selo (user_badges) da empresa
+            const { data: userBadgesData } = await supabase
+                .from('user_badges')
+                .select('user_id, badge_id')
+                .eq('company_id', company.id);
+
+            // 3. Obter todos os profiles da empresa
+            const { data: profilesData } = await supabase
+                .from('profiles')
+                .select('id, xp, level')
+                .eq('company_id', company.id);
+
+            if (!profilesData) return;
+
+            // 4. Obter as company_levels ordenadas
+            const { data: levelsData } = await supabase
+                .from('company_levels')
+                .select('*')
+                .eq('company_id', company.id)
+                .order('level_number', { ascending: true });
+
+            const levels = levelsData || [];
+
+            // Mapear XP acumulado para cada usuário
+            const userXpMap = new Map<string, number>();
+            // Inicializar todos os usuários da empresa com 0 XP
+            profilesData.forEach(p => {
+                userXpMap.set(p.id, 0);
+            });
+
+            // Somar o XP dos selos concedidos
+            if (userBadgesData) {
+                userBadgesData.forEach(ub => {
+                    const badgeXp = badgeXpMap.get(ub.badge_id) || 0;
+                    const currentXp = userXpMap.get(ub.user_id) || 0;
+                    userXpMap.set(ub.user_id, currentXp + badgeXp);
+                });
+            }
+
+            // 5. Atualizar cada usuário no banco se houver discrepância de XP ou Nível
+            const updates = [];
+            for (const p of profilesData) {
+                const calculatedXp = userXpMap.get(p.id) || 0;
+                const calculatedLevel = getLevelForXP(calculatedXp, levels);
+
+                if (p.xp !== calculatedXp || p.level !== calculatedLevel) {
+                    updates.push(
+                        supabase
+                            .from('profiles')
+                            .update({ xp: calculatedXp, level: calculatedLevel })
+                            .eq('id', p.id)
+                    );
+                }
+            }
+
+            if (updates.length > 0) {
+                await Promise.all(updates);
+            }
+
+            // Atualizar os perfis da tela
+            await fetchUserProfiles();
+        } catch (err) {
+            console.error("Erro ao recalcular XP de usuários:", err);
+        }
+    };
+
+    const triggerRingUpload = (levelNum: number) => {
+        setUploadingLevelNum(levelNum);
+        levelRingInputRef.current?.click();
+    };
+
+    const handleLevelRingUpload = async (e: React.ChangeEvent<HTMLInputElement>, levelNumber: number) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `ring-lvl-${levelNumber}-${Date.now()}.${fileExt}`;
+            const filePath = `${company.id}/levels/${fileName}`;
+            
+            const { error: uploadError } = await supabase.storage
+                .from('feed-media')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('feed-media')
+                .getPublicUrl(filePath);
+
+            if (publicUrl) {
+                setCompanyLevels(prev => prev.map(lvl => 
+                    lvl.level_number === levelNumber ? { ...lvl, ring_image_url: publicUrl } : lvl
+                ));
+                alert(`Upload do anel do nível ${levelNumber} concluído! Lembre-se de salvar as alterações para persistir.`);
+            }
+        } catch (error: any) {
+            console.error('Error uploading level ring:', error);
+            alert('Erro ao fazer upload do anel do elo: ' + error.message);
+        }
+    };
+
+    const handleSaveLevels = async () => {
+        setIsSavingLevels(true);
+        try {
+            const sortedLevels = [...companyLevels].sort((a, b) => a.level_number - b.level_number);
+            
+            if (sortedLevels.length > 0) {
+                sortedLevels[0].required_xp = 0; // O nível 1 sempre é 0 XP
+            }
+
+            for (let i = 1; i < sortedLevels.length; i++) {
+                if (Number(sortedLevels[i].required_xp) <= Number(sortedLevels[i-1].required_xp)) {
+                    alert(`Erro: O XP do Nível ${sortedLevels[i].level_number} (${sortedLevels[i].required_xp} XP) deve ser maior que o do Nível ${sortedLevels[i-1].level_number} (${sortedLevels[i-1].required_xp} XP).`);
+                    setIsSavingLevels(false);
+                    return;
+                }
+            }
+
+            const { error } = await supabase
+                .from('company_levels')
+                .upsert(sortedLevels.map(lvl => ({
+                    id: lvl.id,
+                    company_id: company.id,
+                    level_number: lvl.level_number,
+                    name: lvl.name,
+                    required_xp: Number(lvl.required_xp),
+                    ring_image_url: lvl.ring_image_url
+                })));
+
+            if (error) throw error;
+
+            alert('Configurações de níveis salvas com sucesso!');
+            await fetchCompanyLevels();
+            await recalculateAllUsersXPAndLevels();
+        } catch (e: any) {
+            console.error('Erro ao salvar níveis:', e);
+            alert('Erro ao salvar níveis: ' + e.message);
+        } finally {
+            setIsSavingLevels(false);
+        }
+    };
+
+    const handleAddNewLevel = () => {
+        const nextLevelNumber = companyLevels.length > 0 
+            ? Math.max(...companyLevels.map(l => l.level_number)) + 1 
+            : 1;
+        const lastXP = companyLevels.length > 0
+            ? Math.max(...companyLevels.map(l => l.required_xp))
+            : 0;
+
+        const newLevel = {
+            company_id: company.id,
+            level_number: nextLevelNumber,
+            name: `Elo Nível ${nextLevelNumber}`,
+            required_xp: lastXP + 500,
+            ring_image_url: null
+        };
+
+        setCompanyLevels(prev => [...prev, newLevel]);
+    };
+
+    const handleRemoveLastLevel = async () => {
+        if (companyLevels.length <= 1) {
+            alert('Você deve manter pelo menos o Nível 1.');
+            return;
+        }
+        const maxLvl = Math.max(...companyLevels.map(l => l.level_number));
+        if (!confirm(`Deseja realmente remover o Nível ${maxLvl}? Colaboradores com este nível serão reajustados para o nível inferior.`)) return;
+
+        const target = companyLevels.find(l => l.level_number === maxLvl);
+        if (target && target.id) {
+            try {
+                const { error } = await supabase
+                    .from('company_levels')
+                    .delete()
+                    .eq('id', target.id);
+
+                if (error) throw error;
+
+                await fetchCompanyLevels();
+                await recalculateAllUsersXPAndLevels();
+                alert(`Nível ${maxLvl} removido com sucesso.`);
+            } catch (err: any) {
+                console.error("Erro ao deletar nível:", err);
+                alert("Erro ao remover nível: " + err.message);
+            }
+        } else {
+            setCompanyLevels(prev => prev.filter(l => l.level_number !== maxLvl));
+        }
     };
 
     const fetchCompanyBadges = async () => {
@@ -174,6 +371,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         fetchCompanyBadges();
         fetchAwardHistory();
         fetchUserProfiles();
+        fetchCompanyLevels();
     }, [company?.id]);
 
     const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,6 +468,9 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
             setNewIcon('🏆');
             setNewXP(15);
             setNewColor(PRESET_GRADIENTS[0].class);
+            
+            // Recalcular XP e nível retroativamente após criar ou editar selo
+            await recalculateAllUsersXPAndLevels();
             fetchCompanyBadges();
             fetchAwardHistory();
         } catch (error: any) {
@@ -290,6 +491,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
             if (error) throw error;
 
             alert('Selo excluído com sucesso!');
+            // Recalcular XP e nível retroativamente após deletar selo
+            await recalculateAllUsersXPAndLevels();
             fetchCompanyBadges();
             fetchAwardHistory();
         } catch (error: any) {
@@ -327,8 +530,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
             const badgeXP = badge.xp || 10;
             const newXPValue = currentXP + badgeXP;
             
-            const thresholds = getThresholds();
-            const newLevelValue = getLevelForXP(newXPValue, thresholds);
+            const newLevelValue = getLevelForXP(newXPValue, companyLevels);
 
             // 2. Conceder o selo
             const { error: insertError } = await supabase
@@ -344,11 +546,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
             if (insertError) throw insertError;
 
-            // 3. Atualizar XP e Nível do usuário no banco
-            await supabase
-                .from('profiles')
-                .update({ xp: newXPValue, level: newLevelValue })
-                .eq('id', targetUserId);
+            // Recalcular XP e nível globalmente/retroativamente
+            await recalculateAllUsersXPAndLevels();
 
             // 4. Inserir post de conquista de selo no feed
             const awardPayload = {
@@ -427,29 +626,6 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         if (!confirm('Deseja realmente revogar esta concessão de selo?')) return;
 
         try {
-            // Buscando o selo e o usuário para diminuir XP correspondente
-            const { data: userBadge } = await supabase
-                .from('user_badges')
-                .select('user_id, badge_id')
-                .eq('id', userBadgeId)
-                .single();
-
-            if (userBadge) {
-                const targetUser = userBadge.user_id;
-                const badge = companyBadges.find(b => b.id === userBadge.badge_id);
-                const badgeXP = badge?.xp || 10;
-
-                const { data: p } = await supabase.from('profiles').select('xp, level').eq('id', targetUser).single();
-                if (p) {
-                    const currentXP = p.xp || 0;
-                    const newXP = Math.max(0, currentXP - badgeXP);
-                    const thresholds = getThresholds();
-                    const newLvl = getLevelForXP(newXP, thresholds);
-                    
-                    await supabase.from('profiles').update({ xp: newXP, level: newLvl }).eq('id', targetUser);
-                }
-            }
-
             const { error } = await supabase
                 .from('user_badges')
                 .delete()
@@ -457,9 +633,11 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
             if (error) throw error;
 
+            // Executar recálculo retroativo de XP e nível após revogar
+            await recalculateAllUsersXPAndLevels();
+
             alert('Concessão revogada com sucesso.');
             fetchAwardHistory();
-            fetchUserProfiles();
         } catch (error: any) {
             console.error('Error revoking badge:', error);
             alert('Erro ao revogar selo: ' + error.message);
@@ -885,70 +1063,143 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* XP Goals Config Box */}
                     <div className="lg:col-span-1">
-                        <Card title="Metas de XP por Nível" className="bg-white dark:bg-slate-800 shadow-sm">
+                        <Card title="Metas de XP e Anéis dos Elos" className="bg-white dark:bg-slate-800 shadow-sm">
                             <div className="space-y-4 mt-2">
                                 <div className="bg-emerald-50 dark:bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-semibold">
-                                    A XP acumulada é cumulativa. Configure a pontuação necessária que o usuário precisa atingir para ser promovido a cada nível de RPG.
+                                    O XP acumulado é cumulativo. Personalize o nome do elo, a meta de XP requerida e faça o upload da moldura (anel) em PNG transparente para cada nível do ecossistema.
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 2 (Bronze)</label>
-                                    <input
-                                        type="number"
-                                        value={level2XP}
-                                        onChange={e => {
-                                            const v = Number(e.target.value);
-                                            setLevel2XP(v);
-                                            saveThresholds(v, level3XP, level4XP, level5XP);
-                                        }}
-                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                    />
+                                {/* Hidden input file for level ring upload */}
+                                <input
+                                    type="file"
+                                    ref={levelRingInputRef}
+                                    onChange={async (e) => {
+                                        if (uploadingLevelNum !== null) {
+                                            await handleLevelRingUpload(e, uploadingLevelNum);
+                                            setUploadingLevelNum(null);
+                                        }
+                                        if (e.target) e.target.value = '';
+                                    }}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+
+                                <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+                                    {companyLevels.map(lvl => {
+                                        const maxLvl = companyLevels.length > 0 
+                                            ? Math.max(...companyLevels.map(l => l.level_number)) 
+                                            : 10;
+                                        return (
+                                            <div key={lvl.level_number} className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-black text-slate-700 dark:text-gray-300">Nível {lvl.level_number}</span>
+                                                    {lvl.level_number > 10 && lvl.level_number === maxLvl && (
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={handleRemoveLastLevel}
+                                                            className="text-[10px] text-red-500 hover:text-red-700 font-bold"
+                                                        >
+                                                            Remover Nível
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">Nome do Elo</label>
+                                                        <input
+                                                            type="text"
+                                                            value={lvl.name}
+                                                            onChange={e => {
+                                                                const val = e.target.value;
+                                                                setCompanyLevels(prev => prev.map(l => 
+                                                                    l.level_number === lvl.level_number ? { ...l, name: val } : l
+                                                                ));
+                                                            }}
+                                                            className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">XP Requerido</label>
+                                                        <input
+                                                            type="number"
+                                                            value={lvl.required_xp}
+                                                            disabled={lvl.level_number === 1}
+                                                            onChange={e => {
+                                                                const val = Number(e.target.value);
+                                                                setCompanyLevels(prev => prev.map(l => 
+                                                                    l.level_number === lvl.level_number ? { ...l, required_xp: val } : l
+                                                                ));
+                                                            }}
+                                                            className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Upload/Exibição da Moldura do Elo (PNG transparente) */}
+                                                <div className="flex items-center gap-3 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                                                    {lvl.ring_image_url ? (
+                                                        <div className="flex items-center justify-between w-full">
+                                                            <div className="flex items-center gap-2">
+                                                                <img src={lvl.ring_image_url} className="w-8 h-8 object-contain bg-slate-200 dark:bg-slate-700 rounded" alt="Anel" />
+                                                                <span className="text-[10px] text-slate-500 truncate max-w-[120px]">Anel customizado ativo</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setCompanyLevels(prev => prev.map(l => 
+                                                                        l.level_number === lvl.level_number ? { ...l, ring_image_url: null } : l
+                                                                    ));
+                                                                }}
+                                                                className="text-[10px] text-red-500 hover:text-red-700 font-bold"
+                                                            >
+                                                                Remover
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center justify-between w-full">
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">Usando gradiente CSS padrão</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => triggerRingUpload(lvl.level_number)}
+                                                                className="text-[10px] text-brand-primary hover:text-emerald-600 font-bold"
+                                                            >
+                                                                + Enviar Anel PNG
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 3 (Prata)</label>
-                                    <input
-                                        type="number"
-                                        value={level3XP}
-                                        onChange={e => {
-                                            const v = Number(e.target.value);
-                                            setLevel3XP(v);
-                                            saveThresholds(level2XP, v, level4XP, level5XP);
-                                        }}
-                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 4 (Ouro)</label>
-                                    <input
-                                        type="number"
-                                        value={level4XP}
-                                        onChange={e => {
-                                            const v = Number(e.target.value);
-                                            setLevel4XP(v);
-                                            saveThresholds(level2XP, level3XP, v, level5XP);
-                                        }}
-                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 5 (Lendário)</label>
-                                    <input
-                                        type="number"
-                                        value={level5XP}
-                                        onChange={e => {
-                                            const v = Number(e.target.value);
-                                            setLevel5XP(v);
-                                            saveThresholds(level2XP, level3XP, level4XP, v);
-                                        }}
-                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                    />
-                                </div>
-
-                                <div className="text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-500/10 p-3 rounded-xl border border-orange-100 dark:border-orange-500/20 font-bold leading-normal">
-                                    🛡️ Nota do RPG: Nível 5 é o limite padrão predefinido e exibe o anel lendário neon pulsante ao redor do avatar!
+                                <div className="pt-3 space-y-2 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleAddNewLevel}
+                                            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-750 dark:text-gray-250 font-bold rounded-xl transition-all text-xs border border-slate-200 dark:border-slate-650"
+                                        >
+                                            + Adicionar Novo Elo
+                                        </button>
+                                        {companyLevels.length > 10 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveLastLevel}
+                                                className="py-2 px-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 text-red-650 dark:text-red-400 font-bold rounded-xl transition-all text-xs"
+                                            >
+                                                Excluir Último
+                                            </button>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveLevels}
+                                        disabled={isSavingLevels}
+                                        className="w-full py-2.5 bg-brand-primary hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 text-xs flex items-center justify-center gap-1.5"
+                                    >
+                                        {isSavingLevels ? 'Salvando...' : '💾 Salvar Alterações dos Elos'}
+                                    </button>
                                 </div>
                             </div>
                         </Card>
@@ -962,12 +1213,19 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                     const xp = user.xp || 0;
                                     const level = user.level || 1;
                                     
-                                    // Determinar limites de XP para a barra de progresso
-                                    const thresholds = getThresholds();
-                                    const prevThreshold = level === 1 ? 0 : thresholds[level - 2];
-                                    const nextThreshold = level >= 5 ? thresholds[3] : thresholds[level - 1];
+                                    // Determinar limites de XP para a barra de progresso usando companyLevels
+                                    const maxLevel = companyLevels.length > 0 
+                                        ? Math.max(...companyLevels.map(l => l.level_number)) 
+                                        : 10;
                                     
-                                    const progressVal = level >= 5 
+                                    const currentLvlConfig = companyLevels.find(l => l.level_number === level);
+                                    const nextLvlConfig = companyLevels.find(l => l.level_number === level + 1);
+                                    const prevLvlConfig = companyLevels.find(l => l.level_number === level - 1);
+
+                                    const prevThreshold = level === 1 ? 0 : (prevLvlConfig?.required_xp || 0);
+                                    const nextThreshold = level >= maxLevel ? (currentLvlConfig?.required_xp || 0) : (nextLvlConfig?.required_xp || 100);
+
+                                    const progressVal = level >= maxLevel 
                                         ? 100 
                                         : ((xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100;
                                     
@@ -987,7 +1245,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                         {user.full_name}
                                                     </span>
                                                     <span className="text-xs font-black text-brand-primary uppercase">
-                                                        Nível {level}
+                                                        {currentLvlConfig?.name || `Nível ${level}`}
                                                     </span>
                                                 </div>
                                                 
@@ -995,7 +1253,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 <div className="relative w-full bg-slate-200 dark:bg-slate-750 h-2.5 rounded-full overflow-hidden border dark:border-slate-700">
                                                     <div 
                                                         className={`h-full transition-all duration-500 bg-gradient-to-r ${
-                                                            level >= 5 
+                                                            level >= maxLevel 
                                                                 ? 'from-pink-500 via-purple-500 to-cyan-400 animate-pulse' 
                                                                 : 'from-emerald-400 to-brand-primary'
                                                         }`}
@@ -1006,7 +1264,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold mt-1">
                                                     <span>{xp} XP Acumulado</span>
                                                     <span>
-                                                        {level >= 5 ? 'Nível Máximo Atingido! 🎉' : `${nextThreshold} XP para subir`}
+                                                        {level >= maxLevel ? 'Nível Máximo Atingido! 🎉' : `${nextThreshold} XP para subir`}
                                                     </span>
                                                 </div>
                                             </div>

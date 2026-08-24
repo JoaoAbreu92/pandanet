@@ -137,23 +137,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
             }
 
-            if (data) {
-                const isMasterAdmin = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
-                const defaultAdminPermissions = {
-                    viewMessages: true, viewCalendar: true, useMarketplace: true,
-                    canPostText: true, canPostImage: true, canPostVideo: true,
-                    viewDirectory: true, viewForms: true, viewBenefits: true,
-                    viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
-                    viewTiDashboard: true, openTickets: true, openTiRequests: true,
-                    viewTraining: true, viewSurveys: true, viewPolicies: true,
-                    viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                    createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true, viewProjects: true,
-                    viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
-                    viewVacationRequests: true, manageVacationRequests: true,
-                    viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                    viewScheduling: true, viewAgenda: true, viewReservations: true,
-                    viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
-                };
+            const isMasterAdmin = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
+            const defaultAdminPermissions = {
+                viewMessages: true, viewCalendar: true, useMarketplace: true,
+                canPostText: true, canPostImage: true, canPostVideo: true,
+                viewDirectory: true, viewForms: true, viewBenefits: true,
+                viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
+                viewTiDashboard: true, openTickets: true, openTiRequests: true,
+                viewTraining: true, viewSurveys: true, viewPolicies: true,
+                viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
+                createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true, viewProjects: true,
+                viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
+                viewVacationRequests: true, manageVacationRequests: true,
+                viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
+                viewScheduling: true, viewAgenda: true, viewReservations: true,
+                viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
+            };
 
                 const planEmailLimit = data.company?.plan?.email_limit;
                 const planWhatsappLimit = data.company?.plan?.whatsapp_limit;
@@ -209,8 +208,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     plan_whatsapp_limit: isMasterAdmin ? 100 : planWhatsappLimit,
                     company: data.company
                 };
+
+                // Carregar níveis da empresa e salvar no localStorage
+                if (data.company_id) {
+                    try {
+                        const { data: levelsData, error: levelsError } = await supabase
+                            .from('company_levels')
+                            .select('*')
+                            .eq('company_id', data.company_id)
+                            .order('level_number', { ascending: true });
+
+                        if (levelsError || !levelsData || levelsData.length === 0) {
+                            const defaultLevels = [
+                                { level_number: 1, name: 'Membro', required_xp: 0 },
+                                { level_number: 2, name: 'Bronze', required_xp: 100 },
+                                { level_number: 3, name: 'Prata', required_xp: 250 },
+                                { level_number: 4, name: 'Ouro', required_xp: 500 },
+                                { level_number: 5, name: 'Platina', required_xp: 800 },
+                                { level_number: 6, name: 'Esmeralda', required_xp: 1200 },
+                                { level_number: 7, name: 'Safira', required_xp: 1700 },
+                                { level_number: 8, name: 'Rubi', required_xp: 2300 },
+                                { level_number: 9, name: 'Diamante', required_xp: 3000 },
+                                { level_number: 10, name: 'Lendário', required_xp: 4000 }
+                            ];
+                            const insertPayload = defaultLevels.map(lvl => ({
+                                company_id: data.company_id,
+                                level_number: lvl.level_number,
+                                name: lvl.name,
+                                required_xp: lvl.required_xp
+                            }));
+                            const { data: insertedData } = await supabase.from('company_levels').insert(insertPayload).select();
+                            localStorage.setItem('pixel_company_levels', JSON.stringify(insertedData || insertPayload));
+                        } else {
+                            localStorage.setItem('pixel_company_levels', JSON.stringify(levelsData));
+                        }
+                    } catch (levelsErr) {
+                        console.error("Erro ao carregar níveis da empresa:", levelsErr);
+                    }
+                }
+
                 setProfile(employee);
-            }
         } catch (err) { }
     };
 
