@@ -96,6 +96,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10); // User requested 10
     const [totalEmails, setTotalEmails] = useState(0);
+    const [unseenCount, setUnseenCount] = useState(0);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [filterTag, setFilterTag] = useState<string | null>(null);
@@ -260,6 +261,23 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         });
     };
 
+    const createFolder = async () => {
+        const folderName = prompt('Nome da nova pasta:');
+        if (!folderName) return;
+
+        const { error } = await callEmailServer('folders', {
+            config: settings,
+            action: 'create',
+            path: folderName
+        });
+
+        if (error) alert('Erro ao criar pasta: ' + error.message);
+        else {
+            alert('Pasta criada com sucesso!');
+            fetchFolders();
+        }
+    };
+
     const fetchFolders = async () => {
         if (!settings.imap_host) return;
         const { data, error } = await callEmailServer('folders', { config: settings, action: 'list' });
@@ -355,8 +373,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             // Handle Response (Array or Object with total)
             const emailList = Array.isArray(data) ? data : data.emails;
             const total = Array.isArray(data) ? data.length : data.total; // Default to length if API old
+            const unseen = data.unseen || 0;
 
             setTotalEmails(total);
+            if (currentFolder === 'INBOX') setUnseenCount(unseen);
 
             // Fetch Local Metadata (Tags/Notes)
             const { data: metadataList } = await supabase
@@ -477,14 +497,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     <nav className="space-y-1">
                         {/* Always show INBOX first */}
                         <button
-                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); setPage(1); }}
+                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); setPage(1); }} 
                             className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             <InboxIcon className="w-5 h-5" />
                             Caixa de Entrada
-                            {currentFolder === 'INBOX' && (
-                                <span className="ml-auto bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                                    {totalEmails}
+                            {unseenCount > 0 && (
+                                <span className="ml-auto bg-red-500 text-white py-0.5 px-2 rounded-full text-xs font-bold">
+                                    {unseenCount}
                                 </span>
                             )}
                         </button>
@@ -511,6 +531,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     </button>
                                 );
                             })}
+
+                        <button onClick={createFolder} className="w-full text-left px-3 py-2 text-xs text-brand-primary hover:bg-gray-100 rounded flex items-center gap-2 mt-2 font-semibold">
+                            + Nova Pasta
+                        </button>
                     </nav>
 
                     <div className="pt-4 mt-4 border-t border-gray-200">

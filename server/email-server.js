@@ -63,15 +63,18 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
         const emails = [];
 
         try {
-            const status = client.mailbox;
-            if (!status || status.exists === 0) return res.json([]);
+            // Fetch Status (Unseen count)
+            const status = await client.status(mailboxPath, { unseen: true, messages: true });
+
+            if (!status || status.messages === 0) return res.json({ emails: [], total: 0, unseen: 0 });
 
             // Pagination Logic
             const page = parseInt(req.body.page) || 1;
             const pageSize = parseInt(req.body.pageSize) || 10;
-            const total = status.exists;
+            const total = status.messages;
+            const unseen = status.unseen;
 
-            if (total === 0) return res.json({ emails: [], total: 0 });
+            if (total === 0) return res.json({ emails: [], total: 0, unseen: 0 });
 
             // IMAP ranges are 1-based. 
             // Page 1 (newest): total -> total - pageSize + 1
@@ -98,7 +101,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             // Sort by date desc
             emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-            return res.json({ emails, total });
+            return res.json({ emails, total, unseen });
         } finally {
             lock.release();
             await client.logout();
