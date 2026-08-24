@@ -103,7 +103,7 @@ const Layout: React.FC<LayoutProps> = ({
     }, [currentPage]);
 
     return (
-        <div className={`flex flex-col h-[125dvh] w-full overflow-hidden bg-slate-50 dark:bg-[#020617] ${isShaking ? 'nudge-shake' : ''}`}>
+        <div className={`flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-[#020617] ${isShaking ? 'nudge-shake' : ''}`}>
             {isImpersonating && (
                 <div className={`text-white text-xs py-1.5 px-4 text-center z-[60] flex items-center justify-center gap-2 font-medium shadow-sm ${impersonatedUser ? 'bg-purple-600' : 'bg-red-600'}`}>
                     <span className="relative flex h-2.5 w-2.5">
