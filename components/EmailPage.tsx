@@ -92,6 +92,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const { setModuleUnreadCount, notifications, markAsRead, markNotificationsByLink } = useNotifications();
     const { isGhostMode } = useAuth();
 
+    const canManageAccounts = currentUser?.email_permissions?.can_manage_accounts || 
+                            currentUser?.isAdmin || 
+                            currentUser?.isCompanyAdmin || 
+                            currentUser?.email === 'ti@grupopixel.com.br';
+
     // --- State: Confirm Modal ---
     const [confirmState, setConfirmState] = useState<{
         isOpen: boolean;
@@ -463,7 +468,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const deleteAccount = async (accountId: string) => {
-        if (!currentUser.email_permissions?.can_manage_accounts) {
+        if (!canManageAccounts) {
             showToast('Você não tem permissão para remover contas.', 'error');
             return;
         }
@@ -2437,7 +2442,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Suas Contas</p>
                                                 <p className="text-sm font-black text-gray-900">{accounts.length} / {currentUser.email_permissions?.account_limit || 1}</p>
                                             </div>
-                                            {currentUser.email_permissions?.can_manage_accounts && (
+                                            {canManageAccounts && (
                                                 <button 
                                                     onClick={() => {
                                                         setActiveAccountId(null);

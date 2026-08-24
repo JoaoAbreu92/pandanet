@@ -700,6 +700,9 @@ const AppContent: React.FC = () => {
             case 'manual-usuario': return <ManualPage />;
             case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" /> : null;
             case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" /> : null;
+            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" /> : null;
+            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" /> : null;
+            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;

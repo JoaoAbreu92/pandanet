@@ -124,7 +124,24 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
 
     // Estado principal
     const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [selectedProject, setSelectedProjectState] = useState<Project | null>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('pixel_selected_project');
+            return saved ? JSON.parse(saved) : null;
+        }
+        return null;
+    });
+
+    const setSelectedProject = (proj: Project | null) => {
+        setSelectedProjectState(proj);
+        if (typeof window !== 'undefined') {
+            if (proj) {
+                localStorage.setItem('pixel_selected_project', JSON.stringify(proj));
+            } else {
+                localStorage.removeItem('pixel_selected_project');
+            }
+        }
+    };
     const [stages, setStages] = useState<ProjectStage[]>([]);
     const [tasks, setTasks] = useState<ProjectTask[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -238,7 +255,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                 .eq('company_id', currentUser.company_id)
                 .order('full_name', { ascending: true });
 
-            if (data) setEmployees(data as unknown as Employee[]);
+            if (data) {
+                const mapped = data.map((e: any) => ({
+                    ...e,
+                    name: e.full_name || 'Usuário',
+                    avatarUrl: e.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(e.full_name || 'User')}`
+                }));
+                setEmployees(mapped as unknown as Employee[]);
+            }
         } catch (e) {
             console.error(e);
         }
@@ -365,7 +389,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             // Buscar tarefas do projeto
             const { data: taskData, error: taskError } = await supabase
                 .from('project_tasks')
-                .select('*, assignee:profiles(full_name, avatar_url), subtasks:project_subtasks(*), timesheets:project_timesheets(*)')
+                .select('*, assignee:profiles!assigned_to(full_name, avatar_url), subtasks:project_subtasks(*), timesheets:project_timesheets(*)')
                 .eq('project_id', project.id)
                 .order('position', { ascending: true });
 
@@ -383,6 +407,19 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             setLoading(false);
         }
     };
+
+    // Auto-carregar detalhes se o projeto já estiver selecionado no localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('pixel_selected_project');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                handleSelectProject(parsed);
+            } catch (err) {
+                console.error('Erro ao fazer parse do projeto salvo:', err);
+            }
+        }
+    }, []);
 
     // Criar / Editar Projeto
     const handleSaveProject = async (e: React.FormEvent) => {
@@ -997,44 +1034,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                 /* VIEW 2: VISÃO INTERNA DO PROJETO SELECIONADO */
                 <Card className="p-0 overflow-hidden border-0 shadow-2xl rounded-3xl">
                     {/* Barra de Abas e Filtros */}
-                    <div className="bg-slate-900 text-white p-4 flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 gap-4">
-                        <div className="flex space-x-2 bg-white/5 p-1 rounded-2xl">
-                            <button
-                                onClick={() => setActiveTab('kanban')}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'kanban' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <ClipboardDocumentCheckIcon className="w-4 h-4" />
-                                Painel de Controle
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('planning')}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'planning' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <CalendarIcon className="w-4 h-4" />
-                                Planejamento
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('list')}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'list' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <ListBulletIcon className="w-4 h-4" />
-                                Lista
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('calendar')}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'calendar' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <CalendarIcon className="w-4 h-4" />
-                                Calendário
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('timesheet')}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'timesheet' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-                            >
-                                <ChartBarIcon className="w-4 h-4" />
-                                Métricas
-                            </button>
-                        </div>
+                    <div className="bg-slate-900 text-white p-4 flex flex-col lg:flex-row lg:items-center justify-end border-b border-white/10 gap-4">
 
                         {/* Filtros */}
                         <div className="flex flex-wrap items-center gap-3">

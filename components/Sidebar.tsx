@@ -29,7 +29,10 @@ import {
     ChartBarIcon,
     BanknotesIcon,
     CurrencyDollarIcon,
-    ClipboardDocumentCheckIcon
+    ClipboardDocumentCheckIcon,
+    WhatsAppIcon,
+    CalendarIcon,
+    ListBulletIcon
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
@@ -49,10 +52,10 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
-    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false });
     const navRef = useRef<HTMLDivElement>(null);
 
-    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects') => {
+    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects' | 'social') => {
         setOpenMenus(prev => {
             const newState = { ...prev, [menu]: !prev[menu] };
             // Se estamos abrindo o menu, vamos rolar para ele
@@ -75,6 +78,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             return newState;
         });
     };
+
+    useEffect(() => {
+        if (['directory', 'org-chart', 'meu-rh', 'jobs', 'training', 'surveys', 'policies'].includes(currentPage)) {
+            setOpenMenus(prev => ({ ...prev, rh: true }));
+        }
+        if (['knowledge-base', 'service-status', 'infosec'].includes(currentPage)) {
+            setOpenMenus(prev => ({ ...prev, ti: true }));
+        }
+        if (['projects', 'projects-planning', 'projects-list', 'projects-calendar', 'projects-metrics'].includes(currentPage)) {
+            setOpenMenus(prev => ({ ...prev, projects: true }));
+        }
+        if (['messages', 'whatspanda', 'feed'].includes(currentPage)) {
+            setOpenMenus(prev => ({ ...prev, social: true }));
+        }
+    }, [currentPage]);
 
     const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || (isImpersonating && isMasterAdmin);
@@ -135,7 +153,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
             >
                 <div className="relative">
-                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : ''}`} />
+                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary'} transition-colors`} />
                     {badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
                             {badgeCount > 99 ? '99+' : badgeCount}
@@ -152,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects' | 'social'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
@@ -193,7 +211,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 >
                     <div className="flex items-center">
                         <div className="relative">
-                            <Icon className="w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
+                            <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300 ${isActive ? 'text-brand-primary' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary'} transition-colors`} />
                             {menuBadgeCount > 0 && !openMenus[menuKey] && (
                                 <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900 animate-pulse">
                                     {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
@@ -238,16 +256,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 className="flex-1 px-3 md:px-4 py-4 md:py-6 space-y-1.5 md:space-y-2 overflow-y-auto no-scrollbar"
             >
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
-                <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
-                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
+                <NavMenu label="Social" icon={UserGroupIcon} menuKey="social" permission={true}>
+                    <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
+                    <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={WhatsAppIcon} permission="viewWhatsPanda" featureId="whatspanda" />
+                    <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
+                </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
-                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
                     <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />
+                    <NavItem page="projects-list" label="Lista" icon={ListBulletIcon} permission="viewProjects" featureId="projects" />
+                    <NavItem page="projects-calendar" label="Calendário" icon={CalendarIcon} permission="viewProjects" featureId="projects" />
+                    <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />
                 </NavMenu>
 
                 <hr className="my-2 border-gray-100 dark:border-slate-800" />

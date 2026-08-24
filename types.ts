@@ -44,6 +44,9 @@ export type Page =
   | 'manual-usuario'
   | 'projects'
   | 'projects-planning'
+  | 'projects-list'
+  | 'projects-calendar'
+  | 'projects-metrics'
   | 'whatspanda';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
