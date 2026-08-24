@@ -511,7 +511,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
                                 <p className="text-sm text-gray-500 font-medium">Versão do Sistema</p>
-                                <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">1.0.7 beta</h2>
+                                <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">
+                                    {systemUpdates.length > 0 ? systemUpdates[0].version : '1.0.7 beta'}
+                                </h2>
                                 <p className="text-xs text-green-500 mt-1 font-semibold">Sistema Atualizado</p>
                             </div>
                             <MetricCardSimple title="Empresas Cadastradas" value={totalCompanies} icon={BuildingOfficeIcon} />
