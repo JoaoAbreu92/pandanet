@@ -2480,9 +2480,35 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
  */
 async function processScheduledCampaigns() {
     try {
-        // Obter data e hora atual no fuso horário de Brasília
+        // Função auxiliar para converter string de horário (HH:MM:SS ou HH:MM) em minutos desde a meia-noite
+        const timeToMin = (tStr) => {
+            if (!tStr) return 0;
+            const pts = tStr.split(':');
+            const h = parseInt(pts[0], 10) || 0;
+            const m = parseInt(pts[1], 10) || 0;
+            return h * 60 + m;
+        };
+
+        // Obter data atual em Brasília no formato YYYY-MM-DD
         const todayStr = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).split(' ')[0];
-        const currentHourStr = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour12: false });
+        
+        // Obter a hora e minuto atuais em Brasília de forma estruturada e imune a formatações locais
+        const spFormatter = new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hour12: false
+        });
+        const spParts = spFormatter.formatToParts(new Date());
+        const hourVal = parseInt(spParts.find(p => p.type === 'hour').value, 10);
+        const minVal = parseInt(spParts.find(p => p.type === 'minute').value, 10);
+        const secVal = parseInt(spParts.find(p => p.type === 'second').value, 10);
+        
+        const currentMinutes = hourVal * 60 + minVal;
+        const currentHourStr = `${hourVal.toString().padStart(2, '0')}:${minVal.toString().padStart(2, '0')}:${secVal.toString().padStart(2, '0')}`;
+
+        console.log(`[CAMPANHA-LOOP] Processando disparadores periódicos... Hora SP: ${currentHourStr} (${currentMinutes}m) | Data SP: ${todayStr}`);
 
         // 1. Obter todas as campanhas em status 'running' ou 'pending'
         const { data: campaigns, error: campErr } = await supabase
@@ -2491,7 +2517,9 @@ async function processScheduledCampaigns() {
             .in('status', ['running', 'pending']);
 
         if (campErr) throw campErr;
-        if (!campaigns || campaigns.length === 0) return;
+        if (!campaigns || campaigns.length === 0) {
+            return;
+        }
 
         // Filtrar campanhas no Javascript para máxima robustez e compatibilidade com qualquer versão do PostgREST
         const validCampaigns = campaigns.filter(camp => {
@@ -2502,16 +2530,17 @@ async function processScheduledCampaigns() {
             return false;
         });
 
-        if (validCampaigns.length === 0) return;
+        if (validCampaigns.length === 0) {
+            return;
+        }
 
         for (const camp of validCampaigns) {
-            // Verificar limite de horário do expediente da campanha
-            // Formatar os horários do banco de dados (ex: '08:00:00') para comparar corretamente com HH:MM:SS
-            const startTimeStr = camp.start_time.length === 5 ? `${camp.start_time}:00` : camp.start_time;
-            const endTimeStr = camp.end_time.length === 5 ? `${camp.end_time}:00` : camp.end_time;
+            // Verificar limite de horário do expediente da campanha usando minutos desde a meia-noite (100% robusto)
+            const startMinutes = timeToMin(camp.start_time);
+            const endMinutes = timeToMin(camp.end_time);
 
-            if (currentHourStr < startTimeStr || currentHourStr > endTimeStr) {
-                console.log(`[CAMPANHA] Ignorando campanha "${camp.name}" (${camp.id}) porque está fora do horário permitido (${startTimeStr} - ${endTimeStr}). Hora atual: ${currentHourStr}`);
+            if (currentMinutes < startMinutes || currentMinutes > endMinutes) {
+                console.log(`[CAMPANHA] Ignorando campanha "${camp.name}" (${camp.id}) porque está fora do horário permitido (Limites: ${camp.start_time} às ${camp.end_time} | Atual SP: ${currentHourStr}).`);
                 continue;
             }
 
@@ -2519,9 +2548,14 @@ async function processScheduledCampaigns() {
             if (camp.last_sent_at) {
                 const elapsedMs = Date.now() - new Date(camp.last_sent_at).getTime();
                 if (elapsedMs < camp.interval_seconds * 1000) {
+                    const remainingSec = Math.round((camp.interval_seconds * 1000 - elapsedMs) / 1000);
+                    console.log(`[CAMPANHA] Aguardando intervalo de "${camp.name}" (Faltam ${remainingSec}s).`);
                     continue;
                 }
             }
+
+            console.log(`[CAMPANHA] Processando campanha ativa: "${camp.name}" (${camp.id})`);
+            global.addDebugLog('CAMPANHA', `Processando campanha ativa: "${camp.name}"`, { id: camp.id, status: camp.status });
 
             // Se o status era 'pending', atualiza para 'running'
             if (camp.status === 'pending') {
