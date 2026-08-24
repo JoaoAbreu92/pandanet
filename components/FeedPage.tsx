@@ -229,7 +229,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [posts, setPosts] = useState<Post[]>([]);
     const [localRecognitions, setLocalRecognitions] = useState<Recognition[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
-    const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video', file?: File } | null>(null);
+    const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image', file?: File } | null>(null);
     const [showRecognitionModal, setShowRecognitionModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [mentionSearch, setMentionSearch] = useState('');
@@ -237,13 +237,15 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [mentions, setMentions] = useState<{ id: string, name: string }[]>([]);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
-    const videoInputRef = useRef<HTMLTextAreaElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     const fetchPosts = async () => {
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             if (!profile?.company_id) return;
+
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
             const { data, error } = await supabase
                 .from('posts')
@@ -254,6 +256,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
                 `)
                 .eq('company_id', profile.company_id)
+                .gte('created_at', sixtyDaysAgo.toISOString())
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -265,7 +268,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 authorAvatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'Usuario Excluido')}&background=random`,
                 content: item.content,
                 mediaUrl: item.media_url,
-                mediaType: item.media_type as 'image' | 'video',
+                mediaType: item.media_type as 'image',
                 timestamp: item.created_at,
                 mentions: item.mentions || [],
                 reactions: item.post_reactions.map((r: any) => ({
@@ -362,6 +365,55 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         postTextareaRef.current?.focus();
     };
 
+    const compressImage = (file: File): Promise<File> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Redimensionar se for muito grande (max 1200px)
+                    const MAX_WIDTH = 1200;
+                    const MAX_HEIGHT = 1200;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+                            resolve(compressedFile);
+                        } else {
+                            resolve(file);
+                        }
+                    }, 'image/jpeg', 0.7); // 70% de qualidade
+                };
+            };
+        });
+    };
+
     const handleCreatePost = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -369,13 +421,16 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             let uploadedMediaUrl = null;
             if (mediaFile && mediaFile.file) {
-                const fileExt = mediaFile.file.name.split('.').pop();
+                // Compress image before upload
+                const fileToUpload = await compressImage(mediaFile.file);
+
+                const fileExt = fileToUpload.name.split('.').pop();
                 const fileName = `${Math.random()}.${fileExt}`;
                 const filePath = `${currentUser.id}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('feed-media')
-                    .upload(filePath, mediaFile.file);
+                    .upload(filePath, fileToUpload);
 
                 if (uploadError) throw uploadError;
 
@@ -603,11 +658,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                             {mediaFile && (
                                 <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50">
-                                    {mediaFile.type === 'image' ? (
-                                        <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
-                                    ) : (
-                                        <video src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" />
-                                    )}
+                                    <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
                                     <button onClick={() => setMediaFile(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-all shadow-lg scale-90 group-hover:scale-100 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-5 h-5" /></button>
                                 </div>
                             )}
@@ -615,21 +666,19 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                 <div className="flex space-x-2">
                                     <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">Foto</span></button>
-                                    <button onClick={() => videoInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><VideoCameraIcon className="w-5 h-5 text-blue-500" /><span className="text-sm font-medium">Video</span></button>
                                     <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">Reconhecer</span></button>
                                 </div>
                                 <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center space-x-2 px-6 py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
                             </div>
                             <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3">
                                 <div className="flex items-center space-x-1">
-                                    <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></div>
-                                    <span>Posts expiram automaticamente em 90 dias (Sistema FIFO)</span>
+                                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
+                                    <span className="text-orange-600 font-bold">Importante: Postagens expiram automaticamente em 60 dias para otimização de espaço.</span>
                                 </div>
-                                <span className="italic">Rede social corporativa organizada e eficiente</span>
+                                <span className="italic whitespace-nowrap hidden sm:inline">Acervo organizado e eficiente</span>
                             </div>
 
                             <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
-                            <input type="file" ref={videoInputRef as any} className="hidden" accept="video/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'video', file }); }} />
                         </div>
                     </Card>
 
