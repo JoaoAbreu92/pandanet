@@ -12,7 +12,8 @@ import { GiftIcon, UserPlusIcon } from './icons';
 
 interface HomePageProps {
     onNavigate: (page: string, context?: any) => void;
-    companyData: AppData;
+    employees: Employee[];
+    currentUser: Employee;
 }
 
 const Birthdays: React.FC<{ employees: Employee[] }> = ({ employees }) => {
@@ -83,7 +84,7 @@ interface HomePageProps {
     employees: Employee[];
 }
 
-const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees }) => {
+const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser }) => {
     return (
         <div className="space-y-8">
             <Carousel />
@@ -95,7 +96,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees }) => {
                 </div>
                 {/* Right Sidebar */}
                 <div className="space-y-8">
-                    <QuickLinks onNavigate={onNavigate} />
+                    <QuickLinks onNavigate={onNavigate} currentUser={currentUser} />
                     <CompanyPoll />
                     <Birthdays employees={employees} />
                     <NewHires employees={employees} />

@@ -1,7 +1,7 @@
 import React from 'react';
 import Card from './Card';
 // FIX: Correcting the import path for types.
-import type { QuickLink } from '../types';
+import type { QuickLink, Employee } from '../types';
 // FIX: Update icon imports for consistency and correctness.
 import { FolderIcon, CalendarIcon, UsersIcon, Cog6ToothIcon } from './icons';
 
@@ -9,15 +9,22 @@ interface QuickLinksProps {
   onNavigate: (page: string) => void;
 }
 
-// FIX: Corrected page links and updated icons for consistency.
-const links: QuickLink[] = [
-  { label: 'Formulários RH', icon: <FolderIcon className="w-7 h-7" />, page: 'forms' },
-  { label: 'Painel de T.I.', icon: <Cog6ToothIcon className="w-7 h-7" />, page: 'ti-dashboard' },
-  { label: 'Diretório de Pessoas', icon: <UsersIcon className="w-7 h-7" />, page: 'directory' },
-  { label: 'Agendar Evento', icon: <CalendarIcon className="w-7 h-7" />, page: 'calendar' },
-];
+interface QuickLinksProps {
+  onNavigate: (page: string) => void;
+  currentUser: Employee;
+}
 
-const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate }) => {
+const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser }) => {
+  const links: QuickLink[] = [
+    { label: 'Formulários RH', icon: <FolderIcon className="w-7 h-7" />, page: 'forms', permission: 'viewForms' },
+    { label: 'Painel de T.I.', icon: <Cog6ToothIcon className="w-7 h-7" />, page: 'ti-dashboard', permission: 'viewTiDashboard' },
+    { label: 'Diretório de Pessoas', icon: <UsersIcon className="w-7 h-7" />, page: 'directory', permission: 'viewDirectory' },
+    { label: 'Agendar Evento', icon: <CalendarIcon className="w-7 h-7" />, page: 'calendar', permission: 'viewCalendar' },
+  ].filter(link => {
+    if (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') return true;
+    return (currentUser.permissions as any)[link.permission] === true;
+  }) as QuickLink[];
+
   return (
     <Card title="Links Rápidos">
       <div className="grid grid-cols-2 gap-4">
@@ -25,9 +32,7 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate }) => {
           <button
             key={link.label}
             type="button"
-            onClick={(e) => {
-              onNavigate(link.page);
-            }}
+            onClick={() => onNavigate(link.page)}
             className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg hover:bg-emerald-50 transition-colors duration-200 group"
           >
             <div className="text-brand-primary group-hover:text-emerald-600 mb-2">

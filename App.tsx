@@ -530,7 +530,7 @@ const AppContent: React.FC = () => {
         };
 
         switch (currentPage) {
-            case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
+            case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
 
