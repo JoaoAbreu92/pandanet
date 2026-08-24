@@ -120,8 +120,12 @@ export const PostCard: React.FC<{
                     )}
 
                     {/* Badge Icon 3D Floating */}
-                    <div className={`w-24 h-24 rounded-3xl ${badgeData.badge_color} border-2 border-white/20 flex items-center justify-center text-5xl shadow-xl shadow-slate-900/50 transform hover:scale-115 hover:rotate-6 transition-all duration-305 cursor-pointer animate-float select-none`}>
-                        {badgeData.badge_icon}
+                    <div className={`w-24 h-24 rounded-3xl ${badgeData.badge_color} border-2 border-white/20 flex items-center justify-center text-5xl shadow-xl shadow-slate-900/50 transform hover:scale-115 hover:rotate-6 transition-all duration-305 cursor-pointer animate-float select-none overflow-hidden`}>
+                        {badgeData.badge_icon.startsWith('http') ? (
+                            <img src={badgeData.badge_icon} className="w-full h-full object-cover rounded-3xl border border-white/10" alt="" />
+                        ) : (
+                            badgeData.badge_icon
+                        )}
                     </div>
 
                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-5 flex items-center gap-1">
@@ -891,7 +895,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 </div>
                             </div>
 
-                            {/* ESPAÇO RETANGULAR VERMELHO DO PRINT: GALERIA DE 6 ÚLTIMOS SELOS */}
+                            {/* ESPAÇO RETANGULAR VERMELHO DO PRINT: GALERIA DE 3 ÚLTIMOS SELOS */}
                             <div className="mt-5 pt-4 border-t border-gray-100 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-[10px] font-bold text-brand-subtle-text dark:text-gray-500 uppercase tracking-wider">Selos em Destaque</span>
@@ -903,25 +907,30 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     </button>
                                 </div>
                                 
-                                <div className="flex justify-between items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/80 min-h-[52px]">
-                                    {Array.from({ length: 6 }).map((_, idx) => {
+                                <div className="flex justify-around items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-h-[80px]">
+                                    {Array.from({ length: 3 }).map((_, idx) => {
                                         const userBadge = equippedBadges[idx];
                                         if (userBadge && userBadge.company_badges) {
                                             const badge = userBadge.company_badges;
+                                            const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
                                             return (
                                                 <div 
                                                     key={userBadge.id} 
-                                                    className={`w-9 h-9 rounded-lg ${badge.color} border flex items-center justify-center text-xl shadow-sm select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float`}
+                                                    className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}
                                                     title={`${badge.name}: ${badge.description || ''}`}
                                                 >
-                                                    {badge.icon}
+                                                    {isUrl ? (
+                                                        <img src={badge.icon} className="w-full h-full object-cover rounded-2xl border border-white/10" alt={badge.name} />
+                                                    ) : (
+                                                        badge.icon
+                                                    )}
                                                 </div>
                                             );
                                         }
                                         return (
                                             <div 
                                                 key={idx} 
-                                                className="w-9 h-9 rounded-lg border-2 border-dashed border-gray-200 dark:border-slate-800/60 flex items-center justify-center text-xs text-gray-300 dark:text-slate-700 select-none font-bold"
+                                                className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 dark:border-slate-800/60 flex items-center justify-center text-lg text-gray-300 dark:text-slate-700 select-none font-bold"
                                                 title="Slot de Selo Vazio"
                                             >
                                                 +
@@ -1072,7 +1081,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     🏆 Minha Galeria de Selos
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                    Equipe até 6 selos conquistados para exibir em seu perfil
+                                    Equipe até 3 selos conquistados para exibir em seu perfil
                                 </p>
                             </div>
                             <button 
@@ -1089,7 +1098,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     Painel de Destaques
                                 </span>
                                 <span className="text-xs bg-brand-primary text-white font-bold px-2.5 py-1 rounded-full">
-                                    {equippedBadges.length} / 6 Equipados
+                                    {equippedBadges.length} / 3 Equipados
                                 </span>
                             </div>
                             
@@ -1110,8 +1119,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                     if (!earned) return; // Locked badge
                                                     
                                                     const newEquippedState = !isEquipped;
-                                                    if (newEquippedState && equippedBadges.length >= 6) {
-                                                        alert("Você só pode equipar no máximo 6 selos em destaque!");
+                                                    if (newEquippedState && equippedBadges.length >= 3) {
+                                                        alert("Você só pode equipar no máximo 3 selos em destaque!");
                                                         return;
                                                     }
                                                     
@@ -1119,7 +1128,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                         .from('user_badges')
                                                         .update({ is_equipped: newEquippedState })
                                                         .eq('id', earned.id);
-                                                        
+                                                    
                                                     if (!error) {
                                                         fetchUserBadgesData();
                                                     }
@@ -1132,12 +1141,16 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                         : 'border-slate-50 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/30 opacity-60 cursor-not-allowed'
                                                 }`}
                                             >
-                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-3 select-none ${
+                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-3 select-none overflow-hidden ${
                                                     earned 
                                                         ? badge.color 
                                                         : 'bg-slate-200 dark:bg-slate-800 text-slate-455 dark:text-slate-650 grayscale'
                                                 }`}>
-                                                    {badge.icon}
+                                                    {badge.icon.startsWith('http') ? (
+                                                        <img src={badge.icon} className={`w-full h-full object-cover rounded-2xl ${earned ? '' : 'grayscale'}`} alt="" />
+                                                    ) : (
+                                                        badge.icon
+                                                    )}
                                                 </div>
                                                 
                                                 <span className="text-[10px] font-bold text-center truncate w-full">

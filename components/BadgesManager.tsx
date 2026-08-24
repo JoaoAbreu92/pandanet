@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import type { Company, Employee, CompanyBadge, UserBadge } from '../types';
 import { useNotifications } from './NotificationContext';
@@ -51,6 +51,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [newDescription, setNewDescription] = useState('');
     const [newIcon, setNewIcon] = useState('🏆');
     const [newColor, setNewColor] = useState(PRESET_GRADIENTS[0].class);
+    const [isUploadingIcon, setIsUploadingIcon] = useState(false);
     
     // Award Badge Form State
     const [targetUserId, setTargetUserId] = useState('');
@@ -59,9 +60,11 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('');
 
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const fetchCompanyBadges = async () => {
         if (!company?.id) return;
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('company_badges')
             .select('*')
             .eq('company_id', company.id)
@@ -72,7 +75,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
     const fetchAwardHistory = async () => {
         if (!company?.id) return;
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('user_badges')
             .select(`
                 id,
@@ -99,6 +102,37 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         fetchAwardHistory();
     }, [company?.id]);
 
+    const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setIsUploadingIcon(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `badge-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+            const filePath = `company_badges/${fileName}`;
+            
+            const { error: uploadError } = await supabase.storage
+                .from('feed-media')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('feed-media')
+                .getPublicUrl(filePath);
+
+            if (publicUrl) {
+                setNewIcon(publicUrl);
+            }
+        } catch (error: any) {
+            console.error('Error uploading badge icon:', error);
+            alert('Erro ao fazer upload do selo: ' + error.message);
+        } finally {
+            setIsUploadingIcon(false);
+        }
+    };
+
     const handleCreateBadge = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newName.trim() || !newIcon.trim() || !newColor) {
@@ -107,7 +141,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         }
 
         try {
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('company_badges')
                 .insert({
                     company_id: company.id,
@@ -115,14 +149,14 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     description: newDescription,
                     icon: newIcon,
                     color: newColor
-                })
-                .select();
+                });
 
             if (error) throw error;
 
             alert('Selo criado com sucesso!');
             setNewName('');
             setNewDescription('');
+            setNewIcon('🏆');
             fetchCompanyBadges();
         } catch (error: any) {
             console.error('Error creating badge:', error);
@@ -257,6 +291,14 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         emp.email.toLowerCase().includes(searchEmployeeQuery.toLowerCase())
     );
 
+    const renderBadgeIcon = (icon: string, sizeClass = 'w-14 h-14 text-3xl') => {
+        const isUrl = icon.startsWith('http://') || icon.startsWith('https://');
+        if (isUrl) {
+            return <img src={icon} className={`${sizeClass} object-cover rounded-2xl shrink-0 border border-white/10`} alt="" />;
+        }
+        return icon;
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
@@ -291,6 +333,24 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     <div className="lg:col-span-1">
                         <Card title="Criar Novo Selo" className="bg-white dark:bg-slate-800 shadow-sm">
                             <form onSubmit={handleCreateBadge} className="space-y-4 mt-2">
+                                {/* Interactive Preview Card */}
+                                <div className="flex items-center space-x-4 mb-4 bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <div 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={`w-20 h-20 rounded-2xl ${newColor} border-2 border-white/20 flex items-center justify-center text-4xl shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-all select-none overflow-hidden shrink-0 group relative`}
+                                        title="Clique para carregar uma imagem do computador"
+                                    >
+                                        {renderBadgeIcon(newIcon, 'w-full h-full text-3xl object-cover')}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] font-bold">
+                                            Alterar
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-sm text-slate-800 dark:text-white truncate">{newName || 'Nome do Selo'}</h4>
+                                        <p className="text-xs text-slate-400 truncate">Clique no ícone para carregar imagem</p>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Nome do Selo *</label>
                                     <input
@@ -315,7 +375,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Ícone (Emoji) *</label>
+                                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Ícone ou Imagem do Selo *</label>
                                     <div className="flex gap-2 flex-wrap mb-2">
                                         {PRESET_EMOJIS.map(emoji => (
                                             <button
@@ -327,15 +387,37 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 {emoji}
                                             </button>
                                         ))}
+                                        {/* Upload inline button */}
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isUploadingIcon}
+                                            className="text-xl p-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-650 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center justify-center hover:scale-105 hover:border-brand-primary"
+                                            title="Carregar imagem do computador"
+                                        >
+                                            {isUploadingIcon ? '⏳' : '📁'}
+                                        </button>
                                     </div>
+
+                                    {/* Hidden Input file */}
                                     <input
-                                        type="text"
-                                        value={newIcon}
-                                        onChange={e => setNewIcon(e.target.value)}
-                                        maxLength={4}
-                                        placeholder="Emoji customizado"
-                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleIconUpload}
+                                        accept="image/*"
+                                        className="hidden"
                                     />
+
+                                    <div className="mt-3">
+                                        <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Ícone Atual (Texto ou URL)</label>
+                                        <input
+                                            type="text"
+                                            value={newIcon}
+                                            onChange={e => setNewIcon(e.target.value)}
+                                            placeholder="Emoji ou Link da imagem"
+                                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -348,8 +430,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 onClick={() => setNewColor(grad.class)}
                                                 className={`flex items-center space-x-2 p-2 rounded-xl border text-left transition-all ${newColor === grad.class ? 'border-brand-primary scale-[1.02]' : 'border-transparent hover:scale-98'}`}
                                             >
-                                                <span className={`w-6 h-6 rounded-lg ${grad.class} flex items-center justify-center font-bold text-xs`}>
-                                                    {newIcon}
+                                                <span className={`w-10 h-10 rounded-xl ${grad.class} flex items-center justify-center font-bold text-xs overflow-hidden`}>
+                                                    {renderBadgeIcon(newIcon, 'w-8 h-8 text-lg')}
                                                 </span>
                                                 <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">{grad.name}</span>
                                             </button>
@@ -383,8 +465,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                             className="flex flex-col justify-between p-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 hover:shadow-md transition-all group"
                                         >
                                             <div className="flex items-start space-x-4">
-                                                <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md shrink-0 select-none transform group-hover:scale-110 transition-transform duration-300`}>
-                                                    {badge.icon}
+                                                <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center shadow-md shrink-0 select-none overflow-hidden transform group-hover:scale-110 transition-transform duration-300`}>
+                                                    {renderBadgeIcon(badge.icon)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-bold text-slate-800 dark:text-white text-base truncate">{badge.name}</h4>
@@ -474,8 +556,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 onClick={() => setSelectedBadgeId(badge.id)}
                                                 className={`flex items-center space-x-3 p-3 rounded-xl border text-left transition-all ${selectedBadgeId === badge.id ? 'border-brand-primary bg-emerald-50/20 dark:bg-slate-700/50 scale-[1.01]' : 'border-slate-100 dark:border-slate-700 hover:scale-99'}`}
                                             >
-                                                <div className={`w-10 h-10 rounded-xl ${badge.color} border flex items-center justify-center text-xl shadow shrink-0 select-none`}>
-                                                    {badge.icon}
+                                                <div className={`w-10 h-10 rounded-xl ${badge.color} border flex items-center justify-center shadow shrink-0 select-none overflow-hidden`}>
+                                                    {renderBadgeIcon(badge.icon, 'w-8 h-8 text-lg')}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{badge.name}</p>
@@ -550,9 +632,9 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex items-center space-x-2">
-                                                        <span className={`w-7 h-7 rounded-lg ${badge.color} border flex items-center justify-center text-sm shadow-sm select-none`}>
-                                                            {badge.icon}
-                                                        </span>
+                                                        <div className={`w-8 h-8 rounded-lg ${badge.color} border flex items-center justify-center shadow-sm select-none overflow-hidden`}>
+                                                            {renderBadgeIcon(badge.icon, 'w-6 h-6 text-sm')}
+                                                        </div>
                                                         <span className="font-bold text-slate-700 dark:text-slate-300">{badge.name}</span>
                                                     </div>
                                                 </td>

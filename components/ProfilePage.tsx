@@ -623,17 +623,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{userData.role} • {userData.team}</p>
                 </div>
                 {/* Equipped Badges Row */}
-                <div className="flex gap-2 flex-wrap select-none mt-2 md:mt-0">
-                    {profileBadges.filter(ub => ub.is_equipped).slice(0, 6).map(ub => {
+                <div className="flex gap-3 flex-wrap select-none mt-2 md:mt-0">
+                    {profileBadges.filter(ub => ub.is_equipped).slice(0, 3).map(ub => {
                         const badge = ub.company_badges;
                         if (!badge) return null;
+                        const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
                         return (
                             <div 
                                 key={ub.id} 
-                                className={`w-11 h-11 rounded-xl ${badge.color} border flex items-center justify-center text-2xl shadow-md select-none transform hover:scale-110 transition-transform duration-300 cursor-pointer animate-float`}
+                                className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 transition-transform duration-300 cursor-pointer animate-float overflow-hidden`}
                                 title={`${badge.name}: ${badge.description || ''}`}
                             >
-                                {badge.icon}
+                                {isUrl ? (
+                                    <img src={badge.icon} className="w-full h-full object-cover rounded-2xl border border-white/10" alt={badge.name} />
+                                ) : (
+                                    badge.icon
+                                )}
                             </div>
                         );
                     })}
@@ -970,13 +975,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 {profileBadges.map(ub => {
                                     const badge = ub.company_badges;
                                     if (!badge) return null;
+                                    const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
                                     return (
                                         <div 
                                             key={ub.id}
                                             className="flex items-start space-x-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30 shadow-sm hover:shadow transition-shadow"
                                         >
-                                            <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-sm shrink-0 select-none transform hover:scale-105 transition-transform animate-float`}>
-                                                {badge.icon}
+                                            <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-sm shrink-0 select-none transform hover:scale-105 transition-transform animate-float overflow-hidden`}>
+                                                {isUrl ? (
+                                                    <img src={badge.icon} className="w-full h-full object-cover rounded-2xl border border-white/10" alt={badge.name} />
+                                                ) : (
+                                                    badge.icon
+                                                )}
                                             </div>
                                             <div className="min-w-0">
                                                 <h4 className="font-bold text-slate-850 dark:text-white text-base truncate">{badge.name}</h4>

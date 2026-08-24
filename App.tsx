@@ -495,25 +495,48 @@ const AppContent: React.FC = () => {
         }
         return [];
     });
-    const [expandedChatHeadId, setExpandedChatHeadId] = useState<string | null>(null);
-
+    const [expandedChatHeadIds, setExpandedChatHeadIds] = useState<string[]>([]);
+ 
     const handleMinimizeConversation = useCallback((conversationId: string, participantName: string, participantAvatarUrl: string, participantId?: string) => {
         setChatHeads(prev => {
-            if (prev.some(ch => ch.conversationId === conversationId)) return prev;
+            if (prev.some(ch => ch.conversationId === conversationId)) {
+                setExpandedChatHeadIds(ids => {
+                    if (ids.includes(conversationId)) return ids;
+                    return [...ids, conversationId];
+                });
+                return prev;
+            }
+ 
+            if (prev.length >= 4) {
+                const oldest = prev[0];
+                const confirmClose = window.confirm(`Você já possui o limite máximo de 4 conversas simultâneas. Deseja fechar a conversa com "${oldest.participantName}" para abrir esta nova?`);
+                if (!confirmClose) {
+                    return prev;
+                }
+                const updated = [...prev.slice(1), { conversationId, participantName, participantAvatarUrl, participantId }];
+                localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+                setExpandedChatHeadIds(ids => {
+                    const filtered = ids.filter(id => id !== oldest.conversationId);
+                    return [...filtered, conversationId];
+                });
+                return updated;
+            }
+ 
             const updated = [...prev, { conversationId, participantName, participantAvatarUrl, participantId }];
             localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+            setExpandedChatHeadIds(ids => [...ids, conversationId]);
             return updated;
         });
         handleNavigate('home');
     }, [handleNavigate]);
-
+ 
     const handleCloseChatHead = useCallback((conversationId: string) => {
         setChatHeads(prev => {
             const updated = prev.filter(ch => ch.conversationId !== conversationId);
             localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
             return updated;
         });
-        setExpandedChatHeadId(prev => prev === conversationId ? null : prev);
+        setExpandedChatHeadIds(prev => prev.filter(id => id !== conversationId));
     }, []);
 
 
@@ -822,9 +845,9 @@ const AppContent: React.FC = () => {
                 <AICorrector currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
                 <FloatingChatHeads
                     chatHeads={chatHeads}
-                    expandedChatHeadId={expandedChatHeadId}
+                    expandedChatHeadIds={expandedChatHeadIds}
                     setChatHeads={setChatHeads}
-                    setExpandedChatHeadId={setExpandedChatHeadId}
+                    setExpandedChatHeadIds={setExpandedChatHeadIds}
                     onCloseChatHead={handleCloseChatHead}
                     currentUser={currentUser}
                 />
