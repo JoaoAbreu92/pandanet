@@ -1733,7 +1733,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             {/* --- Create Folder Modal --- */}
             {showFolderModal && (
                 <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[110] backdrop-blur-xl">
-                    <div className="bg-white/90 dark:bg-slate-900/90 rounded-3xl p-8 w-[450px] shadow-2xl border border-gray-100 dark:border-white/5 transform transition-all animate-scale-in">
+                    <div className="bg-white/90 dark:bg-slate-900/90 rounded-3xl p-4 sm:p-8 w-[calc(100vw-2rem)] sm:w-[450px] max-w-full shadow-2xl border border-gray-100 dark:border-white/5 transform transition-all animate-scale-in">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary">
                                 <FolderIcon className="w-5 h-5" />

@@ -422,11 +422,11 @@ const CRMDashboard: React.FC = () => {
 
             {/* Bottom Section: Tabs & Detailed Table */}
             <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-                <div className="flex items-center border-b border-gray-50 dark:border-slate-800 px-4">
-                    <button className="px-6 py-4 text-xs font-bold text-blue-500 border-b-2 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10">Minhas Tarefas</button>
-                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50">Meus Projetos</button>
-                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50">Meus lembretes</button>
-                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50">Anúncios</button>
+                <div className="flex items-center border-b border-gray-50 dark:border-slate-800 px-4 overflow-x-auto no-scrollbar">
+                    <button className="px-6 py-4 text-xs font-bold text-blue-500 border-b-2 border-blue-500 bg-blue-50/30 dark:bg-blue-900/10 whitespace-nowrap">Minhas Tarefas</button>
+                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50 whitespace-nowrap">Meus Projetos</button>
+                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50 whitespace-nowrap">Meus lembretes</button>
+                    <button className="px-6 py-4 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800/50 whitespace-nowrap">Anúncios</button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">

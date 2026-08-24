@@ -82,7 +82,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany }) 
 
             {/* Panel */}
             {isOpen && (
-                <div className="absolute bottom-16 right-0 w-[450px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
+                <div className="absolute bottom-16 right-0 w-[calc(100vw-3rem)] sm:w-[450px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
                     <div className="p-4 bg-gray-50 dark:bg-gray-900 border-b flex justify-between items-center">
                         <div>
                             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">

@@ -191,8 +191,8 @@ const CRMSales: React.FC<{
             </div>
 
             {/* List Control actions */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800">
+                <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
                     {activeTab !== 'payments' && (
                         <button
                             onClick={() => {
@@ -202,19 +202,19 @@ const CRMSales: React.FC<{
                                     onNewRequest?.(type);
                                 }
                             }}
-                            className="flex items-center gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg"
+                            className="flex items-center justify-center flex-1 md:flex-none gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg whitespace-nowrap"
                         >
                             <PlusIcon className="w-4 h-4" />
-                            Novo {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}
+                            <span className="hidden sm:inline">Novo</span> {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}
                         </button>
                     )}
-                    <button className="flex items-center gap-2 text-gray-600 dark:text-slate-300 px-4 py-2.5 rounded-lg font-bold text-xs border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all">
+                    <button className="flex items-center justify-center p-2.5 text-gray-600 dark:text-slate-300 rounded-lg font-bold border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all flex-shrink-0">
                         <ArrowPathIcon className="w-4 h-4" />
                     </button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="relative flex-1 lg:w-80">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-80">
                         <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input 
                             type="text" 

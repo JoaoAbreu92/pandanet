@@ -181,7 +181,7 @@ const Chat: React.FC = () => {
 
   return (
     <div className="flex h-full bg-[#f8fafc] dark:bg-transparent overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
-      {/* Sidebar: Conversations List */}
+      {/* Middle Section: Conversations List */}
       <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
         <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-white dark:bg-transparent">
@@ -450,9 +450,9 @@ const Chat: React.FC = () => {
         )}
       </div>
 
-      {/* Right Sidebar: Contact Info */}
+      {/* Info Sidebar (Right) */}
       {selectedConversation && (
-        <div className={`w-[320px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
+        <div className={`w-full sm:w-[320px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
           {/* Contact Header Component / Modal Wrapper Alternative */}
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center xl:hidden">
             <span className="font-bold text-slate-700">Detalhes</span>

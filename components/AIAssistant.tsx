@@ -255,7 +255,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     // Render Behavior Specific Open View
     if (behavior === 'sidebar') {
         return (
-            <div className="fixed inset-y-0 right-0 w-full sm:w-[400px] md:w-[450px] z-50 animate-slide-in-right">
+            <div className="fixed inset-y-0 right-0 w-[calc(100vw-2rem)] sm:w-[400px] md:w-[450px] z-50 animate-slide-in-right">
                 {renderChatBox()}
             </div>
         );
@@ -275,7 +275,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
 
     // Default to Popup
     return (
-        <div className="fixed bottom-6 right-6 w-[350px] sm:w-[400px] h-[600px] max-h-[80vh] z-50 rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up border border-slate-200 dark:border-slate-700">
+        <div className="fixed bottom-6 right-2 sm:right-6 w-[calc(100vw-1rem)] sm:w-[400px] h-[600px] max-h-[80vh] z-50 rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up border border-slate-200 dark:border-slate-700">
             {renderChatBox()}
         </div>
     );

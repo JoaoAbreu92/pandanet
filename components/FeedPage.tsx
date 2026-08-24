@@ -110,7 +110,7 @@ export const PostCard: React.FC<{
             )}
 
             {!post.mediaUrl && getEmbedUrl(post.content) && (
-                <div className={`mb-4 rounded-lg overflow-hidden bg-black shadow-inner ${getEmbedUrl(post.content)?.type === 'youtube' || getEmbedUrl(post.content)?.type === 'vimeo' ? 'aspect-video' : 'aspect-[9/16] max-h-[600px] w-full max-w-[400px] mx-auto'}`}>
+                <div className={`mb-4 rounded-lg overflow-hidden bg-black shadow-inner flex justify-center items-center ${getEmbedUrl(post.content)?.type === 'youtube' || getEmbedUrl(post.content)?.type === 'vimeo' ? 'aspect-video w-full' : 'max-h-[600px] w-full max-w-[400px] mx-auto'}`}>
                     <iframe
                         width="100%"
                         height="100%"

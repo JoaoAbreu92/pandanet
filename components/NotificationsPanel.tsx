@@ -38,7 +38,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
 
             {/* Mini Modal / Popover */}
             {isOpen && (
-                <div className="absolute top-20 right-6 w-96 max-h-[600px] flex flex-col bg-white rounded-xl shadow-2xl border border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-20 right-2 sm:right-6 w-[calc(100vw-1rem)] sm:w-96 max-h-[600px] flex flex-col bg-white rounded-xl shadow-2xl border border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
 
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-gray-100 rounded-t-xl bg-gray-50/50">
