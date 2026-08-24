@@ -38,7 +38,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
             // "role", "team" are in DB. "name" -> "full_name". 
             // "bio", "phone", "officeLocation" -> "office_location"
 
-            const dbUpdates = {
+            const dbUpdates: any = {
+                id: currentUser.id,
                 full_name: tempUserData.name,
                 role: tempUserData.role,
                 team: tempUserData.team,
@@ -51,10 +52,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                 updated_at: new Date()
             };
 
+            // Se o usuário já tiver um company_id no estado, mantemos ele no upsert
+            if (currentUser.company_id) {
+                dbUpdates.company_id = currentUser.company_id;
+            }
+
             const { error } = await supabase
                 .from('profiles')
-                .update(dbUpdates)
-                .eq('id', currentUser.id);
+                .upsert(dbUpdates, { onConflict: 'id' });
 
             if (error) throw error;
 

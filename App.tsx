@@ -93,7 +93,7 @@ const AppContent: React.FC = () => {
                     let targetCompanyId = profile.company_id;
 
                     // Fallback para Master Admin sem ID de empresa
-                    const isMaster = userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br';
+                    const isMaster = userEmail === 'ti@grupopixel.com.br';
                     if (!targetCompanyId && isMaster) {
                         console.log("Master Admin sem company_id. Buscando domínio grupopixel.com.br...");
                         const { data: companyByDomain } = await supabase
@@ -117,13 +117,30 @@ const AppContent: React.FC = () => {
                             const mappedCompany = company as unknown as Company;
                             setCurrentCompany(mappedCompany);
 
-                            const defaultData: AppData = {
-                                employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
-                                formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
-                                events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                            const baseData = (mappedCompany.data || {}) as any;
+                            const mergedData: AppData = {
+                                employees: baseData.employees || [],
+                                announcements: baseData.announcements || [],
+                                banners: baseData.banners || [],
+                                conversations: baseData.conversations || [],
+                                tickets: baseData.tickets || [],
+                                marketplaceItems: baseData.marketplaceItems || [],
+                                formSubmissions: baseData.formSubmissions || [],
+                                tiRequests: baseData.tiRequests || [],
+                                documents: baseData.documents || [],
+                                benefits: baseData.benefits || [],
+                                polls: baseData.polls || [],
+                                feedPosts: baseData.feedPosts || [],
+                                events: baseData.events || [],
+                                trainings: baseData.trainings || [],
+                                kbArticles: baseData.kbArticles || [],
+                                services: baseData.services || [],
+                                securityAlerts: baseData.securityAlerts || [],
+                                recognitions: baseData.recognitions || [],
+                                wellnessItems: baseData.wellnessItems || []
                             };
 
-                            setCompanyData(mappedCompany.data || defaultData);
+                            setCompanyData(mergedData);
                             setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
                             console.log("Empresa carregada com sucesso:", mappedCompany.name);
                         } else {
@@ -306,7 +323,7 @@ const AppContent: React.FC = () => {
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
-            case 'admin': return currentUser.role === 'Super Admin' ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado.</p>;
+            case 'admin': return (currentUser.role === 'Super Admin' && currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;
@@ -382,7 +399,7 @@ const AppContent: React.FC = () => {
         const handleRepairProfile = async () => {
             if (!session.user.email) return;
             const userEmail = session.user.email.toLowerCase();
-            const isMaster = userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br';
+            const isMaster = userEmail === 'ti@grupopixel.com.br';
             let domain = isMaster ? 'grupopixel.com.br' : userEmail.split('@')[1];
             domain = domain.trim().toLowerCase();
 
