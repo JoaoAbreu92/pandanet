@@ -152,10 +152,30 @@ const Layout: React.FC<LayoutProps> = ({
                         companyLogo={companySettings.logoUrl}
                         isImpersonating={isImpersonating}
                         isMasterAdmin={isMasterAdmin}
-                        customFeatures={{
-                            ...(currentCompany?.plan?.features || {}),
-                            ...(currentCompany?.custom_features || {})
-                        }}
+                        customFeatures={(() => {
+                            if (!currentCompany) return {};
+                            const planFeatures = currentCompany.plan?.features || {};
+                            const customFeatures = currentCompany.custom_features || {};
+                            const merged: Record<string, any> = {};
+                            
+                            if (currentCompany.plan) {
+                                Object.keys(planFeatures).forEach(key => {
+                                    const planVal = planFeatures[key];
+                                    const customVal = customFeatures[key];
+                                    
+                                    if (planVal === false || planVal === 'disabled') {
+                                        merged[key] = false;
+                                    } else if (customVal === false || customVal === 'disabled') {
+                                        merged[key] = false;
+                                    } else {
+                                        merged[key] = customVal !== undefined ? customVal : planVal;
+                                    }
+                                });
+                            } else {
+                                Object.assign(merged, customFeatures);
+                            }
+                            return merged;
+                        })()}
                     />
                 </div>
 

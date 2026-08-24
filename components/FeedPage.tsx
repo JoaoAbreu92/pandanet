@@ -3,7 +3,7 @@ import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
 import RecognitionWidget from './RecognitionWidget';
 import RecognitionModal from './RecognitionModal';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
@@ -580,17 +580,32 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             if (error) throw error;
 
-            const formatted: Recognition[] = data.map((item: any) => ({
-                id: item.id,
-                fromId: item.from_id,
-                toId: item.to_id,
-                from: item.from_profile?.full_name || 'Usuário Excluído',
-                to: item.to_profile?.full_name || 'Usuário Excluído',
-                fromAvatar: item.from_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.from_profile?.full_name || 'Usuario Excluido')}&background=random`,
-                toAvatar: item.to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.to_profile?.full_name || 'Usuario Excluido')}&background=random`,
-                message: item.message,
-                value: item.type as any
-            }));
+            const getAvatarUrl = (avatarUrl: string | null | undefined, fullName: string) => {
+                if (!avatarUrl) {
+                    return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`;
+                }
+                if (avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:')) {
+                    return getCleanImageUrl(avatarUrl);
+                }
+                const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+                return getCleanImageUrl(data?.publicUrl || avatarUrl);
+            };
+
+            const formatted: Recognition[] = data.map((item: any) => {
+                const fromName = item.from_profile?.full_name || 'Usuário Excluído';
+                const toName = item.to_profile?.full_name || 'Usuário Excluído';
+                return {
+                    id: item.id,
+                    fromId: item.from_id,
+                    toId: item.to_id,
+                    from: fromName,
+                    to: toName,
+                    fromAvatar: getAvatarUrl(item.from_profile?.avatar_url, fromName),
+                    toAvatar: getAvatarUrl(item.to_profile?.avatar_url, toName),
+                    message: item.message,
+                    value: item.type as any
+                };
+            });
             setLocalRecognitions(formatted);
         } catch (err) {
             console.error('Error fetching recognitions:', err);

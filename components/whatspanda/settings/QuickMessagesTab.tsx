@@ -13,6 +13,7 @@ interface QuickMessage {
   is_public: boolean;
   created_by: string;
   created_at: string;
+  shared_with?: string[];
   creator?: {
     full_name: string;
   };
@@ -34,11 +35,31 @@ const QuickMessagesTab: React.FC = () => {
   const [shortcut, setShortcut] = useState('');
   const [messageText, setMessageText] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [shareWithSpecific, setShareWithSpecific] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchQuickMessages();
+    fetchAgents();
   }, [companyId, userId]);
+
+  const fetchAgents = async () => {
+    if (!companyId) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('company_id', companyId)
+        .order('full_name', { ascending: true });
+      if (!error) {
+        setAgents(data || []);
+      }
+    } catch (err) {
+      console.error('[QUICK-MSG] Erro ao carregar agentes:', err);
+    }
+  };
 
   const fetchQuickMessages = async () => {
     if (!companyId || !userId) return;
@@ -48,7 +69,7 @@ const QuickMessagesTab: React.FC = () => {
         .from('whatsapp_quick_messages')
         .select('*, creator:profiles(full_name)')
         .eq('company_id', companyId)
-        .or(`is_public.eq.true,created_by.eq.${userId}`)
+        .or(`is_public.eq.true,created_by.eq.${userId},shared_with.cs.{${userId}}`)
         .order('shortcut', { ascending: true });
 
       if (error) throw error;
@@ -79,6 +100,8 @@ const QuickMessagesTab: React.FC = () => {
       return;
     }
 
+    const shared = isPublic ? [] : (shareWithSpecific ? selectedAgents : []);
+
     setActionLoading(true);
     try {
       if (editId) {
@@ -88,7 +111,8 @@ const QuickMessagesTab: React.FC = () => {
           .update({
             shortcut: cleanShortcut,
             message: messageText.trim(),
-            is_public: isPublic
+            is_public: isPublic,
+            shared_with: shared
           })
           .eq('id', editId);
 
@@ -102,7 +126,8 @@ const QuickMessagesTab: React.FC = () => {
             shortcut: cleanShortcut,
             message: messageText.trim(),
             is_public: isPublic,
-            created_by: userId
+            created_by: userId,
+            shared_with: shared
           });
 
         if (error) throw error;
@@ -112,6 +137,8 @@ const QuickMessagesTab: React.FC = () => {
       setShortcut('');
       setMessageText('');
       setIsPublic(true);
+      setShareWithSpecific(false);
+      setSelectedAgents([]);
       setEditId(null);
       setIsEditing(false);
       fetchQuickMessages();
@@ -128,6 +155,9 @@ const QuickMessagesTab: React.FC = () => {
     setShortcut(msg.shortcut);
     setMessageText(msg.message);
     setIsPublic(msg.is_public);
+    const shared = msg.shared_with || [];
+    setSelectedAgents(shared);
+    setShareWithSpecific(!msg.is_public && shared.length > 0);
     setIsEditing(true);
   };
 
@@ -200,7 +230,13 @@ const QuickMessagesTab: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setIsPublic(!isPublic)}
+                onClick={() => {
+                  setIsPublic(!isPublic);
+                  if (isPublic) {
+                    setShareWithSpecific(false);
+                    setSelectedAgents([]);
+                  }
+                }}
                 className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${
                   isPublic ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
                 }`}
@@ -208,6 +244,55 @@ const QuickMessagesTab: React.FC = () => {
                 <span className="w-4.5 h-4.5 bg-white rounded-full shadow-md" />
               </button>
             </div>
+
+            {!isPublic && (
+              <>
+                <div className="flex items-center justify-between p-3.5 bg-slate-50/50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                  <div>
+                    <h4 className="text-[10px] font-bold text-gray-700 dark:text-white uppercase tracking-wider">Compartilhar Específico</h4>
+                    <p className="text-[9px] text-gray-400 font-medium mt-0.5">Selecione usuários específicos para visualizar o atalho.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShareWithSpecific(!shareWithSpecific)}
+                    className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${
+                      shareWithSpecific ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
+                    }`}
+                  >
+                    <span className="w-4.5 h-4.5 bg-white rounded-full shadow-md" />
+                  </button>
+                </div>
+
+                {shareWithSpecific && (
+                  <div className="p-4 bg-slate-50/50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Usuários Disponíveis
+                    </label>
+                    {agents.filter(a => a.id !== userId).length === 0 ? (
+                      <p className="text-[10px] text-gray-400 font-medium">Nenhum outro usuário disponível.</p>
+                    ) : (
+                      agents.filter(a => a.id !== userId).map(agent => (
+                        <label key={agent.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={selectedAgents.includes(agent.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedAgents([...selectedAgents, agent.id]);
+                              } else {
+                                setSelectedAgents(selectedAgents.filter(id => id !== agent.id));
+                              }
+                            }}
+                            className="rounded text-emerald-500 focus:ring-emerald-500 border-gray-300 dark:border-white/10 dark:bg-white/5"
+                          />
+                          {agent.full_name}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="flex gap-3 pt-2">
               {editId && (
@@ -281,6 +366,11 @@ const QuickMessagesTab: React.FC = () => {
                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                       Criador: {msg.created_by === userId ? 'Você' : (msg.creator?.full_name || 'Desconhecido')}
                     </span>
+                    {!msg.is_public && msg.shared_with && msg.shared_with.length > 0 && (
+                      <span className="text-[9px] font-medium text-slate-500 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-lg">
+                        Compartilhado com: {msg.shared_with.map(id => agents.find(a => a.id === id)?.full_name?.split(' ')[0]).filter(Boolean).join(', ')}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-650 dark:text-gray-300 font-medium whitespace-pre-wrap leading-relaxed mt-1">
                     {msg.message}
@@ -288,20 +378,28 @@ const QuickMessagesTab: React.FC = () => {
                 </div>
 
                 <div className="flex items-start gap-2">
-                  <button
-                    onClick={() => handleEdit(msg)}
-                    className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-all"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-300" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(msg.id)}
-                    className="p-2.5 bg-red-500/10 hover:bg-red-500 dark:bg-red-500/20 dark:hover:bg-red-500 hover:text-white rounded-xl transition-all"
-                    title="Excluir"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-500 hover:text-inherit" />
-                  </button>
+                  {msg.created_by === userId ? (
+                    <>
+                      <button
+                        onClick={() => handleEdit(msg)}
+                        className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-all"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-300" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(msg.id)}
+                        className="p-2.5 bg-red-500/10 hover:bg-red-500 dark:bg-red-500/20 dark:hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500 hover:text-inherit" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[9px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-widest self-center opacity-60">
+                      Apenas Visualização
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

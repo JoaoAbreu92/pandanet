@@ -67,10 +67,31 @@ const AppContent: React.FC = () => {
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
-    const mergedFeatures = {
-        ...(currentCompany?.plan?.features || {}),
-        ...(currentCompany?.custom_features || {})
+    const getMergedFeatures = (company: Company | null) => {
+        if (!company) return {};
+        const planFeatures = company.plan?.features || {};
+        const customFeatures = company.custom_features || {};
+        const merged: Record<string, any> = {};
+        
+        if (company.plan) {
+            Object.keys(planFeatures).forEach(key => {
+                const planVal = planFeatures[key];
+                const customVal = customFeatures[key];
+                
+                if (planVal === false || planVal === 'disabled') {
+                    merged[key] = false;
+                } else if (customVal === false || customVal === 'disabled') {
+                    merged[key] = false;
+                } else {
+                    merged[key] = customVal !== undefined ? customVal : planVal;
+                }
+            });
+        } else {
+            Object.assign(merged, customFeatures);
+        }
+        return merged;
     };
+    const mergedFeatures = getMergedFeatures(currentCompany);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     // Loading & Error States

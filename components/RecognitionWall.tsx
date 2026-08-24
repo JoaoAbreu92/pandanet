@@ -3,7 +3,7 @@ import Card from './Card';
 import { PlusIcon } from './icons';
 import type { Recognition, Employee } from '../types';
 import RecognitionModal from './RecognitionModal';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
@@ -88,16 +88,31 @@ const RecognitionWall: React.FC = () => {
                 if (error) {
                     console.error('Error fetching recognitions:', error);
                 } else if (recognitionsData) {
-                    const formattedRecognitions: Recognition[] = recognitionsData.map((r: any) => ({
-                        id: r.id,
-                        from: (r.from as any)?.full_name || 'Usuário Excluído',
-                        fromAvatar: (r.from as any)?.avatar_url || 'https://via.placeholder.com/150',
-                        to: (r.to as any)?.full_name || 'Usuário Excluído',
-                        toAvatar: (r.to as any)?.avatar_url || 'https://via.placeholder.com/150',
-                        message: r.message,
-                        value: r.type as any,
-                        date: r.created_at
-                    }));
+                    const getAvatarUrl = (avatarUrl: string | null | undefined, fullName: string) => {
+                        if (!avatarUrl) {
+                            return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`;
+                        }
+                        if (avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:')) {
+                            return getCleanImageUrl(avatarUrl);
+                        }
+                        const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+                        return getCleanImageUrl(data?.publicUrl || avatarUrl);
+                    };
+
+                    const formattedRecognitions: Recognition[] = recognitionsData.map((r: any) => {
+                        const fromName = (r.from as any)?.full_name || 'Usuário Excluído';
+                        const toName = (r.to as any)?.full_name || 'Usuário Excluído';
+                        return {
+                            id: r.id,
+                            from: fromName,
+                            fromAvatar: getAvatarUrl((r.from as any)?.avatar_url, fromName),
+                            to: toName,
+                            toAvatar: getAvatarUrl((r.to as any)?.avatar_url, toName),
+                            message: r.message,
+                            value: r.type as any,
+                            date: r.created_at
+                        };
+                    });
                     setRecognitions(formattedRecognitions);
                 }
             } catch (err) {

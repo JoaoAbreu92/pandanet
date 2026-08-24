@@ -182,6 +182,13 @@ async function runAutoMigration() {
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar novas colunas de chatbot:', e));
 
+        console.log('[MIGRATION] Verificando e criando coluna shared_with para whatsapp_quick_messages...');
+        await supabase.rpc('exec_sql', {
+            sql: `
+                ALTER TABLE public.whatsapp_quick_messages ADD COLUMN IF NOT EXISTS shared_with UUID[] DEFAULT '{}';
+            `
+        }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna shared_with:', e));
+
         console.log('[MIGRATION] Verificando e criando coluna created_at nas tabelas de campanhas e alvos...');
         await supabase.rpc('exec_sql', {
             sql: `
@@ -2379,6 +2386,70 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
                         let hasTransferred = false;
 
+                        // 0. Verificar se há uma seleção de atendente pendente para a triagem inteligente
+                        if (chatbotMode === 'gemini' && !currentConv.queue_id && !currentConv.assigned_to) {
+                            const pendingSelection = global.pendingTriagemSelections?.get(conversationId);
+                            if (pendingSelection) {
+                                const userInput = (text || "").trim().toLowerCase();
+                                
+                                // 1. Tentar casar pelo número (1, 2, 3...)
+                                const numIdx = parseInt(userInput);
+                                let selectedAgent = null;
+                                if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= pendingSelection.agents.length) {
+                                    selectedAgent = pendingSelection.agents[numIdx - 1];
+                                } else {
+                                    // 2. Tentar casar pelo primeiro nome (case-insensitive)
+                                    selectedAgent = pendingSelection.agents.find(agent => {
+                                        const firstName = agent.firstName.toLowerCase();
+                                        return userInput.includes(firstName);
+                                    });
+                                }
+
+                                if (selectedAgent) {
+                                    console.log(`[IA TRIAGEM] Cliente selecionou o atendente: ${selectedAgent.fullName} (${selectedAgent.id})`);
+                                    
+                                    await supabase
+                                        .from('whatsapp_conversations')
+                                        .update({ assigned_to: selectedAgent.id, chatbot_node_id: null, queue_id: null })
+                                        .eq('id', conversationId);
+
+                                    const notifyText = `Certo! Vou transferir você para o especialista *${selectedAgent.fullName}*. Por favor, aguarde um instante.`;
+                                    
+                                    const instanceName = `conn_${connectionId}`;
+                                    await dispatchTextEvolution(instanceName, fromPhone, notifyText)
+                                        .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+
+                                    await supabase.from('whatsapp_messages').insert({
+                                        company_id: companyId,
+                                        conversation_id: conversationId,
+                                        message_text: notifyText,
+                                        is_from_customer: false,
+                                        sent_by: null,
+                                        assigned_to: selectedAgent.id
+                                    });
+
+                                    global.pendingTriagemSelections.delete(conversationId);
+                                    hasTransferred = true;
+                                } else {
+                                    const optionsList = pendingSelection.agents.map((agent, idx) => `${idx + 1} - ${agent.firstName}`).join('\n');
+                                    const retryText = `Não entendi sua opção. Por favor, digite o número correspondente ou o primeiro nome do atendente com quem deseja falar:\n\n${optionsList}`;
+                                    
+                                    const instanceName = `conn_${connectionId}`;
+                                    await dispatchTextEvolution(instanceName, fromPhone, retryText)
+                                        .catch(e => console.error('[IA TRIAGEM] Erro ao enviar opções novamente:', e.message));
+
+                                    await supabase.from('whatsapp_messages').insert({
+                                        company_id: companyId,
+                                        conversation_id: conversationId,
+                                        message_text: retryText,
+                                        is_from_customer: false,
+                                        sent_by: null
+                                    });
+                                    hasTransferred = true;
+                                }
+                            }
+                        }
+
                         // 1. Verificar transferências por palavra-chave se bot estiver ativo
                         if (chatbotMode !== 'disabled' && !currentConv.queue_id && !currentConv.assigned_to) {
                             try {
@@ -2489,30 +2560,80 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
                                     if (suggestion && suggestion.target_type === 'queue' && suggestion.target_id) {
                                         console.log(`[IA TRIAGEM] Sugeriu transferir para fila: ${suggestion.target_id}`);
-                                        addDebugLog('IA_TRIAGEM_OK', `Transferência automática via IA para fila ${suggestion.target_id} sugerida com sucesso.`);
                                         
-                                        await supabase
-                                            .from('whatsapp_conversations')
-                                            .update({ queue_id: suggestion.target_id, chatbot_node_id: null, assigned_to: null })
-                                            .eq('id', conversationId);
-                                        
-                                        const destQueue = queues.find(q => q.id === suggestion.target_id);
-                                        const notifyText = suggestion.response || `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
-                                        
-                                        const instanceName = `conn_${connectionId}`;
-                                        await dispatchTextEvolution(instanceName, fromPhone, notifyText)
-                                            .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+                                        // Buscar atendentes associados a esta fila
+                                        let assignedAgents = [];
+                                        try {
+                                            const { data: queueAgents } = await supabase
+                                                .from('profiles')
+                                                .select('id, full_name, whatspanda_permissions')
+                                                .eq('company_id', companyId)
+                                                .eq('is_whatsapp_agent', true);
+                                            
+                                            assignedAgents = (queueAgents || []).filter(agent => {
+                                                const aq = agent.whatspanda_permissions?.assigned_queues;
+                                                return Array.isArray(aq) && aq.includes(suggestion.target_id);
+                                            });
+                                        } catch (agentErr) {
+                                            console.error('[IA TRIAGEM] Erro ao buscar agentes da fila:', agentErr.message);
+                                        }
 
-                                        await supabase.from('whatsapp_messages').insert({
-                                            company_id: companyId,
-                                            conversation_id: conversationId,
-                                            message_text: notifyText,
-                                            is_from_customer: false,
-                                            sent_by: null,
-                                            queue_id: suggestion.target_id
-                                        });
+                                        if (assignedAgents.length > 1) {
+                                            const agentsList = assignedAgents.map(a => ({
+                                                id: a.id,
+                                                firstName: a.full_name.split(' ')[0],
+                                                fullName: a.full_name
+                                            }));
 
-                                        hasTransferred = true;
+                                            global.pendingTriagemSelections = global.pendingTriagemSelections || new Map();
+                                            global.pendingTriagemSelections.set(conversationId, {
+                                                queueId: suggestion.target_id,
+                                                agents: agentsList
+                                            });
+
+                                            const destQueue = queues.find(q => q.id === suggestion.target_id);
+                                            const queueName = destQueue ? destQueue.name : "Setor";
+                                            const optionsText = agentsList.map((a, idx) => `${idx + 1} - ${a.firstName}`).join('\n');
+                                            const askText = `Olá! Entendi seu interesse pelo setor de *${queueName}*.\nCom qual dos atendentes abaixo você gostaria de falar? Por favor, digite o número correspondente ou o primeiro nome:\n\n${optionsText}`;
+                                            
+                                            const instanceName = `conn_${connectionId}`;
+                                            await dispatchTextEvolution(instanceName, fromPhone, askText)
+                                                .catch(e => console.error('[IA TRIAGEM] Erro ao enviar pergunta de atendentes:', e.message));
+
+                                            await supabase.from('whatsapp_messages').insert({
+                                                company_id: companyId,
+                                                conversation_id: conversationId,
+                                                message_text: askText,
+                                                is_from_customer: false,
+                                                sent_by: null
+                                            });
+                                            hasTransferred = true;
+                                        } else {
+                                            addDebugLog('IA_TRIAGEM_OK', `Transferência automática via IA para fila ${suggestion.target_id} sugerida com sucesso.`);
+                                            
+                                            await supabase
+                                                .from('whatsapp_conversations')
+                                                .update({ queue_id: suggestion.target_id, chatbot_node_id: null, assigned_to: null })
+                                                .eq('id', conversationId);
+                                            
+                                            const destQueue = queues.find(q => q.id === suggestion.target_id);
+                                            const notifyText = suggestion.response || `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
+                                            
+                                            const instanceName = `conn_${connectionId}`;
+                                            await dispatchTextEvolution(instanceName, fromPhone, notifyText)
+                                                .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+
+                                            await supabase.from('whatsapp_messages').insert({
+                                                company_id: companyId,
+                                                conversation_id: conversationId,
+                                                message_text: notifyText,
+                                                is_from_customer: false,
+                                                sent_by: null,
+                                                queue_id: suggestion.target_id
+                                            });
+
+                                            hasTransferred = true;
+                                        }
                                     } else if (suggestion && suggestion.target_type === 'agent' && suggestion.target_id) {
                                         console.log(`[IA TRIAGEM] Sugeriu transferir para agente: ${suggestion.target_id}`);
                                         addDebugLog('IA_TRIAGEM_AGENT_OK', `Transferência automática via IA para agente ${suggestion.target_id} sugerida com sucesso.`);
