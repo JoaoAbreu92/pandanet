@@ -196,18 +196,20 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 console.error("Erro ao buscar status do WhatsApp:", e);
             }
 
-            // Fetch Pending Users (includes orphaned active users without company)
+            // Fetch Pending Users (only those without a company, i.e., new company registration requests)
             const { data: pendingData } = await supabase
                 .from('profiles')
                 .select('*, company:companies(*)')
-                .eq('status', 'pending');
+                .eq('status', 'pending')
+                .is('company_id', null);
             if (pendingData) setPendingUsers(pendingData as any);
 
             // Fetch Rejected Users
             const { data: rejectedData } = await supabase
                 .from('profiles')
                 .select('*, company:companies(*)')
-                .eq('status', 'rejected');
+                .eq('status', 'rejected')
+                .is('company_id', null);
             if (rejectedData) setRejectedUsers(rejectedData as any);
         } catch (error) {
             console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
