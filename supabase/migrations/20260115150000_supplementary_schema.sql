@@ -52,14 +52,32 @@ CREATE TABLE IF NOT EXISTS public.poll_votes (
     UNIQUE(poll_id, user_id)
 );
 
--- 4. ENABLE RLS
+-- 4. FORM SUBMISSIONS TABLE
+CREATE TABLE IF NOT EXISTS public.form_submissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    form_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pendente',
+    submitted_at TIMESTAMPTZ DEFAULT now(),
+    start_date DATE,
+    end_date DATE,
+    reason TEXT,
+    sector_manager TEXT,
+    employee_manager TEXT,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. ENABLE RLS
 ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.security_alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.polls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.poll_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.poll_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.form_submissions ENABLE ROW LEVEL SECURITY;
 
--- 5. RLS POLICIES
+-- 6. RLS POLICIES
 DO $$
 BEGIN
     -- Services
@@ -110,24 +128,6 @@ BEGIN
     END IF;
 END $$;
 
--- 5.5 FORM SUBMISSIONS TABLE
-CREATE TABLE IF NOT EXISTS public.form_submissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-    requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    form_type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'Pendente',
-    submitted_at TIMESTAMPTZ DEFAULT now(),
-    start_date DATE,
-    end_date DATE,
-    reason TEXT,
-    sector_manager TEXT,
-    employee_manager TEXT,
-    metadata JSONB,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.form_submissions ENABLE ROW LEVEL SECURITY;
 
 -- 6. EXTRA STORAGE BUCKETS
 INSERT INTO storage.buckets (id, name, public) VALUES ('announcements-media', 'announcements-media', true) ON CONFLICT (id) DO UPDATE SET public = true;
