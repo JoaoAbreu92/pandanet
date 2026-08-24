@@ -183,28 +183,28 @@ const MasterBanner: React.FC = () => {
     if (!hasContent && !canEdit) return null;
 
     return (
-        <div className="w-full flex flex-col items-center gap-3">
+        <div className="w-full flex flex-col items-center gap-4">
             {/* Banner exibido */}
             {hasContent && (
-                <div className="w-full max-w-[860px] mx-auto relative group overflow-hidden rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
+                <div className="w-full max-w-[1280px] mx-auto relative group overflow-hidden rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {bannerData!.videoUrl ? (
                         <video
                             src={bannerData!.videoUrl}
                             autoPlay muted loop playsInline
                             className="w-full object-cover"
-                            style={{ maxHeight: '320px' }}
+                            style={{ minHeight: '400px', maxHeight: '500px' }}
                         />
                     ) : bannerData!.link ? (
                         <a href={bannerData!.link} target="_blank" rel="noopener noreferrer" className="block">
                             <img
                                 src={bannerData!.imageUrl}
                                 alt="Banner Master"
-                                className="w-full object-cover transition-transform duration-500 group-hover:scale-[1.01]"
-                                style={{ maxHeight: '320px' }}
+                                className="w-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+                                style={{ minHeight: '400px', maxHeight: '500px' }}
                             />
                             {bannerData!.buttonText && (
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-                                    <span className="px-6 py-2.5 bg-white/90 backdrop-blur text-gray-900 font-bold rounded-full shadow-lg text-sm hover:bg-white transition-all">
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+                                    <span className="px-8 py-3 bg-white/95 backdrop-blur text-gray-900 font-bold rounded-full shadow-2xl text-base hover:bg-white transition-all transform group-hover:scale-105">
                                         {bannerData!.buttonText}
                                     </span>
                                 </div>
@@ -215,7 +215,7 @@ const MasterBanner: React.FC = () => {
                             src={bannerData!.imageUrl}
                             alt="Banner Master"
                             className="w-full object-cover"
-                            style={{ maxHeight: '320px' }}
+                            style={{ minHeight: '400px', maxHeight: '500px' }}
                         />
                     )}
 
@@ -235,9 +235,9 @@ const MasterBanner: React.FC = () => {
             {!hasContent && canEdit && (
                 <button
                     onClick={() => setIsEditing(true)}
-                    className="w-full max-w-[860px] mx-auto h-16 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all text-sm font-medium"
+                    className="w-full max-w-[1280px] mx-auto h-24 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-3xl text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all text-base font-medium bg-gray-50/50 dark:bg-gray-800/50"
                 >
-                    <span className="text-xl">🖼️</span>
+                    <span className="text-2xl">🖼️</span>
                     Adicionar Banner Global (Masteradmin)
                 </button>
             )}

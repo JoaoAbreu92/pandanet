@@ -472,124 +472,158 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
+        console.log(`[SYNC] Iniciando sincronização total para ${instanceName}...`);
         const contactMap = {};
-
-        // Evolution API v2 usa POST com body para buscar contatos/chats
-        // Tenta GET e POST para cobrir v1 e v2
-        const contactEndpoints = [
-            { method: 'POST', url: `${evoUrl}/contact/findContacts/${instanceName}`, body: { where: {} } },
-            { method: 'POST', url: `${evoUrl}/contact/findAll/${instanceName}`, body: {} },
-            { method: 'GET',  url: `${evoUrl}/contact/findContacts/${instanceName}`, body: null },
-            { method: 'GET',  url: `${evoUrl}/contact/findAll/${instanceName}`, body: null },
-        ];
-
-        for (const ep of contactEndpoints) {
-            try {
-                console.log(`[SYNC] Tentando ${ep.method} ${ep.url}`);
-                const fetchOpts = {
-                    method: ep.method,
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
-                };
-                if (ep.body !== null) fetchOpts.body = JSON.stringify(ep.body);
-                
-                const res = await fetch(ep.url, fetchOpts);
-                if (!res.ok) { console.log(`[SYNC] Retornou ${res.status}. Tentando próximo...`); continue; }
-                
-                const raw = await res.json();
-                const list = Array.isArray(raw) ? raw : (raw.contacts || raw.data || []);
-                
-                if (list.length > 0) {
-                    console.log(`[SYNC] ${list.length} contatos encontrados!`);
-                    for (const c of list) {
-                        const jid = c.remoteJid || c.jid || c.id || '';
-                        if (!jid || jid.includes('@g.us') || jid.includes('@lid')) continue;
-                        const phone = jid.split('@')[0];
-                        const name = c.pushName || c.verifiedName || c.name || c.notify || null;
-                        if (name) contactMap[phone] = name;
-                    }
-                    if (Object.keys(contactMap).length > 0) break;
-                }
-            } catch(e) {
-                console.error(`[SYNC] Erro no endpoint:`, e.message);
-            }
-        }
-        console.log(`[SYNC] Total de nomes mapeados: ${Object.keys(contactMap).length}`);
-
-        // Buscar Chats
-        const chatEndpoints = [
-            { method: 'POST', url: `${evoUrl}/chat/findChats/${instanceName}`, body: {} },
-            { method: 'GET',  url: `${evoUrl}/chat/findChats/${instanceName}`, body: null },
-            { method: 'POST', url: `${evoUrl}/chat/findAll/${instanceName}`, body: {} },
-            { method: 'GET',  url: `${evoUrl}/chat/findAll/${instanceName}`, body: null },
-        ];
-
-        const contactsToUpsert = [];
         const processedJids = new Set();
+        const contactsToUpsert = [];
 
-        for (const [phone, cName] of Object.entries(contactMap)) {
-            processedJids.add(phone);
-            contactsToUpsert.push({ company_id: companyId, phone, name: cName, updated_at: new Date().toISOString() });
-        }
+        const headers = { 'apikey': evoKey, 'Content-Type': 'application/json' };
 
-        for (const chatEp of chatEndpoints) {
-            try {
-                console.log(`[SYNC] Tentando ${chatEp.method} ${chatEp.url}`);
-                const fetchOpts = {
-                    method: chatEp.method,
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
-                };
-                if (chatEp.body !== null) fetchOpts.body = JSON.stringify(chatEp.body);
-                
-                const response = await fetch(chatEp.url, fetchOpts);
-                if (!response.ok) { console.log(`[SYNC] Chat retornou ${response.status}.`); continue; }
-
-                const raw = await response.json();
-                const chats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
-
-                if (chats.length > 0) {
-                    console.log(`[SYNC] ${chats.length} chats encontrados.`);
-                    for (const chat of chats) {
-                        // Extrair o JID corretamente do objeto chat
-                        const jid = chat.remoteJid || chat.jid || chat.id || '';
-                        // Ignorar broadcasts e @lid (IDs internos), mas PERMITIR grupos (@g.us)
-                        if (!jid || jid.includes('@broadcast') || jid.includes('@lid')) continue;
-                        const isGroup = jid.includes('@g.us');
-                        const phone = jid.split('@')[0];
-                        if (processedJids.has(phone)) continue;
+        // 1. Buscar Contatos Pessoais
+        try {
+            const resp = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, { headers });
+            if (resp.ok) {
+                const raw = await resp.json();
+                const list = Array.isArray(raw) ? raw : (raw.contacts || raw.data || []);
+                console.log(`[SYNC] ${list.length} contatos pessoais encontrados.`);
+                for (const c of list) {
+                    const jid = c.remoteJid || c.jid || c.id || '';
+                    if (!jid || jid.includes('@g.us')) continue;
+                    const phone = jid.split('@')[0];
+                    const name = c.pushName || c.verifiedName || c.name || c.notify || null;
+                    if (name) contactMap[phone] = name;
+                    
+                    if (!processedJids.has(phone)) {
                         processedJids.add(phone);
-
-                        const rawName = isGroup 
-                            ? (chat.subject || chat.name || 'Grupo Sem Nome')
-                            : (chat.pushName || chat.verifiedName || chat.name || contactMap[phone]);
-                        const name = rawName || formatPhoneDisplay(phone);
                         contactsToUpsert.push({ 
                             company_id: companyId, 
                             phone, 
-                            name, 
-                            is_group: isGroup,
+                            name: name || formatPhoneDisplay(phone), 
+                            is_group: false,
                             updated_at: new Date().toISOString() 
                         });
                     }
-                    break;
                 }
-            } catch(e) {
-                console.error(`[SYNC] Erro em chat endpoint:`, e.message);
             }
+        } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
+
+        // 2. Buscar TODOS os Grupos
+        try {
+            const respG = await fetch(`${evoUrl}/group/findAll/${instanceName}`, { headers });
+            if (respG.ok) {
+                const groups = await respG.json();
+                console.log(`[SYNC] ${groups.length} grupos encontrados.`);
+                for (const g of groups) {
+                    const jid = g.jid || g.id || '';
+                    if (!jid || !jid.includes('@g.us')) continue;
+                    const phone = jid.split('@')[0];
+                    if (processedJids.has(phone)) continue;
+                    processedJids.add(phone);
+
+                    contactsToUpsert.push({ 
+                        company_id: companyId, 
+                        phone, 
+                        name: g.subject || g.name || 'Grupo Sem Nome', 
+                        is_group: true,
+                        updated_at: new Date().toISOString() 
+                    });
+                }
+            }
+        } catch(e) { console.error(`[SYNC] Erro grupos:`, e.message); }
+
+        // 3. Upsert Contatos e Grupos
+        if (contactsToUpsert.length > 0) {
+            console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas (contatos/grupos)...`);
+            const { error: errC } = await supabase
+                .from('whatsapp_contacts')
+                .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
+            if (errC) console.error('[SYNC] Erro upsert contatos:', errC.message);
         }
 
-        if (contactsToUpsert.length > 0) {
-            console.log(`[SYNC] Upsert de ${contactsToUpsert.length} contatos...`);
-            const batchSize = 100;
-            for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
-                const batch = contactsToUpsert.slice(i, i + batchSize);
-                const { error: errC } = await supabase
-                    .from('whatsapp_contacts')
-                    .upsert(batch, { onConflict: 'company_id,phone' });
-                if (errC) console.error('[SYNC] Erro ao upsert:', errC.message);
+        // 4. Buscar Histórico (10 msgs) para cada conversa ativa
+        // Buscamos os chats ativos primeiro para priorizar
+        let activeChats = [];
+        try {
+            const respC = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { 
+                method: 'POST', 
+                headers, 
+                body: JSON.stringify({ where: {} }) 
+            });
+            if (respC.ok) {
+                const raw = await respC.json();
+                activeChats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
             }
-            console.log(`[SYNC] Contatos sincronizados!`);
-        } else {
-            console.log(`[SYNC] Nenhum contato encontrado. Verifique os logs acima para o endpoint correto.`);
+        } catch(e) { console.error(`[SYNC] Erro findChats:`, e.message); }
+
+        console.log(`[SYNC] Buscando histórico para ${activeChats.length} conversas ativas...`);
+        
+        // Limitar a sincronização de histórico para evitar sobrecarga nas primeiras conversas
+        const batchSize = 5; 
+        for (let i = 0; i < activeChats.length; i += batchSize) {
+            const batch = activeChats.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (chat) => {
+                const jid = chat.remoteJid || chat.jid || chat.id;
+                if (!jid) return;
+
+                try {
+                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            where: { remoteJid: jid },
+                            limit: 10
+                        })
+                    });
+
+                    if (msgResp.ok) {
+                        const messages = await msgResp.json();
+                        const msgs = Array.isArray(messages) ? messages : (messages.messages || messages.data || []);
+                        
+                        if (msgs.length > 0) {
+                            // Buscar ou criar a conversa no Supabase primeiro
+                            const phone = jid.split('@')[0];
+                            const { data: conv } = await supabase
+                                .from('whatsapp_conversations')
+                                .select('id')
+                                .eq('company_id', companyId)
+                                .eq('contact_phone', phone)
+                                .single();
+
+                            let convId = conv?.id;
+                            if (!convId) {
+                                const isGroup = jid.includes('@g.us');
+                                const { data: newConv } = await supabase
+                                    .from('whatsapp_conversations')
+                                    .insert({
+                                        company_id: companyId,
+                                        contact_phone: phone,
+                                        contact_name: chat.name || chat.subject || phone,
+                                        is_group: isGroup,
+                                        status: 'pendente'
+                                    })
+                                    .select('id')
+                                    .single();
+                                convId = newConv?.id;
+                            }
+
+                            if (convId) {
+                                const msgsToInsert = msgs.map(m => ({
+                                    company_id: companyId,
+                                    conversation_id: convId,
+                                    message_text: m.message?.conversation || m.message?.extendedTextMessage?.text || (m.pushName ? `[Mídia de ${m.pushName}]` : '[Mídia]'),
+                                    is_from_customer: !m.key?.fromMe,
+                                    whatsapp_message_id: m.key?.id,
+                                    created_at: new Date(m.messageTimestamp * 1000).toISOString()
+                                }));
+
+                                await supabase.from('whatsapp_messages').upsert(msgsToInsert, { onConflict: 'whatsapp_message_id' });
+                            }
+                        }
+                    }
+                } catch(e) { console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); }
+            }));
+            // Pequena pausa entre lotes
+            await new Promise(r => setTimeout(r, 500));
         }
 
         console.log(`[SYNC] Concluído para ${instanceName}.`);
