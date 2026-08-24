@@ -14,15 +14,32 @@ docker compose -f docker-compose.production.yml down --remove-orphans
 echo "🚀 Reconstruindo e iniciando o sistema..."
 docker compose -f docker-compose.production.yml up -d --build
 
-# 4. Aplicar correções de banco de dados (Ex: agent_id, RPCs)
-echo "🗄️ Aplicando correções de banco de dados na VPS..."
-# Aguarda o banco subir se necessário
-sleep 5
-docker exec -i supabase-db psql -U postgres -d postgres < supabase/vps_fix_2026.sql
+# 4. Aguardar o banco estar acessível (com retry)
+echo "🗄️ Aguardando o banco de dados ficar pronto..."
+MAX_RETRIES=12
+RETRY_COUNT=0
+until docker exec supabase-db psql -U postgres -d postgres -c '\q' 2>/dev/null; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "❌ Banco não ficou pronto após ${MAX_RETRIES} tentativas. Aplicando SQL assim mesmo..."
+    break
+  fi
+  echo "  Aguardando DB... (tentativa $RETRY_COUNT/$MAX_RETRIES)"
+  sleep 5
+done
 
-# 5. Atualizar e reiniciar processos do PM2
+# 5. Aplicar correções de banco de dados (RPCs, agent_id, etc.)
+echo "🗄️ Aplicando correções de banco de dados na VPS..."
+docker exec -i supabase-db psql -U postgres -d postgres < supabase/vps_fix_2026.sql
+if [ $? -eq 0 ]; then
+    echo "✅ Correções de banco aplicadas com sucesso!"
+else
+    echo "⚠️ Aviso: Algumas correções de banco podem ter falhado (verifique os logs acima)."
+fi
+
+# 6. Atualizar e reiniciar processos do PM2
 echo "🔄 Reiniciando processos PM2..."
 pm2 restart all --update-env
 
 echo "✅ Atualização concluída com sucesso!"
-docker ps | grep pandanet
+docker ps | grep -E "pandanet|supabase"
