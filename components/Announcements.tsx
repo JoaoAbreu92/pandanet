@@ -31,7 +31,9 @@ const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
 
     const getCompanyId = async () => {
         if (!currentUser) return null;
-        if (currentUser.isCompanyAdmin) return null; // Logic might vary, let's fetch from profile
+        // Use company_id directly if available, otherwise fallback to DB fetch
+        if (currentUser.company_id) return currentUser.company_id;
+
         const { data } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
         return data?.company_id;
     };
