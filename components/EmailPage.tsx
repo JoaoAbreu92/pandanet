@@ -759,6 +759,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             const finalCc = ccTags.join(', ');
             const finalBcc = bccTags.join(', ');
 
+            // Validation: prevent sending empty body
+            const plainBody = composeBody.replace(/<[^>]*>/g, '').trim();
+            if (!plainBody && !composeSubject.trim()) {
+                showToast('O assunto ou o corpo do e-mail deve ser preenchido.', 'error');
+                setLoading(false);
+                return;
+            }
+
             console.log("[EmailPage] Sending email payload:", {
                 to: finalTo,
                 subject: composeSubject,

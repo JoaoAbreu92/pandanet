@@ -234,6 +234,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .select('id, unread_count')
                 .or(`participant1_id.eq.${currentUser.id},participant2_id.eq.${currentUser.id}`);
 
+            if (error) {
+                console.error('[NotificationContext] Error fetching conversation counts:', error);
+            }
             if (convsData) {
                 // Determine how many conversations have unread messages for THIS user
                 // Our schema usually handles participant unreads but let's just do a rough count or query messages directly

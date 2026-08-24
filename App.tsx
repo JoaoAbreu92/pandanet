@@ -593,6 +593,7 @@ const AppContent: React.FC = () => {
     }, [currentUser?.company_id, fetchCRMCustomers]);
 
     const handleViewCustomer = async (customerOrId: CRMCustomer | string) => {
+        console.log('[App] handleViewCustomer called with:', customerOrId);
         if (typeof customerOrId === 'string') {
             // Se receber apenas o ID (ex: do módulo de Vendas), busca os dados completos
             const { data, error } = await supabase
