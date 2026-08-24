@@ -200,14 +200,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   }, [selectedConversation, markNotificationsByLink]);
 
+  const [isUserReading, setIsUserReading] = useState(false);
+
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll if we are not actively reading the history
+    if (!isUserReading) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   const scrollToBottom = (force = false) => {
     if (force) {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setIsUserReading(false);
       }, 100);
       return;
     }
@@ -218,7 +224,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
       if (isAtBottom) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setIsUserReading(false);
       }
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
+    
+    if (isAtBottom) {
+      setIsUserReading(false);
+    } else {
+      setIsUserReading(true);
     }
   };
 
@@ -332,9 +350,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      query = query.ilike('contact_phone', '%@g.us%');
+      query = query.eq('is_group', true);
     } else if (chatTypeFilter === 'private') {
-      query = query.not('contact_phone', 'ilike', '%@g.us%');
+      query = query.eq('is_group', false);
     }
 
     // Logica de visibilidade:
@@ -565,11 +583,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     const messageText = type === 'text' ? newMessage : '';
     const stickerUrl = type === 'sticker' ? content : null;
     const isSticker = type === 'sticker';
-    const isEmojiOnly = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\s)+$/.test(messageText);
+    const isEmojiOnly = /^[\p{Emoji}\s]+$/u.test(messageText.trim()) && messageText.trim().length > 0;
 
     let messageWithSignature = messageText;
-    if (messageText && useSignature && profile?.name && !isEmojiOnly && !isSticker) {
-      messageWithSignature = `${messageText}\n\n*Atenciosamente: ${profile.name}*`;
+    const targetProfile = activeProfile || profile; // Fallback para perfil
+    const nameObj = (targetProfile as any)?.full_name || targetProfile?.name;
+
+    if (messageText && useSignature && nameObj && !isEmojiOnly && !isSticker) {
+      const signatureText = targetProfile?.whatsapp_signature || `*Atenciosamente: ${nameObj}*`;
+      messageWithSignature = `${messageText}\n\n${signatureText}`;
     }
 
     try {
@@ -1079,6 +1101,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             {/* Messages */}
             <div 
               ref={scrollContainerRef}
+              onScroll={handleScroll}
               className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
             >
               {messages.map((msg) => (

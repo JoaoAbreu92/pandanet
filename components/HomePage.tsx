@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Announcements from './Announcements';
 import UpcomingEvents from './UpcomingEvents';
 import Carousel from './Carousel';
 import RecognitionWall from './RecognitionWall';
 import CompanyPoll from './CompanyPoll';
 import QuickLinks from './QuickLinks';
+import { supabase } from '../supabaseClient';
 // FIX: Correcting the import path for types.
 import type { Employee, AppData } from '../types';
 import Card from './Card';
@@ -82,16 +83,42 @@ const NewHires: React.FC<{ employees: Employee[] }> = ({ employees }) => {
     );
 };
 
-
-interface HomePageProps {
-    onNavigate: (page: string, context?: any) => void;
-    employees: Employee[];
-}
-
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser }) => {
+    const [masterBanner, setMasterBanner] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchMasterBanner = async () => {
+            try {
+                const { data } = await supabase.from('system_settings').select('value').eq('key', 'master_banner').single();
+                if (data?.value) {
+                    setMasterBanner(JSON.parse(data.value));
+                }
+            } catch (error) {
+                console.error('Error fetching master banner', error);
+            }
+        };
+        fetchMasterBanner();
+    }, []);
+
     return (
         <div className="space-y-8">
             <Carousel />
+            
+            {masterBanner?.isActive && masterBanner?.imageUrl && (
+                <div className="w-full">
+                    {masterBanner.link ? (
+                        <a href={masterBanner.link} target="_blank" rel="noopener noreferrer" className="block relative group overflow-hidden rounded-xl shadow-md border border-gray-100 dark:border-gray-800">
+                            <img src={masterBanner.imageUrl} alt="Anúncio Especial" className="w-full h-auto object-cover max-h-[300px] transition-transform duration-500 group-hover:scale-[1.01]" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>
+                        </a>
+                    ) : (
+                        <div className="block relative overflow-hidden rounded-xl shadow-md border border-gray-100 dark:border-gray-800">
+                            <img src={masterBanner.imageUrl} alt="Anúncio Especial" className="w-full h-auto object-cover max-h-[300px]" />
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Column */}
                 <div className="lg:col-span-2 space-y-8">

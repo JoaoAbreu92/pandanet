@@ -124,6 +124,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         tag: 'Destaque',
         image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop'
     });
+    
+    // NEW: Master Banner State
+    const [masterBannerData, setMasterBannerData] = useState<any>({
+        imageUrl: '',
+        link: '',
+        isActive: false
+    });
+    const [masterBannerFile, setMasterBannerFile] = useState<File | null>(null);
 
     // --- Buscar Dados ---
     const fetchData = async () => {
@@ -184,6 +192,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 const promo = settingsData.find(s => s.key === 'manual_promo')?.value;
                 if (promo) {
                     try { setManualPromo(JSON.parse(promo)); } catch (e) { }
+                }
+
+                const banner = settingsData.find(s => s.key === 'master_banner')?.value;
+                if (banner) {
+                    try { setMasterBannerData(JSON.parse(banner)); } catch (e) { }
                 }
 
                 const iaIcon = settingsData.find(s => s.key === 'panda_ia_icon')?.value;
@@ -285,6 +298,27 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             } else if (pandaIaIcon) {
                 updates.push({ key: 'panda_ia_icon', value: pandaIaIcon });
             }
+
+            // Handle Master Banner Upload
+            let currentBannerData = { ...masterBannerData };
+            if (masterBannerFile) {
+                console.log("[SaaS] Novo Master Banner detectado. Fazendo upload...", masterBannerFile.name);
+                const fileExt = masterBannerFile.name.split('.').pop();
+                const fileName = `master_banner_${Date.now()}.${fileExt}`;
+                const filePath = `system/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('announcements-media')
+                    .upload(filePath, masterBannerFile, { cacheControl: '3600', upsert: true });
+
+                if (uploadError) throw new Error("Falha ao enviar Master Banner: " + uploadError.message);
+
+                const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(filePath);
+                currentBannerData.imageUrl = publicUrl;
+                setMasterBannerData(currentBannerData);
+                setMasterBannerFile(null);
+            }
+            updates.push({ key: 'master_banner', value: JSON.stringify(currentBannerData) });
 
             console.log("[SaaS] Executando UPSERT no banco:", updates);
             const { error: upsertError, data: upsertData } = await supabase
@@ -1407,6 +1441,55 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-6">Configurações da Central de Ajuda (Manual)</h3>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    {/* Master Banner Section */}
+                                    <div className="space-y-4 col-span-1 lg:col-span-2 bg-brand-primary/5 dark:bg-brand-primary/10 p-6 rounded-xl border border-brand-primary/20">
+                                        <div className="flex items-center justify-between border-b border-brand-primary/20 pb-2">
+                                            <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                                <SparklesIcon className="w-5 h-5 text-brand-primary" />
+                                                Master Banner (Global)
+                                            </h4>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Exibir Banner?</span>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer" 
+                                                        checked={masterBannerData.isActive} 
+                                                        onChange={(e) => setMasterBannerData({ ...masterBannerData, isActive: e.target.checked })} 
+                                                    />
+                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500">Este banner aparecerá no topo da tela inicial de <strong>todas as empresas</strong>. Use para Master Class, Ofertas da Matriz, etc.</p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL de Redirecionamento (Link)</label>
+                                                <input type="text" placeholder="Ex: https://grupopixel.com.br/oferta" value={masterBannerData.link} onChange={(e) => setMasterBannerData({ ...masterBannerData, link: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none" />
+                                                
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mt-4 mb-2">Imagem do Banner</label>
+                                                <div className="flex items-center gap-4">
+                                                    <label className="flex-1 text-center px-3 py-2 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded text-xs font-bold cursor-pointer transition-all uppercase border border-dashed border-gray-300 dark:border-gray-500">
+                                                        {masterBannerFile ? masterBannerFile.name : 'Subir Nova Imagem'}
+                                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setMasterBannerFile(e.target.files[0])} disabled={isSavingSettings} />
+                                                    </label>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 mt-1 italic">Recomendado: 1200x300px (Banner horizontal largo).</p>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-center bg-black/5 dark:bg-black/20 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-2 min-h-[120px]">
+                                                {masterBannerFile ? (
+                                                    <img src={URL.createObjectURL(masterBannerFile)} className="max-w-full max-h-[100px] object-contain rounded" alt="Preview Novo" />
+                                                ) : masterBannerData.imageUrl ? (
+                                                    <img src={masterBannerData.imageUrl} className="max-w-full max-h-[100px] object-contain rounded" alt="Master Banner Atual" />
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 font-bold uppercase">Sem Imagem</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Promo Section */}
                                     <div className="space-y-4">
                                         <h4 className="font-bold text-gray-600 dark:text-gray-300 border-b pb-2">Banner Promocional (Rodapé)</h4>
