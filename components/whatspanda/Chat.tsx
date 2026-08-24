@@ -74,26 +74,32 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     fetchSettings();
     fetchConversations();
     
-    // Real-time subscriptions
+    // Conversation list subscription - independent of selectedConversation
     const convSubscription = supabase
       .channel('whatsapp_conversations_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
-        fetchConversations(); // Refresh list on change
-      })
-      .subscribe();
-
-    const msgSubscription = supabase
-      .channel('whatsapp_messages_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_messages' }, payload => {
-        const newMsg = payload.new as WhatsAppMessage;
-        if (selectedConversation && newMsg.conversation_id === selectedConversation.id) {
-          setMessages(prev => [...prev, newMsg]);
-        }
+        fetchConversations(); 
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(convSubscription);
+    };
+  }, []); // Run once on mount
+
+  useEffect(() => {
+    // Message subscription - depends on selectedConversation
+    if (!selectedConversation) return;
+
+    const msgSubscription = supabase
+      .channel(`whatsapp_messages_changes_${selectedConversation.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
+        const newMsg = payload.new as WhatsAppMessage;
+        setMessages(prev => [...prev, newMsg]);
+      })
+      .subscribe();
+
+    return () => {
       supabase.removeChannel(msgSubscription);
     };
   }, [selectedConversation]);

@@ -158,6 +158,11 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
         </div>
       </div>
 
+      {/* Main Content Area */}
+      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6] dark:bg-transparent flex flex-col`}>
+        {renderView()}
+      </div>
+
       {/* Mobile Menu - Shown only on small screens */}
       {menuItems.length > 0 && !(currentView === 'chat' && isChatActive) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
@@ -175,11 +180,6 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
           ))}
         </div>
       )}
-
-      {/* Main Content Area */}
-      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6] dark:bg-transparent`}>
-        {renderView()}
-      </div>
     </div>
   );
 };
