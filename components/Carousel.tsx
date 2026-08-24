@@ -34,7 +34,7 @@ const fallbackBanners: Banner[] = [
 ];
 
 const Carousel: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [banners, setBanners] = useState<Banner[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);

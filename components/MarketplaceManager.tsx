@@ -10,7 +10,7 @@ const ItemFormModal: React.FC<{
     onClose: () => void;
     onSave: () => void;
 }> = ({ item, onClose, onSave }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [formData, setFormData] = useState({
         title: item?.title || '',
@@ -172,7 +172,7 @@ const ItemFormModal: React.FC<{
 };
 
 const MarketplaceManager: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setFormOpen] = useState(false);

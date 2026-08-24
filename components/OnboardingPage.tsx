@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const OnboardingPage: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [onboardingData, setOnboardingData] = useState<OnboardingCategory[]>([]);
     const [loading, setLoading] = useState(true);
 

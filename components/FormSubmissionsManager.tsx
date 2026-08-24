@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const FormSubmissionsManager: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 

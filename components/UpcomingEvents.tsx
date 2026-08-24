@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const UpcomingEvents: React.FC = () => {
-  const { profile: currentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

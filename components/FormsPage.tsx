@@ -67,7 +67,7 @@ const VacationRequestModal: React.FC<{
 
 const FormsPage: React.FC = () => {
     const { t } = useLanguage();
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);

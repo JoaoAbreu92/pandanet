@@ -97,7 +97,7 @@ const BannerFormModal: React.FC<{
 };
 
 const BannerManager: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [banners, setBanners] = useState<Banner[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);

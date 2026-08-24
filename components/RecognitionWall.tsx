@@ -36,7 +36,7 @@ const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }
 };
 
 const RecognitionWall: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
     const [recognitions, setRecognitions] = useState<Recognition[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);

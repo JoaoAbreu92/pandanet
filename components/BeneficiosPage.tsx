@@ -48,7 +48,7 @@ const BenefitFormModal: React.FC<{
 };
 
 const BeneficiosPage: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [benefits, setBenefits] = useState<Benefit[]>([]);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingBenefit, setEditingBenefit] = useState<Benefit | null>(null);

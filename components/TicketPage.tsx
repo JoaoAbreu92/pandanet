@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
 const TicketPage: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);

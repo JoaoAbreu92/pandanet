@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const CompanyPoll: React.FC = () => {
-  const { profile: currentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [poll, setPoll] = useState<Poll | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);

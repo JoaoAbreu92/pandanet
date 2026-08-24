@@ -49,13 +49,12 @@ import AIAssistant from './components/AIAssistant';
 
 
 const AppContent: React.FC = () => {
-    const { session, profile, loading, signOut } = useAuth();
+    const { session, profile, currentUser, loading, signOut, isGhostMode, setGhostData, impersonatedUser } = useAuth();
     const { onlineUsers } = usePresence();
 
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
-    const [currentUser, setCurrentUser] = useState<Employee | null>(null);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     // Loading & Error States
@@ -226,15 +225,14 @@ const AppContent: React.FC = () => {
     // Robust Initialization Logic
     useEffect(() => {
         const loadInitialData = async () => {
-            if (profile) {
-                const userEmail = profile.email.toLowerCase();
-                setCurrentUser(profile);
+            if (currentUser) {
+                const userEmail = currentUser.email.toLowerCase();
                 setCompanyLoading(true);
                 setInitError(null);
 
                 try {
                     console.log("Iniciando carregamento para:", userEmail);
-                    let targetCompanyId = profile.company_id;
+                    let targetCompanyId = currentUser.company_id;
 
                     // Fallback para Master Admin sem ID de empresa
                     const isMaster = userEmail === 'ti@grupopixel.com.br';
@@ -359,7 +357,6 @@ const AppContent: React.FC = () => {
                     setCompanyLoading(false);
                 }
             } else {
-                setCurrentUser(null);
                 setCurrentCompany(null);
                 setCompanyData(null);
                 setCompanySettings(null);
@@ -367,7 +364,7 @@ const AppContent: React.FC = () => {
             }
         };
         loadInitialData();
-    }, [profile]);
+    }, [currentUser]);
 
     // Sync Online Status
     useEffect(() => {
@@ -413,7 +410,6 @@ const AppContent: React.FC = () => {
         }
     };
 
-    const { isGhostMode, setGhostData, impersonatedUser } = useAuth();
 
     const handleImpersonateStart = (company: Company) => {
         setGhostData(true, null); // Auditoria de empresa
@@ -455,7 +451,6 @@ const AppContent: React.FC = () => {
     }, []);
 
     const handleUpdateUser = (updatedUser: Employee) => {
-        setCurrentUser(updatedUser);
         if (companyData) {
             setCompanyData({
                 ...companyData,

@@ -9,7 +9,7 @@ interface EventsManagerProps {
 }
 
 const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);

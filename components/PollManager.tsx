@@ -10,7 +10,7 @@ const PollFormModal: React.FC<{
     onSave: () => void;
     isProcessing?: boolean;
 }> = ({ onClose, onSave, isProcessing }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState<string[]>(['', '']);
 
@@ -129,7 +129,7 @@ const PollFormModal: React.FC<{
 };
 
 const PollManager: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [polls, setPolls] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);

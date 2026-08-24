@@ -29,7 +29,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
     newItemTemplate,
     users = []
 }: SupabaseGenericManagerProps<T>) {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [items, setItems] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);

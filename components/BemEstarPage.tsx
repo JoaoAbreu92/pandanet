@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const BemEstarPage: React.FC = () => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const [items, setItems] = useState<WellnessItem[]>([]);
     const [loading, setLoading] = useState(true);
 

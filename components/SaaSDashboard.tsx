@@ -76,7 +76,7 @@ const CompanyUserCount = ({ companyId }: { companyId: string }) => {
 };
 
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImpersonate }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const { showToast } = useToast();
     const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');

@@ -11,7 +11,7 @@ interface EventsPageProps {
 }
 
 const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser } = useAuth();
     const { t } = useLanguage();
     const { addNotification } = useNotifications();
     const [events, setEvents] = useState<Event[]>([]);
