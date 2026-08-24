@@ -384,6 +384,13 @@ export interface TIRequest {
   assignedUserId?: string;
   assignedUserName?: string;
   assignedUserAvatarUrl?: string;
+  comments: Array<{
+    id: string;
+    author: string;
+    authorAvatarUrl: string;
+    text: string;
+    timestamp: string;
+  }>;
   status: TIRequestStatus;
   submittedAt: string; // YYYY-MM-DD
 }

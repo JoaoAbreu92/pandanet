@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import { PlusIcon, XCircleIcon, TrashIcon, CheckCircleIcon, ArchiveBoxIcon } from './icons';
+import { PlusIcon, XCircleIcon, TrashIcon, CheckCircleIcon, ArchiveBoxIcon, PaperAirplaneIcon } from './icons';
 import type { TIRequest, TIRequestStatus, TIRequestType, Employee } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
@@ -84,6 +84,8 @@ const RequestModal: React.FC<{
 const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmissions, currentUser }) => {
     const [isModalOpen, setModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'active' | 'finalized'>('active');
+    const [selectedRequest, setSelectedRequest] = useState<TIRequest | null>(null);
+    const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectableUsers, setSelectableUsers] = useState<Array<{ id: string; full_name: string }>>([]);
     const { addNotification } = useNotifications();
@@ -115,6 +117,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                     assignedUserId: d.assigned_user_id,
                     assignedUserName: d.assigned?.full_name || 'Não atribuído',
                     assignedUserAvatarUrl: d.assigned?.avatar_url,
+                    comments: d.comments || [],
                     status: d.status as TIRequestStatus,
                     submittedAt: d.created_at
                 }));
@@ -176,7 +179,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                     item_name: data.itemName,
                     justification: data.justification,
                     assigned_user_id: data.assignedUserId,
-                    status: 'Pendente'
+                    status: 'Pendente',
+                    comments: []
                 }]);
 
             if (error) throw error;
@@ -246,10 +250,13 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
         }
     };
 
-    const isTIUser = currentUser.department_name === 'TI';
+    const isTIUser = currentUser.department_name?.toUpperCase().includes('TI') || currentUser.team?.toUpperCase().includes('TI');
+    const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin;
+
     const filteredSubmissions = submissions.filter(sub => {
         const belongsToUser = sub.requesterId === currentUser.id;
-        const isVisible = isTIUser || belongsToUser;
+        const isAssignedToUser = sub.assignedUserId === currentUser.id;
+        const isVisible = isTIUser || isAdmin || belongsToUser || isAssignedToUser;
         if (!isVisible) return false;
 
         if (activeTab === 'active') {
@@ -308,8 +315,17 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                     </thead>
                                     <tbody>
                                         {filteredSubmissions.map(sub => (
-                                            <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
-                                                {isTIUser && <td className="px-6 py-4 font-medium text-gray-900">{sub.requesterName}</td>}
+                                            <tr key={sub.id} className="bg-white border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedRequest(sub)}>
+                                                {isTIUser && (
+                                                    <td className="px-6 py-4 font-medium text-gray-900">
+                                                        <div className="flex items-center space-x-2">
+                                                            {sub.comments && sub.comments.length > 0 && (
+                                                                <span className="w-2 h-2 bg-brand-primary rounded-full" title="Possui mensagens"></span>
+                                                            )}
+                                                            <span>{sub.requesterName}</span>
+                                                        </div>
+                                                    </td>
+                                                )}
                                                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center space-x-2">
@@ -342,7 +358,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                     )}
                                                 </td>
                                                 {isTIUser && (
-                                                    <td className="px-6 py-4 text-right">
+                                                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex justify-end space-x-2">
                                                             {activeTab === 'active' && sub.status !== 'Finalizado' && (
                                                                 <button
@@ -373,6 +389,133 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 </Card>
             </div>
             {isModalOpen && <RequestModal onClose={() => setModalOpen(false)} selectableUsers={selectableUsers} onSubmit={handleNewRequest} />}
+
+            {selectedRequest && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl relative animate-fade-in-up max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-brand-text">Detalhes da Solicitação</h3>
+                            <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600">
+                                <XCircleIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <div className="grid grid-cols-2 gap-4 text-sm text-brand-text">
+                                <div>
+                                    <p className="text-gray-500">Solicitante</p>
+                                    <p className="font-medium">{selectedRequest.requesterName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Responsável</p>
+                                    <p className="font-medium">{selectedRequest.assignedUserName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Tipo</p>
+                                    <p className="font-medium">{selectedRequest.requestType}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Status</p>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedRequest.status)}`}>{selectedRequest.status}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="font-semibold text-brand-text mb-2">Item</h4>
+                                <p className="text-brand-subtle-text">{selectedRequest.itemName}</p>
+                            </div>
+
+                            <div>
+                                <h4 className="font-semibold text-brand-text mb-2">Justificativa</h4>
+                                <p className="text-brand-subtle-text">{selectedRequest.justification}</p>
+                            </div>
+
+                            {(isAdmin || isTIUser || selectedRequest.assignedUserId === currentUser.id) && selectedRequest.status !== 'Finalizado' && (
+                                <div className="flex space-x-3 pt-2">
+                                    <button
+                                        onClick={() => { handleUpdateStatus(selectedRequest.id, 'Aprovado'); setSelectedRequest(null); }}
+                                        className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-md hover:bg-emerald-700 transition-colors"
+                                    >
+                                        Aprovar / Atender
+                                    </button>
+                                    <button
+                                        onClick={() => { handleUpdateStatus(selectedRequest.id, 'Rejeitado'); setSelectedRequest(null); }}
+                                        className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-md hover:bg-red-700 transition-colors"
+                                    >
+                                        Recusar
+                                    </button>
+                                </div>
+                            )}
+
+                            <div>
+                                <h4 className="font-semibold text-brand-text mb-4">Mensagens ({selectedRequest.comments.length})</h4>
+                                <div className="space-y-4">
+                                    {selectedRequest.comments.length === 0 ? (
+                                        <p className="text-sm text-gray-400 italic">Nenhuma mensagem ainda.</p>
+                                    ) : (
+                                        selectedRequest.comments.map((comment, index) => (
+                                            <div key={index} className={`flex items-start space-x-3 ${comment.author === currentUser.name ? 'flex-row-reverse' : ''}`}>
+                                                <img src={comment.authorAvatarUrl || 'https://via.placeholder.com/40'} alt={comment.author} className="w-8 h-8 rounded-full object-cover" />
+                                                <div className={`flex flex-col ${comment.author === currentUser.name ? 'items-end' : ''}`}>
+                                                    <div className={`p-3 rounded-lg ${comment.author === currentUser.name ? 'bg-brand-primary text-white rounded-tr-none' : 'bg-gray-100 text-brand-text rounded-tl-none'}`}>
+                                                        <p className="font-semibold text-[10px] mb-1 opacity-70">{comment.author}</p>
+                                                        <p className="text-sm">{comment.text}</p>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 mt-1">{comment.timestamp}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-gray-100">
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    if (!newComment.trim()) return;
+                                    const comment = {
+                                        id: Date.now().toString(),
+                                        author: currentUser.name,
+                                        authorAvatarUrl: currentUser.avatarUrl,
+                                        text: newComment,
+                                        timestamp: new Date().toLocaleString('pt-BR')
+                                    };
+                                    const updatedComments = [...selectedRequest.comments, comment];
+                                    try {
+                                        const { error } = await supabase
+                                            .from('ti_requests')
+                                            .update({ comments: updatedComments })
+                                            .eq('id', selectedRequest.id);
+                                        if (error) throw error;
+                                        setSelectedRequest({ ...selectedRequest, comments: updatedComments });
+                                        setNewComment('');
+                                        // Também atualizar na lista principal para que ao fechar o modal a lista esteja certa
+                                        fetchRequests();
+                                    } catch (err) {
+                                        console.error('Error adding comment:', err);
+                                        alert('Erro ao enviar mensagem.');
+                                    }
+                                }}
+                                className="flex items-center space-x-3"
+                            >
+                                <img src={currentUser.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Digite sua mensagem..."
+                                        className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text"
+                                    />
+                                    <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:opacity-50">
+                                        <PaperAirplaneIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
