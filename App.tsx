@@ -5,6 +5,9 @@ import type { Company, Employee, Page, AppData, Announcement, EmployeePermission
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
+import { AuthProvider, useAuth } from './components/AuthContext';
+import LoginPage from './components/LoginPage';
+import { supabase } from './supabaseClient';
 
 import HomePage from './components/HomePage';
 import Messages from './components/Messages';
@@ -34,42 +37,37 @@ import StatusPage from './components/StatusPage';
 import InfoSecPage from './components/InfoSecPage';
 import { fetchAnnouncements } from './services/geminiService';
 
-const App: React.FC = () => {
-    // Authentication & Tenant State - Now initialized with a default company and user
+
+const AppContent: React.FC = () => {
+    const { session, loading } = useAuth();
+
+    // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>(mockCompanies);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(mockCompanies[0]);
+    // Allow mock user initially for dev/testing if needed, but ideally we sync with session
     const [currentUser, setCurrentUser] = useState<Employee | null>(mockCompanies[0].data.employees[0]);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
-    // Theme State - Forced to Light as per user request
     const [theme, setTheme] = useState<'light'>('light');
 
     useEffect(() => {
-        // Enforce light mode cleanup
         document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
     }, []);
 
     const toggleTheme = () => {
-        // Disabled toggling to strictly enforce light mode if requested, 
-        // or just keep it minimal. The user asked to remove the button, so this function is effectively unused/dead code 
-        // but kept to satisfy LayoutProps interface if needed, although we should probably pass a dummy.
         setTheme('light');
     };
 
-    // Super Admin Impersonation State
     const [isImpersonating, setIsImpersonating] = useState(false);
     const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
 
-    // Navigation State
     const [currentPage, setCurrentPage] = useState<Page>('home');
     const [pageContext, setPageContext] = useState<any>(null);
 
-    // Data state initialized with the first company
     const [companyData, setCompanyData] = useState<AppData | null>(mockCompanies[0].data);
     const [companySettings, setCompanySettings] = useState(mockCompanies[0].settings);
 
-    // Notification State
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
     const handleMarkAsRead = (id: string) => {
@@ -92,7 +90,6 @@ const App: React.FC = () => {
         }
     }, [authStage, currentCompany]);
 
-    // Sync Teams to Conversations
     useEffect(() => {
         if (companyData && currentUser) {
             const currentTeams = Array.from(new Set(companyData.employees.map(e => e.team).filter(t => t && t !== 'Sem Equipe')));
@@ -104,17 +101,13 @@ const App: React.FC = () => {
                 let hasChanges = false;
 
                 currentTeams.forEach((teamName: string) => {
-                    // Check if conversation for this team exists
                     const exists = updatedConversations.find(c => c.isGroup && c.groupName === teamName);
-
-                    // Check if current user is in this team
                     const isMember = prevData.employees.some(e => e.id === currentUser.id && e.team === teamName);
 
                     if (!exists && isMember) {
-                        // Create new group conversation
                         const newConversation: Conversation = {
-                            id: Date.now() + Math.random(), // Simple ID generation
-                            participantName: teamName, // Reused for display
+                            id: Date.now() + Math.random(),
+                            participantName: teamName,
                             groupName: teamName,
                             isGroup: true,
                             participantAvatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(teamName)}&background=random`,
@@ -126,18 +119,16 @@ const App: React.FC = () => {
                         updatedConversations.push(newConversation);
                         hasChanges = true;
                     }
-                    // Note: Handling removal if user leaves team is complex without more state, 
-                    // but for now we ensure they have it if they are in it.
                 });
 
                 return hasChanges ? { ...prevData, conversations: updatedConversations } : prevData;
             });
         }
-    }, [companyData?.employees, currentUser?.team]); // Re-run when employees or user team changes
+    }, [companyData?.employees, currentUser?.team]);
 
-    const handleLogout = () => {
-        // Since auth is removed, we just reset to the default state or refresh
-        window.location.reload();
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        // window.location.reload(); // Not needed as state change will trigger re-render
     };
 
     const handleImpersonateStart = (company: Company) => {
@@ -170,7 +161,6 @@ const App: React.FC = () => {
     const handleImpersonateEnd = () => {
         setIsImpersonating(false);
         setImpersonatedCompany(null);
-        // Returns to the first company as default instead of super admin panel
         setCurrentCompany(mockCompanies[0]);
         setCurrentUser(mockCompanies[0].data.employees[0]);
         setCompanyData(mockCompanies[0].data);
@@ -201,10 +191,8 @@ const App: React.FC = () => {
     };
 
     const handleUpdateFeedPosts = (newPosts: Post[]) => {
-        // Simple logic: If new post count > old count, check the latest post for mentions
         if (companyData && newPosts.length > companyData.feedPosts.length) {
-            const latestPost = newPosts[0]; // Assuming new posts are prepended
-            // Check if current user is mentioned
+            const latestPost = newPosts[0];
             if (currentUser && latestPost.mentions.includes(currentUser.id) && latestPost.authorId !== currentUser.id) {
                 const newNotification: Notification = {
                     id: Date.now().toString(),
@@ -224,21 +212,15 @@ const App: React.FC = () => {
 
     const handleUpdateTickets = (newTickets: Ticket[]) => {
         if (companyData) {
-            // Check for status changes or new assignments would be complex without diffing. 
-            // For this demo, we can assume if a ticket has 'hasNotification' flag or just simulate on change.
-            // Let's simplified: If we are acting as "Agent", updates might trigger.
-            // For now, standard setCompanyData.
             setCompanyData({ ...companyData, tickets: newTickets });
         }
     };
 
     const handleUpdateConversations = (newConversations: Conversation[]) => {
-        // Check for new unread messages
         const oldUnreadCount = companyData?.conversations.reduce((acc, c) => acc + c.unreadCount, 0) || 0;
         const newUnreadCount = newConversations.reduce((acc, c) => acc + c.unreadCount, 0);
 
         if (newUnreadCount > oldUnreadCount) {
-            // Find the conversation with new unread
             const changedConv = newConversations.find(c => {
                 const oldConv = companyData?.conversations.find(oc => oc.id === c.id);
                 return c.unreadCount > (oldConv?.unreadCount || 0);
@@ -262,21 +244,10 @@ const App: React.FC = () => {
         if (companyData) setCompanyData({ ...companyData, conversations: newConversations });
     };
 
-    // Calendar State
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
     const handleAddEvent = (newEvent: CalendarEvent) => {
         setCalendarEvents(prev => [...prev, newEvent]);
-
-        // Check if current user is invited (and not the creator? Creator is implied as local user for now)
-        // In local mock, we are always 'me'.
-        // If I create an event and add myself, should I get a notification? Maybe.
-        // Or if 'someone else' created it.
-        // Since we only have single player mode, we can simulate an "Invite" by assuming
-        // if we add *other* people, they get notified (we can't see that).
-        // To demonstrate notification to THIS user, we'd need another mechanism or just trigger it for demo.
-        // Let's trigger it if the user adds THEMSELVES to the list, or just for any created event for feedback.
-
         if (currentUser && newEvent.attendees.some(a => a.id === currentUser.id)) {
             const newNotification: Notification = {
                 id: Date.now().toString(),
@@ -301,10 +272,7 @@ const App: React.FC = () => {
                 const newAttendees = isAttending
                     ? event.attendees.filter(id => id !== currentUser.id)
                     : [...event.attendees, currentUser.id];
-
-                // If joining, remove from declined list if present
                 const newDeclined = (event.declined || []).filter(d => d.userId !== currentUser.id);
-
                 return { ...event, attendees: newAttendees, declined: newDeclined };
             }
             return event;
@@ -318,12 +286,9 @@ const App: React.FC = () => {
 
         const updatedEvents = companyData.events.map(event => {
             if (event.id === eventId) {
-                // Remove from attendees if present
                 const newAttendees = event.attendees.filter(id => id !== currentUser.id);
-                // Add to declined list
                 const currentDeclined = event.declined || [];
                 const newDeclined = [...currentDeclined.filter(d => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
-
                 return { ...event, attendees: newAttendees, declined: newDeclined };
             }
             return event;
@@ -332,7 +297,6 @@ const App: React.FC = () => {
         setCompanyData({ ...companyData, events: updatedEvents });
     };
 
-    // Check for Event Invites
     useEffect(() => {
         if (companyData && currentUser) {
             const pendingInvites = companyData.events.filter(event =>
@@ -343,8 +307,8 @@ const App: React.FC = () => {
 
             if (pendingInvites.length > 0) {
                 const inviteNotification: Notification = {
-                    id: 'event-invites', // Fixed ID to prevent duplicates/stacking for the same concept
-                    type: 'event', // Reusing event type or could be 'alert'
+                    id: 'event-invites',
+                    type: 'event',
                     title: 'Convocações Pendentes',
                     description: `Você tem ${pendingInvites.length} evento(s) com presença obrigatória pendente.`,
                     timestamp: 'Agora',
@@ -354,13 +318,10 @@ const App: React.FC = () => {
                 };
 
                 setNotifications(prev => {
-                    // Avoid duplicate if already top
                     if (prev.length > 0 && prev[0].id === 'event-invites' && prev[0].description === inviteNotification.description) return prev;
-                    // Remove old invite notification if exists and add new one
                     return [inviteNotification, ...prev.filter(n => n.id !== 'event-invites')];
                 });
             } else {
-                // Remove notification if cleared
                 setNotifications(prev => prev.filter(n => n.id !== 'event-invites'));
             }
         }
@@ -403,32 +364,48 @@ const App: React.FC = () => {
         }
     };
 
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div></div>;
+    }
+
+    if (!session) {
+        return <LoginPage />;
+    }
+
     if (authStage === 'logged_in' && currentUser && companyData && currentCompany && companySettings) {
         return (
-            <LanguageProvider>
-                <Layout
-                    currentUser={currentUser}
-                    currentCompany={mockCompanies[0]} // Always use first company data for now as wrapper
-                    companySettings={companyData.settings || mockCompanies[0].settings}
-                    isImpersonating={isImpersonating}
-                    impersonatedCompanyName={impersonatedCompany?.name}
-                    onNavigate={handleNavigate}
-                    currentPage={currentPage}
-                    onLogout={handleLogout}
-                    onEndImpersonation={handleImpersonateEnd}
-                    notifications={notifications}
-                    onMarkAsRead={handleMarkAsRead}
-                    onClearAllNotifications={handleClearAllNotifications}
-                    theme={theme}
-                    toggleTheme={toggleTheme}
-                >
-                    {renderPage()}
-                </Layout>
-            </LanguageProvider>
+            <Layout
+                currentUser={currentUser}
+                currentCompany={mockCompanies[0]}
+                companySettings={companyData.settings || mockCompanies[0].settings}
+                isImpersonating={isImpersonating}
+                impersonatedCompanyName={impersonatedCompany?.name}
+                onNavigate={handleNavigate}
+                currentPage={currentPage}
+                onLogout={handleLogout}
+                onEndImpersonation={handleImpersonateEnd}
+                notifications={notifications}
+                onMarkAsRead={handleMarkAsRead}
+                onClearAllNotifications={handleClearAllNotifications}
+                theme={theme}
+                toggleTheme={toggleTheme}
+            >
+                {renderPage()}
+            </Layout>
         );
     }
 
     return <div className="flex items-center justify-center h-screen">Carregando Pixel Intranet...</div>;
+};
+
+const App: React.FC = () => {
+    return (
+        <LanguageProvider>
+            <AuthProvider>
+                <AppContent />
+            </AuthProvider>
+        </LanguageProvider>
+    );
 };
 
 export default App;
