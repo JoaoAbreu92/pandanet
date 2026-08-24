@@ -1,27 +1,26 @@
-import { serve } from "std/http/server.ts"
-import { createClient } from "@supabase/supabase-js"
-import nodemailer from "nodemailer"
-import { ImapFlow } from "imapflow"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import nodemailer from "npm:nodemailer@6.9.7"
+import { ImapFlow } from "npm:imapflow@1.0.141"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const { action, settings, emailData } = await req.json()
-  
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  )
-
   try {
+    const { action, settings, emailData } = await req.json()
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
     if (action === 'test-connection') {
       // Testar SMTP
       const transporter = nodemailer.createTransport({
@@ -99,28 +98,27 @@ serve(async (req) => {
         const messages = []
         // Buscar as últimas 20 mensagens para sincronização
         for await (let msg of client.fetch({ last: 20 }, { envelope: true, source: true })) {
+          const fromData = msg.envelope.from?.[0]
             const emailEntry = {
                 user_id: settings.user_id,
                 company_id: settings.company_id,
-                from_name: msg.envelope.from[0].name || msg.envelope.from[0].address,
-                from_email: msg.envelope.from[0].address,
+              from_name: fromData?.name || fromData?.address || 'Remetente Desconhecido',
+              from_email: fromData?.address || '',
                 subject: msg.envelope.subject || '(Sem assunto)',
-                created_at: msg.envelope.date.toISOString(),
-                is_read: msg.flags?.includes('\\Seen') || false,
+              created_at: msg.envelope.date ? msg.envelope.date.toISOString() : new Date().toISOString(),
+              is_read: msg.flags?.has('\\Seen') || false,
                 folder: 'inbox',
-                preview: msg.envelope.subject || '', // Simplificado
-                content: msg.envelope.subject || '', // Idealmente processar o source/body
-                is_starred: msg.flags?.includes('\\Flagged') || false
+              preview: msg.envelope.subject || '',
+              content: msg.envelope.subject || '',
+              is_starred: msg.flags?.has('\\Flagged') || false
             }
             messages.push(emailEntry)
         }
 
-        // Upsert no Supabase
-        // Para evitar duplicatas, o ideal seria ter um UNIQUE constraint no Message-ID
         if (messages.length > 0) {
             const { error: insertError } = await supabase
                 .from('emails')
-                .upsert(messages, { onConflict: 'user_id, subject, created_at' }) // Simplificação de conflito
+              .upsert(messages, { onConflict: 'user_id, subject, created_at' })
 
             if (insertError) throw insertError
         }
@@ -138,9 +136,9 @@ serve(async (req) => {
       status: 400, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Edge Function Error:', error)
-    return new Response(JSON.stringify({ error: error.message }), { 
+    return new Response(JSON.stringify({ error: error.message || String(error) || 'Erro desconhecido na Edge Function' }), { 
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     })

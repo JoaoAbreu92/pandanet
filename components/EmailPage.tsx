@@ -810,12 +810,31 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Porta (SSL)</label>
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Porta IMAP</label>
                                                         <input
                                                             type="number"
                                                             className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
                                                             value={serverConfig.imap_port}
                                                             onChange={(e) => setServerConfig(prev => ({ ...prev, imap_port: parseInt(e.target.value) }))}
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Servidor SMTP</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="smtp.hostinger.com"
+                                                            className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
+                                                            value={serverConfig.smtp_host}
+                                                            onChange={(e) => setServerConfig(prev => ({ ...prev, smtp_host: e.target.value }))}
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Porta SMTP</label>
+                                                        <input
+                                                            type="number"
+                                                            className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
+                                                            value={serverConfig.smtp_port}
+                                                            onChange={(e) => setServerConfig(prev => ({ ...prev, smtp_port: parseInt(e.target.value) }))}
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2">
