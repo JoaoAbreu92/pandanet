@@ -45,16 +45,13 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'Missing IMAP config' });
     }
 
-    console.log(`[email-server] FETCH: ${config.imap_host}:${config.imap_port} (user: ${config.imap_user})`);
+    console.log(`[email-server] FETCH LIST: ${config.imap_host}:${config.imap_port}`);
 
     const client = new ImapFlow({
         host: config.imap_host,
         port: ensureNumber(config.imap_port),
         secure: config.imap_ssl !== false,
-        auth: {
-            user: config.imap_user,
-            pass: config.imap_pass,
-        },
+        auth: { user: config.imap_user, pass: config.imap_pass },
         tls: { rejectUnauthorized: false },
         logger: false
     });
@@ -66,37 +63,72 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
         try {
             const status = client.mailbox;
-            console.log(`[email-server] Mailbox: ${status?.exists} messages`);
+            if (!status || status.exists === 0) return res.json([]);
 
-            if (!status || status.exists === 0) {
-                return res.json([]);
-            }
-
-            const total = status.exists;
-            const fetchStart = Math.max(1, total - 19);
+            // Fetch last 20 emails
+            const fetchStart = Math.max(1, status.exists - 19);
             const range = `${fetchStart}:*`;
 
-            for await (const message of client.fetch(range, { envelope: true, source: false }, { uid: true })) {
+            for await (const message of client.fetch(range, { envelope: true }, { uid: true })) {
                 emails.push({
                     uid: message.uid,
-                    messageId: message.envelope.messageId || `uid-${message.uid}`,
+                    messageId: message.envelope.messageId,
                     subject: message.envelope.subject || '(Sem Assunto)',
                     from: message.envelope.from?.[0]?.address || 'Desconhecido',
                     date: message.envelope.date,
                     flags: message.flags
                 });
             }
-
             emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             return res.json(emails);
-
         } finally {
             lock.release();
             await client.logout();
         }
     } catch (err) {
-        console.error('[email-server] IMAP Error:', err.message, err.code);
-        return res.status(500).json({ error: `IMAP Error: ${err.message || err.code || 'Unknown'}` });
+        console.error('[email-server] IMAP List Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- FETCH EMAIL BODY (IMAP) ---
+const simpleParser = require('mailparser').simpleParser;
+
+app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
+    const { config, uid } = req.body;
+    if (!config || !uid) return res.status(400).json({ error: 'Missing config or uid' });
+
+    console.log(`[email-server] FETCH BODY: UID ${uid}`);
+
+    const client = new ImapFlow({
+        host: config.imap_host,
+        port: ensureNumber(config.imap_port),
+        secure: config.imap_ssl !== false,
+        auth: { user: config.imap_user, pass: config.imap_pass },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
+
+    try {
+        await client.connect();
+        const lock = await client.getMailboxLock('INBOX');
+        try {
+            const message = await client.fetchOne(uid, { source: true }, { uid: true });
+            if (!message) return res.status(404).json({ error: 'Email not found' });
+
+            const parsed = await simpleParser(message.source);
+
+            return res.json({
+                text: parsed.text,
+                html: parsed.html || parsed.textAsHtml // Fallback if no HTML part
+            });
+        } finally {
+            lock.release();
+            await client.logout();
+        }
+    } catch (err) {
+        console.error('[email-server] IMAP Body Error:', err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 

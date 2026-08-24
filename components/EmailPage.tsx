@@ -80,6 +80,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     // Tracks the saved imap_user (from DB), NOT the form input — prevents fetchEmails from firing on every keystroke
     const [savedImapUser, setSavedImapUser] = useState('');
     const [showEmailPass, setShowEmailPass] = useState(false);
+    const [loadingBody, setLoadingBody] = useState(false);
     
     // --- State: Search & Filters ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -188,6 +189,27 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             return { data, error: null };
         } catch (err: any) {
             return { data: null, error: { message: err.message || 'Falha ao conectar ao servidor de email' } };
+        }
+    };
+
+    const fetchEmailBody = async (email: EmailMessage) => {
+        if (email.html || email.text) return; // Already has body
+        if (!settings.imap_host) return;
+
+        setLoadingBody(true);
+        const { data, error } = await callEmailServer('fetch-body', { config: settings, uid: email.uid });
+        setLoadingBody(false);
+
+        if (error) {
+            console.error('Error fetching body:', error);
+            // Fallback to existing text if failure, or show error in UI (not implemented here)
+            return;
+        }
+
+        if (data) {
+            // Update the email in the list with the fetched body so we don't fetch again
+            setEmails(prev => prev.map(e => e.uid === email.uid ? { ...e, html: data.html, text: data.text } : e));
+            setSelectedEmail(prev => prev?.uid === email.uid ? { ...prev, html: data.html, text: data.text } : prev);
         }
     };
 
@@ -364,7 +386,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             filteredEmails.map(email => (
                                 <div
                                     key={email.uid}
-                                    onClick={() => { setSelectedEmail(email); setView('read'); }}
+                                    onClick={() => { setSelectedEmail(email); setView('read'); fetchEmailBody(email); }}
                                     onContextMenu={(e) => handleContextMenu(e, email)}
                                     className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-white hover:shadow-sm transition-all ${selectedEmail?.uid === email.uid ? 'bg-white border-l-4 border-l-brand-primary shadow-sm' : 'bg-transparent'}`}
                                 >
@@ -491,13 +513,19 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                         {/* Body */}
                         <div className="flex-1 overflow-y-auto p-6 pt-0">
-                            {/* IFRAME for isolation is safer, but DangerousSetInnerHTML with DOMPurify is standard for Webmail Clients */}
-                            <div
-                                className="prose max-w-none text-gray-800"
-                                dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || '')
-                                }}
-                            />
+                            {loadingBody ? (
+                                <div className="flex items-center justify-center h-40">
+                                    <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
+                                    <span className="ml-2 text-gray-400">Carregando conteúdo...</span>
+                                </div>
+                            ) : (
+                                <div
+                                    className="prose max-w-none text-gray-800"
+                                    dangerouslySetInnerHTML={{
+                                            __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || '<div class="text-gray-400 italic">Sem conteúdo disponível ou falha ao carregar.</div>')
+                                        }}
+                                    />
+                            )}
                         </div>
                     </div>
                 ) : view === 'read' && !selectedEmail ? (
