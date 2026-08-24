@@ -191,6 +191,24 @@ const Channels: React.FC = () => {
         }
     };
 
+    const checkDbStatus = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return alert('Sem Company ID');
+
+        try {
+            const { data, error } = await supabase
+                .from('whatsapp_settings')
+                .select('*')
+                .eq('company_id', companyId)
+                .maybeSingle();
+
+            console.log('[Debug] DB Status:', data, error);
+            alert(JSON.stringify({ data, error }, null, 2));
+        } catch (e) {
+            alert('Erro ao checar DB: ' + e);
+        }
+    };
+
     return (
         <div className="p-8 max-w-4xl mx-auto h-full flex flex-col items-center justify-center">
             
@@ -291,6 +309,24 @@ const Channels: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col gap-2">
+                        <div className="flex gap-2 justify-center">
+                            <button
+                                onClick={() => {
+                                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                    if (companyId) stopSession(companyId);
+                                }}
+                                className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-sm font-medium hover:bg-red-200"
+                            >
+                                Parar Conexão
+                            </button>
+                            <button
+                                onClick={checkDbStatus}
+                                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200"
+                            >
+                                Debug (Ver DB)
+                            </button>
+                        </div>
+
                         <button
                             onClick={() => {
                                 const companyId = profile?.company_id || user?.user_metadata?.company_id;
