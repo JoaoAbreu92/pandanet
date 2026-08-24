@@ -475,13 +475,18 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         console.log(`[SYNC] Iniciando sincronização total para ${instanceName}...`);
         const processedJids = new Set();
         const contactsToUpsert = [];
-        const headers = { 'apikey': evoKey, 'Content-Type': 'application/json' };
         
         if (evoUrl.startsWith('https')) {
             process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         }
 
         // 1. Buscar Contatos Pessoais
+        const headers = { 
+            'apikey': evoKey, 
+            'Content-Type': 'application/json',
+            'instance': instanceName // Algumas versões v1 exigem este header
+        };
+
         try {
             const resp = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, { headers });
             if (resp.ok) {
@@ -506,21 +511,49 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
 
-        // 2. Buscar TODOS os Grupos
+        // 2. Buscar TODOS os Grupos (Lógica Resiliente)
         try {
-            console.log(`[SYNC] Buscando grupos via Evolution API para ${instanceName}...`);
+            console.log(`[SYNC] Buscando grupos via fetchAllGroups para ${instanceName}...`);
             const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
+            let groupList = [];
 
             if (respG.ok) {
                 const groups = await respG.json();
-                const groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
-                console.log(`[SYNC] ${groupList.length} grupos encontrados.`);
+                groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
+            } else if (respG.status === 400) {
+                console.warn(`[SYNC] Erro 400 em fetchAllGroups. Tentando fallback para findChats...`);
+            }
+
+            // FALLBACK: Se fetchAllGroups falhar ou vier vazio, tenta buscar via chats recentes
+            if (groupList.length === 0) {
+                console.log(`[SYNC] fetchAllGroups vazio. Tentando extrair grupos das conversas recentes (findChats)...`);
+                const respChats = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { 
+                    method: 'POST', 
+                    headers, 
+                    body: JSON.stringify({ where: {} }) 
+                });
                 
-                if (groupList.length === 0) {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A API retornou 0 grupos para a instância ${instanceName}. Certifique-se de que a conta tem grupos.` }).eq('id', connectionId);
-                } else {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados. Processando importação...` }).eq('id', connectionId);
+                if (respChats.ok) {
+                    const chatsRaw = await respChats.json();
+                    const activeChats = Array.isArray(chatsRaw) ? chatsRaw : (chatsRaw.chats || chatsRaw.data || []);
+                    // Filtrar apenas o que for grupo (@g.us)
+                    const detectedGroups = activeChats.filter(c => {
+                        const jid = c.remoteJid || c.jid || c.id || '';
+                        return jid.includes('@g.us');
+                    });
+                    
+                    console.log(`[SYNC] ${detectedGroups.length} grupos detectados via conversas recentes.`);
+                    groupList = detectedGroups.map(g => ({
+                        jid: g.remoteJid || g.jid || g.id,
+                        subject: g.name || g.subject || 'Grupo Detectado'
+                    }));
                 }
+            }
+
+            if (groupList.length > 0) {
+                await supabase.from('whatsapp_settings').update({ 
+                    last_sync_error: `SUCESSO: ${groupList.length} grupos identificados (método resiliente).` 
+                }).eq('id', connectionId);
 
                 for (const g of groupList) {
                     const jid = g.jid || g.id || g.remoteJid || '';
@@ -537,18 +570,14 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     }
                 }
             } else {
-                const errStatus = respG.status;
-                const errText = await respG.text();
-                let errMsg = `Erro API Grupos (${errStatus})`;
-                if (errStatus === 404) errMsg = `Erro 404: Instância "${instanceName}" não encontrada na Evolution API. Tente REPARAR a conexão.`;
-                if (errStatus === 401) errMsg = `Erro 401: API Key inválida na Evolution API. Verifique as variáveis de ambiente.`;
-                
-                await supabase.from('whatsapp_settings').update({ last_sync_error: errMsg }).eq('id', connectionId);
-                console.error(`[SYNC] ${errMsg}`, errText);
+                const statusInfo = respG.status !== 200 ? ` (Status ${respG.status})` : "";
+                await supabase.from('whatsapp_settings').update({ 
+                    last_sync_error: `AVISO: Nenhum grupo encontrado na API${statusInfo}. Se você tem grupos, tente RECONECTAR o QR Code.` 
+                }).eq('id', connectionId);
             }
         } catch(e) { 
             console.error(`[SYNC] Erro grupos:`, e.message); 
-            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção na sincronização de grupos: ${e.message}` }).eq('id', connectionId);
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `Erro técnico na busca de grupos: ${e.message}` }).eq('id', connectionId);
         }
 
         // 3. Salvar Contatos e Garantir Conversas de Grupo
