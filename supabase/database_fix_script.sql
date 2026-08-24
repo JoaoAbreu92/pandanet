@@ -652,14 +652,20 @@ SELECT apply_tenant_policies();
 
 -- PROFILES: Users can view everyone in their company, but only update themselves.
 DROP POLICY IF EXISTS profile_view_policy ON public.profiles;
-CREATE POLICY profile_view_policy ON public.profiles FOR SELECT USING (company_id = public.get_user_company_id());
+CREATE POLICY profile_view_policy ON public.profiles FOR SELECT USING (company_id = public.get_user_company_id() OR public.is_super_admin());
 
 DROP POLICY IF EXISTS profile_update_policy ON public.profiles;
-CREATE POLICY profile_update_policy ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY profile_update_policy ON public.profiles FOR UPDATE USING (auth.uid() = id OR public.is_super_admin());
+
+DROP POLICY IF EXISTS profile_admin_manage ON public.profiles;
+CREATE POLICY profile_admin_manage ON public.profiles FOR ALL USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
 
 -- COMPANIES: Admins can view/edit their own company.
 DROP POLICY IF EXISTS company_view_policy ON public.companies;
-CREATE POLICY company_view_policy ON public.companies FOR SELECT USING (id = public.get_user_company_id());
+CREATE POLICY company_view_policy ON public.companies FOR SELECT USING (id = public.get_user_company_id() OR public.is_super_admin());
+
+DROP POLICY IF EXISTS company_all_policy ON public.companies;
+CREATE POLICY company_all_policy ON public.companies FOR ALL USING (id = public.get_user_company_id() OR public.is_super_admin()) WITH CHECK (id = public.get_user_company_id() OR public.is_super_admin());
 
 --------------------------------------------------------------------------------
 -- 10. RPC FUNCTIONS
