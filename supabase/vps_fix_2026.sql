@@ -999,6 +999,9 @@ NOTIFY pgrst, 'reload schema';
 -- ==========================================
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT NULL;
 
+-- 18. WHATSAPP SCHEDULED CAMPAIGNS NEW FEATURES
+ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS media_type VARCHAR(50) DEFAULT 'image';
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 

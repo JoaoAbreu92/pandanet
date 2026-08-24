@@ -150,6 +150,9 @@ async function runAutoMigration() {
             console.error('[MIGRATION] Erro ao adicionar media_type a whatsapp_scheduled_campaigns:', errMedia.message);
         } else {
             console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna media_type em whatsapp_scheduled_campaigns).');
+            // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar a nova coluna imediatamente
+            await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
+            console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');
         }
     } catch (err) {
         console.error('[MIGRATION] Falha ao rodar auto-migração:', err.message);
