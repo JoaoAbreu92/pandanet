@@ -5,6 +5,7 @@ import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
 import Card from './Card';
 import { UserAvatar } from './UserAvatar';
+import { Download, Zap, Sparkles, Palette, Check } from 'lucide-react';
 
 interface BadgesManagerProps {
     company: Company;
@@ -44,7 +45,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const { profile } = useAuth();
     const { addNotification } = useNotifications();
 
-    const [activeTab, setActiveTab] = useState<'create' | 'award' | 'history' | 'gamification'>('create');
+    const [activeTab, setActiveTab] = useState<'create' | 'award' | 'history' | 'gamification' | 'design_elo'>('create');
     const [companyBadges, setCompanyBadges] = useState<CompanyBadge[]>([]);
     const [history, setHistory] = useState<AwardHistoryItem[]>([]);
     
@@ -689,6 +690,12 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     >
                         ⚙️ Elos, RPG & Metas
                     </button>
+                    <button
+                        onClick={() => setActiveTab('design_elo')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'design_elo' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
+                    >
+                        🎨 Criar Design do Elo
+                    </button>
                 </div>
             </div>
 
@@ -1282,6 +1289,608 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     </div>
                 </div>
             )}
+
+            {activeTab === 'design_elo' && (
+                <EloDesignGenerator 
+                    company={company} 
+                    companyLevels={companyLevels} 
+                    fetchCompanyLevels={fetchCompanyLevels} 
+                    recalculateAllUsersXPAndLevels={recalculateAllUsersXPAndLevels}
+                    profile={profile}
+                />
+            )}
+        </div>
+    );
+};
+
+interface EloDesignGeneratorProps {
+    company: Company;
+    companyLevels: any[];
+    fetchCompanyLevels: () => Promise<void>;
+    recalculateAllUsersXPAndLevels: () => Promise<void>;
+    profile: any;
+}
+
+export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
+    company,
+    companyLevels,
+    fetchCompanyLevels,
+    recalculateAllUsersXPAndLevels,
+    profile
+}) => {
+    const [selectedLevel, setSelectedLevel] = useState<number>(2);
+    const [color1, setColor1] = useState('#b45309');
+    const [color2, setColor2] = useState('#f59e0b');
+    const [color3, setColor3] = useState('#78350f');
+    const [glowColor, setGlowColor] = useState('#fbbf24');
+    const [glowBlur, setGlowBlur] = useState<number>(15);
+    const [borderColor, setBorderColor] = useState('#fef08a');
+    const [borderWidth, setBorderWidth] = useState<number>(3);
+    const [innerBorderColor, setInnerBorderColor] = useState('#b45309');
+    const [innerBorderWidth, setInnerBorderWidth] = useState<number>(1);
+    const [starsCount, setStarsCount] = useState<number>(3);
+    const [ringThickness, setRingThickness] = useState<number>(35);
+    const [segmentedStyle, setSegmentedStyle] = useState<'clean' | 'segmented' | 'neon' | 'sparkle'>('sparkle');
+    const [showBadgeFrame, setShowBadgeFrame] = useState<boolean>(true);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [previewUrl, setPreviewUrl] = useState<string>('');
+
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    const PRESETS = [
+        { name: 'Bronze 🟫', color1: '#8a4f32', color2: '#c98a6b', color3: '#5c301c', glowColor: '#c98a6b', glowBlur: 10, borderColor: '#d7a187', borderWidth: 2, innerBorderColor: '#5c301c', innerBorderWidth: 1, starsCount: 1, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true },
+        { name: 'Prata ⬜', color1: '#7e8590', color2: '#cbd5e1', color3: '#475569', glowColor: '#cbd5e1', glowBlur: 12, borderColor: '#ffffff', borderWidth: 2, innerBorderColor: '#475569', innerBorderWidth: 1, starsCount: 2, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true },
+        { name: 'Ouro 🟨', color1: '#b45309', color2: '#f59e0b', color3: '#78350f', glowColor: '#fbbf24', glowBlur: 15, borderColor: '#fef08a', borderWidth: 3, innerBorderColor: '#78350f', innerBorderWidth: 1.5, starsCount: 3, ringThickness: 35, segmentedStyle: 'sparkle', showBadgeFrame: true },
+        { name: 'Platina 💎', color1: '#0891b2', color2: '#38bdf8', color3: '#1e3a8a', glowColor: '#06b6d4', glowBlur: 16, borderColor: '#e0f2fe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 4, ringThickness: 35, segmentedStyle: 'segmented', showBadgeFrame: true },
+        { name: 'Esmeralda 🟩', color1: '#047857', color2: '#34d399', color3: '#064e3b', glowColor: '#10b981', glowBlur: 16, borderColor: '#a7f3d0', borderWidth: 3, innerBorderColor: '#064e3b', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true },
+        { name: 'Safira 🟦', color1: '#1d4ed8', color2: '#60a5fa', color3: '#1e3a8a', glowColor: '#3b82f6', glowBlur: 18, borderColor: '#bfdbfe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true },
+        { name: 'Rubi 🟥', color1: '#b91c1c', color2: '#f87171', color3: '#7f1d1d', glowColor: '#ef4444', glowBlur: 20, borderColor: '#fca5a5', borderWidth: 3, innerBorderColor: '#7f1d1d', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 40, segmentedStyle: 'segmented', showBadgeFrame: true },
+        { name: 'Diamante 👑', color1: '#0284c7', color2: '#bae6fd', color3: '#a855f7', glowColor: '#38bdf8', glowBlur: 22, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#a855f7', innerBorderWidth: 2, starsCount: 5, ringThickness: 42, segmentedStyle: 'sparkle', showBadgeFrame: true },
+        { name: 'Lendário 👾', color1: '#ec4899', color2: '#8b5cf6', color3: '#06b6d4', glowColor: '#d946ef', glowBlur: 25, borderColor: '#fdf2f8', borderWidth: 4, innerBorderColor: '#0891b2', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true },
+        { name: 'Arco-Íris 🌈', color1: '#f43f5e', color2: '#eab308', color3: '#3b82f6', glowColor: '#10b981', glowBlur: 25, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#1e1b4b', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true }
+    ];
+
+    useEffect(() => {
+        if (companyLevels.length > 0 && !companyLevels.find(l => l.level_number === selectedLevel)) {
+            setSelectedLevel(companyLevels[0].level_number);
+        }
+    }, [companyLevels]);
+
+    const applyPreset = (preset: typeof PRESETS[0]) => {
+        setColor1(preset.color1);
+        setColor2(preset.color2);
+        setColor3(preset.color3);
+        setGlowColor(preset.glowColor);
+        setGlowBlur(preset.glowBlur);
+        setBorderColor(preset.borderColor);
+        setBorderWidth(preset.borderWidth);
+        setInnerBorderColor(preset.innerBorderColor);
+        setInnerBorderWidth(preset.innerBorderWidth);
+        setStarsCount(preset.starsCount);
+        setRingThickness(preset.ringThickness);
+        setSegmentedStyle(preset.segmentedStyle as any);
+        setShowBadgeFrame(preset.showBadgeFrame);
+    };
+
+    const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) => {
+        let rot = (Math.PI / 2) * 3;
+        let x = cx;
+        let y = cy;
+        const step = Math.PI / spikes;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+            x = cx + Math.cos(rot) * outerRadius;
+            y = cy + Math.sin(rot) * outerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+
+            x = cx + Math.cos(rot) * innerRadius;
+            y = cy + Math.sin(rot) * innerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+        }
+        ctx.lineTo(cx, cy - outerRadius);
+        ctx.closePath();
+        ctx.fill();
+    };
+
+    const renderRing = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        canvas.width = 512;
+        canvas.height = 512;
+
+        ctx.clearRect(0, 0, 512, 512);
+
+        const cx = 256;
+        const cy = 256;
+        const outerRadius = 220; 
+        const innerRadius = outerRadius - ringThickness;
+
+        // 1. Draw Glow Shadow using canvas shadow API
+        if (glowBlur > 0) {
+            ctx.save();
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = glowBlur;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+            ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.fillStyle = color2;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 2. Draw Main Ring Donut with linear gradient
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+        ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2, true);
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(64, 64, 448, 448);
+        grad.addColorStop(0, color1);
+        grad.addColorStop(0.5, color2);
+        grad.addColorStop(1, color3);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+
+        // 3. Segmented Styles
+        if (segmentedStyle === 'segmented') {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)'; 
+            ctx.lineWidth = 5;
+            const numSegments = 8;
+            for (let i = 0; i < numSegments; i++) {
+                const angle = (i * Math.PI * 2) / numSegments;
+                const xStart = cx + innerRadius * Math.cos(angle);
+                const yStart = cy + innerRadius * Math.sin(angle);
+                const xEnd = cx + outerRadius * Math.cos(angle);
+                const yEnd = cy + outerRadius * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(xStart, yStart);
+                ctx.lineTo(xEnd, yEnd);
+                ctx.stroke();
+            }
+            ctx.restore();
+        } else if (segmentedStyle === 'neon') {
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(cx, cy, (outerRadius + innerRadius) / 2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        } else if (segmentedStyle === 'sparkle') {
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 4;
+            const numDots = 16;
+            const midRadius = (outerRadius + innerRadius) / 2;
+            for (let i = 0; i < numDots; i++) {
+                const angle = (i * Math.PI * 2) / numDots;
+                const x = cx + midRadius * Math.cos(angle);
+                const y = cy + midRadius * Math.sin(angle);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // 4. Draw outer border
+        if (borderWidth > 0) {
+            ctx.save();
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = borderWidth;
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 5. Draw inner border
+        if (innerBorderWidth > 0) {
+            ctx.save();
+            ctx.strokeStyle = innerBorderColor;
+            ctx.lineWidth = innerBorderWidth;
+            ctx.beginPath();
+            ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 6. Draw Stars at the top
+        if (starsCount > 0) {
+            ctx.save();
+            ctx.fillStyle = borderColor || '#ffffff';
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 6;
+            const starRadius = 10;
+            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.14;
+            for (let i = 0; i < starsCount; i++) {
+                const angle = startAngle + i * 0.28;
+                const dist = outerRadius + 14;
+                const sx = cx + dist * Math.cos(angle);
+                const sy = cy + dist * Math.sin(angle);
+                drawStar(ctx, sx, sy, 5, starRadius, starRadius / 2);
+            }
+            ctx.restore();
+        }
+
+        // 7. Draw Level Badge Frame at the bottom right
+        if (showBadgeFrame) {
+            const bx = 422;
+            const by = 422;
+            const br = 52; 
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fillStyle = '#0f172a'; 
+            ctx.fill();
+
+            const badgeGrad = ctx.createLinearGradient(bx - br, by - br, bx + br, by + br);
+            badgeGrad.addColorStop(0, color2);
+            badgeGrad.addColorStop(1, color3);
+            ctx.strokeStyle = badgeGrad;
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(bx, by, br + 3, 0, Math.PI * 2);
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        setPreviewUrl(canvas.toDataURL());
+    };
+
+    useEffect(() => {
+        renderRing();
+    }, [
+        color1, color2, color3, glowColor, glowBlur, borderColor, borderWidth,
+        innerBorderColor, innerBorderWidth, starsCount, ringThickness,
+        segmentedStyle, showBadgeFrame
+    ]);
+
+    const handleDownload = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const link = document.createElement('a');
+        link.download = `anel_elo_nivel_${selectedLevel}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+
+    const handleApplyRing = async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !company?.id) return;
+
+        setIsSaving(true);
+        try {
+            const targetConfig = companyLevels.find(l => l.level_number === selectedLevel);
+            if (!targetConfig) {
+                alert(`Por favor, crie o Nível ${selectedLevel} na aba "Elos, RPG & Metas" primeiro antes de aplicar o design.`);
+                setIsSaving(false);
+                return;
+            }
+
+            const blob = await new Promise<Blob | null>((resolve) => {
+                canvas.toBlob((b) => resolve(b), 'image/png');
+            });
+
+            if (!blob) throw new Error("Erro ao gerar blob da imagem");
+
+            const fileName = `ring-lvl-${selectedLevel}-${Date.now()}.png`;
+            const filePath = `${company.id}/levels/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('feed-media')
+                .upload(filePath, blob, {
+                    contentType: 'image/png',
+                    upsert: true
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('feed-media')
+                .getPublicUrl(filePath);
+
+            if (!publicUrl) throw new Error("Erro ao obter URL pública da imagem");
+
+            const { error: dbError } = await supabase
+                .from('company_levels')
+                .update({ ring_image_url: publicUrl })
+                .eq('id', targetConfig.id);
+
+            if (dbError) throw dbError;
+
+            alert(`Design do anel aplicado com sucesso ao Nível ${selectedLevel}!`);
+            await fetchCompanyLevels();
+            await recalculateAllUsersXPAndLevels();
+        } catch (err: any) {
+            console.error("Erro ao aplicar design do anel:", err);
+            alert("Erro ao aplicar design: " + err.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-2 animate-in fade-in duration-200">
+            <div className="lg:col-span-7 space-y-6">
+                <Card title="Customização do Anel do Elo" className="bg-white dark:bg-slate-800 shadow-sm">
+                    <div className="space-y-5 mt-2">
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Nível do Elo de Destino</label>
+                            <select
+                                value={selectedLevel}
+                                onChange={(e) => setSelectedLevel(Number(e.target.value))}
+                                className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-semibold cursor-pointer"
+                            >
+                                {companyLevels.map(lvl => (
+                                    <option key={lvl.level_number} value={lvl.level_number}>
+                                        Nível {lvl.level_number} - {lvl.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Modelos Rápidos (Presets)</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                {PRESETS.map((preset, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => applyPreset(preset)}
+                                        className="py-2 px-1 text-[11px] font-bold bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-750 hover:border-brand-primary rounded-xl text-slate-700 dark:text-gray-300 transition-all text-center"
+                                    >
+                                        {preset.name.replace(/ \p{Emoji}/u, '')}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <hr className="border-slate-100 dark:border-slate-700" />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Cor Inicial</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="color"
+                                        value={color1}
+                                        onChange={(e) => setColor1(e.target.value)}
+                                        className="w-10 h-10 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={color1}
+                                        onChange={(e) => setColor1(e.target.value)}
+                                        className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Cor Central</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="color"
+                                        value={color2}
+                                        onChange={(e) => setColor2(e.target.value)}
+                                        className="w-10 h-10 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={color2}
+                                        onChange={(e) => setColor2(e.target.value)}
+                                        className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Cor Final</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="color"
+                                        value={color3}
+                                        onChange={(e) => setColor3(e.target.value)}
+                                        className="w-10 h-10 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={color3}
+                                        onChange={(e) => setColor3(e.target.value)}
+                                        className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Espessura do Anel ({ringThickness}px)</label>
+                                <input
+                                    type="range"
+                                    min="15"
+                                    max="55"
+                                    value={ringThickness}
+                                    onChange={(e) => setRingThickness(Number(e.target.value))}
+                                    className="w-full h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Brilho Externo (Glow: {glowBlur}px)</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="35"
+                                        value={glowBlur}
+                                        onChange={(e) => setGlowBlur(Number(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                    />
+                                    <input
+                                        type="color"
+                                        value={glowColor}
+                                        onChange={(e) => setGlowColor(e.target.value)}
+                                        className="w-8 h-8 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Borda Externa ({borderWidth}px)</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="8"
+                                        value={borderWidth}
+                                        onChange={(e) => setBorderWidth(Number(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                    />
+                                    <input
+                                        type="color"
+                                        value={borderColor}
+                                        onChange={(e) => setBorderColor(e.target.value)}
+                                        className="w-8 h-8 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Borda Interna ({innerBorderWidth}px)</label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="8"
+                                        value={innerBorderWidth}
+                                        onChange={(e) => setInnerBorderWidth(Number(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                    />
+                                    <input
+                                        type="color"
+                                        value={innerBorderColor}
+                                        onChange={(e) => setInnerBorderColor(e.target.value)}
+                                        className="w-8 h-8 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Estrelas Ornamentais ({starsCount})</label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="5"
+                                    value={starsCount}
+                                    onChange={(e) => setStarsCount(Number(e.target.value))}
+                                    className="w-full h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Estilo do Preenchimento</label>
+                                <select
+                                    value={segmentedStyle}
+                                    onChange={(e) => setSegmentedStyle(e.target.value as any)}
+                                    className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                >
+                                    <option value="clean">Contínuo / Limpo</option>
+                                    <option value="segmented">Segmentado (8 divisões)</option>
+                                    <option value="sparkle">Com Pontos de Brilho</option>
+                                    <option value="neon">Brilho Neon Interno</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-3 pt-4">
+                                <input
+                                    type="checkbox"
+                                    id="badge_frame"
+                                    checked={showBadgeFrame}
+                                    onChange={(e) => setShowBadgeFrame(e.target.checked)}
+                                    className="w-5 h-5 rounded-lg border-gray-300 text-brand-primary focus:ring-brand-primary"
+                                />
+                                <label htmlFor="badge_frame" className="text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer">
+                                    Adicionar suporte para o badge do nível
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr className="border-slate-100 dark:border-slate-700" />
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={handleDownload}
+                                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-800 dark:text-white font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-600 shadow-sm"
+                            >
+                                <Download className="w-4 h-4" />
+                                Baixar Anel PNG
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleApplyRing}
+                                disabled={isSaving}
+                                className="flex-1 py-2.5 px-4 bg-brand-primary hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-md active:scale-98 disabled:opacity-50 text-xs flex items-center justify-center gap-2"
+                            >
+                                {isSaving ? 'Aplicando...' : <><Zap className="w-4 h-4" /> Aplicar Design ao Nível {selectedLevel}</>}
+                            </button>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            <div className="lg:col-span-5 flex flex-col items-center justify-start space-y-6">
+                <Card title="Desenho do Canvas" className="w-full bg-white dark:bg-slate-800 shadow-sm flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-center py-4">
+                        <div className="relative border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-4 bg-slate-50 dark:bg-slate-900/30">
+                            <canvas
+                                ref={canvasRef}
+                                className="w-64 h-64 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 20 20%22><rect width=%2210%22 height=%2210%22 fill=%22%23ccc%22 opacity=%220.2%22/><rect x=%2210%22 y=%2210%22 width=%2210%22 height=%2210%22 fill=%22%23ccc%22 opacity=%220.2%22/></svg>')] bg-repeat"
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-2">Dimensão real: 512x512px (PNG transparente)</p>
+                    </div>
+                </Card>
+
+                <Card title="Amostra no Colaborador" className="w-full bg-white dark:bg-slate-800 shadow-sm">
+                    <div className="flex flex-col items-center justify-center py-6 space-y-4">
+                        <div className="scale-110">
+                            {previewUrl && (
+                                <UserAvatar
+                                    src={profile?.avatar_url}
+                                    name={profile?.full_name || 'Amostra'}
+                                    level={selectedLevel}
+                                    size="xl"
+                                    ring_image_url={previewUrl}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </Card>
+            </div>
         </div>
     );
 };

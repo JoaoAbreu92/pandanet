@@ -484,7 +484,7 @@ const ChatbotSettings: React.FC = () => {
     };
 
     // ── Templates ─────────────────────────────────────────────────────────────
-    const loadTemplate = async (templateType: 'support_sales' | 'clinic' | 'restaurant') => {
+    const loadTemplate = async (templateType: 'support_sales' | 'clinic' | 'restaurant' | 'practical_example') => {
         if (!selectedFlow) return;
         if (!window.confirm('Atenção: Carregar este modelo irá apagar todas as etapas atuais deste fluxo de chatbot. Deseja continuar?')) return;
 
@@ -495,7 +495,119 @@ const ChatbotSettings: React.FC = () => {
             const q1 = queues[0]?.id || null;
             const q2 = queues[1]?.id || queues[0]?.id || null;
 
-            if (templateType === 'support_sales') {
+            if (templateType === 'practical_example') {
+                const u1 = team[0]?.id || activeProfile?.id;
+                const u2 = team[1]?.id || team[0]?.id || activeProfile?.id;
+                const u3 = team[2]?.id || team[1]?.id || team[0]?.id || activeProfile?.id;
+
+                const name1 = team[0]?.full_name || 'Carlos';
+                const name2 = team[1]?.full_name || 'Ana';
+                const name3 = team[2]?.full_name || 'Lucas';
+
+                // 1. Inserir nós de transferência de usuário (Suporte)
+                const { data: t1 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 5,
+                    content: { text: `Perfeito. Estou te transferindo para o atendente ${name1} no Suporte. Por favor, aguarde.`, user_id: u1 }
+                }).select().single();
+
+                const { data: t2 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 6,
+                    content: { text: `Perfeito. Estou te transferindo para o atendente ${name2} no Suporte. Por favor, aguarde.`, user_id: u2 }
+                }).select().single();
+
+                const { data: t3 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 7,
+                    content: { text: `Perfeito. Estou te transferindo para o atendente ${name3} no Suporte. Por favor, aguarde.`, user_id: u3 }
+                }).select().single();
+
+                // 2. Inserir nós de transferência de usuário (Comercial)
+                const { data: t4 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 8,
+                    content: { text: `Entendido. Um momento enquanto te conecto com o consultor ${name1} do Comercial.`, user_id: u1 }
+                }).select().single();
+
+                const { data: t5 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 9,
+                    content: { text: `Entendido. Um momento enquanto te conecto com o consultor ${name2} do Comercial.`, user_id: u2 }
+                }).select().single();
+
+                const { data: t6 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 10,
+                    content: { text: `Entendido. Um momento enquanto te conecto com o consultor ${name3} do Comercial.`, user_id: u3 }
+                }).select().single();
+
+                // 3. Inserir nós de transferência de usuário (Financeiro)
+                const { data: t7 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 11,
+                    content: { text: `Certo. Vou te transferir para o analista ${name1} no Financeiro.`, user_id: u1 }
+                }).select().single();
+
+                const { data: t8 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 12,
+                    content: { text: `Certo. Vou te transferir para o analista ${name2} no Financeiro.`, user_id: u2 }
+                }).select().single();
+
+                const { data: t9 } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_user', sort_order: 13,
+                    content: { text: `Certo. Vou te transferir para o analista ${name3} no Financeiro.`, user_id: u3 }
+                }).select().single();
+
+                // 4. Inserir menus de cada setor
+                const { data: mSup } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 2,
+                    content: {
+                        text: 'Você escolheu *Suporte*. Selecione o atendente desejado:',
+                        options: [
+                            { label: `1. Falar com ${name1} 🛠️`, next_node: t1?.id || '' },
+                            { label: `2. Falar com ${name2} 🛠️`, next_node: t2?.id || '' },
+                            { label: `3. Falar com ${name3} 🛠️`, next_node: t3?.id || '' }
+                        ]
+                    }
+                }).select().single();
+
+                const { data: mCom } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 3,
+                    content: {
+                        text: 'Você escolheu *Comercial*. Selecione o consultor desejado:',
+                        options: [
+                            { label: `1. Falar com ${name1} 💼`, next_node: t4?.id || '' },
+                            { label: `2. Falar com ${name2} 💼`, next_node: t5?.id || '' },
+                            { label: `3. Falar com ${name3} 💼`, next_node: t6?.id || '' }
+                        ]
+                    }
+                }).select().single();
+
+                const { data: mFin } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 4,
+                    content: {
+                        text: 'Você escolheu *Financeiro*. Selecione o analista desejado:',
+                        options: [
+                            { label: `1. Falar com ${name1} 💳`, next_node: t7?.id || '' },
+                            { label: `2. Falar com ${name2} 💳`, next_node: t8?.id || '' },
+                            { label: `3. Falar com ${name3} 💳`, next_node: t9?.id || '' }
+                        ]
+                    }
+                }).select().single();
+
+                // 5. Inserir Menu Principal
+                const { data: mMain } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 1,
+                    content: {
+                        text: 'Por favor, escolha uma das opções abaixo para direcionarmos seu atendimento:',
+                        options: [
+                            { label: '1. Suporte Técnico 🛠️', next_node: mSup?.id || '' },
+                            { label: '2. Comercial / Vendas 💼', next_node: mCom?.id || '' },
+                            { label: '3. Financeiro 💳', next_node: mFin?.id || '' }
+                        ]
+                    }
+                }).select().single();
+
+                // 6. Inserir Etapa de Saudação (Greeting)
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'greeting', sort_order: 0,
+                    content: { text: 'Olá! Seja bem-vindo à nossa central de atendimento PandaNet. Como posso ajudar você hoje?' }
+                });
+            } else if (templateType === 'support_sales') {
                 const { data: supportNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
                     flow_id: selectedFlow.id, type: 'transfer_queue', sort_order: 2,
                     content: { text: 'Perfeito. Estou transferindo seu atendimento para nossa equipe do Suporte Técnico. Por favor, aguarde.', queue_id: q1 }
@@ -1066,6 +1178,14 @@ const ChatbotSettings: React.FC = () => {
                                             accept=".json"
                                             className="hidden"
                                         />
+                                        <button
+                                            onClick={() => loadTemplate('practical_example')}
+                                            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all text-xs font-bold shadow-md shadow-amber-500/20 cursor-pointer"
+                                            title="Carregar Exemplo Prático com Saudação, Menus e Agentes"
+                                        >
+                                            <Zap className="w-4 h-4" />
+                                            Exemplo Prático
+                                        </button>
                                         <button
                                             onClick={isSimulating ? resetSimulation : startSimulation}
                                             className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all text-xs font-bold shadow-md shadow-indigo-500/20 cursor-pointer"

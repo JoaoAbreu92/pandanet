@@ -6,6 +6,7 @@ interface UserAvatarProps {
   level?: number;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  ring_image_url?: string;
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({
@@ -14,6 +15,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   level = 1,
   size = 'md',
   className = '',
+  ring_image_url,
 }) => {
   // Configurações de tamanho do avatar
   const sizeClasses = {
@@ -144,8 +146,10 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     );
   }
 
-  // Se tiver imagem de anel customizada cadastrada pelo administrador
-  if (currentLevelConfig.ring_image_url) {
+  const activeRingUrl = ring_image_url || currentLevelConfig.ring_image_url;
+
+  // Se tiver imagem de anel customizada cadastrada pelo administrador ou informada por prop
+  if (activeRingUrl) {
     return (
       <div className={`relative inline-block select-none ${sizeClasses[size]} ${className}`}>
         {/* Avatar interno com preenchimento para caber dentro da moldura */}
@@ -155,7 +159,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
         
         {/* Anel PNG absoluto por cima */}
         <img 
-          src={currentLevelConfig.ring_image_url} 
+          src={activeRingUrl} 
           alt={currentLevelConfig.name} 
           className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10"
         />
