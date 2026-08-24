@@ -161,9 +161,10 @@ serve(async (req) => {
                 }
 
             } catch (err: any) {
-                console.error("IMAP Connection/Fetch Error:", err);
+                const errDetail = `${err?.message || '(sem mensagem)'} | code: ${err?.code || '?'} | name: ${err?.name || '?'}`;
+                console.error("IMAP Connection/Fetch Error:", JSON.stringify({ message: err?.message, code: err?.code, name: err?.name }));
                 // Return 200 with error field so frontend handles it gracefully
-                return new Response(JSON.stringify({ error: `IMAP Error: ${err.message}` }), {
+                return new Response(JSON.stringify({ error: `IMAP Error: ${errDetail}` }), {
                     status: 200,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 });
