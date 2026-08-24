@@ -52,7 +52,7 @@ const availableEmojis = [
     '👸', '👳', '👲', '🧕'
 ];
 
-const MASTER_ADMIN_ID = 'bd6b9e1b-52c0-482a-8caa-96f11677b261';
+// MASTER_ADMIN_ID is fetched dynamically at runtime — see useEffect below
 
 const NOTE_COLORS = [
     { id: 'blue', bg: 'bg-blue-100', border: 'border-blue-200' },
@@ -79,6 +79,28 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
+    const [masterAdminId, setMasterAdminId] = useState<string>('');
+    const [masterAdminProfile, setMasterAdminProfile] = useState<{ id: string, name: string, avatarUrl: string } | null>(null);
+
+    // Fetch master admin dynamically by email
+    useEffect(() => {
+        const fetchMasterAdmin = async () => {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .eq('email', 'ti@grupopixel.com.br')
+                .maybeSingle();
+            if (data) {
+                setMasterAdminId(data.id);
+                setMasterAdminProfile({
+                    id: data.id,
+                    name: data.full_name || 'Master Admin',
+                    avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=Master+Admin&background=6366f1&color=fff`
+                });
+            }
+        };
+        fetchMasterAdmin();
+    }, []);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
@@ -883,10 +905,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         try {
             setLoading(true);
             // 1. Se for o Master Admin (Suporte VIP), usamos um RPC especial para evitar RLS cross-tenant
-            if (contactId === MASTER_ADMIN_ID) {
+            if (contactId === masterAdminId) {
                 const { data: convId, error: rpcError } = await supabase.rpc('get_or_create_support_conversation', {
                     admin_id: currentUser.id,
-                    master_id: contactId
+                    master_id: masterAdminId
                 });
 
                 if (rpcError) throw rpcError;
@@ -934,7 +956,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
                     if (convs) {
                         // Se for suporte VIP e estiver fechado, reabre
-                        if (contactId === MASTER_ADMIN_ID) {
+                        if (contactId === masterAdminId) {
                             await supabase
                                 .from('conversations')
                                 .update({ is_closed: false })
@@ -1024,7 +1046,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const isMasterAdmin = (profile?.email === 'ti@grupopixel.com.br' || profile?.id === MASTER_ADMIN_ID) && isGhostMode;
+        const isMasterAdmin = (profile?.email === 'ti@grupopixel.com.br' || profile?.id === masterAdminId) && isGhostMode;
         if (!isMasterAdmin) {
             alert("Apenas o Administrador Master (em Modo Fantasma) tem permissão para apagar conversas permanentemente.");
             return;
@@ -1279,11 +1301,17 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 
                 {/* Suporte VIP para Admins */}
                 {(currentUser.isCompanyAdmin || currentUser.isAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin') && 
-                 currentUser.id !== MASTER_ADMIN_ID && currentUser.email !== 'ti@grupopixel.com.br' && (
+                    currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && masterAdminId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
+                        {masterAdminProfile && (
+                            <div className="flex items-center gap-2 mb-2">
+                                <img src={masterAdminProfile.avatarUrl} alt={masterAdminProfile.name} className="w-7 h-7 rounded-full border-2 border-red-300" />
+                                <span className="text-xs font-semibold text-red-700">{masterAdminProfile.name}</span>
+                            </div>
+                        )}
                         <button 
-                            onClick={() => handleStartConversation(MASTER_ADMIN_ID)}
+                            onClick={() => handleStartConversation(masterAdminId)}
                             className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-red-700 transition-all shadow-lg active:scale-95 group-hover:shadow-red-200"
                         >
                             <SparklesIcon className="w-5 h-5 animate-pulse" />
@@ -1332,7 +1360,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                     <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        {((profile?.email === 'ti@grupopixel.com.br' || profile?.id === MASTER_ADMIN_ID) && isGhostMode) && (
+                                                        {((profile?.email === 'ti@grupopixel.com.br' || profile?.id === masterAdminId) && isGhostMode) && (
                                                             <button
                                                                 onClick={(e) => handleDeleteConversation(conv.id, e)}
                                                                 className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
@@ -1443,7 +1471,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                {(currentUser.id === MASTER_ADMIN_ID || selectedConversation?.participantId === MASTER_ADMIN_ID) && !selectedConversation?.is_closed && (
+                                {(currentUser.id === masterAdminId || selectedConversation?.participantId === masterAdminId) && !selectedConversation?.is_closed && (
                                     <button 
                                         onClick={handleCloseConversation}
                                         className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all border border-slate-200 hover:border-red-200"
