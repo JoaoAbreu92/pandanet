@@ -85,7 +85,7 @@ const Layout: React.FC<LayoutProps> = ({
                     isImpersonating={isImpersonating}
                     impersonatedCompanyName={impersonatedCompanyName}
                     onEndImpersonation={onEndImpersonation}
-                    onToggleNotifications={() => setNotificationsOpen(true)}
+                    onToggleNotifications={() => setNotificationsOpen(!isNotificationsOpen)}
                     unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
                     theme={theme}
                     toggleTheme={toggleTheme}

@@ -139,6 +139,11 @@ const TicketPage: React.FC = () => {
         setSelectedTicket(null);
     };
 
+    const handleRepairForm = () => {
+        console.log('Opening ticket form. Current state:', isFormOpen);
+        setFormOpen(true);
+    };
+
     const handleUpdateTicket = async (updatedTicket: Ticket) => {
         // Optimistic update for UI
         setTickets(tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t));
@@ -194,7 +199,7 @@ const TicketPage: React.FC = () => {
     return (
         <>
             <Card title="Central de Suporte (Chamados)" headerAction={
-                <button onClick={() => setFormOpen(true)} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">
+                <button onClick={handleRepairForm} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-30">
                     Abrir Novo Chamado
                 </button>
             }>
