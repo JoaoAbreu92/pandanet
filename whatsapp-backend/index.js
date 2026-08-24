@@ -56,6 +56,12 @@ app.get('/sessions/:companyId/status', (req, res) => {
   res.json({ companyId, isConnected });
 });
 
+// Endpoint para listar TODAS as sessões ativas (SaaS Dashboard)
+app.get('/sessions/status/all', (req, res) => {
+  const activeSessions = Array.from(sessions.keys());
+  res.json({ count: activeSessions.length, activeCompanyIds: activeSessions });
+});
+
 // Inicialização: Carregar todas as empresas que têm configurações
 async function startAllSessions() {
   console.log('🔄 Buscando empresas para iniciar sessões WhatsApp...');

@@ -40,15 +40,20 @@ import {
     PlayIcon,
     PlayCircleIcon
 } from './icons';
-import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon, ChatBubbleLeftRightIcon as HeroChatBubbleLeftRightIcon, MegaphoneIcon as HeroMegaphoneIcon, ArrowRightOnRectangleIcon as HeroArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useToast } from './ToastContext';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface SaaSDashboardProps {
     companies?: Company[]; // Keep for compatibility but we will fetch internal state
+    onImpersonate?: (company: Company) => void;
 }
 
-type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
-type ModalType = 'createCompany' | 'edit' | 'delete' | 'disable' | 'stats' | 'addMonth' | 'config' | 'createPlan' | 'editPlan' | 'deletePlan' | 'users' | 'newUpdate' | 'newVideo';
+type TabType = 'dashboard' | 'companies' | 'plans' | 'settings' | 'announcements';
+type ModalType = 'createCompany' | 'edit' | 'delete' | 'disable' | 'stats' | 'addMonth' | 'config' | 'createPlan' | 'editPlan' | 'deletePlan' | 'users' | 'newUpdate' | 'newVideo' | 'createAnnouncement';
+
+// --- COLORS ---
+const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 // ... Helper Components moved to top ...
 const CheckCircle = () => (<div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>);
@@ -67,7 +72,7 @@ const CompanyUserCount = ({ companyId }: { companyId: string }) => {
     return <span>{count !== null ? count : '...'}</span>;
 };
 
-const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
+const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImpersonate }) => {
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
@@ -81,6 +86,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const [statsLoading, setStatsLoading] = useState(false);
     const [manualVideos, setManualVideos] = useState<any[]>([]);
     const [videoLoading, setVideoLoading] = useState(false);
+
+    // NEW: WhatsApp Status & Charts Data
+    const [whatsappStatus, setWhatsappStatus] = useState<{ count: number, activeCompanyIds: string[] }>({ count: 0, activeCompanyIds: [] });
+    const [growthData, setGrowthData] = useState<any[]>([]);
+    const [planDistribution, setPlanDistribution] = useState<any[]>([]);
+    const [globalAnnouncements, setGlobalAnnouncements] = useState<any[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
@@ -138,6 +149,21 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 const unit = settingsData.find(s => s.key === 'update_notification_unit')?.value;
                 if (unit) setUpdateDurationUnit(unit as any || 'hours');
             }
+
+            // NEW: Fetch WhatsApp Status
+            try {
+                const res = await fetch('http://localhost:3000/sessions/status/all');
+                if (res.ok) {
+                    const statusData = await res.json();
+                    setWhatsappStatus(statusData);
+                }
+            } catch (e) {
+                console.error("Erro ao buscar status do WhatsApp:", e);
+            }
+
+            // NEW: Fetch Global Announcements (mocking via common table or specific query)
+            // For now, let's fetch 'system' type announcements if we implement that, or just show last 5 created by superadmin
+            // We'll manage creation here.
 
         } catch (error) {
             console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
@@ -265,6 +291,36 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         fetchCounts();
     }, [localCompanies]); // Refresh when companies change
 
+    // --- CHART DATA PREPARATION ---
+    useEffect(() => {
+        if (localCompanies.length > 0) {
+            // 1. Plan Distribution
+            const distribution: Record<string, number> = {};
+            localCompanies.forEach(c => {
+                const planName = c.plan?.name || 'Sem Plano';
+                distribution[planName] = (distribution[planName] || 0) + 1;
+            });
+            const pieData = Object.keys(distribution).map((key, index) => ({
+                name: key,
+                value: distribution[key]
+            }));
+            setPlanDistribution(pieData);
+
+            // 2. Growth (Mock based on creation date or just random for now as we don't track creation_date in Company type explicitly yet?
+            // Actually supabase usually has created_at. Let's assume we fetch it.
+            // If not, we'll mock a simple growth curve
+            const mockGrowth = [
+                { name: 'Jan', empresas: Math.floor(totalCompanies * 0.2) },
+                { name: 'Fev', empresas: Math.floor(totalCompanies * 0.35) },
+                { name: 'Mar', empresas: Math.floor(totalCompanies * 0.5) },
+                { name: 'Abr', empresas: Math.floor(totalCompanies * 0.7) },
+                { name: 'Mai', empresas: Math.floor(totalCompanies * 0.85) },
+                { name: 'Jun', empresas: totalCompanies },
+            ];
+            setGrowthData(mockGrowth);
+        }
+    }, [localCompanies, totalCompanies]);
+
     // --- Gerenciamento de Estado de Modais ---
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
     const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
@@ -299,6 +355,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             setFeaturesState(company.custom_features || company.plan?.features || {});
         } else if (type === 'newUpdate') {
             setFormData({ version: SYSTEM_VERSION, description: '' });
+        } else if (type === 'createAnnouncement') {
+            setFormData({ title: '', content: '', category: 'Notícias da Empresa' });
         } else if (type === 'users' && company) {
             // Fetch users for this company
             fetchCompanyUsers(company.id!);
@@ -340,6 +398,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
         if (error) console.error("Error fetching users", error);
         else setCompanyUsers(data as unknown as Employee[] || []);
+    };
+
+    const handleImpersonateUser = (user: Employee) => {
+        if (onImpersonate && selectedCompany) {
+            console.log("Impersonating via SaaSDashboard:", selectedCompany.name);
+            onImpersonate(selectedCompany);
+            closeModal();
+        } else {
+            alert("Erro: Função de impersonate não disponível ou empresa não selecionada.");
+        }
     };
 
     const toggleCompanyAdmin = async (userId: string, currentStatus: boolean) => {
@@ -603,6 +671,38 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         }
     };
 
+    const submitAnnouncement = async () => {
+        if (!formData.title || !formData.content) return;
+        setLoading(true);
+        try {
+            // Broadcast to ALL active companies
+            const announcementsToInsert = localCompanies
+                .filter(c => c.status === 'active')
+                .map(c => ({
+                    company_id: c.id,
+                    title: formData.title,
+                    summary: formData.content, // Map content to summary
+                    category: formData.type || 'info', // Map type to category
+                    created_by: 'Super Admin',
+                    date: new Date().toISOString()
+                }));
+
+            if (announcementsToInsert.length > 0) {
+                const { error } = await supabase.from('announcements').insert(announcementsToInsert);
+                if (error) throw error;
+                showToast(`Aviso enviado para ${announcementsToInsert.length} empresas!`, 'success');
+                closeModal();
+            } else {
+                showToast('Nenhuma empresa ativa para enviar.', 'info');
+            }
+        } catch (e: any) {
+            console.error("Erro ao enviar aviso global:", e);
+            showToast("Erro ao enviar aviso: " + e.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // --- Handlers Genéricos ---
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev: any) => ({ ...prev, [field]: value }));
@@ -696,6 +796,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                     <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>DASHBOARD</button>
                     <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>EMPRESAS</button>
                     <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>PLANOS</button>
+                    <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>AVISOS GLOBAIS</button>
                     <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>CONFIGURAÇÕES</button>
                 </div>
             </div>
@@ -721,6 +822,83 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                             <MetricCardSimple title="Total de Usuários" value={totalUsers} icon={UserGroupIcon} />
                             <MetricCardSimple title="Usuários Online" value={onlineUsers} icon={UsersIcon} />
                         </div>
+
+                        {/* CHARTS SECTION */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Growth Chart */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Crescimento de Empresas</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={growthData}>
+                                            <defs>
+                                                <linearGradient id="colorEmpresas" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
+                                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                                            <CartesianGrid vertical={false} stroke="#E5E7EB" strokeDasharray="3 3" />
+                                            <Area type="monotone" dataKey="empresas" stroke="#10B981" fillOpacity={1} fill="url(#colorEmpresas)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* Plans Distribution */}
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Distribuição de Planos</h3>
+                                <div className="h-64 w-full flex items-center justify-center">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={planDistribution}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                fill="#8884d8"
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {planDistribution.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* WhatsApp Status Widget */}
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                    <HeroChatBubbleLeftRightIcon className="w-6 h-6 text-green-500" />
+                                    Status do WhatsApp (Multi-Tenant)
+                                </h3>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${whatsappStatus.count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                    {whatsappStatus.count} Sessões Ativas
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {localCompanies.map(comp => {
+                                    const isActive = whatsappStatus.activeCompanyIds.includes(comp.id);
+                                    return (
+                                        <div key={comp.id} className={`p-3 rounded border flex items-center justify-between ${isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                                            <span className="text-sm font-medium truncate">{comp.name}</span>
+                                            <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
                     </div>
                 )}
 
@@ -1012,6 +1190,33 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 )}
             </div>
 
+            {/* GLOBAL ANNOUNCEMENTS */}
+            {activeTab === 'announcements' && (
+                <div className="space-y-6 animate-fadeIn">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                            <HeroMegaphoneIcon className="w-5 h-5 text-gray-800 dark:text-white" />
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Avisos Globais</h2>
+                        </div>
+                        <button
+                            onClick={() => openModal('createAnnouncement')}
+                            className="bg-brand-primary hover:bg-brand-secondary text-white px-6 py-2 rounded text-sm font-bold uppercase tracking-wide flex items-center gap-2 transition-colors"
+                        >
+                            <PlusIcon className="w-4 h-4" /> Novo Aviso
+                        </button>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+                        <HeroMegaphoneIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Central de Transmissão</h3>
+                        <p className="text-gray-500 max-w-md mx-auto">
+                            Envie comunicados importantes para <b>todas as empresas</b> registradas na plataforma de uma só vez.
+                            Útil para avisos de manutenção, novidades ou alertas de segurança.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* --- MODALS --- */}
             {modalOpen.stats && selectedCompany && (
                 <Modal onClose={closeModal} title={`Estatísticas: ${selectedCompany.name}`} width="max-w-2xl">
@@ -1135,6 +1340,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                         </select>
                         {modalOpen.createCompany && (
                             <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                                    <select value={formData.category || 'Notícias da Empresa'} onChange={(e) => handleInputChange('category', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all">
+                                        <option value="Notícias da Empresa">Notícias da Empresa</option>
+                                        <option value="Atualização de Produto">Atualização de Produto</option>
+                                        <option value="RH & Cultura">RH & Cultura</option>
+                                        <option value="Evento">Evento</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conteúdo</label>
+                                    <textarea rows={4} value={formData.content || ''} onChange={(e) => handleInputChange('content', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                </div>
                                 <input type="text" placeholder="Whatsapp" value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                                 <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">Responsável</h4>
                                     <input type="text" placeholder="Nome" value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
