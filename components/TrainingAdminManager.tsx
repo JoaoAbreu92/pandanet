@@ -62,11 +62,13 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
     const [existingPdfUrl, setExistingPdfUrl] = useState('');
 
     const fetchTrainings = async () => {
+        if (!currentUser?.company_id) return;
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('training_modules')
                 .select('*')
+                .eq('company_id', currentUser.company_id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -93,8 +95,10 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
     };
 
     useEffect(() => {
-        fetchTrainings();
-    }, []);
+        if (currentUser?.company_id) {
+            fetchTrainings();
+        }
+    }, [currentUser?.company_id]);
 
     const fetchSubmissions = async (trainingId: string) => {
         setLoadingSubmissions(true);
@@ -252,7 +256,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                 thumbnail: finalThumbnailUrl,
                 pdf_url: finalPdfUrl,
                 quiz: quizQuestions,
-                company_id: employees[0]?.company_id
+                company_id: currentUser?.company_id
             };
 
             let trainingId = editingTraining?.id;
@@ -279,9 +283,9 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
             // Create notification and calendar event for new participants
             if (participants && participants.length > 0 && currentUser) {
                 const { data: calEvent, error: calError } = await supabase
-                    .from('calendar_events')
+                    .from('events')
                     .insert([{
-                        company_id: employees[0]?.company_id,
+                        company_id: currentUser.company_id,
                         creator_id: currentUser.id,
                         title: `Treinamento: ${title}`,
                         description: `Prazo final para conclusão do treinamento: ${title}.`,
@@ -306,7 +310,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                 // Insert notifications
                 const notifications = participants.map(userId => ({
                     user_id: userId,
-                    company_id: employees[0]?.company_id,
+                    company_id: currentUser.company_id,
                     type: 'event',
                     title: 'Novo Treinamento Convocado',
                     description: `Você foi convocado para o treinamento: "${title}". Conclua até ${endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'o prazo estabelecido'}.`,

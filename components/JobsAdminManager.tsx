@@ -3,6 +3,8 @@ import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, UsersIcon } from './icons';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
 import type { Employee } from '../types';
 
+import { useAuth } from './AuthContext';
+
 interface JobsAdminManagerProps {
     employees: Employee[];
 }
@@ -35,6 +37,7 @@ interface JobApplication {
 }
 
 const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
+    const { currentUser } = useAuth();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,11 +65,13 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
     const [existingDescImageUrl, setExistingDescImageUrl] = useState('');
 
     const fetchJobs = async () => {
+        if (!currentUser?.company_id) return;
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('jobs')
                 .select('*')
+                .eq('company_id', currentUser.company_id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -92,8 +97,10 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
     };
 
     useEffect(() => {
-        fetchJobs();
-    }, []);
+        if (currentUser?.company_id) {
+            fetchJobs();
+        }
+    }, [currentUser?.company_id]);
 
     const fetchApplications = async (jobId: string) => {
         setLoadingApplications(true);
@@ -217,7 +224,7 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
                 requirements: requirements.split('\n').map(r => r.trim()).filter(Boolean),
                 cover_url: finalCoverUrl,
                 description_image: finalDescImageUrl,
-                company_id: employees[0]?.company_id
+                company_id: currentUser?.company_id
             };
 
             if (editingJob) {
