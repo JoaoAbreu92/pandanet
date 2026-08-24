@@ -909,7 +909,7 @@ const AppContent: React.FC = () => {
 
     // Fallback: Repair Profile
     // Fallback: If session exists but profile is missing, and it's not loading
-    if (session && (!currentUser || !currentUser.company_id) && !loading) {
+    if (session && (!currentUser || (!currentUser.company_id && !currentUser.isAdmin)) && !loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
                 <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
