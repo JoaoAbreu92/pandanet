@@ -1636,7 +1636,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                     // Verificar se já existe a conversa no banco
                     const { data: convExists } = await supabase
                         .from('whatsapp_conversations')
-                        .select('id')
+                        .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
                         .eq('contact_phone', phone)
                         .maybeSingle();
@@ -1706,7 +1706,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
 
                     const { data: convExists } = await supabase
                         .from('whatsapp_conversations')
-                        .select('id')
+                        .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
                         .eq('contact_phone', phone)
                         .maybeSingle();
@@ -1777,7 +1777,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                     // Verificar se já existe a conversa
                     const { data: convExists } = await supabase
                         .from('whatsapp_conversations')
-                        .select('id')
+                        .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
                         .eq('contact_phone', phone)
                         .maybeSingle();
@@ -1853,7 +1853,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                     const phone = c.phone;
                     const { data: convExists } = await supabase
                         .from('whatsapp_conversations')
-                        .select('id')
+                        .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
                         .eq('contact_phone', phone)
                         .maybeSingle();
