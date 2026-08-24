@@ -8,6 +8,7 @@ import FormSubmissionsManager from './FormSubmissionsManager';
 import MarketplaceManager from './MarketplaceManager';
 import EventsManager from './EventsManager';
 import { SupabaseGenericManager } from './SupabaseGenericManager';
+import HRManager from './HRManager';
 import GeneralSettings from './GeneralSettings';
 import PollManager from './PollManager';
 import { supabase } from '../supabaseClient';
@@ -135,6 +136,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'teams', label: 'Equipes', category: 'Pessoas' },
         { id: 'training', label: 'Treinamentos', category: 'Pessoas' },
         { id: 'jobs', label: 'Gestão de Vagas', category: 'Pessoas', featureId: 'jobs' },
+        { id: 'hr', label: 'Gestão RH', category: 'Pessoas' },
 
         { id: 'forms', label: 'Formulários', category: 'Operações' },
         { id: 'marketplace', label: 'Marketplace', category: 'Operações', featureId: 'marketplace' },
@@ -344,6 +346,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.current} / {i.target} {i.unit}</p></div>}
                 />;
+            case 'hr':
+                return <HRManager />;
             case 'crm_settings':
                 return <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Configurações do CRM</h3>
