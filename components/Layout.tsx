@@ -81,6 +81,7 @@ const Layout: React.FC<LayoutProps> = ({
             )}
             <SystemUpdateNotification />
             <EmailNotifier />
+            <DebugPanel currentUser={currentUser} currentCompany={currentCompany} />
             <div className="flex flex-1 w-full overflow-hidden relative">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
@@ -129,8 +130,7 @@ const Layout: React.FC<LayoutProps> = ({
                         <div className={`h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
                         {children}
                     </div>
-                </main>
-                <DebugPanel currentUser={currentUser} currentCompany={currentCompany} />
+                    </main>
             </div>
         </div>
     </div>

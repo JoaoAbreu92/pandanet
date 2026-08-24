@@ -30,6 +30,58 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const [showTooltip, setShowTooltip] = useState(false);
     const [tooltipDismissed, setTooltipDismissed] = useState(false);
 
+    // Draggable state
+    const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setPosition(prev => ({
+                x: Math.min(prev.x, window.innerWidth - 80),
+                y: Math.min(prev.y, window.innerHeight - 80)
+            }));
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (isOpen) return;
+        setIsDragging(true);
+        setDragOffset({
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+
+        const newX = Math.max(20, Math.min(e.clientX - dragOffset.x, window.innerWidth - 80));
+        const newY = Math.max(20, Math.min(e.clientY - dragOffset.y, window.innerHeight - 80));
+
+        setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
     useEffect(() => {
         if (hasAIEnabled) {
             fetchMessages();
@@ -144,7 +196,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 const prompt = `System Instructions: ${systemPrompt}\n\nUser Question: ${userText}`;
 
                 // Using the specific v1beta endpoint structure exactly as documented in Google AI Studio
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${cleanKey}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -396,9 +448,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     // Render Floating Button when closed
     if (!isOpen) {
         return (
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 translate-y-[20px] animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+            <div
+                className={`fixed z-50 flex flex-col items-end gap-3 transition-transform ${isDragging ? 'scale-105 opacity-80 cursor-grabbing' : 'animate-fade-in-up'}`}
+                style={{
+                    left: `${position.x}px`,
+                    top: `${position.y}px`,
+                    transition: isDragging ? 'none' : 'all 0.3s ease-out'
+                }}
+            >
                 {showTooltip && (
-                    <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-2xl shadow-2xl border border-emerald-100 dark:border-emerald-900/50 flex items-center gap-2 animate-bounce-slow relative">
+                    <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-2xl shadow-2xl border border-emerald-100 dark:border-emerald-900/50 flex items-center gap-2 animate-bounce-slow relative whitespace-nowrap">
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Precisa de ajuda?</p>
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowTooltip(false); setTooltipDismissed(true); }}
@@ -411,8 +470,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                     </div>
                 )}
                 <button
-                    onClick={toggleOpen}
-                    className="w-16 h-16 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 bg-white border-2 border-emerald-500 overflow-hidden flex items-center justify-center p-1 group"
+                    onClick={() => { if (!isDragging) toggleOpen(); }}
+                    onMouseDown={handleMouseDown}
+                    className="w-16 h-16 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 bg-white border-2 border-emerald-500 overflow-hidden flex items-center justify-center p-1 group cursor-grab"
                 >
                     <img 
                         src="/logo.png"
