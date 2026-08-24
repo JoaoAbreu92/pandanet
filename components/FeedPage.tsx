@@ -1,19 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
 import RecognitionWidget from './RecognitionWidget';
 import RecognitionModal from './RecognitionModal';
-import type { Post, Employee, Event, Recognition } from '../types';
+import type { Post, Employee, Event, Recognition, PostComment, PostReaction } from '../types';
 import { VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, PaperAirplaneIcon, ShareIcon, FaceSmileIcon, UserGroupIcon, HashtagIcon, CakeIcon } from './icons';
+import { supabase } from '../supabaseClient';
 
 interface FeedPageProps {
-    posts: Post[];
-    setPosts: (posts: Post[]) => void;
     currentUser: Employee;
     allEmployees?: Employee[];
     events?: Event[];
     recognitions?: Recognition[];
     onAddRecognition?: (rec: Recognition) => void;
+    // Legacy props kept for compatibility but ignored for data source
+    posts?: Post[];
+    setPosts?: (posts: Post[]) => void;
 }
 
 export const PostCard: React.FC<{
@@ -66,10 +68,10 @@ export const PostCard: React.FC<{
         <Card title="" className="pb-2 overflow-visible">
             {/* Header */}
             <div className="flex items-center mb-4">
-                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3" />
+                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
                 <div>
                     <h4 className="font-bold text-brand-text">{post.authorName}</h4>
-                    <p className="text-xs text-gray-500">{post.timestamp}</p>
+                    <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
                 </div>
             </div>
 
@@ -80,7 +82,7 @@ export const PostCard: React.FC<{
 
             {/* Media */}
             {post.mediaUrl && (
-                <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border">
+                <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border text-center">
                     {post.mediaType === 'image' ? (
                         <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-cover max-h-[500px]" />
                     ) : (
@@ -155,7 +157,7 @@ export const PostCard: React.FC<{
                     <div className="space-y-3 mb-4">
                         {post.comments.map(comment => (
                             <div key={comment.id} className="flex space-x-2">
-                                <img src={comment.authorAvatar} alt={comment.authorName} className="w-8 h-8 rounded-full" />
+                                <img src={comment.authorAvatar} alt={comment.authorName} className="w-8 h-8 rounded-full object-cover" />
                                 <div className="bg-gray-200 rounded-2xl px-3 py-2">
                                     <p className="font-bold text-xs text-brand-text">{comment.authorName}</p>
                                     <p className="text-sm text-brand-text">{comment.text}</p>
@@ -167,7 +169,7 @@ export const PostCard: React.FC<{
 
                 {/* Add Comment */}
                 <form onSubmit={handleCommentSubmit} className="flex items-center space-x-2">
-                    <img src={currentUser.avatarUrl} alt="User" className="w-8 h-8 rounded-full" />
+                    <img src={currentUser.avatarUrl} alt="User" className="w-8 h-8 rounded-full object-cover" />
                     <div className="flex-1 relative">
                         <input
                             type="text"
@@ -187,17 +189,100 @@ export const PostCard: React.FC<{
     );
 };
 
-const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
+const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
+    const [posts, setPosts] = useState<Post[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
-    const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
+    const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video', file?: File } | null>(null);
     const [showRecognitionModal, setShowRecognitionModal] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleRecognitionSubmit = (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
+    const fetchPosts = async () => {
+        try {
+            // setLoading(true); // Don't block UI refresh if just polling or re-fetching?
+            // Actually good to show load state initially
+            const { data, error } = await supabase
+                .from('posts')
+                .select(`
+                    id,
+                    content,
+                    created_at,
+                    media_url,
+                    media_type,
+                    mentions,
+                    author_id,
+                    profiles:author_id ( full_name, avatar_url ),
+                    post_reactions (
+                        id,
+                        emoji,
+                        user_id
+                    ),
+                    comments (
+                        id,
+                        content,
+                        created_at,
+                        author_id,
+                        profiles:author_id ( full_name, avatar_url )
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const formattedPosts: Post[] = data.map((item: any) => ({
+                id: item.id,
+                authorId: item.author_id,
+                authorName: item.profiles?.full_name || 'Desconhecido',
+                authorAvatar: item.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                content: item.content,
+                mediaUrl: item.media_url,
+                mediaType: item.media_type as 'image' | 'video',
+                timestamp: item.created_at,
+                mentions: item.mentions || [],
+                reactions: item.post_reactions.map((r: any) => ({
+                    emoji: r.emoji,
+                    userId: r.user_id
+                })),
+                comments: item.comments.map((c: any) => ({
+                    id: c.id,
+                    authorId: c.author_id,
+                    authorName: c.profiles?.full_name || 'Desconhecido',
+                    authorAvatar: c.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                    text: c.content, // Changed from c.text to c.content based on DB column
+                    timestamp: c.created_at
+                })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            }));
+
+            setPosts(formattedPosts);
+        } catch (error) {
+            console.error('Error fetching posts:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPosts();
+
+        // Simulating realtime subscription for updates could be added here
+        const channel = supabase
+            .channel('public:posts')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => fetchPosts())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    const handleRecognitionSubmit = async (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
         if (onAddRecognition) {
+            // TODO: Persist recognition to DB
             const newRec: Recognition = {
                 id: Date.now().toString(),
                 from: currentUser.name,
@@ -212,83 +297,132 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             const url = URL.createObjectURL(file);
-            setMediaFile({ url, type });
+            setMediaFile({ url, type, file });
         }
     };
 
-    const handlePostSubmit = (e: React.FormEvent) => {
+    const handlePostSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newPostContent.trim() && !mediaFile) return;
 
-        // Detect mentions
-        const mentions: string[] = [];
-        if (allEmployees) {
-            allEmployees.forEach(emp => {
-                if (newPostContent.includes(`@${emp.name}`)) {
-                    mentions.push(emp.id);
+        try {
+            let uploadedMediaUrl = null;
+
+            if (mediaFile && mediaFile.file) {
+                const fileExt = mediaFile.file.name.split('.').pop();
+                const fileName = `${Date.now()}.${fileExt}`;
+                const filePath = `${currentUser.id}/${fileName}`;
+
+                // Fallback to simpler upload if bucket not ready, but we try standard way
+                // Assuming 'feed-media' bucket exists
+                const { error: uploadError, data } = await supabase.storage
+                    .from('feed-media')
+                    .upload(filePath, mediaFile.file);
+
+                if (uploadError) {
+                    console.error('Upload failed:', uploadError);
+                    // Alert user or fallback
+                } else if (data) {
+                    const { data: { publicUrl } } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+                    uploadedMediaUrl = publicUrl;
                 }
-            });
-        }
+            }
 
-        const newPost: Post = {
-            id: Date.now().toString(),
-            authorId: currentUser.id,
-            authorName: currentUser.name,
-            authorAvatar: currentUser.avatarUrl,
-            content: newPostContent,
-            timestamp: 'Agora mesmo',
-            reactions: [],
-            comments: [],
-            mentions: mentions,
-            ...(mediaFile && { mediaUrl: mediaFile.url, mediaType: mediaFile.type })
-        };
-
-        setPosts([newPost, ...posts]);
-        setNewPostContent('');
-        setMediaFile(null);
-    };
-
-    const handleToggleReaction = (postId: number, emoji: string) => {
-        setPosts(posts.map(post => {
-            if (post.id === postId) {
-                const existingReactionIndex = post.reactions.findIndex(r => r.userId === currentUser.id);
-                let newReactions = [...post.reactions];
-
-                if (existingReactionIndex > -1) {
-                    if (newReactions[existingReactionIndex].emoji === emoji) {
-                        // Toggle off
-                        newReactions = newReactions.filter(r => r.userId !== currentUser.id);
-                    } else {
-                        // Change emoji
-                        newReactions[existingReactionIndex].emoji = emoji;
+            // Detect mentions
+            const mentions: string[] = [];
+            if (allEmployees) {
+                allEmployees.forEach(emp => {
+                    if (newPostContent.includes(`@${emp.name}`)) {
+                        mentions.push(emp.id);
                     }
-                } else {
-                    // Add new reaction
-                    newReactions.push({ emoji, userId: currentUser.id });
-                }
-                return { ...post, reactions: newReactions };
+                });
             }
-            return post;
-        }));
+
+            // Query company_id 
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            const companyId = profileData?.company_id;
+
+            if (!companyId) {
+                alert('Erro: ID da empresa não encontrado.');
+                return;
+            }
+
+            const { error } = await supabase.from('posts').insert({
+                author_id: currentUser.id,
+                company_id: companyId,
+                content: newPostContent,
+                media_url: uploadedMediaUrl,
+                media_type: mediaFile ? mediaFile.type : null,
+                mentions: mentions
+            });
+
+            if (error) throw error;
+
+            setNewPostContent('');
+            setMediaFile(null);
+            // fetchPosts call handled by realtime subscription usually, but call to be safe
+            // fetchPosts(); 
+
+        } catch (error) {
+            console.error('Error creating post:', error);
+            alert('Erro ao publicar post.');
+        }
     };
 
-    const handleSubmitComment = (postId: number, text: string) => {
-        setPosts(posts.map(post => {
-            if (post.id === postId) {
-                return {
-                    ...post,
-                    comments: [...post.comments, {
-                        id: Date.now(),
-                        authorId: currentUser.id,
-                        authorName: currentUser.name,
-                        authorAvatar: currentUser.avatarUrl,
-                        text: text,
-                        timestamp: 'Agora'
-                    }]
-                };
+    const handleToggleReaction = async (postId: string, emoji: string) => {
+        // Optimistic update
+        const postIndex = posts.findIndex(p => p.id === postId);
+        if (postIndex === -1) return;
+
+        // DB Update
+        try {
+            // Check if exists
+            const { data: existingReaction } = await supabase
+                .from('post_reactions')
+                .select('*')
+                .eq('post_id', postId)
+                .eq('user_id', currentUser.id)
+                .single();
+
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+
+            if (existingReaction) {
+                if (existingReaction.emoji === emoji) {
+                    // Delete
+                    await supabase.from('post_reactions').delete().eq('id', existingReaction.id);
+                } else {
+                    // Update
+                    await supabase.from('post_reactions').update({ emoji }).eq('id', existingReaction.id);
+                }
+            } else {
+                // Insert
+                await supabase.from('post_reactions').insert({
+                    post_id: postId,
+                    user_id: currentUser.id,
+                    company_id: profileData?.company_id,
+                    emoji
+                });
             }
-            return post;
-        }));
+            // fetchPosts(); // Refresh to get accurate count
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleSubmitComment = async (postId: string, text: string) => {
+        try {
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+
+            await supabase.from('comments').insert({
+                post_id: postId,
+                author_id: currentUser.id,
+                company_id: profileData?.company_id,
+                content: text
+            });
+            // fetchPosts();
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const handleShare = (post: Post) => {
@@ -298,7 +432,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         });
     };
 
-    // Determine Employee of the Month (Removed mock logic)
+    if (loading) {
+        return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-primary"></div></div>;
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
@@ -313,7 +449,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
             <div className="hidden lg:block space-y-6">
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden p-4 border border-gray-100">
                     <div className="flex flex-col items-center">
-                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md mb-2" />
+                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md mb-2 object-cover" />
                         <h3 className="font-bold text-lg text-gray-800">{currentUser.name}</h3>
                         <p className="text-sm text-gray-500">{currentUser.role}</p>
                     </div>
@@ -361,7 +497,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
                 {/* Create Post Card */}
                 <Card title="">
                     <div className="flex space-x-4">
-                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-10 h-10 rounded-full" />
+                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-10 h-10 rounded-full object-cover" />
                         <div className="flex-1">
                             <form onSubmit={handlePostSubmit}>
                                 <textarea
