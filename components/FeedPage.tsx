@@ -242,6 +242,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
     const fetchPosts = async () => {
         try {
+            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            if (!profile?.company_id) return;
+
             const { data, error } = await supabase
                 .from('posts')
                 .select(`
@@ -250,6 +253,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     post_reactions(id, emoji, user_id),
                     comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
                 `)
+                .eq('company_id', profile.company_id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -398,41 +402,70 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             if (error) throw error;
 
-            finalMentionIds.forEach(id => {
+            for (const id of finalMentionIds) {
                 if (id !== currentUser.id) {
-                    addNotification({
+                    await addNotification({
                         user_id: id,
+                        company_id: profile.company_id,
                         type: 'mention',
                         title: 'Você foi mencionado!',
                         description: `${currentUser.name} mencionou você em um post.`,
                         avatarUrl: currentUser.avatarUrl,
                         link: '/'
-                    } as any);
+                    });
                 }
-            });
+            }
 
             setNewPostContent('');
             setMediaFile(null);
             setMentions([]);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating post:', error);
-            alert('Erro ao publicar post.');
+            alert('Erro ao publicar post: ' + (error.message || 'Erro desconhecido.'));
         }
     };
 
     const handleRecognitionSubmit = async (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
-            await supabase.from('recognitions').insert({
+
+            // If current user has no company_id (Super Admin), try to get from recipient
+            let targetCompanyId = profile?.company_id;
+            if (!targetCompanyId) {
+                const { data: recipientProfile } = await supabase.from('profiles').select('company_id').eq('id', (data as any).toUserId).single();
+                targetCompanyId = recipientProfile?.company_id;
+            }
+
+            if (!targetCompanyId) {
+                throw new Error("Não foi possível determinar a empresa para este reconhecimento.");
+            }
+
+            const { error } = await supabase.from('recognitions').insert({
                 from_id: currentUser.id,
-                to_id: data.to,
-                company_id: profile?.company_id,
+                to_id: (data as any).toUserId,
+                company_id: targetCompanyId,
                 message: data.message,
                 type: data.value
             });
+
+            if (error) throw error;
+
+            // Enviar notificação para o usuário reconhecido
+            await addNotification({
+                user_id: (data as any).toUserId,
+                company_id: targetCompanyId,
+                type: 'mention',
+                title: 'Novo Reconhecimento!',
+                description: `${currentUser.name} enviou um reconhecimento para você: "${data.value}"`,
+                avatarUrl: currentUser.avatarUrl,
+                link: '/'
+            });
+
+            alert('Reconhecimento enviado com sucesso!');
             fetchRecognitions(); // Refresh list immediately
-        } catch (err) {
-            console.error(err);
+        } catch (err: any) {
+            console.error('Error in recognition:', err);
+            alert('Erro ao enviar reconhecimento: ' + (err.message || 'Erro desconhecido'));
         }
     };
 
@@ -474,11 +507,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             const { error } = await supabase.from('posts').delete().eq('id', postId);
             if (error) {
                 console.error("Error deleting post:", error);
-                alert("Erro ao excluir postagem.");
+                alert("Erro ao excluir postagem: " + (error.details || error.message || "Permissão negada."));
                 fetchPosts(); // Revert
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error deleting post:", err);
+            alert("Erro inesperado ao excluir: " + (err.message || "Erro desconhecido."));
             fetchPosts(); // Revert
         }
     };

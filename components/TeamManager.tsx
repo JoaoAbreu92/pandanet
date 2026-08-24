@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import Card from './Card';
 import type { Employee } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon, UsersIcon } from './icons';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface TeamManagerProps {
     users: Employee[];
@@ -13,15 +15,15 @@ interface TeamFormModalProps {
     initialMembers?: Employee[];
     allUsers: Employee[];
     onClose: () => void;
-    onSave: (name: string, members: number[]) => void;
+    onSave: (name: string, members: string[]) => void;
 }
 
 const TeamFormModal: React.FC<TeamFormModalProps> = ({ teamName, initialMembers = [], allUsers, onClose, onSave }) => {
     const [name, setName] = useState(teamName || '');
-    const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>(initialMembers.map(m => m.id));
+    const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(initialMembers.map(m => m.id));
     const [searchTerm, setSearchTerm] = useState('');
 
-    const toggleMember = (id: number) => {
+    const toggleMember = (id: string) => {
         setSelectedMemberIds(prev =>
             prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]
         );
@@ -123,46 +125,78 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers }) => {
         return Array.from(teamMap.entries()).map(([name, members]) => ({ name, members }));
     }, [users]);
 
-    const handleCreateTeam = (name: string, memberIds: number[]) => {
-        // Update selected users to have the new team name
-        const updatedUsers = users.map(u => {
-            if (memberIds.includes(u.id)) {
-                return { ...u, team: name };
-            }
-            return u;
-        });
-        setUsers(updatedUsers);
-        setModalOpen(false);
+    const handleCreateTeam = async (name: string, memberIds: string[]) => {
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ team: name })
+                .in('id', memberIds);
+
+            if (error) throw error;
+
+            // Update selected users to have the new team name
+            const updatedUsers = users.map(u => {
+                if (memberIds.includes(u.id)) {
+                    return { ...u, team: name };
+                }
+                return u;
+            });
+            setUsers(updatedUsers);
+            setModalOpen(false);
+        } catch (err) {
+            console.error('Error creating team:', err);
+            alert('Erro ao criar equipe.');
+        }
     };
 
-    const handleEditTeam = (newName: string, memberIds: number[]) => {
-        // 1. Remove users who were in this team but are NOT in the new list
-        // 2. Add users who are in the new list to this team (checking for name change too)
-        // 3. Update existing members if name changed
-
+    const handleEditTeam = async (newName: string, memberIds: string[]) => {
         const currentTeamName = editingTeamName;
+        if (!currentTeamName) return;
 
-        const updatedUsers = users.map(u => {
-            // Check if user is in the new member list
-            const isSelected = memberIds.includes(u.id);
+        try {
+            // 1. Remove users who were in this team but are NOT in the new list
+            const membersToRemove = users
+                .filter(u => u.team === currentTeamName && !memberIds.includes(u.id))
+                .map(u => u.id);
 
-            // If user was in this team (by name)
-            const wasInTeam = u.team === currentTeamName;
-
-            if (isSelected) {
-                // User should be in this team (with potentially new name)
-                return { ...u, team: newName };
-            } else if (wasInTeam) {
-                // User was in team but is NOT selected anymore -> Remove from team
-                return { ...u, team: 'Sem Equipe' };
+            if (membersToRemove.length > 0) {
+                const { error: removeError } = await supabase
+                    .from('profiles')
+                    .update({ team: 'Sem Equipe' })
+                    .in('id', membersToRemove);
+                if (removeError) throw removeError;
             }
-            // User was not in team and is not selected -> No change
-            return u;
-        });
 
-        setUsers(updatedUsers);
-        setModalOpen(false);
-        setEditingTeamName(null);
+            // 2. Update users who ARE in the new list to this team
+            if (memberIds.length > 0) {
+                const { error: addError } = await supabase
+                    .from('profiles')
+                    .update({ team: newName })
+                    .in('id', memberIds);
+                if (addError) throw addError;
+            }
+
+            const updatedUsers = users.map(u => {
+                // Check if user is in the new member list
+                const isSelected = memberIds.includes(u.id);
+                // If user was in this team (by name)
+                const wasInTeam = u.team === currentTeamName;
+
+                if (isSelected) {
+                    return { ...u, team: newName };
+                } else if (wasInTeam) {
+                    return { ...u, team: 'Sem Equipe' };
+                }
+                return u;
+            });
+
+            setUsers(updatedUsers);
+            setModalOpen(false);
+            setEditingTeamName(null);
+        } catch (err) {
+            console.error('Error editing team:', err);
+            alert('Erro ao editar equipe.');
+        }
     };
 
     const openEditModal = (teamName: string) => {
@@ -170,12 +204,24 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers }) => {
         setModalOpen(true);
     };
 
-    const handleDeleteTeam = (teamName: string) => {
+    const handleDeleteTeam = async (teamName: string) => {
         if (window.confirm(`Tem certeza que deseja dissolver a equipe "${teamName}"? Os membros ficarão "Sem Equipe".`)) {
-            const updatedUsers = users.map(u =>
-                u.team === teamName ? { ...u, team: 'Sem Equipe' } : u
-            );
-            setUsers(updatedUsers);
+            try {
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ team: 'Sem Equipe' })
+                    .eq('team', teamName);
+
+                if (error) throw error;
+
+                const updatedUsers = users.map(u =>
+                    u.team === teamName ? { ...u, team: 'Sem Equipe' } : u
+                );
+                setUsers(updatedUsers);
+            } catch (err) {
+                console.error('Error deleting team:', err);
+                alert('Erro ao excluir equipe.');
+            }
         }
     };
 

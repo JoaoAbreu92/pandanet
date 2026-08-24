@@ -198,7 +198,7 @@ const ItemDetailModal: React.FC<{
 };
 
 const MarketplacePage: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Todos');

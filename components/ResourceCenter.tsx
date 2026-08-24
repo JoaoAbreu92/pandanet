@@ -60,7 +60,7 @@ const DocumentFormModal: React.FC<{
 };
 
 const ResourceCenter: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
     const [documents, setDocuments] = useState<ResourceDocument[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setModalOpen] = useState(false);

@@ -109,6 +109,7 @@ export interface TrainingModule {
   thumbnail: string;
   videoUrl?: string;
   category?: string;
+  participants?: string[];
 }
 
 export interface KBArticle {
@@ -297,6 +298,7 @@ export interface CalendarEvent {
   category: CalendarEventCategory;
   location: string;
   attendees: Employee[];
+  invitedIds?: string[];
   notes: string;
 }
 

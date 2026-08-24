@@ -7,6 +7,7 @@ interface AuthContextType {
     session: Session | null;
     user: User | null;
     profile: Employee | null;
+    currentUser: Employee | null;
     loading: boolean;
     signOut: () => Promise<void>;
 }
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
     session: null,
     user: null,
     profile: null,
+    currentUser: null,
     loading: true,
     signOut: async () => { },
 });
@@ -55,7 +57,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewDirectory: true, viewForms: true, viewBenefits: true,
                             viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
                             viewTiDashboard: true, openTickets: true, openTiRequests: true,
-                            viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
+                            viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
+                            createEvents: true, manageMarketplace: true
                         },
                         following: [],
                         phone: '',
@@ -79,7 +82,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     viewDirectory: true, viewForms: true, viewBenefits: true,
                     viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
                     viewTiDashboard: true, openTickets: true, openTiRequests: true,
-                    viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
+                    viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
+                    createEvents: true, manageMarketplace: true
                 };
 
                 const employee: Employee = {
@@ -146,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, loading, signOut }}>
+        <AuthContext.Provider value={{ session, user, profile, currentUser: profile, loading, signOut }}>
             {!loading && children}
         </AuthContext.Provider>
     );

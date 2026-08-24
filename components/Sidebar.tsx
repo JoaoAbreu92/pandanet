@@ -42,8 +42,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
     };
 
-    const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof Employee['permissions'] | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
-        if (permission !== true && !currentUser.permissions[permission]) {
+    const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
+        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
+        const hasPermission = permission === true || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
+
+        if (!isAdmin && !hasPermission) {
             return null;
         }
         // Check if feature is disabled by company custom_features
@@ -59,7 +62,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     };
 
     const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti'; children: React.ReactNode, permission: boolean }> = ({ label, icon: Icon, menuKey, children, permission }) => {
-        if (!permission) return null;
+        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
+        if (!permission && !isAdmin) return null;
 
         const isActive = React.Children.toArray(children).some(child =>
             React.isValidElement(child) && child.props.page === currentPage

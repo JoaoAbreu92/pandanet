@@ -28,10 +28,39 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
     useEffect(() => {
         if (isOwnProfile) {
-            setTargetUser(currentUser);
-            setTempUserData(currentUser);
+            // Fetch fresh data for current user to ensure we have department_id etc.
+            const fetchFreshProfile = async () => {
+                const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+                if (data) {
+                    const freshUser: Employee = {
+                        ...currentUser,
+                        id: data.id,
+                        name: data.full_name,
+                        email: data.email,
+                        role: data.role,
+                        team: data.team,
+                        avatarUrl: data.avatar_url,
+                        coverUrl: data.cover_url,
+                        bio: data.bio,
+                        phone: data.phone,
+                        officeLocation: data.office_location,
+                        joinDate: data.created_at, // Use created_at as join date equivalent
+                        birthDate: data.birth_date,
+                        company_id: data.company_id,
+                        permissions: data.permissions || {},
+                        following: data.following || []
+                    };
+                    // Manually append department_id as it might not be in Employee type definition yet
+                    (freshUser as any).department_id = data.department_id;
+
+                    setTargetUser(freshUser);
+                    setTempUserData(freshUser);
+                }
+            };
+            fetchFreshProfile();
             setActiveTab('info');
         } else {
+            // ... existing fetchTargetUser code ...
             const fetchTargetUser = async () => {
                 setLoading(true);
                 try {
@@ -52,13 +81,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             bio: data.bio,
                             phone: data.phone,
                             officeLocation: data.office_location,
-                            joinDate: data.join_date,
+                            joinDate: data.created_at,
                             birthDate: data.birth_date,
                             isAdmin: data.is_admin,
                             company_id: data.company_id,
                             following: data.following || [],
                             permissions: data.permissions || {}
                         };
+                        (mapped as any).department_id = data.department_id;
                         setTargetUser(mapped);
                     }
                 } catch (err) {
@@ -70,7 +100,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             fetchTargetUser();
             setActiveTab('activity');
         }
-    }, [userId, currentUser]);
+    }, [userId, currentUser.id]); // Removed currentUser dependency to avoid loop, just ID needs to be stable
 
     const fetchUserPosts = async (targetId: string) => {
         try {
@@ -450,6 +480,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                         <label className="text-sm font-medium text-brand-subtle-text">Escritório</label>
                                         <input name="officeLocation" value={tempUserData.officeLocation || ''} onChange={handleInputChange} placeholder="Ex: São Paulo ou Remoto" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
                                     </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Data de Nascimento</label>
+                                        <input type="date" name="birthDate" value={tempUserData.birthDate || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Data de Início (Empresa)</label>
+                                        <input type="date" name="joinDate" value={tempUserData.joinDate || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                                    </div>
                                     <div className="sm:col-span-2">
                                         <label className="text-sm font-medium text-brand-subtle-text">Departamento</label>
                                         <select
@@ -479,32 +517,40 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         ) : (
                             <div className="space-y-4">
                                 <div>
-                                    <h3 className="text-2xl font-bold text-brand-text">{currentUser.name}</h3>
-                                    <p className="text-brand-subtle-text">{currentUser.role} | {currentUser.team}</p>
+                                    <h3 className="text-2xl font-bold text-brand-text">{userData.name}</h3>
+                                    <p className="text-brand-subtle-text">{userData.role} | {userData.team}</p>
                                 </div>
-                                {currentUser.bio && <p className="text-brand-text italic">"{currentUser.bio}"</p>}
+                                {userData.bio && <p className="text-brand-text italic">"{userData.bio}"</p>}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">E-mail</h4>
-                                        <p className="text-brand-text">{currentUser.email}</p>
+                                        <p className="text-brand-text">{userData.email}</p>
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Telefone</h4>
-                                        <p className="text-brand-text">{currentUser.phone || 'Não informado'}</p>
+                                        <p className="text-brand-text">{userData.phone || 'Não informado'}</p>
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Escritório</h4>
-                                        <p className="text-brand-text">{currentUser.officeLocation || 'Não informado'}</p>
+                                        <p className="text-brand-text">{userData.officeLocation || 'Não informado'}</p>
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Departamento</h4>
                                         <p className="text-brand-text">
-                                            {departments.find(d => d.id === (currentUser as any).department_id)?.name || 'Não informado'}
+                                            {departments.find(d => d.id === (userData as any).department_id)?.name || 'Não informado'}
                                         </p>
                                     </div>
                                     <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Data de Nascimento</h4>
+                                        <p className="text-brand-text">{userData.birthDate ? new Date(userData.birthDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'Não informada'}</p>
+                                    </div>
+                                    <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Data de Início</h4>
-                                        <p className="text-brand-text">{new Date(currentUser.joinDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+                                        <p className="text-brand-text">
+                                            {userData.joinDate && !isNaN(new Date(userData.joinDate).getTime())
+                                                ? new Date(userData.joinDate + 'T12:00:00').toLocaleDateString('pt-BR')
+                                                : 'Não informada'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

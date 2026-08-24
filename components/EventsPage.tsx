@@ -3,11 +3,14 @@ import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserGroupIcon, PlusIcon, Check
 import type { Event } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 
 const EventsPage: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
+    const { addNotification } = useNotifications();
     const [events, setEvents] = useState<Event[]>([]);
     const [declineModalOpen, setDeclineModalOpen] = useState<string | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [declineReason, setDeclineReason] = useState('');
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -39,14 +42,13 @@ const EventsPage: React.FC = () => {
                     title: e.title,
                     description: e.description,
                     date: e.date?.split('T')[0] || e.created_at?.split('T')[0],
-                    time: e.start_time || '00:00', // start_time mapped to time
+                    time: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '00:00',
+                    endTime: e.end_time || '00:00',
                     location: e.location || '',
-                    imageUrl: e.imageUrl, // Assuming imageUrl column exists or mapped from media? Schema said generic. let's assume not.
-                    // Schema check result didn't show imageUrl. 
-                    // I should probably allow random or generic image if null.
+                    imageUrl: e.imageUrl,
                     category: (e.category as any) || 'Outro',
                     imageType: 'url',
-                    invitees: e.invitees || [],
+                    invitees: e.invited_ids || [], // Map to the correct column
                     attendees: e.attendees || [],
                     declined: e.declined || []
                 }));
@@ -80,27 +82,51 @@ const EventsPage: React.FC = () => {
         const event = events.find(e => e.id === eventId);
         if (!event) return;
 
-        // Optimistic update
         const updatedAttendees = [...(event.attendees || []), currentUser.id];
-
-        // Remove from declined if present?
-        const updatedDeclined = (event.declined || []).filter(d => d.userId !== currentUser.id);
+        const updatedInvited = (event.invitees || []).filter(id => id !== currentUser.id);
+        const updatedDeclined = (event.declined || []).filter((d: any) => d.userId !== currentUser.id);
 
         try {
-            // In DB attendees is array of strings (uuid)
             const { error } = await supabase
                 .from('events')
                 .update({
                     attendees: updatedAttendees,
+                    invited_ids: updatedInvited,
                     declined: updatedDeclined
                 })
                 .eq('id', eventId);
 
             if (error) throw error;
-            // State updates via realtime or manual refresh (realtime set above)
-        } catch (err) {
+
+            // Notify creator and other attendees
+            for (const attId of event.attendees) {
+                if (attId !== currentUser.id) {
+                    addNotification({
+                        user_id: attId,
+                        company_id: currentUser.company_id,
+                        type: 'event',
+                        title: 'Nova Confirmação!',
+                        description: `${currentUser.name || currentUser.full_name} confirmou presença em: ${event.title}`,
+                        link: '/events'
+                    });
+                }
+            }
+
+            await addNotification({
+                user_id: currentUser.id,
+                company_id: currentUser.company_id,
+                type: 'event',
+                title: 'Presença Confirmada',
+                description: `Sua presença foi confirmada em: ${event.title}`,
+                link: '/events'
+            });
+
+            alert("Presença confirmada!");
+            fetchEvents();
+            setSelectedEvent(null);
+        } catch (err: any) {
             console.error("Error joining event:", err);
-            alert("Erro ao confirmar presença.");
+            alert("Erro ao confirmar presença: " + err.message);
         }
     };
 
@@ -110,6 +136,7 @@ const EventsPage: React.FC = () => {
         if (!event) return;
 
         const updatedDeclined = [...(event.declined || []), { userId: currentUser.id, reason }];
+        const updatedInvited = (event.invitees || []).filter(id => id !== currentUser.id);
         const updatedAttendees = (event.attendees || []).filter(id => id !== currentUser.id);
 
         try {
@@ -117,14 +144,29 @@ const EventsPage: React.FC = () => {
                 .from('events')
                 .update({
                     attendees: updatedAttendees,
+                    invited_ids: updatedInvited,
                     declined: updatedDeclined
                 })
                 .eq('id', eventId);
 
             if (error) throw error;
-        } catch (err) {
+
+            await addNotification({
+                user_id: currentUser.id,
+                company_id: currentUser.company_id,
+                type: 'event',
+                title: 'Evento Recusado',
+                description: `Você justificou sua ausência no evento: ${event.title}`,
+                link: '/events'
+            });
+
+            alert("Convite recusado.");
+            fetchEvents();
+            setSelectedEvent(null);
+            setDeclineReason('');
+        } catch (err: any) {
             console.error("Error declining event:", err);
-            alert("Erro ao recusar evento.");
+            alert("Erro ao recusar evento: " + err.message);
         }
     };
 
@@ -148,8 +190,10 @@ const EventsPage: React.FC = () => {
                     ...newEvent,
                     company_id: currentUser.company_id,
                     attendees: [],
-                    invitees: [],
-                    declined: []
+                    invited_ids: [],
+                    declined: [],
+                    start_time: new Date(`${newEvent.date}T${newEvent.start_time}:00Z`).toISOString(),
+                    end_time: new Date(`${newEvent.date}T${newEvent.start_time}:00Z`).toISOString(), // Default to same as start for now if not provided
                 }]);
 
             if (error) throw error;
@@ -171,11 +215,13 @@ const EventsPage: React.FC = () => {
     };
 
     const sortedEvents = [...events].filter(event => {
-        const isInvited = (event.invitees || []).includes(currentUser?.id || '');
+        const isInvited = (event.invited_ids || []).includes(currentUser?.id || '');
         const isAttending = (event.attendees || []).includes(currentUser?.id || '');
-        const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invitees || event.invitees.length === 0;
+        const isDeclined = (event.declined || []).some((d: any) => d.userId === currentUser?.id);
+        const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invited_ids || event.invited_ids.length === 0;
 
-        return isSocialOrPublic || isInvited || isAttending;
+        // Don't show declined events in the main list unless explicitly asked
+        return (isSocialOrPublic || isInvited || isAttending) && !isDeclined;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando eventos...</div>;
@@ -245,28 +291,99 @@ const EventsPage: React.FC = () => {
 
                                     <div className="flex space-x-2">
                                         <button
-                                            onClick={() => handleJoinEvent(event.id)}
-                                            disabled={isAttending}
-                                            className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${isAttending
-                                                ? 'bg-green-100 text-green-700 cursor-default'
-                                                : 'bg-brand-primary text-white hover:bg-emerald-600 shadow-md hover:shadow-lg'
-                                                }`}
+                                            onClick={() => setSelectedEvent(event)}
+                                            className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-all bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
                                         >
-                                            {isAttending ? 'Confirmado ✓' : 'Confirmar'}
+                                            Ver Detalhes
                                         </button>
-                                        {!isAttending && (
-                                            <button
-                                                onClick={() => setDeclineModalOpen(event.id)}
-                                                className="px-4 py-2.5 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
-                                            >
-                                                Recusar
-                                            </button>
+                                        {isAttending && (
+                                            <div className="flex items-center text-green-600 font-medium text-sm px-2">
+                                                Confirmado ✓
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Event Detail Modal */}
+            {selectedEvent && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="h-48 relative">
+                            <img
+                                src={selectedEvent.imageUrl || `https://source.unsplash.com/random/800x600/?event,corporate,${selectedEvent.id}`}
+                                alt={selectedEvent.title}
+                                className="w-full h-full object-cover"
+                            />
+                            <button
+                                onClick={() => setSelectedEvent(null)}
+                                className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white p-1.5 rounded-full backdrop-blur-sm transition-colors"
+                            >
+                                <XMarkIcon className="w-6 h-6" />
+                            </button>
+                            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-brand-primary shadow-sm">
+                                {selectedEvent.category}
+                            </div>
+                        </div>
+
+                        <div className="p-6">
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedEvent.title}</h3>
+                            <p className="text-gray-600 mb-6">{selectedEvent.description}</p>
+
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <CalendarDaysIcon className="w-5 h-5 mr-3 text-brand-primary" />
+                                    {new Date(selectedEvent.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <ClockIcon className="w-5 h-5 mr-3 text-brand-primary" />
+                                    {selectedEvent.time}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <MapPinIcon className="w-5 h-5 mr-3 text-brand-primary" />
+                                    {selectedEvent.location}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <UserGroupIcon className="w-5 h-5 mr-3 text-brand-primary" />
+                                    {(selectedEvent.attendees || []).length} confirmados
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-3">
+                                {!(selectedEvent.attendees || []).includes(currentUser?.id || '') ? (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                handleJoinEvent(selectedEvent.id);
+                                                setSelectedEvent(null);
+                                            }}
+                                            className="flex-1 bg-brand-primary text-white py-3 rounded-xl font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                                        >
+                                            Confirmar Presença
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setDeclineModalOpen(selectedEvent.id);
+                                                setSelectedEvent(null);
+                                            }}
+                                            className="px-6 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
+                                        >
+                                            Recusar
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="w-full bg-green-50 text-green-700 py-3 rounded-xl font-bold text-center border border-green-100 flex items-center justify-center space-x-2">
+                                        <CheckCircleIcon className="w-5 h-5" />
+                                        <span>Você confirmou presença neste evento</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

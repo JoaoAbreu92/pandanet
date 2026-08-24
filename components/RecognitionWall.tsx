@@ -5,6 +5,7 @@ import type { Recognition, Employee } from '../types';
 import RecognitionModal from './RecognitionModal';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 
 const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }) => {
     const valueColors: { [key: string]: string } = {
@@ -35,7 +36,8 @@ const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }
 };
 
 const RecognitionWall: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
+    const { addNotification } = useNotifications();
     const [recognitions, setRecognitions] = useState<Recognition[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [showModal, setShowModal] = useState(false);
@@ -71,10 +73,10 @@ const RecognitionWall: React.FC = () => {
                     .select(`
                         id,
                         message,
-                        value_tag,
+                        type,
                         created_at,
-                        from:from_user_id(full_name, avatar_url),
-                        to:to_user_id(full_name, avatar_url)
+                        from:from_id(full_name, avatar_url),
+                        to:to_id(full_name, avatar_url)
                     `)
                     .eq('company_id', currentUser.company_id)
                     .order('created_at', { ascending: false });
@@ -89,7 +91,7 @@ const RecognitionWall: React.FC = () => {
                         to: (r.to as any)?.full_name || 'Desconhecido',
                         toAvatar: (r.to as any)?.avatar_url || 'https://via.placeholder.com/150',
                         message: r.message,
-                        value: r.value_tag as any,
+                        value: r.type as any,
                         date: r.created_at
                     }));
                     setRecognitions(formattedRecognitions);
@@ -120,21 +122,33 @@ const RecognitionWall: React.FC = () => {
         if (!currentUser) return;
 
         try {
-            const { error } = await supabase
+            const { data: insertedData, error: insertError } = await supabase
                 .from('recognitions')
                 .insert([{
                     company_id: currentUser.company_id,
-                    from_user_id: currentUser.id,
-                    to_user_id: data.toUserId,
+                    from_id: currentUser.id,
+                    to_id: data.toUserId,
                     message: data.message,
-                    value_tag: data.value
-                }]);
+                    type: data.value
+                }])
+                .select();
 
-            if (error) throw error;
+            if (insertError) throw insertError;
+
+            // Enviar notificação para o usuário reconhecido
+            await addNotification({
+                user_id: data.toUserId,
+                company_id: currentUser.company_id,
+                type: 'mention',
+                title: 'Novo Reconhecimento!',
+                description: `${currentUser.full_name} reconheceu você: "${data.message}"`,
+                avatarUrl: currentUser.avatar_url,
+                link: '/'
+            });
             // Subscription will handle refresh
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding recognition:', error);
-            alert('Erro ao enviar reconhecimento. Tente novamente.');
+            alert('Erro ao enviar reconhecimento: ' + (error.message || 'Erro desconhecido.'));
         }
     };
 

@@ -15,8 +15,14 @@ const mockHolidays = [
     { title: 'Natal', date: '2024-12-25' },
 ];
 
-const CalendarPage: React.FC = () => {
-    const { currentUser } = useAuth();
+interface CalendarPageProps {
+    events?: CalendarEvent[];
+    currentUser?: Employee | null;
+}
+
+const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, currentUser: propUser }) => {
+    const { profile: contextUser } = useAuth();
+    const currentUser = propUser || contextUser;
     const { addNotification } = useNotifications();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'week'>('month');
@@ -39,20 +45,22 @@ const CalendarPage: React.FC = () => {
     });
 
     useEffect(() => {
-        if (!currentUser?.company_id) return;
+        // Allow fetch even if no company_id (Super Admin might see all)
+        if (!currentUser) return;
 
         const fetchData = async () => {
-            console.log('Fetching calendar data for company:', currentUser.company_id);
+            console.log('Fetching calendar data for user:', currentUser.id);
 
-            // Fetch Employees - Rely on RLS
-            const { data: emps, error: empError } = await supabase.from('profiles').select('*');
+            // Fetch Employees - Filter by company_id
+            const { data: emps, error: empError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
             if (empError) {
                 console.error('Error fetching employees:', empError);
-                alert('Erro ao buscar funcionários: ' + empError.message);
             }
 
             if (emps) {
-                console.log('Employees found:', emps.length);
                 setEmployees(emps.map((e: any) => ({
                     id: e.id,
                     name: e.full_name,
@@ -68,25 +76,27 @@ const CalendarPage: React.FC = () => {
                 })));
             }
 
-            // Fetch Departments - Rely on RLS
-            const { data: depts, error: deptError } = await supabase.from('departments').select('*');
+            // Fetch Departments - Filter by company_id
+            const { data: depts, error: deptError } = await supabase
+                .from('departments')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
             if (deptError) {
                 console.error('Error fetching departments:', deptError);
-                alert('Erro ao buscar departamentos: ' + deptError.message);
             }
             if (depts) {
-                console.log('Departments found:', depts.length);
                 setDepartments(depts);
             }
 
-            // Fetch Events - Rely on RLS
+            // Fetch Events - Filter by company_id
             const { data: evts, error: evtError } = await supabase
                 .from('events')
-                .select('*');
+                .select('*')
+                .eq('company_id', currentUser.company_id);
 
             if (evtError) {
                 console.error('Error fetching events:', evtError);
-                alert('Erro ao buscar eventos: ' + evtError.message);
+                // alert('Erro ao buscar eventos: ' + evtError.message);
             }
 
             if (evts) {
@@ -94,16 +104,14 @@ const CalendarPage: React.FC = () => {
                     id: e.id,
                     title: e.title,
                     date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
-                    startTime: e.start_time || '00:00',
-                    endTime: e.end_time || '00:00',
+                    startTime: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '00:00',
+                    endTime: e.end_time ? new Date(e.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '00:00',
                     category: (e.category as CalendarEventCategory) || 'Reunião',
                     location: e.location || '',
                     attendees: [], // Mapped below
                     notes: e.description || ''
                 }));
 
-                // Map attendees only after employees are loaded? 
-                // We can use 'emps' from local scope.
                 const eventsWithAttendees = formattedEvents.map((fe, index) => {
                     const raw = evts[index];
                     const attendeeIds = raw.attendees || [];
@@ -113,7 +121,9 @@ const CalendarPage: React.FC = () => {
                             id: emp.id,
                             name: emp.full_name,
                             avatarUrl: emp.avatar_url
-                        } as Employee))
+                        } as Employee)),
+                        invitedIds: raw.invited_ids || [],
+                        declined: raw.declined || []
                     };
                 });
                 setEvents(eventsWithAttendees);
@@ -121,11 +131,17 @@ const CalendarPage: React.FC = () => {
         };
 
         fetchData();
-    }, [currentUser?.company_id]);
+    }, [currentUser]);
 
     const handleCreateEvent = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser?.company_id) return;
+
+        let targetCompanyId = currentUser?.company_id;
+
+        if (!targetCompanyId) {
+            alert("Erro: Não foi possível identificar sua empresa. Por favor, recarregue a página ou entre em contato com o suporte.");
+            return;
+        }
 
         let finalAttendees = [...newEventData.attendees];
         if ((newEventData as any).departmentId) {
@@ -134,20 +150,30 @@ const CalendarPage: React.FC = () => {
         }
 
         try {
+            // Garantir formato ISO 8601 completo para timestamptz
+            const combinedStartTime = new Date(`${newEventData.date}T${newEventData.startTime}:00`).toISOString();
+            const combinedEndTime = new Date(`${newEventData.date}T${newEventData.endTime}:00`).toISOString();
+
+            console.log('Enviando evento:', { combinedStartTime, combinedEndTime, date: newEventData.date });
+
             const { data, error } = await supabase.from('events').insert({
-                company_id: currentUser.company_id,
+                company_id: targetCompanyId,
                 title: newEventData.title,
                 description: newEventData.notes,
                 date: newEventData.date,
-                start_time: newEventData.startTime,
-                end_time: newEventData.endTime,
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
                 category: newEventData.category,
                 location: newEventData.location,
-                attendees: finalAttendees,
+                attendees: [currentUser.id], // Apenas o criador começa confirmado
+                invited_ids: finalAttendees.filter(id => id !== currentUser.id), // Os outros são convidados
                 creator_id: currentUser.id
             }).select();
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase error creating event:', error);
+                throw error;
+            }
 
             if (data) {
                 // Refresh or append
@@ -161,29 +187,43 @@ const CalendarPage: React.FC = () => {
                     endTime: data[0].end_time,
                     category: data[0].category as any,
                     location: data[0].location,
-                    attendees: employees.filter(emp => newEventData.attendees.includes(emp.id)),
+                    attendees: employees.filter(emp => [currentUser.id].includes(emp.id)),
+                    invitedIds: data[0].invited_ids || [],
                     notes: data[0].description
                 };
                 setEvents([...events, newEvt]);
                 setCreateModalOpen(false);
-                setNewEventData({ title: '', date: new Date().toISOString().split('T')[0], startTime: '09:00', endTime: '10:00', category: 'Reunião', location: '', attendees: [], notes: '' });
-
-                // Notify attendees
-                newEventData.attendees.forEach(attId => {
-                    if (attId !== currentUser?.id) {
-                        addNotification({
-                            user_id: attId,
-                            type: 'event',
-                            title: 'Novo Convite de Evento',
-                            description: `Você foi convidado para: ${newEventData.title}`,
-                            link: '/calendar'
-                        } as any);
-                    }
+                setNewEventData({
+                    title: '',
+                    date: new Date().toISOString().split('T')[0],
+                    startTime: '09:00',
+                    endTime: '10:00',
+                    category: 'Reunião',
+                    location: '',
+                    attendees: [],
+                    departmentId: '',
+                    notes: ''
                 });
+
+                // Notificar os convidados
+                for (const invitedId of data[0].invited_ids || []) {
+                    addNotification({
+                        user_id: invitedId,
+                        company_id: currentUser.company_id,
+                        type: 'event',
+                        title: 'Novo Convite de Evento!',
+                        description: `${currentUser.full_name} convidou você para: ${newEventData.title}`,
+                        link: '/calendar'
+                    });
+                }
+
+                alert('Evento criado com sucesso e convites enviados!');
+                window.location.reload();
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating event:', error);
-            alert('Erro ao criar evento');
+            const detail = error.details || error.message || 'Erro de conexão ou política de segurança';
+            alert(`Erro ao criar evento: ${detail}`);
         }
     };
 
@@ -191,16 +231,16 @@ const CalendarPage: React.FC = () => {
     const allCalendarEvents = useMemo(() => {
         // ... (birthday and holiday logic same as before)
         const birthdayEvents: CalendarEvent[] = employees.map((emp: any) => ({
-            id: `bday-${emp.id}`, // String ID
-            title: `Aniversário de ${emp.name.split(' ')[0]}`,
-            date: emp.birthDate ? `${currentDate.getFullYear()}-${emp.birthDate.substring(5)}` : '',
+            id: `bday-${emp.id}`,
+            title: `Aniversário de ${emp.name?.split(' ')[0] || 'Colega'}`,
+            date: emp.birthDate ? `${currentDate.getFullYear()}-${emp.birthDate.substring(5, 10)}` : '',
             startTime: '00:00',
             endTime: '23:59',
             category: 'Aniversário',
             location: '',
             attendees: [],
             notes: `Deseje um feliz aniversário para ${emp.name}!`
-        })).filter(e => e.date); // Filter valid dates
+        })).filter(e => e.date);
 
         const holidayEvents: CalendarEvent[] = mockHolidays.map((h, i) => ({
             id: `holiday-${i}`,
@@ -288,31 +328,150 @@ const CalendarPage: React.FC = () => {
         }
     };
 
-    const EventModal: React.FC<{ event: CalendarEvent, onClose: () => void }> = ({ event, onClose }) => (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
-                <div className="flex items-start space-x-4">
-                    <div className={`mt-1 p-2 rounded-full ${getCategoryColor(event.category)}`}>
-                        {event.category === 'Aniversário' ? <GiftIcon className="w-6 h-6" /> : <CalendarIcon className="w-6 h-6" />}
+    const EventModal: React.FC<{ event: CalendarEvent, onClose: () => void }> = ({ event, onClose }) => {
+        const isInvited = event.invitedIds?.includes(currentUser?.id || '');
+        const isConfirmed = event.attendees.some(a => a.id === currentUser?.id);
+        const [showReasonInput, setShowReasonInput] = useState(false);
+        const [reason, setReason] = useState('');
+
+        const handleStatusUpdate = async (status: 'confirm' | 'decline') => {
+            if (!currentUser) return;
+
+            try {
+                // Obter a lista mais atual de recusados para garantir sincronia
+                const { data: currentEvt } = await supabase.from('events').select('declined, invited_ids, attendees').eq('id', event.id).single();
+
+                if (status === 'confirm') {
+                    const updatedAttendees = Array.from(new Set([...(currentEvt?.attendees || []), currentUser.id]));
+                    const updatedInvited = (currentEvt?.invited_ids || []).filter((id: string) => id !== currentUser.id);
+                    const updatedDeclined = (currentEvt?.declined || []).filter((d: any) => d.userId !== currentUser.id);
+
+                    const { error } = await supabase
+                        .from('events')
+                        .update({
+                            attendees: updatedAttendees,
+                            invited_ids: updatedInvited,
+                            declined: updatedDeclined
+                        })
+                        .eq('id', event.id);
+
+                    if (error) throw error;
+
+                    // Notificar todos os que já confirmaram (incluindo o criador)
+                    for (const attId of (currentEvt?.attendees || [])) {
+                        if (attId !== currentUser.id) {
+                            addNotification({
+                                user_id: attId,
+                                company_id: currentUser.company_id,
+                                type: 'event',
+                                title: 'Nova Confirmação!',
+                                description: `${currentUser.full_name} confirmou presença em: ${event.title}`,
+                                link: '/calendar'
+                            });
+                        }
+                    }
+                } else {
+                    if (!reason.trim()) {
+                        setShowReasonInput(true);
+                        return;
+                    }
+
+                    const declinedList = currentEvt?.declined || [];
+                    const updatedDeclined = [...declinedList.filter((d: any) => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
+                    const updatedInvited = (currentEvt?.invited_ids || []).filter((id: string) => id !== currentUser.id);
+                    const updatedAttendees = (currentEvt?.attendees || []).filter((id: string) => id !== currentUser.id);
+
+                    const { error } = await supabase
+                        .from('events')
+                        .update({
+                            declined: updatedDeclined,
+                            invited_ids: updatedInvited,
+                            attendees: updatedAttendees
+                        })
+                        .eq('id', event.id);
+
+                    if (error) throw error;
+                }
+
+                alert(status === 'confirm' ? 'Presença confirmada!' : 'Convite recusado.');
+                onClose();
+                window.location.reload(); // Simplificado para garantir atualização do estado global
+            } catch (err: any) {
+                alert('Erro ao atualizar status: ' + err.message);
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
+                    <div className="flex items-start space-x-4">
+                        <div className={`mt-1 p-2 rounded-full ${getCategoryColor(event.category)}`}>
+                            {event.category === 'Aniversário' ? <GiftIcon className="w-6 h-6" /> : <CalendarIcon className="w-6 h-6" />}
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-bold text-brand-text mb-1">{event.title}</h3>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategoryColor(event.category)}`}>{event.category}</span>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-2xl font-bold text-brand-text mb-1">{event.title}</h3>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getCategoryColor(event.category)}`}>{event.category}</span>
+
+                    <div className="space-y-4 text-brand-subtle-text mt-6">
+                        <div className="flex items-center space-x-3">
+                            <CalendarIcon className="w-5 h-5" />
+                            <span>{new Date(event.date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}, {event.startTime} - {event.endTime}</span>
+                        </div>
+                        {event.location && <p><strong>Local:</strong> {event.location}</p>}
+                        {event.notes && <p><strong>Observações:</strong> {event.notes}</p>}
+
+                        {/* Ações para convidados */}
+                        {isInvited && !isConfirmed && !showReasonInput && (
+                            <div className="flex space-x-3 pt-4">
+                                <button onClick={() => handleStatusUpdate('confirm')} className="flex-1 py-2 bg-emerald-500 text-white rounded-md font-semibold hover:bg-emerald-600">
+                                    Confirmar Presença
+                                </button>
+                                <button onClick={() => setShowReasonInput(true)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300">
+                                    Recusar
+                                </button>
+                            </div>
+                        )}
+
+                        {showReasonInput && (
+                            <div className="space-y-3 pt-4 border-t">
+                                <label className="block text-sm font-medium text-brand-text">Por que você não poderá participar?</label>
+                                <textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Escreva o motivo..."
+                                    className="w-full border-gray-300 rounded-md p-2 text-sm bg-white text-brand-text"
+                                    rows={2}
+                                />
+                                <div className="flex space-x-2">
+                                    <button onClick={() => handleStatusUpdate('decline')} className="flex-1 py-2 bg-red-500 text-white rounded-md text-sm font-semibold hover:bg-red-600">
+                                        Confirmar Recusa
+                                    </button>
+                                    <button onClick={() => setShowReasonInput(false)} className="px-4 py-2 bg-gray-100 text-gray-500 rounded-md text-sm">Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {event.attendees && event.attendees.length > 0 && (
+                            <div className="pt-4 border-t">
+                                <h4 className="font-semibold text-brand-text mb-2 text-sm">Confirmados ({event.attendees.length})</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {event.attendees.map(a => (
+                                        <span key={a.id} className="flex items-center space-x-2 bg-emerald-50 px-2 py-1 rounded-full text-xs text-emerald-700 border border-emerald-100">
+                                            <img src={a.avatarUrl || 'https://via.placeholder.com/32'} className="w-4 h-4 rounded-full" alt={a.name} />
+                                            <span>{a.name}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
-                <div className="space-y-4 text-brand-subtle-text mt-6">
-                    <div className="flex items-center space-x-3"><CalendarIcon className="w-5 h-5" /><span>{new Date(event.date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}, {event.startTime} - {event.endTime}</span></div>
-                    {event.location && <p><strong>Local:</strong> {event.location}</p>}
-                    {event.notes && <p><strong>Observações:</strong> {event.notes}</p>}
-                    {event.attendees && event.attendees.length > 0 && <div>
-                        <h4 className="font-semibold text-brand-text mb-2">Participantes ({event.attendees.length})</h4>
-                        <div className="flex flex-wrap gap-2">{event.attendees.map(a => <span key={a.id} className="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded-full text-sm"><img src={a.avatarUrl || 'https://via.placeholder.com/32'} className="w-5 h-5 rounded-full" alt={a.name} /><span>{a.name}</span></span>)}</div>
-                    </div>}
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -325,6 +484,13 @@ const CalendarPage: React.FC = () => {
                         <button onClick={handleToday} className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-100 text-brand-text bg-white transition-colors">Hoje</button>
                     </div>
                     <div className="flex items-center space-x-2">
+                        <button onClick={async () => {
+                            const { data, error } = await supabase.rpc('get_my_company_id');
+                            alert(`Debug: Company ID from DB: ${data} \nError: ${error?.message} \nLocal User ID: ${currentUser?.id} \nLocal Company ID: ${currentUser?.company_id}`);
+                            console.log('Debug Employees:', employees);
+                            console.log('Debug Departments:', departments);
+                        }} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Debug DB</button>
+
                         <div className="bg-gray-100 p-1 rounded-md flex">
                             <button onClick={() => setView('month')} className={`px-3 py-1 text-sm rounded transition-colors ${view === 'month' ? 'bg-white shadow text-brand-primary font-medium' : 'text-gray-500 hover:text-gray-700'}`}>Mês</button>
                             <button onClick={() => setView('week')} className={`px-3 py-1 text-sm rounded transition-colors ${view === 'week' ? 'bg-white shadow text-brand-primary font-medium' : 'text-gray-500 hover:text-gray-700'}`}>Semana</button>

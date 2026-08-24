@@ -56,19 +56,34 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         fetchNotifications();
 
         if (currentUser?.id) {
+            console.log('--- TESTE REALTIME: Iniciando para usuário:', currentUser.id);
             const channel = supabase
-                .channel(`notifications-${currentUser.id}`)
+                .channel(`notifications-global`) // Nome genérico para teste
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${currentUser.id}`
-                }, () => {
-                    fetchNotifications();
+                    table: 'notifications'
+                    // Removido o filtro temporariamente para garantir recepção total
+                }, (payload) => {
+                    console.log('--- REALTIME EVENTO RECEBIDO ---', payload);
+                    // Verificamos se o registro pertence ao usuário atual no frontend
+                    const newNotif = payload.new as any;
+                    if (newNotif && newNotif.user_id === currentUser.id) {
+                        console.log('Aviso: Notificação pertence a este usuário. Atualizando...');
+                        fetchNotifications();
+                    } else {
+                        console.log('Aviso: Notificação ignorada (pertence a outro usuário).');
+                    }
                 })
-                .subscribe();
+                .subscribe((status, err) => {
+                    console.log('--- REALTIME STATUS:', status, err || '');
+                    if (status === 'CHANNEL_ERROR') {
+                        console.error('Erro crítico no canal Realtime:', err);
+                    }
+                });
 
             return () => {
+                console.log('Finalizando Realtime');
                 supabase.removeChannel(channel);
             };
         }
@@ -104,25 +119,54 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     };
 
-    const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => {
-        if (!currentUser?.id || !currentUser?.company_id) return;
+    const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'> & { user_id?: string, company_id?: string }) => {
+        let targetUserId = notif.user_id;
+        let targetCompanyId = notif.company_id;
+
+        // Se não houver destinatário, assume o usuário atual (self-notification)
+        if (!targetUserId) targetUserId = currentUser?.id;
+
+        // Se a empresa não foi passada, tenta pegar do perfil do destinatário ou do usuário atual
+        if (!targetCompanyId) {
+            if (targetUserId === currentUser?.id) {
+                targetCompanyId = currentUser?.company_id;
+            } else {
+                const { data: prof } = await supabase.from('profiles').select('company_id').eq('id', targetUserId).single();
+                targetCompanyId = prof?.company_id;
+            }
+        }
+
+        console.log('Tentando adicionar notificação:', { targetUserId, targetCompanyId, type: notif.type, title: notif.title });
+
+        if (!targetUserId || !targetCompanyId) {
+            console.error('Falha ao adicionar notificação: User ID ou Company ID ausente.', { targetUserId, targetCompanyId });
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('notifications')
                 .insert({
-                    user_id: currentUser.id,
-                    company_id: currentUser.company_id,
+                    user_id: targetUserId,
+                    company_id: targetCompanyId,
                     type: notif.type,
                     title: notif.title,
                     description: notif.description,
-                    avatar_url: notif.avatarUrl,
+                    avatar_url: notif.avatarUrl || currentUser?.avatarUrl,
                     link: notif.link
                 });
 
-            if (error) throw error;
-            // Realtime will handle the update
+            if (error) {
+                console.error('Erro do Supabase ao inserir notificação:', error);
+                // Reportar erro para o usuário se estiver em modo debug
+                if (window.location.search.includes('debug')) {
+                    alert('Erro notificação: ' + error.message);
+                }
+            } else {
+                console.log('Notificação inserida com sucesso no banco.');
+            }
         } catch (err) {
-            console.error('Error adding notification:', err);
+            console.error('Erro catch em addNotification:', err);
         }
     };
 

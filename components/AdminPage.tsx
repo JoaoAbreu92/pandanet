@@ -155,15 +155,17 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'training':
                 return <SupabaseGenericManager<TrainingModule>
                     title="Módulos de Treinamento"
-                    tableName="trainings"
-                    newItemTemplate={{ title: '', duration: '', category: '', thumbnail: '' }}
+                    tableName="training_modules"
+                    newItemTemplate={{ title: '', duration: '', category: '', thumbnail: '', participants: [] }}
+                    users={employees}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'duration', label: 'Duração' },
                         { key: 'category', label: 'Categoria' },
-                        { key: 'thumbnail', label: 'Capa (Imagem)', type: 'file' }
+                        { key: 'thumbnail', label: 'Capa (Imagem)', type: 'file' },
+                        { key: 'participants', label: 'Participantes / Convocados', type: 'user_list' }
                     ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.duration}</p></div>}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.duration} • {(i as any).participants?.length || 0} inscritos</p></div>}
                 />;
             case 'kb':
                 return <SupabaseGenericManager<KBArticle>

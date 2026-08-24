@@ -53,7 +53,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                     imageUrl: e.imageUrl,
                     category: e.category || 'Social',
                     attendees: e.attendees || [],
-                    invitees: e.invitees || [],
+                    invited_ids: e.invited_ids || [],
                     declined: e.declined || []
                 }));
                 setEvents(formatted);
@@ -145,7 +145,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                 location: formData.location,
                 category: formData.category,
                 imageUrl: uploadedImageUrl,
-                invitees: formData.invitees,
+                invited_ids: formData.invitees || [],
                 attendees: formData.attendees || []
             };
 

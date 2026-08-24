@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, PhotoIcon } from './icons';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import type { Employee } from '../types';
 
 interface SupabaseGenericManagerProps<T> {
     title: string;
@@ -10,12 +11,13 @@ interface SupabaseGenericManagerProps<T> {
     fields: {
         key: string;
         label: string;
-        type?: 'text' | 'select' | 'textarea' | 'file';
+        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list';
         options?: string[];
         dbColumn?: string; // If mapping is different
     }[];
     renderItem: (item: T) => React.ReactNode;
     newItemTemplate: Partial<T>;
+    users?: Employee[]; // Added users for user_list selection
 }
 
 export function SupabaseGenericManager<T extends { id: string }>({
@@ -24,7 +26,8 @@ export function SupabaseGenericManager<T extends { id: string }>({
     storageBucket = 'announcements-media',
     fields,
     renderItem,
-    newItemTemplate
+    newItemTemplate,
+    users = []
 }: SupabaseGenericManagerProps<T>) {
     const { profile: currentUser } = useAuth();
     const [items, setItems] = useState<T[]>([]);
@@ -234,6 +237,29 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                                 />
                                             </div>
                                             {files[field.key] && <p className="text-xs text-emerald-600 mt-2 font-medium">Arquivo selecionado: {files[field.key].name}</p>}
+                                        </div>
+                                    ) : field.type === 'user_list' ? (
+                                        <div className="mt-1 border rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50 space-y-2">
+                                            {users.map(u => (
+                                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded transition-colors cursor-pointer border border-transparent hover:border-gray-200">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded text-brand-primary focus:ring-brand-primary"
+                                                        checked={(formData[field.key] || []).includes(u.id)}
+                                                        onChange={(e) => {
+                                                            const current = formData[field.key] || [];
+                                                            const updated = e.target.checked
+                                                                ? [...current, u.id]
+                                                                : current.filter((id: string) => id !== u.id);
+                                                            setFormData({ ...formData, [field.key]: updated });
+                                                        }}
+                                                    />
+                                                    <div className="flex items-center space-x-2">
+                                                        <img src={u.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                                                        <span className="text-sm font-medium text-gray-700">{u.name}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
                                         </div>
                                     ) : (
                                         <input

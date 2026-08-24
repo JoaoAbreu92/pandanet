@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition } from './types';
+import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest } from './types';
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
@@ -299,6 +299,10 @@ const AppContent: React.FC = () => {
         if (companyData) setCompanyData({ ...companyData, conversations: newConversations });
     };
 
+    const handleUpdateTIRequests = (newRequests: TIRequest[]) => {
+        if (companyData) setCompanyData({ ...companyData, tiRequests: newRequests });
+    };
+
     const handleJoinEvent = (eventId: number) => {
         if (!companyData || !currentUser) return;
         const updatedEvents = companyData.events.map(event => {
@@ -364,7 +368,7 @@ const AppContent: React.FC = () => {
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages />;
             case 'tickets': return <TicketPage />;
-            case 'calendar': return <CalendarPage events={companyData.events} />;
+            case 'calendar': return <CalendarPage events={companyData.events} currentUser={currentUser} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
@@ -374,7 +378,7 @@ const AppContent: React.FC = () => {
             case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage /> : null;
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
-            case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage /> : null;
+            case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={handleUpdateTIRequests} currentUser={currentUser} /> : null;
             case 'profile':
                 const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
                 return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} />;

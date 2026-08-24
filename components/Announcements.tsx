@@ -22,7 +22,7 @@ const AnnouncementSkeleton: React.FC = () => (
 );
 
 const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const [loading, setLoading] = useState(true);
