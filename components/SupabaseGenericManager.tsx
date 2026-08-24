@@ -14,8 +14,9 @@ interface SupabaseGenericManagerProps<T> {
     fields: {
         key: string;
         label: string;
-        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list' | 'checkbox';
+        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list' | 'department_list' | 'checkbox';
         options?: string[];
+        list?: string[];
         dbColumn?: string; // If mapping is different
         optional?: boolean;
         excludeFromDb?: boolean;
@@ -24,6 +25,7 @@ interface SupabaseGenericManagerProps<T> {
     renderItem: (item: T) => React.ReactNode;
     newItemTemplate: Partial<T>;
     users?: Employee[]; // Added users for user_list selection
+    departments?: { id: string; name: string }[]; // Added departments for department_list selection
 }
 
 export function SupabaseGenericManager<T extends { id: string }>({
@@ -36,7 +38,8 @@ export function SupabaseGenericManager<T extends { id: string }>({
     fields,
     renderItem,
     newItemTemplate,
-    users = []
+    users = [],
+    departments = []
 }: SupabaseGenericManagerProps<T>) {
     const { currentUser } = useAuth();
     const activeCompanyId = companyId || currentUser?.company_id;
@@ -315,13 +318,43 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                                     </label>
                                                 ))}
                                             </div>
+                                        ) : field.type === 'department_list' ? (
+                                            <div className="mt-1 border rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50 space-y-2">
+                                                {departments.map(d => (
+                                                    <label key={d.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded transition-colors cursor-pointer border border-transparent hover:border-gray-200">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded text-brand-primary focus:ring-brand-primary"
+                                                            checked={(formData[field.key] || []).includes(d.id)}
+                                                            onChange={(e) => {
+                                                                const current = formData[field.key] || [];
+                                                                const updated = e.target.checked
+                                                                    ? [...current, d.id]
+                                                                    : current.filter((id: string) => id !== d.id);
+                                                                setFormData({ ...formData, [field.key]: updated });
+                                                            }}
+                                                        />
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className="text-sm font-medium text-gray-700">{d.name}</span>
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                            </div>
                                         ) : (
-                                            <input
-                                                className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
-                                                value={formData[field.key] || ''}
-                                                onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                                required={!field.optional}
-                                            />
+                                            <>
+                                                <input
+                                                    className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
+                                                    value={formData[field.key] || ''}
+                                                    onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                    required={!field.optional}
+                                                    list={field.list ? `${field.key}-datalist` : undefined}
+                                                />
+                                                {field.list && (
+                                                    <datalist id={`${field.key}-datalist`}>
+                                                        {field.list.map(opt => <option key={opt} value={opt} />)}
+                                                    </datalist>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 );

@@ -16,6 +16,10 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const [filterDate, setFilterDate] = useState('');
+    const [filterUserId, setFilterUserId] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+
     const [formData, setFormData] = useState<Partial<Event>>({
         category: 'Social',
         title: '',
@@ -68,7 +72,18 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
     useEffect(() => {
         fetchEvents();
     }, [currentUser?.company_id]);
-
+    const filteredEvents = events.filter(event => {
+        if (filterDate && event.date !== filterDate) {
+            return false;
+        }
+        if (filterUserId && !(event.invited_ids || []).includes(filterUserId) && !(event.attendees || []).includes(filterUserId)) {
+            return false;
+        }
+        if (filterCategory && event.category !== filterCategory) {
+            return false;
+        }
+        return true;
+    });
     const handleOpenModal = (event?: Event) => {
         if (event) {
             setEditingEvent(event);
@@ -203,6 +218,48 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                 </button>
             </div>
 
+            {/* Filtros de Eventos */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Data</label>
+                    <input
+                        type="date"
+                        value={filterDate}
+                        onChange={e => setFilterDate(e.target.value)}
+                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Usuário Convocado</label>
+                    <select
+                        value={filterUserId}
+                        onChange={e => setFilterUserId(e.target.value)}
+                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    >
+                        <option value="">Todos os usuários</option>
+                        {employees.map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Categoria (Tipo)</label>
+                    <select
+                        value={filterCategory}
+                        onChange={e => setFilterCategory(e.target.value)}
+                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    >
+                        <option value="">Todas as categorias</option>
+                        <option value="Social">Social</option>
+                        <option value="Comemorativo">Comemorativo</option>
+                        <option value="Corporativo">Corporativo</option>
+                        <option value="Treinamento">Treinamento</option>
+                        <option value="Evento da Empresa">Evento da Empresa</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -215,14 +272,14 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {events.length === 0 ? (
+                        {filteredEvents.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                                    Nenhum evento criado ainda.
+                                    Nenhum evento correspondente aos filtros.
                                 </td>
                             </tr>
                         ) : (
-                            events.map((event) => (
+                            filteredEvents.map((event) => (
                                 <tr key={event.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">

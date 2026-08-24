@@ -411,8 +411,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição/Instruções', type: 'textarea' },
-                        { key: 'link_url', label: 'Link de Destino (Opcional)' },
-                        { key: 'link_text', label: 'Texto do Link (Opcional)' },
+                        { key: 'link_url', label: 'Link de Destino (Opcional)', optional: true },
+                        { key: 'link_text', label: 'Texto do Link (Opcional)', optional: true },
                         { key: 'order', label: 'Ordem de Exibição', type: 'text' }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
@@ -484,14 +484,33 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     tableName="documents"
                     storageBucket="documents"
                     companyId={company.id}
-                    newItemTemplate={{ title: '', category: 'RH & Cultura', file_type: 'PDF', url: '' }}
+                    orderBy="updated_at"
+                    orderAscending={false}
+                    users={employees}
+                    departments={departments}
+                    newItemTemplate={{ title: '', category: 'RH & Cultura', type: 'PDF', url: '', target_type: 'all', target_users: [], target_departments: [] }}
                     fields={[
                         { key: 'title', label: 'Título' },
-                        { key: 'category', label: 'Categoria' },
-                        { key: 'file_type', label: 'Tipo de Arquivo', type: 'select', options: ['PDF', 'DOCX', 'PPTX', 'XLSX', 'OUTRO'], dbColumn: 'file_type' },
-                        { key: 'url', label: 'Arquivo (Upload)', type: 'file' }
+                        { key: 'category', label: 'Categoria', list: ['RH & Cultura', 'Departamento Pessoal', 'Comercial', 'Tecnologia', 'Financeiro', 'Manuais', 'Políticas'] },
+                        { key: 'type', label: 'Tipo de Arquivo', type: 'select', options: ['PDF', 'DOCX', 'PPTX', 'XLSX', 'OUTRO'] },
+                        { key: 'url', label: 'Arquivo (Upload)', type: 'file' },
+                        { key: 'target_type', label: 'Tipo de Destinatário', type: 'select', options: ['all', 'departments', 'users'] },
+                        { 
+                            key: 'target_departments', 
+                            label: 'Departamentos Destinatários', 
+                            type: 'department_list', 
+                            optional: true, 
+                            condition: (formData) => formData.target_type === 'departments' 
+                        },
+                        { 
+                            key: 'target_users', 
+                            label: 'Usuários Destinatários', 
+                            type: 'user_list', 
+                            optional: true, 
+                            condition: (formData) => formData.target_type === 'users' 
+                        }
                     ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.file_type}</p></div>}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
                 />;
             case 'benefits':
                 return <SupabaseGenericManager<any>

@@ -411,6 +411,7 @@ const HRManager: React.FC = () => {
       const { error } = await supabase.from('hr_documents').insert({
         company_id: profile!.company_id!,
         ...docForm,
+        is_public: docTargetType === 'all',
         file_url: publicUrl,
         file_name: docFile.name,
         created_by: profile!.id,

@@ -205,10 +205,23 @@ const EmployeePortal: React.FC = () => {
             .from('hr_documents')
             .select('*')
             .eq('company_id', profile.company_id)
-            .eq('is_public', true)
             .order('category')
             .order('name');
-        if (data) setDocuments(data);
+        if (data) {
+            const filtered = data.filter((doc: any) => {
+                if (doc.is_public) return true;
+                if (!doc.target_type || doc.target_type === 'all') return true;
+                if (doc.target_type === 'users') {
+                    return Array.isArray(doc.target_users) && doc.target_users.includes(profile.id);
+                }
+                if (doc.target_type === 'departments') {
+                    const userDeptId = (profile as any)?.department_id;
+                    return userDeptId && Array.isArray(doc.target_departments) && doc.target_departments.includes(userDeptId);
+                }
+                return false;
+            });
+            setDocuments(filtered);
+        }
     };
 
     const calcVacationDays = () => {

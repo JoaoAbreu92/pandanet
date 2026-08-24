@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import type { ResourceDocument } from '../types';
 import { SearchIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { supabase, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const ResourceCenter: React.FC = () => {
@@ -19,18 +19,34 @@ const ResourceCenter: React.FC = () => {
                 .from('documents')
                 .select('*')
                 .eq('company_id', currentUser.company_id)
-                .order('created_at', { ascending: false });
+                .order('updated_at', { ascending: false });
 
             if (error) throw error;
             if (data) {
-                const formattedDocs: ResourceDocument[] = data.map((doc: any) => ({
-                    id: doc.id,
-                    title: doc.title,
-                    category: doc.category,
-                    type: doc.file_type as any,
-                    url: doc.url,
-                    updatedAt: new Date(doc.created_at).toISOString().split('T')[0]
-                }));
+                const formattedDocs: ResourceDocument[] = data
+                    .filter((doc: any) => {
+                        if (!doc.target_type || doc.target_type === 'all') {
+                            return true;
+                         }
+                         if (doc.target_type === 'users') {
+                             return Array.isArray(doc.target_users) && doc.target_users.includes(currentUser?.id);
+                         }
+                         if (doc.target_type === 'departments') {
+                             const userDeptId = (currentUser as any)?.department_id;
+                             return userDeptId && 
+                                    Array.isArray(doc.target_departments) && 
+                                    doc.target_departments.includes(userDeptId);
+                         }
+                         return false;
+                    })
+                    .map((doc: any) => ({
+                        id: doc.id,
+                        title: doc.title,
+                        category: doc.category || 'Geral',
+                        type: (doc.type || doc.file_type || 'PDF') as any,
+                        url: doc.url,
+                        updatedAt: new Date(doc.updated_at || doc.created_at || Date.now()).toISOString().split('T')[0]
+                    }));
                 setDocuments(formattedDocs);
             }
         } catch (error) {
@@ -94,7 +110,12 @@ const ResourceCenter: React.FC = () => {
                                     <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded text-xs font-semibold ${getTypeStyle(doc.type)}`}>{doc.type}</span></td>
                                     <td className="px-6 py-4">{new Date(doc.updatedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                                     <td className="px-6 py-4">
-                                        <a href={doc.url} download target="_blank" rel="noreferrer" className="font-medium text-brand-primary hover:underline">Baixar</a>
+                                        <button 
+                                            onClick={() => downloadFile(doc.url, doc.title || 'documento')}
+                                            className="font-medium text-brand-primary hover:underline bg-transparent border-none p-0 cursor-pointer"
+                                        >
+                                            Baixar
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
