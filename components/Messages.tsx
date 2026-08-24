@@ -334,6 +334,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     
     // Paginação de mensagens
     const [messageLimit, setMessageLimit] = useState(50);
@@ -972,61 +973,66 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         if (!textToSend.trim() && !stickerUrl && !attachedFile) return;
         if (!selectedConversationId) return;
 
-        try {
-            let uploadedFileUrl = null;
-            let fileType = null;
+            setIsSending(true);
+            try {
+                let uploadedFileUrl = null;
+                let fileType = null;
 
-            if (attachedFile) {
-                // Lógica de Upload
-                const fileExt = attachedFile.name.split('.').pop();
-                const fileName = `${Date.now()}.${fileExt}`;
-                const filePath = `${selectedConversationId}/${fileName}`;
+                if (attachedFile) {
+                    // Lógica de Upload
+                    const fileExt = attachedFile.name.split('.').pop();
+                    const fileName = `${Date.now()}.${fileExt}`;
+                    const filePath = `${selectedConversationId}/${fileName}`;
 
-                const { data, error: uploadError } = await supabase.storage
-                    .from('chat-media')
-                    .upload(filePath, attachedFile);
+                    const { data, error: uploadError } = await supabase.storage
+                        .from('chat-media')
+                        .upload(filePath, attachedFile);
 
-                if (uploadError) {
-                    console.error('Falha no upload:', uploadError);
-                } else if (data) {
-                    const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-                    uploadedFileUrl = publicUrl;
-                    fileType = attachedFile.type;
+                    if (uploadError) {
+                        console.error('Falha no upload:', uploadError);
+                        showToast(`Erro ao subir arquivo: ${uploadError.message}`, "error");
+                        setIsSending(false);
+                        return; // ABORTA O ENVIO SE O UPLOAD FALHAR
+                    } else if (data) {
+                        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                        uploadedFileUrl = publicUrl;
+                        fileType = attachedFile.type;
+                    }
                 }
-            }
 
-            // Use the conversation's company_id (not sender's) to support cross-company chats
-            const currentConv = conversations.find(c => c.id === selectedConversationId);
-            const compId = currentConv?.company_id || currentUser.company_id;
-            if (!compId) {
-                console.error("Missing company_id", currentUser);
-                alert("Erro: Empresa não identificada.");
-                return;
-            }
+                // Use the conversation's company_id (not sender's) to support cross-company chats
+                const currentConv = conversations.find(c => c.id === selectedConversationId);
+                const compId = currentConv?.company_id || currentUser.company_id;
+                if (!compId) {
+                    console.error("Missing company_id", currentUser);
+                    showToast("Erro: Empresa não identificada.", "error");
+                    setIsSending(false);
+                    return;
+                }
 
-            const { error } = await supabase.from('messages').insert({
-                conversation_id: selectedConversationId,
-                sender_id: currentUser.id,
-                company_id: compId,
-                text: stickerUrl || textToSend,
-                file_url: uploadedFileUrl || stickerUrl,
-                file_type: stickerUrl ? 'sticker' : fileType,
-                reactions: [],
-                reply_to: replyingToMessage?.id || null  // Adicionar referência à mensagem respondida
-            });
+                const { error } = await supabase.from('messages').insert({
+                    conversation_id: selectedConversationId,
+                    sender_id: currentUser.id,
+                    company_id: compId,
+                    text: stickerUrl || textToSend,
+                    file_url: uploadedFileUrl || stickerUrl,
+                    file_type: stickerUrl ? 'sticker' : fileType,
+                    reactions: [],
+                    reply_to: replyingToMessage?.id || null  // Adicionar referência à mensagem respondida
+                });
 
-            if (error) throw error;
+                if (error) throw error;
 
-            // Atualiza última mensagem da conversa
-            await supabase.from('conversations').update({
-                last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
-                last_message_at: new Date().toISOString()
-            }).eq('id', selectedConversationId);
+                // Atualiza última mensagem da conversa
+                await supabase.from('conversations').update({
+                    last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
+                    last_message_at: new Date().toISOString()
+                }).eq('id', selectedConversationId);
 
-            setNewMessageText('');
-            setAttachedFile(null);
-            setReplyingToMessage(null);
-            fetchMessages(selectedConversationId);
+                setNewMessageText('');
+                setAttachedFile(null);
+                setReplyingToMessage(null);
+                fetchMessages(selectedConversationId);
 
             // Trigger Notification for the participants (except me)
             if (selectedConversation) {
@@ -1044,9 +1050,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 }
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao enviar mensagem:', error);
-            alert('Falha ao enviar mensagem');
+            showToast(`Falha ao enviar mensagem: ${error.message || 'Erro desconhecido'}`, "error");
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -1775,8 +1783,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                 placeholder="Mensagem"
                                                 className="flex-1 w-full px-3 md:px-5 py-2 md:py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl md:rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-10 md:h-11 text-[15px] transition-all duration-300 dark:text-white"
                                         />
-                                            <button type="submit" className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full flex-shrink-0 hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md md:shadow-lg shadow-brand-primary/20 ml-1 md:ml-0" disabled={(!newMessageText.trim() && !attachedFile)}>
-                                                <PaperAirplaneIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                            <button type="submit" className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full flex-shrink-0 hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md md:shadow-lg shadow-brand-primary/20 ml-1 md:ml-0" disabled={(!newMessageText.trim() && !attachedFile) || isSending}>
+                                                {isSending ? (
+                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <PaperAirplaneIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                                )}
                                         </button>
                                         {showStickerPicker && (
                                                 <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-4 w-80 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
