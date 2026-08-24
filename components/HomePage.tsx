@@ -362,7 +362,23 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
 
     useEffect(() => {
         const fetchRecentAwards = async () => {
-            if (!currentUser?.company_id) return;
+            let companyId = currentUser?.company_id;
+            if (!companyId && currentUser?.id) {
+                try {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('company_id')
+                        .eq('id', currentUser.id)
+                        .single();
+                    if (data?.company_id) {
+                        companyId = data.company_id;
+                    }
+                } catch (err) {
+                    console.error('Error fetching company_id fallback:', err);
+                }
+            }
+            if (!companyId) return;
+
             try {
                 const threeDaysAgo = new Date();
                 threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -386,7 +402,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                             full_name
                         )
                     `)
-                    .eq('company_id', currentUser.company_id)
+                    .eq('company_id', companyId)
                     .gte('created_at', threeDaysAgo.toISOString())
                     .order('created_at', { ascending: false });
 
@@ -408,7 +424,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [currentUser?.company_id]);
+    }, [currentUser?.id, currentUser?.company_id]);
 
     return (
         <div className="space-y-8">
