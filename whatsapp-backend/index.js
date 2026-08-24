@@ -616,7 +616,7 @@ async function authMiddleware(req, res, next) {
           if (global.addDebugLog) {
               global.addDebugLog('AUTH_SUPABASE_FAIL', `Supabase auth falhou: ${error?.message || 'Nenhum usuário retornado'}`);
           }
-          return res.status(401).json({ error: 'Token inválido. Faça login novamente.' });
+          return res.status(401).json({ error: `Token inválido. Faça login novamente. Erro interno: ${error?.message || 'Nenhum usuário'}` });
         }
         req.user = user;
         console.log(`[AUTH] Supabase auth OK para user: ${req.user.email}`);
@@ -633,7 +633,7 @@ async function authMiddleware(req, res, next) {
         if (global.addDebugLog) {
             global.addDebugLog('AUTH_SUPABASE_FAIL_NO_SECRET', `Supabase auth (sem secret) falhou: ${error?.message || 'Nenhum usuário retornado'}`);
         }
-        return res.status(401).json({ error: 'Servidor mal configurado ou token inválido.' });
+        return res.status(401).json({ error: `Servidor mal configurado ou token inválido. Erro interno: ${error?.message || 'Nenhum usuário'}` });
       }
       req.user = user;
     }
