@@ -1594,6 +1594,184 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 }
 
 
+// =========================================================================
+// Importação Direta de Mensagens Históricas (do celular físico para o banco)
+// Função separada do processInboundMessage pois não precisa dos filtros de bot,
+// permissões, webhooks, etc. Apenas salva as mensagens que faltam no banco.
+// =========================================================================
+async function importHistoricalMessages(conv, instanceName) {
+    const { id: conversationId, company_id: companyId, connection_id: connectionId, contact_phone, is_group, queue_id } = conv;
+
+    // Montar o JID correto para consulta na Evolution API
+    const cleanPhone = contact_phone.replace(/\D/g, '');
+    const jidVariants = [];
+    if (is_group) {
+        jidVariants.push(contact_phone.includes('@g.us') ? contact_phone : `${cleanPhone}@g.us`);
+    } else {
+        jidVariants.push(`${cleanPhone}@s.whatsapp.net`);
+        // Tentar também com código de país 55 caso não tenha
+        if (!cleanPhone.startsWith('55') && cleanPhone.length <= 11) {
+            jidVariants.push(`55${cleanPhone}@s.whatsapp.net`);
+        }
+        // Tentar sem o código de país 55
+        if (cleanPhone.startsWith('55') && cleanPhone.length >= 12) {
+            jidVariants.push(`${cleanPhone.slice(2)}@s.whatsapp.net`);
+        }
+    }
+
+    const headers = {
+        'apikey': evoKey,
+        'Content-Type': 'application/json',
+        'instance': instanceName
+    };
+
+    let allMessages = [];
+
+    for (const remoteJid of jidVariants) {
+        // Tentar diferentes endpoints e estruturas de payload da Evolution API
+        const attempts = [
+            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } }, limit: 100 }) },
+            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ remoteJid, count: 100 }) },
+            { url: `${evoUrl}/chat/getMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } } }) },
+        ];
+
+        for (const attempt of attempts) {
+            try {
+                const resp = await fetch(attempt.url, { method: attempt.method, headers, body: attempt.body });
+                if (!resp.ok) continue;
+                const raw = await resp.json();
+                let list = [];
+                if (Array.isArray(raw)) list = raw;
+                else if (raw.messages && Array.isArray(raw.messages)) list = raw.messages;
+                else if (raw.messages?.records && Array.isArray(raw.messages.records)) list = raw.messages.records;
+                else if (raw.records && Array.isArray(raw.records)) list = raw.records;
+                else if (raw.data && Array.isArray(raw.data)) list = raw.data;
+
+                if (list.length > 0) {
+                    console.log(`[HIST-IMPORT] ${list.length} mensagens encontradas para ${remoteJid} via ${attempt.url}`);
+                    allMessages = [...allMessages, ...list];
+                    break;
+                }
+            } catch (e) {
+                console.error(`[HIST-IMPORT] Erro em ${attempt.url}:`, e.message);
+            }
+        }
+        if (allMessages.length > 0) break;
+    }
+
+    if (allMessages.length === 0) {
+        console.log(`[HIST-IMPORT] Nenhuma mensagem encontrada na Evolution API para conversa ${conversationId} (${contact_phone})`);
+        return { imported: 0, skipped: 0, total: 0 };
+    }
+
+    // Buscar IDs de mensagens já existentes para evitar duplicatas
+    const { data: existingMsgs } = await supabase
+        .from('whatsapp_messages')
+        .select('whatsapp_message_id')
+        .eq('conversation_id', conversationId)
+        .not('whatsapp_message_id', 'is', null);
+
+    const existingIds = new Set((existingMsgs || []).map(m => m.whatsapp_message_id));
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const raw of allMessages) {
+        try {
+            // Normalizar estrutura
+            let msg = raw;
+            if (!msg.key && msg.message && msg.message.key) msg = msg.message;
+            if (!msg.key) { skipped++; continue; }
+
+            const msgId = msg.key.id;
+            const isFromMe = !!msg.key.fromMe;
+            const remoteJid = msg.key.remoteJid || '';
+
+            if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) { skipped++; continue; }
+            if (msgId && existingIds.has(msgId)) { skipped++; continue; }
+
+            const getRealMsg = (m) => {
+                if (!m) return {};
+                if (m.ephemeralMessage) return getRealMsg(m.ephemeralMessage.message);
+                if (m.viewOnceMessage) return getRealMsg(m.viewOnceMessage.message);
+                if (m.viewOnceMessageV2) return getRealMsg(m.viewOnceMessageV2.message);
+                if (m.documentWithCaptionMessage) return getRealMsg(m.documentWithCaptionMessage.message);
+                return m;
+            };
+
+            const m = getRealMsg(msg.message || {});
+            let text = m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || m.videoMessage?.caption || m.documentMessage?.caption || msg.text || msg.body || '';
+
+            let mediaType = null;
+            if (m.imageMessage) mediaType = 'image';
+            else if (m.audioMessage) { mediaType = 'audio'; if (!text) text = '🎵 Áudio'; }
+            else if (m.videoMessage) mediaType = m.videoMessage.gifPlayback ? 'gif' : 'video';
+            else if (m.stickerMessage) { mediaType = 'sticker'; if (!text) text = '🎨 Sticker'; }
+            else if (m.documentMessage) { mediaType = 'document'; if (!text) text = `📄 ${m.documentMessage.fileName || 'Documento'}`; }
+            else if (m.contactMessage) { if (!text) text = `👤 Contato: ${m.contactMessage.displayName || ''}`; }
+            else if (m.locationMessage) { if (!text) text = `📍 Localização`; }
+            else if (m.reactionMessage) { skipped++; continue; }
+
+            if (!text && !mediaType) { skipped++; continue; }
+
+            const createdAt = msg.messageTimestamp
+                ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
+                : new Date().toISOString();
+
+            let senderPhone = null;
+            let senderName = null;
+            if (remoteJid.includes('@g.us')) {
+                const participantJid = msg.key?.participant || msg.participant || '';
+                if (participantJid) senderPhone = participantJid.split('@')[0];
+                senderName = msg.pushName || null;
+            }
+
+            let quotedMessageText = null;
+            let quotedMessageSender = null;
+            const contextInfo = m.contextInfo || m.extendedTextMessage?.contextInfo;
+            if (contextInfo?.quotedMessage) {
+                const qm = getRealMsg(contextInfo.quotedMessage);
+                quotedMessageText = qm.conversation || qm.extendedTextMessage?.text || qm.imageMessage?.caption || qm.videoMessage?.caption || (qm.imageMessage ? '📷 Imagem' : qm.audioMessage ? '🎵 Áudio' : null);
+                if (contextInfo.participant) quotedMessageSender = contextInfo.participant.split('@')[0];
+            }
+
+            const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
+                company_id: companyId,
+                conversation_id: conversationId,
+                message_text: text || null,
+                is_from_customer: !isFromMe,
+                whatsapp_message_id: msgId || null,
+                media_type: mediaType,
+                sender_phone: senderPhone,
+                sender_name: senderName,
+                quoted_message_text: quotedMessageText,
+                quoted_message_sender: quotedMessageSender,
+                created_at: createdAt,
+                queue_id: queue_id || null
+            });
+
+            if (insertErr) {
+                console.error(`[HIST-IMPORT] Erro inserindo mensagem ${msgId}:`, insertErr.message);
+                skipped++;
+            } else {
+                imported++;
+                if (msgId) existingIds.add(msgId);
+            }
+        } catch (e) {
+            console.error(`[HIST-IMPORT] Erro processando mensagem:`, e.message);
+            skipped++;
+        }
+    }
+
+    if (imported > 0) {
+        await supabase.from('whatsapp_conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId);
+    }
+
+    console.log(`[HIST-IMPORT] Conv ${conversationId}: ${imported} importadas, ${skipped} ignoradas de ${allMessages.length} total.`);
+    return { imported, skipped, total: allMessages.length };
+}
+
+
 function formatMenuText(node) {
     let text = node.content?.text || "";
     const options = node.content?.options || [];
@@ -3126,67 +3304,9 @@ app.post('/conversations/sync-messages/:conversationId', async (req, res) => {
         }
 
         const instanceName = `conn_${conv.connection_id}`;
-        let remoteJid;
-        if (conv.is_group) {
-            remoteJid = conv.contact_phone.includes('@g.us') ? conv.contact_phone : `${conv.contact_phone}@g.us`;
-        } else {
-            const cleanPhone = conv.contact_phone.replace(/\D/g, '');
-            remoteJid = `${cleanPhone}@s.whatsapp.net`;
-        }
-
-        console.log(`[SYNC-MSG] Buscando histórico recente de ${remoteJid} na instância ${instanceName}...`);
-
-        const headers = { 
-            'apikey': evoKey, 
-            'Content-Type': 'application/json',
-            'instance': instanceName
-        };
-
-        const evoResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                where: {
-                    key: {
-                        remoteJid: remoteJid
-                    }
-                },
-                limit: 50,
-                count: 50
-            })
-        });
-
-        if (!evoResp.ok) {
-            const errBody = await evoResp.text();
-            console.error(`[SYNC-MSG] Evolution API erro ${evoResp.status}:`, errBody);
-            return res.status(500).json({ error: `Erro na Evolution API (${evoResp.status}) ao buscar mensagens.` });
-        }
-
-        const raw = await evoResp.json();
-        let messageList = [];
-        if (Array.isArray(raw)) {
-            messageList = raw;
-        } else if (raw.messages && Array.isArray(raw.messages)) {
-            messageList = raw.messages;
-        } else if (raw.records && Array.isArray(raw.records)) {
-            messageList = raw.records;
-        } else if (raw.data && Array.isArray(raw.data)) {
-            messageList = raw.data;
-        }
-
-        console.log(`[SYNC-MSG] ${messageList.length} mensagens retornadas pela Evolution API para ${remoteJid}`);
-
-        let importedCount = 0;
-        for (const msg of messageList) {
-            if (!msg) continue;
-            const actualMsg = msg.key ? msg : (msg.message && msg.message.key ? msg.message : null);
-            if (actualMsg) {
-                await processInboundMessage(actualMsg, conv.company_id, conv.connection_id, true);
-                importedCount++;
-            }
-        }
-
-        return res.json({ success: true, imported: importedCount, totalFound: messageList.length });
+        console.log(`[SYNC-MSG] Iniciando importação histórica para conversa ${conversationId} (${conv.contact_phone}) na instância ${instanceName}`);
+        const result = await importHistoricalMessages(conv, instanceName);
+        return res.json({ success: true, ...result });
     } catch (err) {
         console.error('[SYNC-MSG] Erro ao sincronizar mensagens:', err);
         return res.status(500).json({ error: err.message });
@@ -3207,57 +3327,8 @@ router.post('/conversations/sync-messages/:conversationId', authMiddleware, asyn
         }
 
         const instanceName = `conn_${conv.connection_id}`;
-        let remoteJid;
-        if (conv.is_group) {
-            remoteJid = conv.contact_phone.includes('@g.us') ? conv.contact_phone : `${conv.contact_phone}@g.us`;
-        } else {
-            const cleanPhone = conv.contact_phone.replace(/\D/g, '');
-            remoteJid = `${cleanPhone}@s.whatsapp.net`;
-        }
-
-        const headers = { 
-            'apikey': evoKey, 
-            'Content-Type': 'application/json',
-            'instance': instanceName
-        };
-
-        const evoResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                where: {
-                    key: {
-                        remoteJid: remoteJid
-                    }
-                },
-                limit: 50,
-                count: 50
-            })
-        });
-
-        if (!evoResp.ok) {
-            const errBody = await evoResp.text();
-            return res.status(500).json({ error: `Erro na Evolution API (${evoResp.status})` });
-        }
-
-        const raw = await evoResp.json();
-        let messageList = [];
-        if (Array.isArray(raw)) messageList = raw;
-        else if (raw.messages && Array.isArray(raw.messages)) messageList = raw.messages;
-        else if (raw.records && Array.isArray(raw.records)) messageList = raw.records;
-        else if (raw.data && Array.isArray(raw.data)) messageList = raw.data;
-
-        let importedCount = 0;
-        for (const msg of messageList) {
-            if (!msg) continue;
-            const actualMsg = msg.key ? msg : (msg.message && msg.message.key ? msg.message : null);
-            if (actualMsg) {
-                await processInboundMessage(actualMsg, conv.company_id, conv.connection_id, true);
-                importedCount++;
-            }
-        }
-
-        return res.json({ success: true, imported: importedCount, totalFound: messageList.length });
+        const result = await importHistoricalMessages(conv, instanceName);
+        return res.json({ success: true, ...result });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
