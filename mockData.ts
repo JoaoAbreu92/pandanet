@@ -1,4 +1,3 @@
-
 import type { Company, Plan, EmployeePermissions, AppData, ResourceDocument, Benefit, Poll, Post, Conversation, Employee } from './types';
 
 const basePermissions: EmployeePermissions = {
@@ -98,50 +97,7 @@ const mockPolls: Poll[] = [
 ];
 
 // Usuários Fictícios (Funcionários)
-const employees: Employee[] = [
-    {
-        id: '1', // ID String
-        name: 'João Abreu',
-        email: 'joao.abreu@pixel.com.br',
-        role: 'Desenvolvedor Senior',
-        team: 'TI',
-        avatarUrl: 'https://ui-avatars.com/api/?name=Joao+Abreu&background=0D8ABC&color=fff',
-        joinDate: '2023-01-15',
-        birthDate: '1992-05-20',
-        isAdmin: true,
-        isOnline: true,
-        permissions: { ...basePermissions },
-        following: ['2', '3'] // IDs String
-    },
-    {
-        id: '2',
-        name: 'Maria Silva',
-        email: 'maria.silva@pixel.com.br',
-        role: 'Gerente de RH',
-        team: 'RH',
-        avatarUrl: 'https://ui-avatars.com/api/?name=Maria+Silva&background=FF5722&color=fff',
-        joinDate: '2022-03-10',
-        birthDate: '1985-08-12',
-        isAdmin: false,
-        isOnline: false,
-        permissions: { ...basePermissions, viewTiDashboard: false, openTickets: true, openTiRequests: true },
-        following: ['1']
-    },
-    {
-        id: '3',
-        name: 'Carlos Souza',
-        email: 'carlos.souza@pixel.com.br',
-        role: 'Analista de Marketing',
-        team: 'Marketing',
-        avatarUrl: 'https://ui-avatars.com/api/?name=Carlos+Souza&background=4CAF50&color=fff',
-        joinDate: '2023-06-01',
-        birthDate: '1995-11-30',
-        isAdmin: false,
-        isOnline: true,
-        permissions: { ...basePermissions, viewTiDashboard: false, viewTraining: false },
-        following: []
-    }
-];
+const employees: Employee[] = [];
 
 const mockFeedPosts: Post[] = [
     {
