@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { 
-  Plus, Calendar, Clock, Play, Pause, Trash2, Send, 
+import {
+  Plus, Calendar, Clock, Play, Pause, Trash2, Send,
   Sparkles, CheckCircle2, AlertCircle, Loader2, X, Users, Image as ImageIcon,
   Video, Search
 } from 'lucide-react';
@@ -33,7 +33,7 @@ interface TargetStats {
 const Scheduler: React.FC = () => {
   const { currentUser, profile } = useAuth();
   const activeProfile = currentUser || profile;
-  
+
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignStats, setCampaignStats] = useState<Record<string, TargetStats>>({});
   const [loading, setLoading] = useState(true);
@@ -74,6 +74,72 @@ const Scheduler: React.FC = () => {
   const [isTargetsModalOpen, setIsTargetsModalOpen] = useState(false);
   const [addingTargets, setAddingTargets] = useState(false);
   const [showAddTargetsArea, setShowAddTargetsArea] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Timer segundo a segundo para contagem regressiva
+  useEffect(() => {
+    if (!isTargetsModalOpen || !selectedCampaignDetails) {
+      setCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const currentCamp = campaigns.find(c => c.id === selectedCampaignDetails.id);
+      if (!currentCamp) return;
+
+      if (currentCamp.status !== 'running') {
+        setCountdown(null);
+        return;
+      }
+
+      if (!currentCamp.last_sent_at) {
+        setCountdown(0);
+        return;
+      }
+
+      const lastSentTime = new Date(currentCamp.last_sent_at).getTime();
+      const nextSentTime = lastSentTime + (currentCamp.interval_seconds * 1000);
+      const diff = nextSentTime - Date.now();
+      const seconds = Math.max(0, Math.ceil(diff / 1000));
+      setCountdown(seconds);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [isTargetsModalOpen, selectedCampaignDetails, campaigns]);
+
+  // Recarga automática periódica (realtime) a cada 3 segundos enquanto o modal estiver aberto
+  useEffect(() => {
+    if (!isTargetsModalOpen || !selectedCampaignDetails) return;
+
+    const reloadInterval = setInterval(() => {
+      // Recarrega alvos (silenciosamente)
+      supabase
+        .from('whatsapp_scheduled_targets')
+        .select('*')
+        .eq('campaign_id', selectedCampaignDetails.id)
+        .order('created_at', { ascending: true })
+        .then(({ data }) => {
+          if (data) setCampaignTargets(data);
+        });
+
+      // Recarrega estatísticas e campanha
+      const companyId = activeProfile?.company_id || profile?.company_id;
+      if (companyId) {
+        supabase
+          .from('whatsapp_scheduled_campaigns')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .then(({ data }) => {
+            if (data) setCampaigns(data);
+          });
+      }
+    }, 3000);
+
+    return () => clearInterval(reloadInterval);
+  }, [isTargetsModalOpen, selectedCampaignDetails, activeProfile?.company_id, profile?.company_id]);
 
   const fetchCampaignTargets = async (campaignId: string) => {
     setLoadingTargets(true);
@@ -257,7 +323,7 @@ const Scheduler: React.FC = () => {
   };
 
   const filteredContacts = agendaContacts.filter(contact => {
-    const matchesSearch = 
+    const matchesSearch =
       contact.name.toLowerCase().includes(searchContact.toLowerCase()) ||
       contact.phone.includes(searchContact);
 
@@ -333,14 +399,14 @@ const Scheduler: React.FC = () => {
         setCampaigns(campaignData);
         // Buscar estatísticas de alvos para cada campanha
         const statsMap: Record<string, TargetStats> = {};
-        
+
         await Promise.all(
           campaignData.map(async (camp) => {
             const { data: targets, error: targetErr } = await supabase
               .from('whatsapp_scheduled_targets')
               .select('status')
               .eq('campaign_id', camp.id);
-            
+
             if (!targetErr && targets) {
               const total = targets.length;
               const sent = targets.filter(t => t.status === 'sent').length;
@@ -350,7 +416,7 @@ const Scheduler: React.FC = () => {
             }
           })
         );
-        
+
         setCampaignStats(statsMap);
       }
     } catch (err) {
@@ -456,7 +522,7 @@ const Scheduler: React.FC = () => {
         setStartTime('08:00');
         setEndTime('18:00');
         setIntervalSeconds(30);
-        
+
         setIsModalOpen(false);
         fetchCampaigns();
       }
@@ -476,7 +542,7 @@ const Scheduler: React.FC = () => {
         .from('whatsapp_scheduled_campaigns')
         .update({ status: newStatus })
         .eq('id', id);
-      
+
       if (error) throw error;
       fetchCampaigns();
     } catch (err: any) {
@@ -489,14 +555,14 @@ const Scheduler: React.FC = () => {
 
   const handleDeleteCampaign = async (id: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta campanha e todos os seus agendamentos?')) return;
-    
+
     setActionLoading(id);
     try {
       const { error } = await supabase
         .from('whatsapp_scheduled_campaigns')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
       fetchCampaigns();
     } catch (err: any) {
@@ -548,10 +614,10 @@ const Scheduler: React.FC = () => {
           {campaigns.map((camp) => {
             const stats = campaignStats[camp.id] || { total: 0, sent: 0, failed: 0, pending: 0 };
             const pct = stats.total > 0 ? Math.round((stats.sent / stats.total) * 100) : 0;
-            
+
             return (
-              <div 
-                key={camp.id} 
+              <div
+                key={camp.id}
                 className="bg-white dark:bg-slate-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col md:flex-row justify-between md:items-center gap-6"
               >
                 <div className="flex-1 min-w-0">
@@ -562,7 +628,7 @@ const Scheduler: React.FC = () => {
 
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500 dark:text-gray-400 font-semibold opacity-85 mt-2">
                     <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-slate-400" /> {camp.scheduled_date}</span>
-                    <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400" /> {camp.start_time.slice(0,5)} até {camp.end_time.slice(0,5)}</span>
+                    <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400" /> {camp.start_time.slice(0, 5)} até {camp.end_time.slice(0, 5)}</span>
                     <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-slate-400" /> Intervalo: {camp.interval_seconds}s</span>
                   </div>
 
@@ -581,45 +647,45 @@ const Scheduler: React.FC = () => {
                       </p>
                     )}
                   </div>
-                        {/* Ações da Campanha */}
-                <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
-                  <button
-                    onClick={() => handleOpenCampaignDetails(camp)}
-                    className="p-3 bg-slate-500/10 text-slate-650 dark:bg-slate-500/20 dark:text-slate-300 hover:bg-slate-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
-                    title="Gerenciar Alvos e Envios"
-                  >
-                    <Users className="w-4.5 h-4.5 shrink-0" />
-                  </button>
-
-                  {camp.status === 'pending' || camp.status === 'paused' ? (
+                  {/* Ações da Campanha */}
+                  <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
                     <button
-                      onClick={() => handleUpdateStatus(camp.id, 'running')}
-                      disabled={actionLoading === camp.id}
-                      className="p-3 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
-                      title="Iniciar Disparos"
+                      onClick={() => handleOpenCampaignDetails(camp)}
+                      className="p-3 bg-slate-500/10 text-slate-650 dark:bg-slate-500/20 dark:text-slate-300 hover:bg-slate-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
+                      title="Gerenciar Alvos e Envios"
                     >
-                      <Play className="w-4 h-4 text-emerald-500 hover:text-inherit fill-emerald-500 hover:fill-inherit shrink-0" />
+                      <Users className="w-4.5 h-4.5 shrink-0" />
                     </button>
-                  ) : camp.status === 'running' ? (
-                    <button
-                      onClick={() => handleUpdateStatus(camp.id, 'paused')}
-                      disabled={actionLoading === camp.id}
-                      className="p-3 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
-                      title="Pausar Disparos"
-                    >
-                      <Pause className="w-4 h-4 shrink-0" />
-                    </button>
-                  ) : null}
 
-                  <button
-                    onClick={() => handleDeleteCampaign(camp.id)}
-                    disabled={actionLoading === camp.id}
-                    className="p-3 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
-                    title="Excluir Campanha"
-                  >
-                    <Trash2 className="w-4 h-4 shrink-0" />
-                  </button>
-                </div>            </div>
+                    {camp.status === 'pending' || camp.status === 'paused' ? (
+                      <button
+                        onClick={() => handleUpdateStatus(camp.id, 'running')}
+                        disabled={actionLoading === camp.id}
+                        className="p-3 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
+                        title="Iniciar Disparos"
+                      >
+                        <Play className="w-4 h-4 text-emerald-500 hover:text-inherit fill-emerald-500 hover:fill-inherit shrink-0" />
+                      </button>
+                    ) : camp.status === 'running' ? (
+                      <button
+                        onClick={() => handleUpdateStatus(camp.id, 'paused')}
+                        disabled={actionLoading === camp.id}
+                        className="p-3 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
+                        title="Pausar Disparos"
+                      >
+                        <Pause className="w-4 h-4 shrink-0" />
+                      </button>
+                    ) : null}
+
+                    <button
+                      onClick={() => handleDeleteCampaign(camp.id)}
+                      disabled={actionLoading === camp.id}
+                      className="p-3 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all font-bold text-xs flex items-center justify-center"
+                      title="Excluir Campanha"
+                    >
+                      <Trash2 className="w-4 h-4 shrink-0" />
+                    </button>
+                  </div>            </div>
               </div>
             );
           })}
@@ -735,7 +801,7 @@ const Scheduler: React.FC = () => {
                     <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Mídia da Campanha (Imagem ou Vídeo)
                     </label>
-                    
+
                     <div>
                       <span className="block text-[9px] text-gray-400 dark:text-gray-400 font-bold mb-1.5 uppercase">Opção A: Upload de arquivo local</span>
                       <input
@@ -851,15 +917,15 @@ const Scheduler: React.FC = () => {
             </div>
 
             <div className="p-6 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 md:gap-4">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="px-8 py-3.5 text-xs font-bold text-gray-650 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl transition-all uppercase tracking-widest"
               >
                 Cancelar
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={actionLoading === 'create'}
                 className="px-10 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition-all font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 flex items-center justify-center"
               >
@@ -883,9 +949,9 @@ const Scheduler: React.FC = () => {
                   Selecione os contatos das conversas existentes.
                 </p>
               </div>
-              <button 
-                type="button" 
-                onClick={() => { setIsAgendaOpen(false); setSelectedContacts({}); setSearchContact(''); setDddFilter(''); }} 
+              <button
+                type="button"
+                onClick={() => { setIsAgendaOpen(false); setSelectedContacts({}); setSearchContact(''); setDddFilter(''); }}
                 className="p-2 hover:bg-gray-150 dark:hover:bg-white/10 rounded-2xl transition-all"
               >
                 <X className="w-6 h-6 text-gray-400" />
@@ -953,13 +1019,12 @@ const Scheduler: React.FC = () => {
                     {filteredContacts.map(c => {
                       const isSelected = !!selectedContacts[c.phone];
                       return (
-                        <div 
-                          key={c.phone} 
-                          className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-200 ${
-                            isSelected 
-                              ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-500/10' 
+                        <div
+                          key={c.phone}
+                          className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-200 ${isSelected
+                              ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-500/10'
                               : 'bg-white dark:bg-slate-900/40 border-gray-100 dark:border-white/5 hover:border-gray-250 dark:hover:border-white/10'
-                          }`}
+                            }`}
                         >
                           <label className="flex items-center gap-3 cursor-pointer flex-1 select-none min-w-0">
                             <input
@@ -1023,9 +1088,9 @@ const Scheduler: React.FC = () => {
                   Dashboard de status de envios e gerenciamento de contatos.
                 </p>
               </div>
-              <button 
-                type="button" 
-                onClick={() => { setIsTargetsModalOpen(false); setSelectedCampaignDetails(null); setShowAddTargetsArea(false); setNewTargetsText(''); }} 
+              <button
+                type="button"
+                onClick={() => { setIsTargetsModalOpen(false); setSelectedCampaignDetails(null); setShowAddTargetsArea(false); setNewTargetsText(''); }}
                 className="p-2 hover:bg-gray-150 dark:hover:bg-white/10 rounded-2xl transition-all"
               >
                 <X className="w-6 h-6 text-gray-400" />
@@ -1061,6 +1126,29 @@ const Scheduler: React.FC = () => {
                   <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm col-span-2 sm:col-span-1">
                     <span className={`block text-2xl font-black text-blue-500 ${sending > 0 ? 'animate-pulse' : ''}`}>{sending}</span>
                     <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">Disparando</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const currentCamp = campaigns.find(c => c.id === selectedCampaignDetails.id);
+              if (!currentCamp || currentCamp.status !== 'running') return null;
+
+              return (
+                <div className="mx-6 mt-4 p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-3xl flex items-center justify-between text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3.5 h-3.5 bg-emerald-500 rounded-full animate-ping" />
+                    <div>
+                      <span className="text-xs font-black text-emerald-800 dark:text-emerald-300 block">Campanha Ativa & Disparando</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Os disparos automáticos estão acontecendo em tempo real.</span>
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 border border-emerald-500/20 px-4 py-2 rounded-2xl text-center shadow-sm min-w-[140px]">
+                    <span className="block text-[8px] font-black text-gray-400 uppercase tracking-wider">Próximo Envio</span>
+                    <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                      {countdown !== null && countdown > 0 ? `${countdown}s` : 'Disparando...'}
+                    </span>
                   </div>
                 </div>
               );

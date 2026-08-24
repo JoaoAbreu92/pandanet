@@ -2184,25 +2184,63 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         // 2. Inserir a mensagem
         if (conversationId) {
-            const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
-                company_id: companyId,
-                conversation_id: conversationId,
-                message_text: text,
-                is_from_customer: !isFromMe,
-                whatsapp_message_id: msgId,
-                media_url: mediaUrl,
-                media_type: mediaType,
-                sender_phone: senderPhone,
-                sender_name: senderName,
-                created_at: parseMessageTimestamp(message.messageTimestamp),
-                queue_id: conv ? conv.queue_id : null
-            });
+            let existingId = null;
+            if (isFromMe && text) {
+                // Buscar mensagem idêntica criada recentemente (últimos 15 segundos) na mesma conversa que não tenha whatsapp_message_id
+                const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
+                const { data: recentMsg } = await supabase
+                    .from('whatsapp_messages')
+                    .select('id')
+                    .eq('conversation_id', conversationId)
+                    .eq('message_text', text)
+                    .is('whatsapp_message_id', null)
+                    .gte('created_at', fifteenSecondsAgo)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
 
-            if (insertErr) {
-                addDebugLog('MSG_INSERT_ERR', `Erro ao inserir mensagem ${msgId} na conv ${conversationId}: ${insertErr.message}`, insertErr);
-                throw insertErr;
+                if (recentMsg) {
+                    existingId = recentMsg.id;
+                    console.log(`[MSG] Associando ID real ${msgId} à mensagem manual pré-existente: ${existingId}`);
+                }
+            }
+
+            if (existingId) {
+                // Atualizar a mensagem existente com o ID real da Evolution
+                const { error: updateErr } = await supabase
+                    .from('whatsapp_messages')
+                    .update({ 
+                        whatsapp_message_id: msgId,
+                        created_at: parseMessageTimestamp(message.messageTimestamp)
+                    })
+                    .eq('id', existingId);
+
+                if (updateErr) {
+                    addDebugLog('MSG_UPDATE_ID_ERR', `Erro ao atualizar ID ${msgId} na msg ${existingId}: ${updateErr.message}`);
+                } else {
+                    addDebugLog('MSG_UPDATE_ID_OK', `ID ${msgId} associado à mensagem manual pré-existente ${existingId}`);
+                }
             } else {
-                addDebugLog('MSG_INSERT_OK', `Mensagem ${msgId} salva com sucesso na conv ${conversationId}`);
+                const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
+                    company_id: companyId,
+                    conversation_id: conversationId,
+                    message_text: text,
+                    is_from_customer: !isFromMe,
+                    whatsapp_message_id: msgId,
+                    media_url: mediaUrl,
+                    media_type: mediaType,
+                    sender_phone: senderPhone,
+                    sender_name: senderName,
+                    created_at: parseMessageTimestamp(message.messageTimestamp),
+                    queue_id: conv ? conv.queue_id : null
+                });
+
+                if (insertErr) {
+                    addDebugLog('MSG_INSERT_ERR', `Erro ao inserir mensagem ${msgId} na conv ${conversationId}: ${insertErr.message}`, insertErr);
+                    throw insertErr;
+                } else {
+                    addDebugLog('MSG_INSERT_OK', `Mensagem ${msgId} salva com sucesso na conv ${conversationId}`);
+                }
             }
 
             if (!isHistorical && !isFromMe && !isGroup) {
@@ -2738,30 +2776,51 @@ app.get('/debug-db', async (req, res) => {
         const results = {};
         
         // 1. Verificar colunas de whatsapp_quick_messages
-        const { data: qmCols } = await supabase.rpc('exec_sql', {
-            sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_quick_messages';"
-        });
-        results.whatsapp_quick_messages_columns = qmCols;
+        try {
+            const { data: qmCols, error: qmErr } = await supabase.rpc('exec_sql', {
+                sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_quick_messages';"
+            });
+            results.whatsapp_quick_messages_columns = qmCols || { error: qmErr?.message };
+        } catch (e) {
+            results.whatsapp_quick_messages_columns = { error: e.message };
+        }
 
         // 2. Verificar colunas de whatsapp_scheduled_campaigns
-        const { data: scCols } = await supabase.rpc('exec_sql', {
-            sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_scheduled_campaigns';"
-        });
-        results.whatsapp_scheduled_campaigns_columns = scCols;
+        try {
+            const { data: scCols, error: scErr } = await supabase.rpc('exec_sql', {
+                sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_scheduled_campaigns';"
+            });
+            results.whatsapp_scheduled_campaigns_columns = scCols || { error: scErr?.message };
+        } catch (e) {
+            results.whatsapp_scheduled_campaigns_columns = { error: e.message };
+        }
 
         // 3. Verificar hora atual do banco
-        const { data: timeData } = await supabase.rpc('exec_sql', {
-            sql: "SELECT NOW() as pg_now, CURRENT_TIME as pg_time, timezone('America/Sao_Paulo', NOW()) as sp_now;"
-        });
-        results.db_time = timeData;
+        try {
+            const { data: timeData, error: timeErr } = await supabase.rpc('exec_sql', {
+                sql: "SELECT NOW() as pg_now, CURRENT_TIME as pg_time, timezone('America/Sao_Paulo', NOW()) as sp_now;"
+            });
+            results.db_time = timeData || { error: timeErr?.message };
+        } catch (e) {
+            results.db_time = { error: e.message };
+        }
 
-        // 4. Verificar campanhas cadastradas e seus status
+        // 4. Verificar hora atual do Node na VPS
+        results.node_time = {
+            now: new Date().toISOString(),
+            sp_now: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        };
+
+        // 5. Verificar campanhas cadastradas e seus status
         const { data: campaigns } = await supabase.from('whatsapp_scheduled_campaigns').select('*');
         results.campaigns = campaigns;
 
-        // 5. Verificar alvos (amostra)
+        // 6. Verificar alvos (amostra)
         const { data: targets } = await supabase.from('whatsapp_scheduled_targets').select('id, campaign_id, status, error_message, sent_at').limit(20);
         results.targets_sample = targets;
+
+        // 7. Retornar os últimos logs em memória
+        results.debug_logs = global.debugLogs;
 
         return res.json(results);
     } catch (err) {

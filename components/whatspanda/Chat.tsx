@@ -163,6 +163,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'todos' | 'fechados'>('meus');
+  const [unreadCounts, setUnreadCounts] = useState({ meus: 0, aguardando: 0, todos: 0 });
   const [useSignature, setUseSignature] = useState(false);
   const [signatureText, setSignatureText] = useState('');
   
@@ -480,6 +481,24 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         table: 'whatsapp_conversations',
         filter: `company_id=eq.${companyId}`
       }, payload => {
+        const userId = activeProfile?.id || profile?.id;
+        
+        // Se a conversa foi atualizada (UPDATE) e atribuída para o atendente logado, move pro "Meus"
+        if (payload.eventType === 'UPDATE') {
+          const isAssignedToMe = payload.new?.assigned_to === userId;
+          
+          if (isAssignedToMe) {
+            // Tocar um som discreto de nova atribuição
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-120.wav');
+              audio.volume = 0.4;
+              audio.play().catch(() => {});
+            } catch (e) {}
+
+            setActiveTab('meus');
+          }
+        }
+
         // Se for um novo registro (INSERT), atualiza na hora para nao ter delay
         if (payload.eventType === 'INSERT') {
           fetchConversationsRef.current?.();
@@ -498,7 +517,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       supabase.removeChannel(convSubscription);
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     };
-  }, [currentUser?.company_id, profile?.company_id]); // Run when companyId is available
+  }, [currentUser?.company_id, profile?.company_id, activeProfile?.id, profile?.id]); // Run when companyId is available
 
   useEffect(() => {
     // Message subscription - depends on selectedConversation
@@ -775,6 +794,44 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     return processedUrl;
   };
 
+  const fetchUnreadCounts = async () => {
+    const companyId = currentUser?.company_id || profile?.company_id;
+    if (!companyId) return;
+    const userId = activeProfile?.id || profile?.id;
+    if (!userId) return;
+
+    try {
+      let query = supabase
+        .from('whatsapp_conversations')
+        .select('id, status, assigned_to, unread_count')
+        .eq('company_id', companyId)
+        .eq('status', 'aberto')
+        .gt('unread_count', 0);
+
+      if (!isAdmin && accessibleChannelIds !== null) {
+        if (accessibleChannelIds.length === 0) {
+          setUnreadCounts({ meus: 0, aguardando: 0, todos: 0 });
+          return;
+        }
+        query = query.in('connection_id', accessibleChannelIds);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data) {
+        const meus = data.filter(c => c.assigned_to === userId).length;
+        const aguardando = data.filter(c => !c.assigned_to).length;
+        const todos = data.length;
+        setUnreadCounts({ meus, aguardando, todos });
+      } else {
+        setUnreadCounts({ meus: 0, aguardando: 0, todos: 0 });
+      }
+    } catch (err) {
+      console.error('Erro ao buscar contagens de não lidas:', err);
+    }
+  };
+
   async function fetchConversations() {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
@@ -870,6 +927,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setConversations(data as WhatsAppConversationWithDetails[]);
     }
     setLoading(false);
+    fetchUnreadCounts();
   }
 
   const handleMuteToggle = async (conversationId: string, currentMuteStatus: boolean) => {
@@ -1793,18 +1851,30 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             {((isAdmin || permissions?.can_view_others_chats)
               ? (['meus', 'aguardando', 'todos', 'fechados'] as const)
               : (['meus', 'aguardando', 'fechados'] as const)
-            ).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-xl capitalize transition-all duration-300 ${activeTab === tab
-                  ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-xl scale-[1.02]'
-                  : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/5'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            ).map((tab) => {
+              const badgeCount = unreadCounts[tab as keyof typeof unreadCounts] || 0;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-xl capitalize transition-all duration-300 ${activeTab === tab
+                    ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-xl scale-[1.02]'
+                    : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <span>{tab}</span>
+                  {badgeCount > 0 && (
+                    <span className={`flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold ${
+                      activeTab === tab 
+                        ? 'bg-emerald-600 dark:bg-white text-white dark:text-emerald-500' 
+                        : 'bg-red-500 text-white animate-pulse'
+                    }`}>
+                      {badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
