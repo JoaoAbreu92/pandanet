@@ -367,13 +367,13 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     const fetchUsageStats = async (companyId: string) => {
         setStatsLoading(true);
-        // Reset old stats
         setUsageStats(null);
 
         const tables = ['profiles', 'posts', 'emails', 'tickets', 'messages', 'announcements', 'marketplace_items', 'events', 'benefits', 'form_submissions', 'ti_requests'];
-        const stats: Record<string, number> = {};
+        const stats: any = {};
 
         try {
+            // Fetch individual table counts
             await Promise.all(tables.map(async (table) => {
                 const { count, error } = await supabase
                     .from(table)
@@ -382,6 +382,13 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                 if (!error) stats[table] = count || 0;
             }));
+
+            // Fetch Storage Metrics via RPC
+            const { data: storageData, error: storageError } = await supabase.rpc('get_storage_stats', { p_company_id: companyId });
+            if (!storageError && storageData) {
+                stats.storage = storageData;
+            }
+
             setUsageStats(stats);
         } catch (e) {
             console.error("Error fetching stats", e);
@@ -1243,7 +1250,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </div>
                                     <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg border border-pink-100 dark:border-pink-800">
                                         <p className="text-[10px] text-pink-600 dark:text-pink-400 font-bold uppercase">Chamados TI</p>
-                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.tickets || 0}</p>
+                                            <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.ti_requests || 0}</p>
                                     </div>
                                     <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-100 dark:border-amber-800">
                                         <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">E-mails</p>
@@ -1255,22 +1262,44 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </div>
                                 </div>
 
-                                <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
-                                    <h4 className="text-sm font-bold text-gray-700 dark:text-white mb-3">Resumo da Infraestrutura</h4>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-500">Total de Registros (DB)</span>
-                                            <span className="font-bold text-gray-800 dark:text-white">
-                                                {Object.values(usageStats).reduce((a: any, b: any) => a + b, 0) as number} linhas
-                                            </span>
+                                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-100 dark:border-gray-700">
+                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                            <ServerIcon className="w-4 h-4 text-brand-primary" />
+                                            Resumo de Infraestrutura
+                                        </h4>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <div className="flex justify-between text-xs mb-2">
+                                                    <span className="text-gray-500">Espaço em Disco (Estimado)</span>
+                                                    <span className="font-bold text-brand-primary">
+                                                        {usageStats.storage?.company_estimated_mb || 0} MB
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                                    <div
+                                                        className="bg-brand-primary h-2 rounded-full transition-all duration-500"
+                                                        style={{ width: `${Math.min(((usageStats.storage?.company_estimated_mb || 0) / 100) * 100, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs py-2 border-t border-gray-100 dark:border-gray-800">
+                                                <span className="text-gray-500">Total de Registros (Empresa)</span>
+                                                <span className="font-semibold">{usageStats.storage?.company_estimated_rows || 0} linhas</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs py-2 border-t border-gray-100 dark:border-gray-800">
+                                                <span className="text-gray-500">Tamanho Total do Banco (VPS)</span>
+                                                <span className="font-semibold">
+                                                    {usageStats.storage?.total_db_size_bytes
+                                                        ? (usageStats.storage.total_db_size_bytes / (1024 * 1024)).toFixed(2)
+                                                        : '0.00'} MB
+                                                </span>
                                         </div>
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-500">Estimativa de Disco</span>
-                                            <span className="font-bold text-gray-800 dark:text-white">~ {(Object.values(usageStats).reduce((a: any, b: any) => a + b, 0) as number * 0.5 / 1024).toFixed(2)} MB</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs pt-2 border-t dark:border-gray-600">
-                                            <span className="text-gray-500">Servidor / VPS</span>
-                                            <span className="text-green-500 font-bold uppercase">Operational / 100% stable</span>
+                                            <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100 dark:border-gray-800">
+                                                <span className="text-gray-500">Status do Servidor</span>
+                                                <span className="text-green-500 font-bold flex items-center gap-1">
+                                                    <CheckCircleIcon className="w-3 h-3" />
+                                                    ONLINE / ESTÁVEL
+                                                </span>
                                         </div>
                                     </div>
                                 </div>
