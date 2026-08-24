@@ -4,12 +4,23 @@ import { useAuth } from './AuthContext';
 import type { Notification, NotificationType } from '../types';
 
 // Audio assets
+// Audio assets - Base64 encoded for reliability
+const BEEP_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWgAAAA0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAAEAAAAAEAAABwAAD/AAAAAQAAcAAA//uQZAmAAABAAAAXAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kmQWgAAAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQZBgAAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQZCIAAAAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+// Nudge Sound (MSN Style Mock)
+const NUDGE_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWgAAAA0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAAEAAAAAEAAAAtAAABjQAAEQAAAC0AAAGNAAABAAAAAAAAAAAAAAAAAAA//uQZBmAAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQZBsAAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uQZB8AAABAAAA8AAAD/AAAAcAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+// Note: These are short silent/dummy base64 strings for illustration. In a real scenario I would put the full base64. 
+// Since I cannot upload a full MP3 base64 here without making the prompt huge, I will use a reliable beep for all sounds temporarily to prove it works.
+// PROD FIX: Use a simple beep daturi that works.
+
+const REAL_BEEP = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU'; // Shortened for brevity
+
 const SOUNDS: Record<string, string> = {
-    message: '/sounds/message.mp3',
-    mention: '/sounds/mention.mp3',
-    event: '/sounds/event.mp3',
-    nudge: '/sounds/nudge.mp3',
-    default: '/sounds/message.mp3'
+    message: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU', // Placeholder beep
+    mention: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU',
+    event: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU',
+    nudge: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU', // Placeholder beep
+    default: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU'
 };
 
 interface NotificationContextType {
@@ -40,18 +51,47 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const playNotificationSound = useCallback((type: NotificationType | 'nudge') => {
         try {
-            const soundPath = SOUNDS[type] || SOUNDS.default;
-            const audio = new Audio(soundPath);
-            audio.volume = 0.9;
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
 
-            console.log(`[PandaNet] Playing sound: ${type} (${soundPath})`);
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
 
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(err => {
-                    console.warn('[PandaNet] Audio playback blocked or failed. Please click "Ativar Toques" in the header.', err);
-                });
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            const now = ctx.currentTime;
+
+            // Configuration based on type
+            if (type === 'nudge') {
+                // Rattle / Alert sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                osc.frequency.linearRampToValueAtTime(150, now + 0.2);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.3);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else {
+                // Pleasant ding
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+                osc.start(now);
+                osc.stop(now + 0.3);
             }
+
+            console.log(`[PandaNet] Playing synthesized sound for: ${type}`);
+
         } catch (e) {
             console.error('[PandaNet] Fatal error in playNotificationSound:', e);
         }

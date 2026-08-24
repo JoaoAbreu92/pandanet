@@ -284,9 +284,17 @@ const AppContent: React.FC = () => {
     const handleLogout = async () => {
         try {
             await signOut();
-            // Aggressive Cleanup
+
+            // Preserve user preferences that should persist across sessions
+            const stickers = localStorage.getItem('custom_stickers');
+            const notes = localStorage.getItem('sticky_notes');
+
+            // Aggressive Cleanup (but keep stickers/notes)
             localStorage.clear();
             sessionStorage.clear();
+
+            if (stickers) localStorage.setItem('custom_stickers', stickers);
+            if (notes) localStorage.setItem('sticky_notes', notes);
 
             // Give a tiny moment for storage events to propogate
             setTimeout(() => {
