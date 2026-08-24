@@ -29,6 +29,7 @@ import {
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
+import { useNotifications } from './NotificationContext';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -42,6 +43,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, customFeatures }) => {
+    const { notifications, moduleUnreadCounts } = useNotifications();
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
 
     const toggleMenu = (menu: 'rh' | 'ti' | 'portal') => {
@@ -59,9 +61,50 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (featureId && customFeatures && customFeatures[featureId] === false) {
             return null;
         }
+
+        // --- Notification Badge Logic ---
+        let badgeCount = 0;
+
+        // 1. Check explicit module counts first (Email, Messages, WhatsPanda)
+        if (moduleUnreadCounts[page]) {
+            badgeCount = moduleUnreadCounts[page];
+        }
+
+        // 2. Generic lookup for other modules via global notifications array
+        if (badgeCount === 0) {
+            badgeCount = notifications.filter(n => {
+                if (n.isRead) return false;
+
+                // Maps page to keywords in link or type
+                const pageKeywords: Record<string, string[]> = {
+                    'feed': ['feed', 'like', 'mention'],
+                    'calendar': ['calendar', 'event'],
+                    'events': ['events', 'event'],
+                    'marketplace': ['marketplace'],
+                    'tickets': ['ticket', 'tickets'],
+                    'recognition': ['recognition'],
+                    'meu-rh': ['vacation', 'forms', 'benefit'],
+                    'training': ['training']
+                };
+
+                const keywords = pageKeywords[page] || [page];
+                return keywords.some(k =>
+                    (n.link && n.link.toLowerCase().includes(k)) ||
+                    (n.type && n.type.toLowerCase().includes(k))
+                );
+            }).length;
+        }
+
         return (
-            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={label}>
-                <Icon className="w-6 h-6 flex-shrink-0" />
+            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative group ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={badgeCount > 0 ? `${label} (${badgeCount})` : label}>
+                <div className="relative">
+                    <Icon className="w-6 h-6 flex-shrink-0" />
+                    {badgeCount > 0 && (
+                        <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm animate-in fade-in zoom-in duration-300 border border-white dark:border-slate-900">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                    )}
+                </div>
                 {isOpen && <span className="ml-4 truncate">{label}</span>}
             </button>
         );
@@ -75,17 +118,32 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             React.isValidElement(child) && (child.props as any).page === currentPage
         );
 
+        // --- NavMenu Badge Logic (Aggregation) ---
+        let menuBadgeCount = 0;
+        if (menuKey === 'ti') {
+            menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'ticket' || (n.link && n.link.includes('ticket')))).length;
+        } else if (menuKey === 'rh') {
+            menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'event' || (n.link && (n.link.includes('survey') || n.link.includes('training') || n.link.includes('form'))))).length;
+        }
+
         return (
             <div>
-                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'}`}>
+                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 relative ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'}`}>
                     <div className="flex items-center">
-                        <Icon className="w-6 h-6 flex-shrink-0" />
+                        <div className="relative">
+                            <Icon className="w-6 h-6 flex-shrink-0" />
+                            {menuBadgeCount > 0 && !openMenus[menuKey] && (
+                                <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900">
+                                    {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
+                                </span>
+                            )}
+                        </div>
                         {isOpen && <span className="ml-4 truncate font-semibold">{label}</span>}
                     </div>
                     {isOpen && <ChevronDownIcon className={`w-5 h-5 transition-transform ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
                 {openMenus[menuKey] && isOpen && (
-                    <div className="pl-8 pt-2 space-y-1">
+                    <div className="pl-8 pt-2 space-y-1 animate-in slide-in-from-top-2 duration-300">
                         {children}
                     </div>
                 )}

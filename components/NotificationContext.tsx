@@ -37,6 +37,10 @@ interface NotificationContextType {
     selectedSound: string;
     availableSounds: { id: string; name: string; path: string | null }[];
     changeSound: (soundId: string) => void;
+
+    // Module specific unread counts (for Sidebar badges)
+    moduleUnreadCounts: Record<string, number>;
+    setModuleUnreadCount: (module: string, count: number) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -45,6 +49,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { currentUser, isGhostMode } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Module explicit counts
+    const [moduleUnreadCounts, setModuleUnreadCountsState] = useState<Record<string, number>>({});
+
+    const setModuleUnreadCount = useCallback((module: string, count: number) => {
+        setModuleUnreadCountsState(prev => {
+            if (prev[module] === count) return prev;
+            return { ...prev, [module]: count };
+        });
+    }, []);
 
     // Sound Customization
     const [selectedSound, setSelectedSound] = useState<string>(() => localStorage.getItem('pixel_notification_sound') || 'synth');
@@ -213,12 +227,48 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 }));
                 setNotifications(mapped);
             }
+
+            // Fetch explicitly Unread Internal Messages (Conversations with unread_count > 0)
+            const { data: convsData } = await supabase
+                .from('conversations')
+                .select('id, unread_count')
+                .or(`participant1_id.eq.${currentUser.id},participant2_id.eq.${currentUser.id}`);
+
+            if (convsData) {
+                // Determine how many conversations have unread messages for THIS user
+                // Our schema usually handles participant unreads but let's just do a rough count or query messages directly
+            }
+            // For true accuracy, count unread messages directed to us
+            const { count: msgsCount } = await supabase
+                .from('messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('receiver_id', currentUser.id)
+                .eq('is_read', false);
+
+            if (msgsCount !== null) {
+                setModuleUnreadCount('messages', msgsCount);
+            }
+
+            // Fetch WhatsPanda Unread Channels (If user has access)
+            if (currentUser.company_id) {
+                const { count: wpCount } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('company_id', currentUser.company_id)
+                    .gt('unread_count', 0)
+                    .neq('status', 'fechado');
+
+                if (wpCount !== null) {
+                    setModuleUnreadCount('whatspanda', wpCount);
+                }
+            }
+
         } catch (err) {
             console.error('Error fetching notifications:', err);
         } finally {
             setLoading(false);
         }
-    }, [currentUser?.id]);
+    }, [currentUser?.id, currentUser?.company_id, setModuleUnreadCount]);
 
     useEffect(() => {
         fetchNotifications();
@@ -257,9 +307,37 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     }
                 });
 
+            // --- REALTIME: Internal Messages ---
+            const messagesChannel = supabase
+                .channel('realtime-messages-count')
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `receiver_id=eq.${currentUser.id}`
+                }, () => {
+                    fetchNotifications();
+                })
+                .subscribe();
+
+            // --- REALTIME: WhatsPanda Conversations ---
+            const whatsappChannel = supabase
+                .channel('realtime-whatsapp-count')
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'whatsapp_conversations',
+                    filter: `company_id=eq.${currentUser.company_id}`
+                }, () => {
+                    fetchNotifications();
+                })
+                .subscribe();
+
             return () => {
                 console.log('Finalizando Realtime');
                 supabase.removeChannel(channel);
+                supabase.removeChannel(messagesChannel);
+                supabase.removeChannel(whatsappChannel);
             };
         }
     }, [currentUser?.id, fetchNotifications, playNotificationSound, showDesktopNotification]);
@@ -389,7 +467,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             // Exposed Sound Selection
             selectedSound,
             availableSounds: AVAILABLE_SOUNDS,
-            changeSound
+            changeSound,
+
+            // Module Unread Counts
+            moduleUnreadCounts,
+            setModuleUnreadCount
         }}>
             {children}
         </NotificationContext.Provider>

@@ -5,7 +5,7 @@ import { useNotifications } from './NotificationContext';
 
 const EmailNotifier: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
+    const { addNotification, playNotificationSound, showDesktopNotification, setModuleUnreadCount } = useNotifications();
     const [lastUnseenCount, setLastUnseenCount] = useState<number | null>(null);
     const [settings, setSettings] = useState<any>(null);
 
@@ -55,6 +55,9 @@ const EmailNotifier: React.FC = () => {
                 
                 if (data && typeof data.unseen === 'number') {
                     const currentUnseen = data.unseen;
+
+                    // Atualiza o contador global no contexto para o Sidebar
+                    setModuleUnreadCount('email', currentUnseen);
 
                     // Se é a primeira carga, apenas sincroniza sem notificar
                     if (lastUnseenCount === null) {

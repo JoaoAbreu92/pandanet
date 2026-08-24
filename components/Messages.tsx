@@ -20,6 +20,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { usePresence } from './PresenceContext';
+import { useToast } from './ToastContext';
 
 const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
 const availableEmojis = [
@@ -72,6 +73,7 @@ interface MessagesProps {
 
 const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const { currentUser, profile, isGhostMode } = useAuth();
+    const { showToast } = useToast();
     const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
@@ -141,7 +143,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     const handleSendNudge = async () => {
         if (isGhostMode) {
-            alert("Modo Fantasma: Você não pode enviar nudges durante a auditoria.");
+            showToast("Modo Fantasma: Você não pode enviar nudges durante a auditoria.", "warning");
             return;
         }
         if (!selectedConversationId || !selectedConversation) return;
@@ -321,7 +323,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (!file.type.includes('gif') && !file.type.includes('image')) {
-            alert('Por favor, selecione um GIF ou imagem.');
+            showToast('Por favor, selecione um GIF ou imagem.', 'warning');
             return;
         }
 
@@ -726,7 +728,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
         if (isGhostMode) {
-            alert("Modo Fantasma: O envio de mensagens está desabilitado durante a auditoria.");
+            showToast("Modo Fantasma: O envio de mensagens está desabilitado durante a auditoria.", "warning");
             return;
         }
         if (e) e.preventDefault();
