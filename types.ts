@@ -32,7 +32,13 @@ export type Page =
   | 'service-status'
   | 'infosec';
 
-export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'system';
+export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
+
+export interface Department {
+  id: string;
+  name: string;
+  company_id: string;
+}
 
 export interface Notification {
   id: string; // Alterado para string para suportar diferentes fontes de ID
@@ -189,6 +195,8 @@ export interface Employee {
   officeLocation?: string;
   bio?: string;
   following: string[]; // Array de IDs de usuários que este funcionário segue
+  department_id?: string;
+  department_name?: string;
 }
 
 export interface Task {
@@ -260,8 +268,10 @@ export interface Ticket {
   description: string;
   requester: string;
   requester_id?: string;
-  assignedTo?: string;
-  assignedToId?: string;
+  assignedTo?: string; // Legacy field
+  assignedToId?: string; // Legacy field
+  assigned_user_id?: string; // New field matching migration
+  department_id?: string; // New field matching migration
   status: TicketStatus;
   priority: TicketPriority;
   createdAt: string;

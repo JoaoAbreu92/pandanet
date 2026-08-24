@@ -5,18 +5,21 @@ import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import type { Department } from '../types';
 
 interface UserManagerProps {
     users: Employee[];
     setUsers: (users: Employee[]) => void;
     plan: Plan;
+    departments: Department[];
 }
 
 const UserFormModal: React.FC<{
     user: Partial<Employee> | null;
+    departments: Department[];
     onClose: () => void;
     onSave: (user: Omit<Employee, 'id'> | Employee) => void;
-}> = ({ user, onClose, onSave }) => {
+}> = ({ user, departments, onClose, onSave }) => {
     const { t } = useLanguage();
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -30,6 +33,7 @@ const UserFormModal: React.FC<{
         avatarUrl: user?.avatarUrl || `https://i.pravatar.cc/150?u=${user?.email || Date.now()}`,
         birthDate: user?.birthDate || '1990-01-01',
         joinDate: user?.joinDate || new Date().toISOString().split('T')[0],
+        department_id: user?.department_id || '',
         permissions: user?.permissions || {
             viewMessages: true,
             openTickets: true,
@@ -75,6 +79,21 @@ const UserFormModal: React.FC<{
 
                         <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.sector_manager')}</label><input type="text" name="sectorManager" value={formData.sectorManager} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                         <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.employee_manager')}</label><input type="text" name="employeeManager" value={formData.employeeManager} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text">Departamento</label>
+                            <select
+                                name="department_id"
+                                value={formData.department_id}
+                                onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))}
+                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                            >
+                                <option value="">Sem Departamento</option>
+                                {departments.map(d => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
                         <div><label className="flex items-center space-x-2 mt-6 text-brand-text"><input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary" /><span>{t('users.admin')}</span></label></div>
                     </div>
@@ -208,7 +227,7 @@ const UserFormModal: React.FC<{
 };
 
 
-const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
+const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, departments }) => {
     const { profile } = useAuth();
     const { t } = useLanguage();
     const [isModalOpen, setModalOpen] = useState(false);
@@ -233,9 +252,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
                         role: userData.role,
                         team: userData.team,
                         is_admin: userData.isAdmin,
-                        is_company_admin: userData.isAdmin, // Mapping admin to company_admin
+                        is_company_admin: userData.isAdmin,
                         permissions: userData.permissions,
-                        avatar_url: userData.avatarUrl
+                        avatar_url: userData.avatarUrl,
+                        department_id: (userData as any).department_id || null
                     })
                     .eq('id', userData.id);
 
@@ -263,7 +283,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
                         permissions: userData.permissions,
                         avatar_url: userData.avatarUrl,
                         join_date: userData.joinDate,
-                        birth_date: userData.birthDate
+                        birth_date: userData.birthDate,
+                        department_id: (userData as any).department_id || null
                     }])
                     .select();
 
@@ -346,7 +367,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
                     </table>
                 </div>
             </Card>
-            {isModalOpen && <UserFormModal user={editingUser} onClose={() => setModalOpen(false)} onSave={handleSave} />}
+            {isModalOpen && <UserFormModal user={editingUser} departments={departments} onClose={() => setModalOpen(false)} onSave={handleSave} />}
         </>
     );
 };

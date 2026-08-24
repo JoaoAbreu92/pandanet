@@ -568,9 +568,9 @@ const Messages: React.FC<MessagesProps> = () => {
     if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
 
     return (
-        <div className="flex h-[calc(100vh-5rem)] bg-white">
+        <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
             {/* Left Sidebar: Conversations/Contacts/Teams */}
-            <div className={`w-full md:w-1/4 lg:w-1/5 bg-white border-r flex-col ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-80 lg:w-96 bg-white border-r flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b">
                     <div className="flex bg-gray-100 rounded-md p-1">
                         <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'conversations' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Chat</button>
@@ -751,7 +751,7 @@ const Messages: React.FC<MessagesProps> = () => {
             </div>
 
             {/* Right Sidebar: Sticky Notes (Local Only) */}
-            <div className="hidden lg:flex flex-col w-64 bg-gray-50 border-l p-4 overflow-y-auto">
+            <div className="hidden lg:flex flex-col w-72 bg-gray-50 border-l p-4 overflow-hidden">
                 <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                     <span className="text-xl">📝</span> Notas Rápidas
                 </h3>
@@ -763,7 +763,7 @@ const Messages: React.FC<MessagesProps> = () => {
                     </div>
                 )}
 
-                <div className="space-y-3 mb-4 flex-1">
+                <div className="space-y-3 mb-4 flex-1 overflow-y-auto pr-1 custom-scrollbar">
                     {notes.map((note) => {
                         const color = NOTE_COLORS.find(c => c.id === note.colorId) || NOTE_COLORS[0];
                         return (

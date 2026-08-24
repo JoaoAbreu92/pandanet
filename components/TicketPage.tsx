@@ -12,7 +12,8 @@ const TicketPage: React.FC = () => {
     const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
     const [tickets, setTickets] = useState<Ticket[]>([]);
-    const [allEmployees, setAllEmployees] = useState<Employee[]>([]); // Need for assignment
+    const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
     const [isFormOpen, setFormOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [loading, setLoading] = useState(true);
@@ -73,6 +74,13 @@ const TicketPage: React.FC = () => {
                 }));
                 setTickets(formattedTickets);
             }
+            // Fetch Departments
+            const { data: deptsData } = await supabase
+                .from('departments')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
+            if (deptsData) setDepartments(deptsData);
+
         } catch (error) {
             console.error('Error fetching tickets:', error);
         } finally {
@@ -95,7 +103,7 @@ const TicketPage: React.FC = () => {
         };
     }, [currentUser?.company_id]);
 
-    const handleCreateTicket = async (ticketData: Omit<Ticket, 'id' | 'requester' | 'status' | 'createdAt' | 'lastUpdate' | 'comments'>) => {
+    const handleCreateTicket = async (ticketData: any) => {
         if (!currentUser) return;
         try {
             const { error } = await supabase
@@ -106,7 +114,8 @@ const TicketPage: React.FC = () => {
                     title: ticketData.title,
                     description: ticketData.description,
                     priority: ticketData.priority,
-                    assigned_to_id: ticketData.assignedTo || null, // assignedTo here comes from form select value (ID)
+                    department_id: ticketData.department_id || null,
+                    assigned_to_id: ticketData.assigned_to_id || null,
                     status: 'Aberto',
                     comments: []
                 }]);
@@ -244,6 +253,7 @@ const TicketPage: React.FC = () => {
                             onCancel={() => setFormOpen(false)}
                             allEmployees={allEmployees}
                             currentUser={currentUser}
+                            departments={departments}
                         />
                     </div>
                 </div>

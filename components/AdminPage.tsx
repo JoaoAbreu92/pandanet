@@ -7,10 +7,12 @@ import FormSubmissionsManager from './FormSubmissionsManager';
 import MarketplaceManager from './MarketplaceManager';
 import PollManager from './PollManager';
 import TeamManager from './TeamManager';
+import { DepartmentManager } from './DepartmentManager';
 import EventsManager from './EventsManager';
 import TrainingManager from './TrainingManager';
 import { GenericManager } from './GenericManager';
 import { supabase } from '../supabaseClient';
+import type { Department } from '../types';
 
 interface AdminPageProps {
     company: Company;
@@ -22,6 +24,7 @@ interface AdminPageProps {
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
 
     useEffect(() => {
         const fetchEmployees = async () => {
@@ -57,7 +60,14 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             }
         };
 
+        const fetchDepartments = async () => {
+            if (!company?.id) return;
+            const { data } = await supabase.from('departments').select('*').eq('company_id', company.id);
+            if (data) setDepartments(data);
+        };
+
         fetchEmployees();
+        fetchDepartments();
     }, [company?.id]);
 
     const handleSetData = async (key: keyof Company['data'], value: any) => {
@@ -94,6 +104,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     const tabs = [
         { id: 'dashboard', label: 'Conteúdo', featureId: 'feed' },
         { id: 'users', label: 'Usuários' },
+        { id: 'departments', label: 'Departamentos' },
         { id: 'teams', label: 'Equipes' },
         { id: 'forms', label: 'Formulários' },
         { id: 'marketplace', label: 'Marketplace', featureId: 'marketplace' },
@@ -120,7 +131,9 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     setBanners={(b) => handleSetData('banners', b)}
                 />;
             case 'users':
-                return <UserManager users={employees} setUsers={setEmployees} plan={plan} />;
+                return <UserManager users={employees} setUsers={setEmployees} plan={plan} departments={departments} />;
+            case 'departments':
+                return <DepartmentManager companyId={company.id!} />;
             case 'teams':
                 return <TeamManager users={employees} setUsers={setEmployees} />;
             case 'forms':

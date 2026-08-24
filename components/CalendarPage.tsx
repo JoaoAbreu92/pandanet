@@ -22,6 +22,7 @@ const CalendarPage: React.FC = () => {
     const [view, setView] = useState<'month' | 'week'>('month');
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -33,6 +34,7 @@ const CalendarPage: React.FC = () => {
         category: 'Reunião' as CalendarEventCategory,
         location: '',
         attendees: [] as string[], // IDs
+        departmentId: '', // To invite entire dept
         notes: ''
     });
 
@@ -48,14 +50,19 @@ const CalendarPage: React.FC = () => {
                     name: e.full_name,
                     email: e.email,
                     role: e.role,
-                    team: e.department,
+                    team: e.team,
+                    department_id: e.department_id,
                     avatarUrl: e.avatar_url,
-                    permissions: {} as any, // minimal
+                    permissions: {} as any,
                     joinDate: e.created_at,
-                    birthDate: '', // Not in profiles usually
+                    birthDate: e.birth_date,
                     following: []
                 })));
             }
+
+            // Fetch Departments
+            const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
+            if (depts) setDepartments(depts);
 
             // Fetch Events
             const { data: evts, error } = await supabase
@@ -108,17 +115,23 @@ const CalendarPage: React.FC = () => {
         e.preventDefault();
         if (!currentUser?.company_id) return;
 
+        let finalAttendees = [...newEventData.attendees];
+        if ((newEventData as any).departmentId) {
+            const deptUsers = employees.filter(emp => (emp as any).department_id === (newEventData as any).departmentId).map(emp => emp.id);
+            finalAttendees = Array.from(new Set([...finalAttendees, ...deptUsers]));
+        }
+
         try {
             const { data, error } = await supabase.from('events').insert({
                 company_id: currentUser.company_id,
                 title: newEventData.title,
                 description: newEventData.notes,
-                date: newEventData.date, // timestamp? Supabase expects ISO string
+                date: newEventData.date,
                 start_time: newEventData.startTime,
                 end_time: newEventData.endTime,
                 category: newEventData.category,
                 location: newEventData.location,
-                attendees: newEventData.attendees, // Array of IDs
+                attendees: finalAttendees,
                 creator_id: currentUser.id
             }).select();
 
@@ -371,6 +384,20 @@ const CalendarPage: React.FC = () => {
                                 <div><label className="block text-sm font-medium text-brand-subtle-text">Fim</label><input type="time" name="endTime" value={newEventData.endTime} onChange={handleInputChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                             </div>
                             <div><label className="block text-sm font-medium text-brand-subtle-text">Local</label><input type="text" name="location" value={newEventData.location} onChange={handleInputChange} placeholder="Ex: Sala de Reunião 1 ou Virtual" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div>
+                                <label className="block text-sm font-medium text-brand-subtle-text">Convidar Departamento Inteiro (Opcional)</label>
+                                <select
+                                    name="departmentId"
+                                    value={newEventData.departmentId}
+                                    onChange={handleInputChange}
+                                    className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                                >
+                                    <option value="">Nenhum Departamento</option>
+                                    {departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-brand-subtle-text mb-1">Participantes</label>
                                 <div className="border rounded-md p-2 bg-gray-50">

@@ -22,11 +22,10 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate }) => {
     <Card title="Links Rápidos">
       <div className="grid grid-cols-2 gap-4">
         {links.map((link) => (
-          <a
+          <button
             key={link.label}
-            href="#"
+            type="button"
             onClick={(e) => {
-              e.preventDefault();
               onNavigate(link.page);
             }}
             className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg hover:bg-emerald-50 transition-colors duration-200 group"
@@ -35,7 +34,7 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate }) => {
               {link.icon}
             </div>
             <span className="text-sm font-semibold text-brand-subtle-text group-hover:text-emerald-800 text-center">{link.label}</span>
-          </a>
+          </button>
         ))}
       </div>
     </Card>

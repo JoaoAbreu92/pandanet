@@ -480,7 +480,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 </div>
             </div>
 
-            <div className="p-8 flex-1 overflow-y-auto">
+            <div className="p-8 flex-1">
                 {/* DASHBOARD */}
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6 animate-fadeIn">
