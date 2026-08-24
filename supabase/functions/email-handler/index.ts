@@ -1,3 +1,42 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import nodemailer from "npm:nodemailer@6.9.7";
+import { ImapFlow } from "npm:imapflow@1.0.141";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Helper para verificar se o host existe (DNS)
+async function verifyHost(host: string) {
+  try {
+    const ips = await Deno.resolveDns(host, "A");
+    return { ok: true, ips };
+  } catch (e: any) {
+    try {
+      const ips = await Deno.resolveDns(host, "AAAA");
+      return { ok: true, ips };
+    } catch {
+      return { ok: false, error: "Domínio não encontrado ou DNS inválido." };
+    }
+  }
+}
+
+// Helper para testar se uma porta TCP está aberta (Otimizado com timeout)
+async function testConnection(host: string, port: number, timeout = 3000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const conn = await Deno.connect({ hostname: host, port });
+    conn.close();
+    clearTimeout(id);
+    return { ok: true };
+  } catch (e: any) {
+    clearTimeout(id);
+    return { ok: false, error: e.message };
+  }
+}
+
 // Helper para testar conectividade pura via TCP/TLS (Nativo Deno)
 async function probeTls(host: string, port: number, timeout = 5000) {
   const controller = new AbortController();
@@ -13,22 +52,53 @@ async function probeTls(host: string, port: number, timeout = 5000) {
   }
 }
 
-console.log("Edge Function 'email-handler' V29 (Native Probe & Fallback) iniciada.");
+// Helper para enviar e-mail via Brevo API
+async function sendEmailBrevo(apiKey: string, sender: string, to: string, subject: string, html: string) {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { email: sender },
+      to: [{ email: to }],
+      subject: subject,
+      htmlContent: html
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Brevo API Error: ${data.message || response.statusText}`);
+  }
+  return data;
+}
+
+// Helper para validar API Key da Brevo
+async function testBrevoAuth(apiKey: string) {
+  const response = await fetch('https://api.brevo.com/v3/account', {
+    headers: { 'api-key': apiKey }
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    return { ok: false, error: data.message || "Chave de API inválida." };
+  }
+  const data = await response.json();
+  return { ok: true, data };
+}
+
+console.log("Edge Function 'email-handler' V32 (Brevo API Integration) iniciada.");
 
 Deno.serve(async (req) => {
-  // 1. CORS Preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // 2. Health Check
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V29). Native Diagnostics.' 
-    }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+      message: 'Edge Function Online (V32). Brevo Supported.'
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
   try {
@@ -39,51 +109,39 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V29] Ação: ${action}`);
+    console.log(`[V32] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
 
-      // 1. VERIFICAR DNS
-      const [smtpHostOk, imapHostOk] = await Promise.all([
-        verifyHost(settings.smtp_host),
-        verifyHost(settings.imap_host)
-      ]);
+      // BREVO DETECT: Se o host contém 'brevo' ou se passou explicitamente uma API Key
+      const isBrevo = settings.smtp_host?.includes('brevo') || settings.brevo_api_key;
+      const brevoKey = settings.brevo_api_key || (isBrevo ? settings.pass : null);
 
-      if (!smtpHostOk.ok) throw new Error(`DNS SMTP: ${smtpHostOk.error} (${settings.smtp_host})`);
-      if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error} (${settings.imap_host})`);
+      let smtpResult: any;
+      let imapResult: any;
 
-      // Determinar flags
-      const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
-      const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
+      // 1. TESTE SMTP / BREVO
+      if (isBrevo && brevoKey) {
+        console.log("[V32] Testando via Brevo API...");
+        const auth = await testBrevoAuth(brevoKey);
+        if (auth.ok) {
+          smtpResult = { status: 'fulfilled', value: "Brevo API OK" };
+        } else {
+          smtpResult = { status: 'rejected', reason: new Error(`Brevo: ${auth.error}`) };
+        }
+      } else {
+        // Teste SMTP tradicional
+        const [smtpHostOk] = await Promise.all([verifyHost(settings.smtp_host)]);
+        if (!smtpHostOk.ok) throw new Error(`DNS SMTP: ${smtpHostOk.error}`);
 
-      console.log(`[V29] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}) | IMAP(${settings.imap_host}:${settings.imap_port})`);
+        const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
+        const probe = useSmtpSsl ? await probeTls(settings.smtp_host, settings.smtp_port) : await testConnection(settings.smtp_host, settings.smtp_port);
 
-      // 2. PRE-FLIGHT (Teste nativo antes de carregar drivers pesados)
-      const probes = await Promise.allSettled([
-        useSmtpSsl ? probeTls(settings.smtp_host, settings.smtp_port) : testConnection(settings.smtp_host, settings.smtp_port),
-        useImapSsl ? probeTls(settings.imap_host, settings.imap_port) : testConnection(settings.imap_host, settings.imap_port)
-      ]);
-
-      const [smtpProbe, imapProbe] = probes;
-      let probeError = "";
-      if (smtpProbe.status === 'fulfilled' && !smtpProbe.value.ok) probeError += `SMTP Socket: ${smtpProbe.value.error}. `;
-      if (imapProbe.status === 'fulfilled' && !imapProbe.value.ok) probeError += `IMAP Socket: ${imapProbe.value.error}. `;
-
-      if (probeError) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: `Falha de rede/firewall: ${probeError}`,
-          debug: { smtpProbe, imapProbe },
-          duration: ((Date.now() - start) / 1000).toFixed(1)
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
-      // 3. SE O SOCKET ESTÁ OK, TESTAR AUTENTICAÇÃO
-      const resultsPromise = Promise.allSettled([
-        // Teste SMTP
-        (async () => {
+        if (!probe.ok) {
+          smtpResult = { status: 'rejected', reason: new Error(`SMTP Socket: ${probe.error}`) };
+        } else {
           const transporter = nodemailer.createTransport({
             host: settings.smtp_host,
             port: settings.smtp_port,
@@ -92,64 +150,80 @@ Deno.serve(async (req) => {
             tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
             connectionTimeout: 10000,
           });
-          await transporter.verify();
-          return "SMTP OK";
-        })(),
-        // Teste IMAP
-        (async () => {
-          const client = new ImapFlow({
-            host: settings.imap_host,
-            port: settings.imap_port,
-            secure: useImapSsl,
-            auth: { user: settings.user, pass: settings.pass },
-            logger: false,
-            tls: { rejectUnauthorized: false, servername: settings.imap_host, minVersion: 'TLSv1.2' },
-            connectionTimeout: 15000,
-          });
-          await client.connect();
-          await client.logout();
-          return "IMAP OK";
-        })()
-      ]);
-
-      const globalTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Global (45s)")), 45000));
-      const results: any = await Promise.race([resultsPromise, globalTimeout]);
-
-      const [smtpRes, imapRes] = results;
-      const duration = Number(((Date.now() - start) / 1000).toFixed(1));
-
-      if (smtpRes.status === 'fulfilled' && imapRes.status === 'fulfilled') {
-        return new Response(JSON.stringify({
-          success: true,
-          message: `Sucesso! Conectado em ${duration}s.`
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          try {
+            await transporter.verify();
+            smtpResult = { status: 'fulfilled', value: "SMTP OK" };
+          } catch (e: any) {
+            smtpResult = { status: 'rejected', reason: e };
+          }
+        }
       }
 
-      // 4. ERRO DE AUTENTICAÇÃO/DRIVER
+      // 2. TESTE IMAP (Sempre via Hostinger/Tradicional por enquanto)
+      const imapHostOk = await verifyHost(settings.imap_host);
+      if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error}`);
+
+      const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
+      const imapProbe = useImapSsl ? await probeTls(settings.imap_host, settings.imap_port) : await testConnection(settings.imap_host, settings.imap_port);
+
+      if (!imapProbe.ok) {
+        imapResult = { status: 'rejected', reason: new Error(`IMAP Socket: ${imapProbe.error}`) };
+      } else {
+        const client = new ImapFlow({
+          host: settings.imap_host,
+          port: settings.imap_port,
+          secure: useImapSsl,
+          auth: { user: settings.user, pass: settings.pass },
+          logger: false,
+          tls: { rejectUnauthorized: false, servername: settings.imap_host, minVersion: 'TLSv1.2' },
+          connectionTimeout: 15000,
+        });
+        try {
+          await client.connect();
+          await client.logout();
+          imapResult = { status: 'fulfilled', value: "IMAP OK" };
+        } catch (e: any) {
+          imapResult = { status: 'rejected', reason: e };
+        }
+      }
+
+      const duration = Number(((Date.now() - start) / 1000).toFixed(1));
+
+      if (smtpResult.status === 'fulfilled' && imapResult.status === 'fulfilled') {
+        const msg = isBrevo ? `Sucesso! Brevo API e IMAP OK (${duration}s).` : `Sucesso! SMTP e IMAP OK (${duration}s).`;
+        return new Response(JSON.stringify({ success: true, message: msg }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       let errorMsg = "";
-      if (smtpRes.status === 'rejected') errorMsg += `SMTP: ${smtpRes.reason.message}. `;
-      if (imapRes.status === 'rejected') errorMsg += `IMAP: ${imapRes.reason.message}. `;
+      if (smtpResult.status === 'rejected') errorMsg += `SMTP/Brevo: ${smtpResult.reason.message}. `;
+      if (imapResult.status === 'rejected') errorMsg += `IMAP: ${imapResult.reason.message}. `;
+
+      // Dica específica para Hostinger + Brevo
+      if (isBrevo && imapResult.status === 'rejected' && imapResult.reason.message.includes('Unexpected close')) {
+        errorMsg += " Dica: Hostinger bloqueou o IMAP. Tente porta 143 sem SSL ou verifique permissões.";
+      }
 
       return new Response(JSON.stringify({
         success: false,
         error: errorMsg.trim(),
-        debug: { smtp: smtpRes, imap: imapRes },
+        debug: { smtp: smtpResult, imap: imapResult, isBrevo },
         duration
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'V29 Online' }), { 
+    // Ação: Send (Para uso futuro quando implementarmos o envio real)
+    if (action === 'send-email') {
+      // Lógica de envio aqui (usando Brevo se configurado)
+    }
+
+    return new Response(JSON.stringify({ success: true, message: 'V32 Online' }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error: any) {
-    console.error(`[V29 ERROR]`, error.message);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
-      status: 200, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    console.error(`[V32 ERROR]`, error.message);
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })
