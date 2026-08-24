@@ -40,6 +40,7 @@ function addDebugLog(type, message, details = null) {
     }
     console.log(`[DEBUG_LOG] [${type}] ${message}`, details ? JSON.stringify(details).substring(0, 300) : '');
 }
+global.addDebugLog = addDebugLog;
 
 app.set('trust proxy', 1);
 

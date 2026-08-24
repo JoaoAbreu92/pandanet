@@ -76,11 +76,20 @@ async function sendPushNotification(token, title, body, data = {}) {
 
     try {
         console.log(`[FCM] Enviando push para o token: ${token.substring(0, 15)}...`);
+        if (global.addDebugLog) {
+            global.addDebugLog('FCM_SEND_START', `Iniciando envio para o token: ${token.substring(0, 15)}...`, { message });
+        }
         const response = await admin.messaging().send(message);
         console.log('[FCM] Notificação push enviada com sucesso. Response ID:', response);
+        if (global.addDebugLog) {
+            global.addDebugLog('FCM_SEND_SUCCESS', `Push enviado com sucesso para o token: ${token.substring(0, 15)}...`, { response });
+        }
         return response;
     } catch (error) {
         console.error('[FCM] Erro ao enviar notificação push via Firebase:', error.message);
+        if (global.addDebugLog) {
+            global.addDebugLog('FCM_SEND_ERROR', `Erro ao enviar push: ${error.message}`, { error: error.stack, message });
+        }
         return null;
     }
 }
