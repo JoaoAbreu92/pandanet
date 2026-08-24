@@ -101,14 +101,15 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             }
             setTimeout(() => {
                 fetchContacts();
-                alert('Sincronização concluída!');
-            }, 2000);
+                setSyncing(false);
+                alert('Sincronização solicitada! Os contatos aparecerão em alguns instantes.');
+            }, 5000);
         } catch (error) {
             console.error('Error syncing:', error);
-        } finally {
             setSyncing(false);
         }
     };
+
 
     const handleOpenModal = (contact?: WhatsAppContact) => {
         if (contact) {

@@ -307,7 +307,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             .from('whatsapp_conversations')
             .update({ 
                 last_message_at: new Date().toISOString(),
-                status: conv.status === 'fechado' ? 'aberto' : conv.status
+                status: (conv.status === 'fechado' || conv.status === 'pendente') ? 'aberto' : conv.status,
+                assigned_to: (conv.status === 'pendente' && !conv.assigned_to) ? userId : conv.assigned_to
             })
             .eq('id', conversationId);
 
@@ -358,42 +359,57 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         console.log(`[SYNC] Iniciando syncEvolutionData para ${instanceName}...`);
         console.log(`[SYNC] evoUrl: ${evoUrl}`);
         
-        // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API
+        // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API (v1 e v2)
         const endpoints = [
-            `${evoUrl}/chat/findContacts/${instanceName}`,
-            `${evoUrl}/chat/fetchContacts/${instanceName}`,
-            `${evoUrl}/contact/fetchContacts/${instanceName}`,
-            `${evoUrl}/instance/fetchContacts/${instanceName}`
+            { url: `${evoUrl}/chat/findChats/${instanceName}`, method: 'GET' },
+            { url: `${evoUrl}/chat/fetchContacts/${instanceName}`, method: 'POST', body: {} },
+            { url: `${evoUrl}/chat/getContacts/${instanceName}`, method: 'POST', body: {} },
+            { url: `${evoUrl}/contact/fetchContacts/${instanceName}`, method: 'POST', body: {} },
+            { url: `${evoUrl}/chat/findContacts/${instanceName}`, method: 'GET' },
+            { url: `${evoUrl}/chat/fetchContacts/${instanceName}`, method: 'GET' },
+            { url: `${evoUrl}/contact/fetchContacts/${instanceName}`, method: 'GET' },
+            { url: `${evoUrl}/instance/fetchContacts/${instanceName}`, method: 'GET' }
         ];
+
         
         let contacts = [];
         let successEndpoint = null;
 
-        for (const url of endpoints) {
+        for (const ep of endpoints) {
             try {
-                console.log(`[SYNC] Tentando endpoint: ${url}`);
-                const res = await fetch(url, { 
-                    method: 'GET',
-                    headers: { 'apikey': evoKey } 
-                });
+                console.log(`[SYNC] Tentando endpoint ${ep.method}: ${ep.url}`);
+                const options = {
+                    method: ep.method,
+                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
+                };
+                if (ep.method === 'POST') options.body = JSON.stringify(ep.body);
+
+                const res = await fetch(ep.url, options);
                 
                 if (!res.ok) {
-                    console.warn(`[SYNC] Endpoint ${url} retornou status ${res.status}`);
+                    const errText = await res.text().catch(() => '');
+                    console.warn(`[SYNC] Endpoint ${ep.url} falhou (${res.status}): ${errText.slice(0, 100)}`);
                     continue;
                 }
 
                 const data = await res.json();
-                console.log(`[SYNC] Dados recebidos de ${url}:`, Array.isArray(data) ? `${data.length} contatos` : 'Objeto');
+                console.log(`[SYNC] OK! Endpoint ${ep.url} retornou dados.`);
 
+                // Evolution pode retornar array direto ou { contacts: [] } ou { data: [] }
                 contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
-                if (contacts.length > 0) {
-                    successEndpoint = url;
+                
+                if (Array.isArray(contacts) && contacts.length > 0) {
+                    console.log(`[SYNC] SUCESSO: ${contacts.length} contatos encontrados via ${ep.url}`);
+                    successEndpoint = ep.url;
                     break;
+                } else {
+                    console.log(`[SYNC] Endpoint ${ep.url} retornou lista vazia.`);
                 }
             } catch (e) {
-                console.warn(`[SYNC] Falha ao tentar ${url}:`, e.message);
+                console.warn(`[SYNC] Falha ao tentar ${ep.url}:`, e.message);
             }
         }
+
 
         if (contacts.length > 0) {
             console.log(`[SYNC] ${contacts.length} contatos brutos encontrados via ${successEndpoint}. Processando...`);
@@ -642,7 +658,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     company_id: companyId,
                     contact_phone: fromPhone,
                     contact_name: contactName,
-                    status: 'aberto',
+                    status: 'pendente',
                     unread_count: isHistorical ? 0 : 1,
                     connection_id: connectionId,
                     last_message_at: new Date().toISOString()
@@ -742,8 +758,14 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     const { companyId, connectionId } = req.params;
     const { event, data, instance } = req.body;
 
-    console.log(`[WEBHOOK RAW] Evento: ${event} | Instância: ${instance}`);
-    console.log(`[WEBHOOK RAW] Payload:`, JSON.stringify(req.body, null, 2));
+    console.log(`[WEBHOOK] Evento: ${event} | Instância: ${instance} | Empresa: ${companyId}`);
+    
+    // Log detalhado para MESSAGES_UPSERT ajuda a identificar se a Evolution está enviando o que esperamos
+    if (event === 'messages.upsert') {
+        console.log(`[WEBHOOK] Detalhes do Payload MESSAGES_UPSERT:`, JSON.stringify(data, null, 2));
+    } else {
+        console.log(`[WEBHOOK RAW] Payload:`, JSON.stringify(req.body, null, 2));
+    }
 
     if (!data) {
         console.log(`[WEBHOOK] Recebido evento ${event} sem dados anexados.`);

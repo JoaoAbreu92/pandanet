@@ -161,11 +161,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     }
   }, [initialSearch]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchConversations();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, activeTab]);
+
   const fetchConversations = async () => {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
 
-    console.log(`[CHAT] Buscando conversas para empresa: ${companyId}`);
+    console.log(`[CHAT] Buscando conversas para empresa: ${companyId}, Tab: ${activeTab}, Search: ${searchTerm}`);
     let query = supabase
       .from('whatsapp_conversations')
       .select(`
@@ -175,7 +182,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
       `)
-      .eq('company_id', companyId);
+      .eq('company_id', companyId)
+      .eq('status', activeTab);
+
+    if (searchTerm) {
+      query = query.or(`contact_name.ilike.%${searchTerm}%,contact_phone.ilike.%${searchTerm}%`);
+    }
 
     // Filter by queues if not Admin and cannot see all departments
     if (!isAdmin && profile?.id && !permissions.can_see_all_departments && !permissions.can_view_others_chats) {
@@ -192,14 +204,34 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     
     if (data) {
       setConversations(data as WhatsAppConversationWithDetails[]);
-      // Se não tem nada na aba atual mas tem pendentes, avise ou mude se for o caso
-      const hasPending = (data as any[]).some(c => c.status === 'pendente');
-      const hasOpen = (data as any[]).some(c => c.status === 'aberto');
-      if (hasPending && !hasOpen && activeTab === 'aberto') {
-         console.log('[WP-DEBUG] Sugerindo mudar para aba Pendente');
-      }
     }
     setLoading(false);
+  };
+
+  const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
+    try {
+      const updateData: any = { status: newStatus };
+      if (assignToMe && activeProfile?.id) {
+        updateData.assigned_to = activeProfile.id;
+      }
+
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update(updateData)
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      // Update local state to reflect change immediately
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(prev => prev ? { ...prev, ...updateData } : null);
+        // Se mudou de aba, talvez deselecionar ou apenas atualizar o objeto local
+      }
+
+    } catch (err: any) {
+      alert('Erro ao atualizar status: ' + err.message);
+    }
   };
 
   const fetchMessages = async (conversationId: string) => {
@@ -324,7 +356,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     }
   };
 
-  const filteredConversations = conversations.filter(c => c.status === activeTab);
+  const filteredConversations = conversations; // Already filtered by fetchConversations
 
   return (
     <div className="flex h-full bg-[#f8fafc] dark:bg-transparent overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
@@ -377,7 +409,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 dark:text-white"
             />
           </div>
-          {isAdmin && (
+          {isAdmin && activeTab === 'fechado' && (
             <button
               onClick={async () => {
                   try {
@@ -387,20 +419,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                     const { error } = await supabase
                       .from('whatsapp_conversations')
                       .delete()
-                      .eq('company_id', companyId);
+                      .eq('company_id', companyId)
+                      .eq('status', 'fechado');
                     
                     if (error) throw error;
                     setConversations([]);
                     setSelectedConversation(null);
-                    alert('Atendimentos limpos com sucesso.');
+                    alert('Atendimentos fechados limpos com sucesso.');
                   } catch (err: any) {
                     alert('Erro ao limpar: ' + err.message);
                   }
-                }
-              }
+              }}
               className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
             >
-              LIMPAR ATENDIMENTOS
+              LIMPAR ATENDIMENTOS (FECHADOS)
             </button>
           )}
         </div>
@@ -467,14 +499,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                   <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-medium tracking-tight opacity-70 group-hover:opacity-100">
                       {conv.contact_phone}
                   </p>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 mt-1">
                     {conv.assigned_user && (
-                      <span className="text-[9px] bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-md border border-indigo-100/50 dark:border-indigo-500/20 font-bold truncate max-w-[80px]">
+                      <span className="text-[9px] bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-200/50 dark:border-indigo-500/30 font-bold flex items-center gap-1 shadow-sm">
+                        <User className="w-2.5 h-2.5" />
                         {conv.assigned_user.full_name.split(' ')[0]}
                       </span>
                     )}
                     {conv.department && (
-                      <span className="text-[9px] bg-emerald-50/50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-md border border-emerald-100/50 dark:border-emerald-500/20 font-bold truncate max-w-[80px]">
+                      <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-500/30 font-bold flex items-center gap-1 shadow-sm">
+                        <LayoutGrid className="w-2.5 h-2.5" />
                         {conv.department.name}
                       </span>
                     )}
@@ -559,7 +593,36 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                   </div>
                 </div>
               </div>
-              <div className="flex gap-1.5">
+                    <div className="flex gap-2 items-center">
+                      {selectedConversation.status === 'pendente' && (
+                        <button
+                          onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-500/20"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          ACEITAR ATENDIMENTO
+                        </button>
+                      )}
+                      {selectedConversation.status === 'aberto' && (
+                        <button
+                          onClick={() => handleUpdateStatus(selectedConversation.id, 'fechado')}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-red-500/20"
+                        >
+                          <CheckCheck className="w-4 h-4" />
+                          FINALIZAR
+                        </button>
+                      )}
+                      {selectedConversation.status === 'fechado' && (
+                        <button
+                          onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto')}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                          REABRIR
+                        </button>
+                      )}
+                      <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-1" />
+                      <div className="flex gap-1.5">
                 {canTransfer && (
                   <button
                     onClick={() => setShowTransferModal(true)}
@@ -578,6 +641,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                 </button>
               </div>
             </div>
+                  </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
