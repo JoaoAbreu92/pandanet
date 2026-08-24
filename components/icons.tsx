@@ -72,4 +72,9 @@ export {
   PlusCircleIcon,
   BugAntIcon,
   ExclamationTriangleIcon,
+  EnvelopeIcon,
+  InboxIcon,
+  PencilSquareIcon,
+  ExclamationCircleIcon,
+  EllipsisVerticalIcon,
 } from '@heroicons/react/24/outline';

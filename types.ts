@@ -4,6 +4,7 @@ import React from 'react';
 export type Page =
   | 'home'
   | 'messages'
+  | 'email'
   | 'tickets'
   | 'calendar'
   | 'directory'
