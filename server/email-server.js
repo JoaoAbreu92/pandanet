@@ -43,6 +43,33 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+app.get('/api/email/diagnose-nodemailer', (req, res) => {
+    const diagnostics = {
+        nodemailer_installed: false,
+        nodemailer_version: null,
+        mail_composer_required: false,
+        mail_composer_error: null,
+        env_keys: Object.keys(process.env)
+    };
+
+    try {
+        const nm = require('nodemailer');
+        diagnostics.nodemailer_installed = true;
+        diagnostics.nodemailer_version = require('nodemailer/package.json').version;
+        
+        try {
+            const mc = require('nodemailer/lib/mail-composer');
+            diagnostics.mail_composer_required = true;
+        } catch (mcErr) {
+            diagnostics.mail_composer_error = mcErr.message;
+        }
+    } catch (nmErr) {
+        diagnostics.nodemailer_error = nmErr.message;
+    }
+
+    return res.json(diagnostics);
+});
+
 // --- JWT Auth Middleware ---
 function authMiddleware(req, res, next) {
     const authHeader = req.headers['authorization'];
