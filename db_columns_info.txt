@@ -1,0 +1,7 @@
+--- COLUMN INSPECTION ---
+
+--- whatsapp_messages ---
+COLUMNS: id, conversation_id, message_text, media_url, media_type, is_from_customer, sent_by, whatsapp_message_id, created_at, company_id
+
+--- whatsapp_contacts ---
+COLUMNS: id, company_id, name, phone, email, notes, tags, created_at, updated_at, queue_id, is_blocked, ignore_contact, disable_transcription, disable_kanban

@@ -1,0 +1,24 @@
+--- DEEP SCAN LOG for conn_60323974-89c5-4120-a7a1-9c8774e24ed8 ---
+
+>>> CHECKING CHATS (/chat/findChats/conn_60323974-89c5-4120-a7a1-9c8774e24ed8)...
+RESULT: []
+
+>>> CHECKING CONTACTS (/contact/fetchContacts/conn_60323974-89c5-4120-a7a1-9c8774e24ed8)...
+RESULT: {
+  "status": 404,
+  "error": "Not Found",
+  "response": {
+    "message": [
+      "Cannot GET /contact/fetchContacts/conn_60323974-89c5-4120-a7a1-9c8774e24ed8"
+    ]
+  }
+}
+
+>>> CHECKING STATUS (/instance/connectionState/conn_60323974-89c5-4120-a7a1-9c8774e24ed8)...
+RESULT: {
+  "instance": {
+    "instanceName": "conn_60323974-89c5-4120-a7a1-9c8774e24ed8",
+    "state": "open"
+  }
+}
+

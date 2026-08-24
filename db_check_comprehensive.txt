@@ -1,0 +1,76 @@
+--- DB INSPECTION START ---
+
+=== CHECKING ACRILIGHT (6323c46c-f0d1-49af-886a-912efb3c6f41) ===
+RECENT MESSAGES: [
+  {
+    "id": "89ada5b6-6cbf-4362-8706-0445161df61d",
+    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
+    "message_text": "Teste",
+    "is_from_customer": false,
+    "created_at": "2026-03-13T15:28:48.546415+00:00"
+  },
+  {
+    "id": "0e925eb3-9ce9-462f-baf5-31739b78116e",
+    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
+    "message_text": "Teste",
+    "is_from_customer": false,
+    "created_at": "2026-03-13T15:25:55.321552+00:00"
+  },
+  {
+    "id": "2fecf85e-ca25-4df2-bc70-1c654c84fd31",
+    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
+    "message_text": "teste\n",
+    "is_from_customer": false,
+    "created_at": "2026-03-13T13:29:04.40055+00:00"
+  }
+]
+RECENT CONTACTS: [
+  {
+    "id": "ad2af137-1f6d-4460-b7a1-fa83b5f05465",
+    "name": "Joao",
+    "phone": "5541984727828",
+    "created_at": "2026-03-11T16:50:19.785547+00:00"
+  }
+]
+SETTINGS: [
+  {
+    "id": "60323974-89c5-4120-a7a1-9c8774e24ed8",
+    "phone_number": "554132870748",
+    "is_connected": true,
+    "connection_name": "PandaNet"
+  }
+]
+
+=== CHECKING PIXEL (56eaa5ed-8d1b-4879-a002-838702eeb14d) ===
+RECENT MESSAGES: [
+  {
+    "id": "de5ffd4a-3fc3-47aa-a61b-48d6cd421729",
+    "conversation_id": "d8211afd-3c25-45f0-b46a-155b96b965a5",
+    "message_text": "boa noite\n",
+    "is_from_customer": false,
+    "created_at": "2026-03-13T23:57:18.289345+00:00"
+  }
+]
+RECENT CONTACTS: [
+  {
+    "id": "3b663b1c-4d25-4cd4-9a0c-3e95d96238c5",
+    "name": "CONTATO TESTE ANTIGRAVITY",
+    "phone": "1234567890",
+    "created_at": "2026-03-13T14:02:31.979282+00:00"
+  },
+  {
+    "id": "d55be6a9-3a5d-4610-9a29-94ff25af5d2a",
+    "name": "João Henrique",
+    "phone": "5541984727828",
+    "created_at": "2026-03-11T22:04:29.786822+00:00"
+  }
+]
+SETTINGS: [
+  {
+    "id": "271ca3fd-3bc2-4f68-8da5-b4de56132588",
+    "phone_number": "5541984826972",
+    "is_connected": true,
+    "connection_name": "Whats Empresa"
+  }
+]
+

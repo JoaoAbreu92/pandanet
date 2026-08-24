@@ -441,7 +441,39 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         }
 
 
-        // 2. Upsert de Contatos
+        // 2. Fallback: Buscar Contatos se chats vierem vazios ou para garantir lista completa
+        if (chats.length === 0) {
+            console.log(`[SYNC] findChats retornou vazio. Tentando fetchContacts...`);
+            try {
+                // A Evolution v1.x costuma ter /contact/fetchContacts como POST ou GET dependendo da build
+                const contactRes = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, {
+                    method: 'GET',
+                    headers: { 'apikey': evoKey }
+                });
+                if (contactRes.ok) {
+                    const allContacts = await contactRes.json();
+                    if (Array.isArray(allContacts)) {
+                        console.log(`[SYNC] ${allContacts.length} contatos encontrados via findAll.`);
+                        for (const c of allContacts) {
+                            const jid = c.id || c.jid;
+                            if (!jid || processedJids.has(jid)) continue;
+                            processedJids.add(jid);
+                            const phone = jid.split('@')[0];
+                            contactsToUpsert.push({
+                                company_id: companyId,
+                                phone: phone,
+                                name: c.name || c.pushName || c.verifiedName || phone,
+                                updated_at: new Date().toISOString()
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[SYNC] Erro no fallback de contatos:', e.message);
+            }
+        }
+
+        // 3. Upsert de Contatos
         if (contactsToUpsert.length > 0) {
             console.log(`[SYNC] Upsert de ${contactsToUpsert.length} contatos...`);
             const { error: errC } = await supabase
@@ -707,6 +739,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         // 2. Inserir a mensagem
         if (conversationId) {
+            console.log(`[MSG] Inserindo mensagem. FromCustomer: ${!isFromMe} | De: ${fromPhone}`);
             const { error: insErr } = await supabase.from('whatsapp_messages').insert({
                 company_id: companyId,
                 conversation_id: conversationId,
