@@ -1019,6 +1019,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
+
+        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin';
+        if (!isAdmin) {
+            alert("Apenas administradores têm permissão para apagar conversas.");
+            return;
+        }
+
         if (!window.confirm("Deseja apagar esta conversa da sua lista?")) return;
 
         try {
@@ -1315,13 +1322,15 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                     <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        <button
-                                                            onClick={(e) => handleDeleteConversation(conv.id, e)}
-                                                            className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
-                                                            title="Apagar conversa"
-                                                        >
-                                                            <TrashIcon className="w-4 h-4" />
-                                                        </button>
+                                                        {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin') && (
+                                                            <button
+                                                                onClick={(e) => handleDeleteConversation(conv.id, e)}
+                                                                className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
+                                                                title="Apagar conversa"
+                                                            >
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <p className="text-sm text-brand-subtle-text truncate">{conv.lastMessage}</p>
