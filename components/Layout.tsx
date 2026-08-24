@@ -15,7 +15,7 @@ interface LayoutProps {
     isImpersonating: boolean;
     impersonatedCompanyName?: string;
     impersonatedUser?: Employee | null;
-    onNavigate: (page: Page) => void;
+    onNavigate: (page: Page, context?: any) => void;
     currentPage: Page;
     onLogout: () => void;
     onEndImpersonation: () => void;

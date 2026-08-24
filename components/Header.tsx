@@ -1,15 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon, SunIcon, MoonIcon, BugAntIcon } from './icons';
+import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon, SunIcon, MoonIcon, BugAntIcon, SparklesIcon } from './icons';
 import type { Employee, Page } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
+import { useEffect } from 'react';
 
 interface HeaderProps {
     onToggleSidebar: () => void;
     onToggleDebug?: () => void;
     currentUser: Employee;
     onLogout: () => void;
-    onNavigate: (page: Page) => void;
+    onNavigate: (page: Page, context?: any) => void;
     isImpersonating: boolean;
     impersonatedCompanyName?: string;
     onEndImpersonation: () => void;
@@ -25,8 +26,67 @@ import { useLanguage } from './LanguageContext';
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme, onSearch }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [searchResults, setSearchResults] = useState<{ type: 'menu' | 'user' | 'action', label: string, target: any, icon?: any }[]>([]);
     const { language, setLanguage, t } = useLanguage();
     const { testNotifications, availableSounds, selectedSound, changeSound } = useNotifications();
+    const [profiles, setProfiles] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchProfiles = async () => {
+            const { data } = await supabase.from('profiles').select('id, full_name, role, avatar_url').eq('company_id', currentUser.company_id).limit(10);
+            if (data) setProfiles(data);
+        };
+        fetchProfiles();
+    }, [currentUser.company_id]);
+
+    const menuItems = [
+        { label: 'Home', target: 'home', icon: '🏠' },
+        { label: 'Feed', target: 'feed', icon: '📰' },
+        { label: 'Mensagens', target: 'messages', icon: '💬' },
+        { label: 'WhatsPanda', target: 'whatspanda', icon: '🐼' },
+        { label: 'CRM', target: 'crm-dashboard', icon: '💼' },
+        { label: 'Calculadoras', target: 'ti-dashboard', icon: '🧮' },
+        { label: 'Chamados', target: 'tickets', icon: '🎟️' },
+        { label: 'Diretório', target: 'directory', icon: '👥' },
+        { label: 'Documentos', target: 'documentos', icon: '📂' },
+        { label: 'Perfil', target: 'profile-page', icon: '👤' },
+    ];
+
+    useEffect(() => {
+        if (!searchTerm.trim()) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        const term = searchTerm.toLowerCase();
+        const results: any[] = [];
+
+        // Search Menus
+        menuItems.forEach(item => {
+            if (item.label.toLowerCase().includes(term)) {
+                results.push({ type: 'menu', label: item.label, target: item.target, icon: item.icon });
+            }
+        });
+
+        // Search Users
+        profiles.forEach(p => {
+            if (p.full_name?.toLowerCase().includes(term)) {
+                results.push({ type: 'user', label: p.full_name, target: p.id, icon: '👤' });
+            }
+        });
+
+        setSearchResults(results.slice(0, 8));
+        setShowSearchResults(results.length > 0);
+    }, [searchTerm, profiles]);
+
+    const handleResultClick = (result: any) => {
+        if (result.type === 'menu') onNavigate(result.target);
+        else if (result.type === 'user') onNavigate('profile-page' as Page, { id: result.target });
+        setSearchTerm('');
+        setShowSearchResults(false);
+    };
 
     // Sound Menu Logic with Delay
     const [isSoundMenuOpen, setSoundMenuOpen] = useState(false);
@@ -68,20 +128,55 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
                         <Bars3Icon className="w-6 h-6" />
                     </button>
-                    <form onSubmit={handleSearch} className="relative ml-6 hidden md:block group">
+                    <div className="relative ml-6 hidden md:block group">
                         <MagnifyingGlassIcon className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-300 ${theme === 'dark' ? 'text-gray-500 group-focus-within:text-brand-primary' : 'text-gray-400'}`} />
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onFocus={() => setShowSearchResults(searchResults.length > 0)}
                             placeholder={t('header.search_placeholder')}
                             className="pl-11 pr-6 py-2.5 w-64 md:w-80 border-0 rounded-2xl bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 dark:bg-white/5 dark:text-white transition-all duration-300 hover:bg-gray-200 dark:hover:bg-white/10"
                         />
-                    </form>
+                        
+                        {/* Search Results Dropdown */}
+                        {showSearchResults && (
+                            <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 z-[100]">
+                                <div className="p-2 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Resultados</span>
+                                    <button onClick={() => setShowSearchResults(false)} className="text-[10px] h-5 w-5 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-white/10 text-gray-400">✕</button>
+                                </div>
+                                <div className="max-h-80 overflow-y-auto py-2">
+                                    {searchResults.map((res, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleResultClick(res)}
+                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 dark:hover:bg-white/5 transition-colors text-left group"
+                                        >
+                                            <span className="text-lg group-hover:scale-125 transition-transform">{res.icon}</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{res.label}</span>
+                                                <span className="text-[10px] text-gray-400 uppercase font-medium">{res.type === 'menu' ? 'Navegação' : 'Usuário'}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
 
                 <div className="flex items-center space-x-4">
+                    {/* Botão AI Assistant no Header */}
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('toggle-panda-ai'))}
+                        className="p-2.5 text-brand-primary bg-brand-primary/5 hover:bg-brand-primary/10 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-xl transition-all active:scale-95 group relative border border-brand-primary/10"
+                        title="Abrir Assistente com IA"
+                    >
+                        <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                    </button>
                     {currentUser.email === 'ti@grupopixel.com.br' && (
                         <>
                             {/* Diagnóstico Master Admin - Agora no Header */}

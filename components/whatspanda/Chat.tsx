@@ -59,7 +59,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
-  const [useSignature, setUseSignature] = useState(activeProfile?.use_whatsapp_signature || false);
+  const [useSignature, setUseSignature] = useState(false);
+  
+  // Atualiza useSignature quando o perfil carrega
+  useEffect(() => {
+    if (activeProfile?.whatsapp_signature || activeProfile?.use_whatsapp_signature) {
+      setUseSignature(true);
+    }
+  }, [activeProfile]);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false); // Added loading state for messages
@@ -96,11 +103,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     const convSubscription = supabase
       .channel('whatsapp_conversations_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
-        // Debounce: aguardar 800ms antes de refazer o fetch
+        // Se for um novo registro (INSERT), atualiza na hora para nao ter delay
+        if (payload.eventType === 'INSERT') {
+          fetchConversations();
+          return;
+        }
+        
+        // Debounce: aguardar 600ms antes de refazer o fetch para updates/deletes
         if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = setTimeout(() => {
           fetchConversations();
-        }, 800);
+        }, 600);
       })
       .subscribe();
 
@@ -225,10 +238,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     if (filterAssignee.length > 0) query = query.in('assigned_to', filterAssignee);
 
     // Filtro de Tipo (Privado / Grupo)
+    // Se o filtro for 'group', pega onde is_group é true OU o telefone termina em @g.us
     if (chatTypeFilter === 'private') {
-      query = query.eq('is_group', false);
+      query = query.or('is_group.eq.false,is_group.is.null').not('contact_phone', 'ilike', '%@g.us%');
     } else if (chatTypeFilter === 'group') {
-      query = query.eq('is_group', true);
+      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
     }
 
     // Logica de visibilidade:

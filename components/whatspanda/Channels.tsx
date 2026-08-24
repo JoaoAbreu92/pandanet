@@ -219,6 +219,30 @@ const Channels: React.FC = () => {
         }
     };
 
+    const syncContacts = async (companyId: string, connectionId: string) => {
+        addDebugLog(`Iniciando SINCRONIZAÇÃO de contatos para: ${connectionId}`, 'info');
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`https://pandanet.grupopixel.com.br/api/sync-contacts/${companyId}/${connectionId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
+            
+            if (res.ok) {
+                addDebugLog('Sincronização iniciada com sucesso!', 'success');
+                alert('Sincronização iniciada com sucesso! Os contatos e grupos aparecerão em breve.');
+            } else {
+                const err = await res.json();
+                addDebugLog(`Erro ao sincronizar: ${err.error || 'Erro desconhecido'}`, 'error');
+                alert('Falha ao iniciar sincronização.');
+            }
+        } catch (error: any) {
+            addDebugLog(`Erro de rede na sincronização: ${error.message}`, 'error');
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!confirm('Deseja realmente remover esta conexão? ATENÇÃO: Se houverem contatos e conversas vinculadas, a exclusão será bloqueada.')) return;
         const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
@@ -368,7 +392,7 @@ const Channels: React.FC = () => {
                                             <button onClick={() => {
                                                 setCurrentId(channel.id);
                                                 setView('qr');
-                                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                                const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
                                                 if (companyId) startSession(companyId, channel.id);
                                             }} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                                 <QrCode className="w-3.5 h-3.5" /> QR Code
@@ -376,16 +400,28 @@ const Channels: React.FC = () => {
                                         )}
 
                                         {channel.channel_type === 'whatsapp' && channel.is_connected && (
-                                            <button 
-                                                onClick={() => {
-                                                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
-                                                    if (companyId) repairWebhook(companyId, channel.id);
-                                                }} 
-                                                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
-                                                title="Reparar Webhooks (Use se mensagens não chegarem)"
-                                            >
-                                                <ShieldCheck className="w-3.5 h-3.5" /> Reparar
-                                            </button>
+                                            <div className="flex flex-1 gap-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
+                                                        if (companyId) syncContacts(companyId, channel.id);
+                                                    }} 
+                                                    className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
+                                                    title="Sincronizar Contatos e Grupos"
+                                                >
+                                                    <RefreshCw className="w-3.5 h-3.5" /> Sync
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
+                                                        if (companyId) repairWebhook(companyId, channel.id);
+                                                    }} 
+                                                    className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
+                                                    title="Reparar Webhook"
+                                                >
+                                                    <ShieldCheck className="w-3.5 h-3.5" /> Reparar
+                                                </button>
+                                            </div>
                                         )}
 
                                         <button onClick={() => handleDelete(channel.id)} className="p-2.5 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all duration-300">

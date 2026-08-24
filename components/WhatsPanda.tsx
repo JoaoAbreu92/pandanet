@@ -25,6 +25,12 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   const { profile } = useAuth();
   const [currentView, setCurrentView] = useState<View>('chat');
   const [isChatActive, setIsChatActive] = useState(false);
+  const [internalSearch, setInternalSearch] = useState(initialSearch);
+
+  const handleContactChat = (phone: string) => {
+    setInternalSearch(phone);
+    setCurrentView('chat');
+  };
 
   const permissions = profile?.whatspanda_permissions || {
     can_view_contacts: false,
@@ -71,8 +77,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     }
 
     switch (currentView) {
-      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={initialSearch} /> : null;
-      case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={initialSearch} /> : null;
+      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} /> : null;
+      case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
       case 'new-ticket': return permissions.can_view_chats ? (
         <NewTicket 
           onBack={() => setCurrentView('chat')} 

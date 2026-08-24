@@ -3,15 +3,17 @@ import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
 import { 
     Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check, RefreshCw, 
-    MessageSquare, Mail, UserPlus, Filter, ShieldOff, Shield, Ban, ListFilter, LayoutGrid
+    MessageSquare, Mail, UserPlus, Filter, ShieldOff, Shield, Ban, ListFilter, LayoutGrid,
+    MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 interface ContactsProps {
     initialSearch?: string;
+    onChat?: (phone: string) => void;
 }
 
-const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
+const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -399,6 +401,15 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                 </td>
                                 <td className="p-4 text-right">
                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {onChat && (
+                                            <button 
+                                                onClick={() => onChat(contact.phone)} 
+                                                className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg transition-all"
+                                                title="Iniciar Conversa"
+                                            >
+                                                <MessageCircle className="w-4 h-4 fill-emerald-500/10" />
+                                            </button>
+                                        )}
                                         <button onClick={() => handleOpenModal(contact)} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-blue-600 dark:text-blue-500 rounded-lg transition-all">
                                             <Edit2 className="w-4 h-4" />
                                         </button>

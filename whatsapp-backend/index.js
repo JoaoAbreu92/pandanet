@@ -508,16 +508,24 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 if (chats.length > 0) {
                     console.log(`[SYNC] ${chats.length} chats encontrados.`);
                     for (const chat of chats) {
-                        const jid = chat.id || chat.remoteJid || chat.jid || '';
-                        // Ignorar grupos, broadcasts e @lid (IDs internos)
-                        if (!jid || jid.includes('@g.us') || jid.includes('@broadcast') || jid.includes('@lid')) continue;
+                        // Ignorar broadcasts e @lid (IDs internos), mas PERMITIR grupos (@g.us)
+                        if (!jid || jid.includes('@broadcast') || jid.includes('@lid')) continue;
+                        const isGroup = jid.includes('@g.us');
                         const phone = jid.split('@')[0];
                         if (processedJids.has(phone)) continue;
                         processedJids.add(phone);
 
-                        const rawName = chat.pushName || chat.verifiedName || chat.name || contactMap[phone];
+                        const rawName = isGroup 
+                            ? (chat.subject || chat.name || 'Grupo Sem Nome')
+                            : (chat.pushName || chat.verifiedName || chat.name || contactMap[phone]);
                         const name = rawName || formatPhoneDisplay(phone);
-                        contactsToUpsert.push({ company_id: companyId, phone, name, updated_at: new Date().toISOString() });
+                        contactsToUpsert.push({ 
+                            company_id: companyId, 
+                            phone, 
+                            name, 
+                            is_group: isGroup,
+                            updated_at: new Date().toISOString() 
+                        });
                     }
                     break;
                 }
@@ -755,7 +763,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 .insert({
                     company_id: companyId,
                     contact_phone: fromPhone,
-                    contact_name: pushName || (isGroup ? 'Grupo' : formatPhoneDisplay(fromPhone)),
+                    contact_name: pushName || (isGroup ? (message.subject || 'Grupo') : formatPhoneDisplay(fromPhone)),
                     status: initialStatus,
                     unread_count: isHistorical ? 0 : 1,
                     connection_id: connectionId,
@@ -808,6 +816,18 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         console.error('[MSG] Erro fatal:', err.message);
     }
 }
+
+app.post('/sync-contacts/:companyId/:connectionId', async (req, res) => {
+    const { companyId, connectionId } = req.params;
+    try {
+        const instanceName = `conn_${connectionId}`;
+        console.log(`[HTTP] Iniciando sync manual para ${instanceName}...`);
+        syncEvolutionData(instanceName, companyId, connectionId);
+        res.json({ success: true, message: 'Sincronização iniciada com sucesso' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     // Responde 200 rápido para a Evolution não travar
