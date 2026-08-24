@@ -217,6 +217,7 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
     }
 
     // Disparar sincronização
+    console.log(`[SYNC-API] Iniciando sincronização solicitada pela UI para ${instanceName} (Empresa: ${companyId})`);
     syncEvolutionData(instanceName, companyId, connectionId);
     
     res.json({ status: 'Sync started' });
@@ -326,7 +327,8 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
-        console.log(`[SYNC] Iniciando sincronização para ${instanceName} (Empresa: ${companyId})...`);
+        console.log(`[SYNC] Iniciando syncEvolutionData para ${instanceName}...`);
+        console.log(`[SYNC] evoUrl: ${evoUrl}`);
         
         // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API
         const endpoints = [
@@ -342,33 +344,42 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         for (const url of endpoints) {
             try {
                 console.log(`[SYNC] Tentando endpoint: ${url}`);
-                const res = await fetch(url, { headers: { 'apikey': evoKey } });
-                const data = await res.json();
+                const res = await fetch(url, { 
+                    method: 'GET',
+                    headers: { 'apikey': evoKey } 
+                });
+                
+                if (!res.ok) {
+                    console.warn(`[SYNC] Endpoint ${url} retornou status ${res.status}`);
+                    continue;
+                }
 
-                if (res.ok) {
-                    contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
-                    if (contacts.length > 0) {
-                        successEndpoint = url;
-                        break;
-                    }
-                } else {
-                    console.warn(`[SYNC] Endpoint ${url} retornou status ${res.status}:`, data);
+                const data = await res.json();
+                console.log(`[SYNC] Dados recebidos de ${url}:`, Array.isArray(data) ? `${data.length} contatos` : 'Objeto');
+
+                contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
+                if (contacts.length > 0) {
+                    successEndpoint = url;
+                    break;
                 }
             } catch (e) {
-                console.warn(`[SYNC] Falha no endpoint ${url}:`, e.message);
+                console.warn(`[SYNC] Falha ao tentar ${url}:`, e.message);
             }
         }
 
         if (contacts.length > 0) {
-            console.log(`[SYNC] ${contacts.length} contatos encontrados via ${successEndpoint}. Processando batch upsert...`);
+            console.log(`[SYNC] ${contacts.length} contatos brutos encontrados via ${successEndpoint}. Processando...`);
             
-            const batchSize = 100;
             const contactsToUpsert = [];
+            const processedPhones = new Set();
 
             for (const c of contacts) {
-                const jid = c.id || c.remoteJid;
-                const phone = jid?.split('@')[0];
-                if (phone && !jid.includes('@g.us')) {
+                const jid = c.id || c.remoteJid || c.jid;
+                if (!jid) continue;
+
+                const phone = jid.split('@')[0];
+                if (phone && !jid.includes('@g.us') && !processedPhones.has(phone)) {
+                    processedPhones.add(phone);
                     const name = c.name || c.pushName || c.notify || phone;
                     contactsToUpsert.push({
                         company_id: companyId,
@@ -379,23 +390,32 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 }
             }
 
-            // Executar em lotes para não sobrecarregar a query
-            for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
-                const batch = contactsToUpsert.slice(i, i + batchSize);
-                const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert(batch, { onConflict: 'company_id,phone' });
-                if (upsertErr) {
-                    console.error(`[SYNC] Erro no lote ${i / batchSize}:`, upsertErr.message);
-                } else {
-                    console.log(`[SYNC] Lote ${i / batchSize + 1} processado (${batch.length} contatos).`);
+            if (contactsToUpsert.length > 0) {
+                console.log(`[SYNC] Realizando upsert de ${contactsToUpsert.length} contatos únicos no Supabase...`);
+                
+                // Dividir em lotes de 100 para evitar limites de timeout/payload
+                const batchSize = 100;
+                for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
+                    const batch = contactsToUpsert.slice(i, i + batchSize);
+                    const { error: upsertErr } = await supabase
+                        .from('whatsapp_contacts')
+                        .upsert(batch, { onConflict: 'company_id,phone' });
+                    
+                    if (upsertErr) {
+                        console.error(`[SYNC] Erro no lote ${i/batchSize}:`, upsertErr.message);
+                    } else {
+                        console.log(`[SYNC] Lote ${i/batchSize + 1} processado com sucesso.`);
+                    }
                 }
+                console.log(`[SYNC] Sincronização finalizada com sucesso.`);
+            } else {
+                console.warn('[SYNC] Nenhum contato válido após filtragem.');
             }
-            
-            console.log(`[SYNC] Sincronização de ${contactsToUpsert.length} contatos finalizada.`);
         } else {
-            console.warn('[SYNC] Nenhum contato retornado pelos endpoints testados.');
+            console.warn('[SYNC] Nenhum contato retornado por nenhum endpoint.');
         }
     } catch (err) {
-        console.error(`[SYNC] Erro fatal na sincronização:`, err.message);
+        console.error(`[SYNC] Erro fatal:`, err.message);
     }
 }
 
@@ -675,8 +695,14 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     const { companyId, connectionId } = req.params;
     const { event, data, instance } = req.body;
 
-    if (!data) return;
-    console.log(`[WEBHOOK] ${event} da inst. ${instance} / Empresa: ${companyId}`);
+    console.log(`[WEBHOOK RAW] Evento: ${event} | Instância: ${instance}`);
+    console.log(`[WEBHOOK RAW] Payload:`, JSON.stringify(req.body, null, 2));
+
+    if (!data) {
+        console.log(`[WEBHOOK] Recebido evento ${event} sem dados anexados.`);
+        return;
+    }
+    console.log(`[WEBHOOK] Processando ${event} para Empresa: ${companyId}`);
 
     // ----- QR CODE ATUALIZADO -----
     if (event === 'qrcode.updated') {
