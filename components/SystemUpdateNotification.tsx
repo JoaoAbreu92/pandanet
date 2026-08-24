@@ -99,6 +99,7 @@ const SystemUpdateNotification: React.FC = () => {
     const handleDownloadNota = async () => {
         const { default: jsPDF } = await import('jspdf');
         const doc = new jsPDF();
+        const now = new Date();
 
         try {
             // 1. Obter Logo do PandaNet (System Settings)
@@ -108,48 +109,96 @@ const SystemUpdateNotification: React.FC = () => {
                 .eq('key', 'main_logo')
                 .maybeSingle();
 
-            const logoUrl = systemLogo?.value || '/logo.png';
+            let logoUrl = systemLogo?.value || '/logo.png';
+            if (logoUrl.startsWith('/')) {
+                logoUrl = window.location.origin + logoUrl;
+            }
 
-            // 2. Adicionar Logo
+            // 2. Adicionar Logo (se carregada com sucesso)
             try {
                 const { data: base64Logo, width, height } = await getBase64ImageFromURL(logoUrl);
-                const maxWidth = 30;
+                const maxWidth = 35;
                 const aspectRatio = height / width;
                 const finalHeight = maxWidth * aspectRatio;
-                doc.addImage(base64Logo, 'PNG', 14, 10, maxWidth, finalHeight, undefined, 'FAST');
+                doc.addImage(base64Logo, 'PNG', 20, 20, maxWidth, finalHeight, undefined, 'FAST');
             } catch (e) {
                 console.warn('Erro ao carregar logo para o PDF da nota:', e);
             }
 
             // 3. Cabeçalho da Nota de Atualização
-            doc.setFontSize(22);
-            doc.setTextColor(220, 38, 38); // Red-600
-            doc.text('Nota de Atualização PandaNet', 45, 22);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(20);
+            doc.setTextColor(16, 185, 129); // Emerald-500 brand color
+            doc.text('Nota de Atualização', 60, 28);
 
-            doc.setFontSize(16);
-            doc.setTextColor(31, 41, 55);
-            doc.text(`Versão: ${latestUpdate.version}`, 45, 32);
-
-            // Linha separadora
-            doc.setDrawColor(229, 231, 235);
-            doc.line(14, 40, 196, 40);
-
-            // 4. Conteúdo
-            doc.setFontSize(12);
-            doc.setTextColor(55, 65, 81);
             doc.setFont('helvetica', 'normal');
+            doc.setFontSize(13);
+            doc.setTextColor(31, 41, 55); // Slate-800
+            doc.text(`Versão: ${latestUpdate.version}`, 60, 36);
 
+            doc.setFontSize(9.5);
+            doc.setTextColor(107, 114, 128); // Slate-500
+            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`, 60, 43);
+
+            // Linha separadora do cabeçalho
+            doc.setDrawColor(229, 231, 235);
+            doc.setLineWidth(0.5);
+            doc.line(20, 52, 190, 52);
+
+            // 4. Conteúdo com quebra automática de página
             const cleanDescription = stripEmojis(latestUpdate.description);
             const splitDescription = doc.splitTextToSize(cleanDescription, 170);
-            doc.text(splitDescription, 14, 50);
 
-            // 5. Rodapé
-            doc.setFontSize(10);
-            doc.setTextColor(156, 163, 175);
-            const now = new Date();
-            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`, 14, 285);
-            doc.text('© PandaNet - Sistema de Gestão Inteligente', 130, 285);
+            // Calcular total de páginas
+            let linesLeft = splitDescription.length;
+            let totalPages = 1;
+            const linesOnFirstPage = 29;
+            const linesOnSubsequentPages = 36;
+            if (linesLeft > linesOnFirstPage) {
+                linesLeft -= linesOnFirstPage;
+                totalPages += Math.ceil(linesLeft / linesOnSubsequentPages);
+            }
 
+            const drawPageDecorations = (pageNum: number, total: number) => {
+                // Linha verde no topo (marca da empresa)
+                doc.setFillColor(16, 185, 129); // Emerald-500
+                doc.rect(20, 10, 170, 3, 'F');
+
+                // Linha do rodapé
+                doc.setDrawColor(229, 231, 235);
+                doc.line(20, 275, 190, 275);
+
+                // Textos do rodapé
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8.5);
+                doc.setTextColor(156, 163, 175);
+                doc.text('© PandaNet - Sistema de Gestão Inteligente', 20, 281);
+                doc.text(`Página ${pageNum} de ${total}`, 170, 281);
+            };
+
+            let currentY = 62;
+            let pageNumber = 1;
+            const lineSpacing = 6.5;
+
+            for (let i = 0; i < splitDescription.length; i++) {
+                if (currentY > 265) {
+                    drawPageDecorations(pageNumber, totalPages);
+                    doc.addPage();
+                    pageNumber++;
+                    currentY = 25; // Começa mais alto nas páginas seguintes
+                }
+
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                doc.setTextColor(55, 65, 81); // Slate-700
+                doc.text(splitDescription[i], 20, currentY);
+                currentY += lineSpacing;
+            }
+
+            // Decorar a última página
+            drawPageDecorations(pageNumber, totalPages);
+
+            // Salvar
             doc.save(`PandaNet_Nota_Atualizacao_${latestUpdate.version}.pdf`);
         } catch (err) {
             console.error('Erro ao gerar PDF da nota:', err);

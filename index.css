@@ -343,6 +343,36 @@
 
 /* --- MODO ESCURO CONTRASTE & LEGIBILIDADE POLISH --- */
 @layer base {
+  /* Inversão de fundos claros/cinzas para escuro */
+  .dark .bg-white,
+  .dark .bg-gray-50,
+  .dark .bg-slate-50,
+  .dark .bg-gray-100,
+  .dark .bg-slate-100 {
+    background-color: #0f172a !important;
+  }
+
+  .dark .bg-gray-200,
+  .dark .bg-slate-200,
+  .dark .bg-gray-300,
+  .dark .bg-slate-300 {
+    background-color: #1e293b !important;
+  }
+
+  /* Inversão de fontes escuras/pretas para cinza claro */
+  .dark .text-black,
+  .dark .text-brand-text,
+  .dark .text-slate-950,
+  .dark .text-slate-900,
+  .dark .text-slate-850,
+  .dark .text-slate-800,
+  .dark .text-slate-700,
+  .dark .text-gray-900,
+  .dark .text-gray-800,
+  .dark .text-gray-700 {
+    color: #cbd5e1 !important; /* Cinza claro */
+  }
+
   .dark .text-slate-500,
   .dark .text-gray-500,
   .dark .text-slate-400,
@@ -353,16 +383,10 @@
   .dark .text-slate-650,
   .dark .text-slate-600,
   .dark .text-gray-600 {
-    color: #f1f5f9 !important; /* Brilho slate-200 */
+    color: #e2e8f0 !important; /* Brilho slate-200 */
   }
 
-  .dark .text-slate-700,
-  .dark .text-gray-700,
-  .dark .text-slate-800,
-  .dark .text-gray-800 {
-    color: #ffffff !important; /* Branco puro */
-  }
-
+  /* Caixas de digitar no modo escuro: cinza escuro e fontes ao digitar brancas */
   .dark input,
   .dark select,
   .dark textarea {
@@ -376,13 +400,10 @@
     color: #94a3b8 !important;
   }
 
-  .dark .bg-gray-50,
-  .dark .bg-slate-50 {
-    background-color: #0f172a !important;
-  }
-
   .dark .border-gray-200,
-  .dark .border-slate-200 {
+  .dark .border-slate-200,
+  .dark .border-gray-100,
+  .dark .border-slate-100 {
     border-color: #1e293b !important;
   }
 

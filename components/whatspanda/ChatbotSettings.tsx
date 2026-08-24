@@ -1014,20 +1014,8 @@ const ChatbotSettings: React.FC = () => {
                         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                             {/* Node Editor (Col-8) */}
                             <div className="xl:col-span-8 space-y-6">
-                                {/* Toolbar: Templates + Save + Simulator */}
-                                <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Modelos:</span>
-                                        <button onClick={() => loadTemplate('support_sales')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200/50">
-                                            Suporte & Vendas
-                                        </button>
-                                        <button onClick={() => loadTemplate('clinic')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all border border-purple-200/50">
-                                            Clínica / Agenda
-                                        </button>
-                                        <button onClick={() => loadTemplate('restaurant')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all border border-emerald-200/50">
-                                            Restaurante / Delivery 🍔
-                                        </button>
-                                    </div>
+                                {/* Toolbar: Save + Simulator */}
+                                <div className="flex flex-wrap items-center justify-end gap-3 p-4 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
                                     <div className="flex items-center gap-2">
                                         {/* Dirty state indicator */}
                                         {dirtyNodeIds.size > 0 && !saveSuccess && (
@@ -1058,18 +1046,18 @@ const ChatbotSettings: React.FC = () => {
                                         <button
                                             onClick={handleExportFlow}
                                             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
-                                            title="Exportar fluxo para arquivo JSON"
+                                                title="Baixar fluxo para arquivo JSON"
                                         >
                                             <Download className="w-4 h-4" />
-                                            Exportar
+                                                Baixar Fluxo
                                         </button>
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
                                             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
-                                            title="Importar fluxo de arquivo JSON"
+                                                title="Fazer upload de fluxo de arquivo JSON"
                                         >
                                             <Upload className="w-4 h-4" />
-                                            Importar
+                                                Fazer Upload
                                         </button>
                                         <input
                                             type="file"
@@ -1451,3 +1439,4 @@ const ChatbotSettings: React.FC = () => {
 };
 
 export default ChatbotSettings;
+

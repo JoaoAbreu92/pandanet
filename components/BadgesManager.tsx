@@ -581,7 +581,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     recipient_name: recipient.name,
                     recipient_avatar: recipient.avatarUrl,
                     new_level: newLevelValue,
-                    message: `Subiu para o Nível ${newLevelValue} no RPG PandaNet! Parabéns pela jornada de evolução! 🛡️⚔️`
+                    message: `Subiu para o Nível ${newLevelValue}! Parabéns pela jornada de evolução! 🛡️⚔️`
                 };
 
                 await supabase
@@ -687,7 +687,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                         onClick={() => setActiveTab('gamification')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'gamification' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
-                        ⚙️ RPG & Metas
+                        ⚙️ Elos, RPG & Metas
                     </button>
                 </div>
             </div>

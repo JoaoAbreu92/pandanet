@@ -142,7 +142,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'bem-estar', label: 'Bem Estar', category: 'Social', featureId: 'wellness' },
 
         { id: 'users', label: 'Usuários', category: 'Recursos Humanos (RH)' },
-        { id: 'badges', label: 'Selos / Gamificação', category: 'Recursos Humanos (RH)' },
+        { id: 'badges', label: 'Selos, Elos & Gamificação', category: 'Recursos Humanos (RH)' },
         { id: 'departments', label: 'Departamentos', category: 'Recursos Humanos (RH)' },
         { id: 'teams', label: 'Equipes', category: 'Recursos Humanos (RH)' },
         { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Recursos Humanos (RH)' },

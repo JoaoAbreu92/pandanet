@@ -235,34 +235,7 @@ const GeneralTab: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Working Hours */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-blue-500" /> Horário de Atendimento
-                    </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Defina o período do seu expediente. Mensagens recebidas fora deste horário receberão a mensagem de ausência configurada ao lado.</p>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Início do Expediente</label>
-                            <input
-                                type="time"
-                                value={businessHoursStart}
-                                onChange={(e) => setBusinessHoursStart(e.target.value)}
-                                className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-bold text-center text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Fim do Expediente</label>
-                            <input
-                                type="time"
-                                value={businessHoursEnd}
-                                onChange={(e) => setBusinessHoursEnd(e.target.value)}
-                                className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-bold text-center text-sm"
-                            />
-                        </div>
-                    </div>
-                </div>
+
 
                 {/* Away Message */}
                 <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
