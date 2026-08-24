@@ -395,95 +395,112 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
-        // 1. Buscar TODOS os contatos da agenda para garantir que temos os nomes originais
         const contactMap = {};
-        try {
-            console.log(`[SYNC] Buscando contatos em: ${evoUrl}/contact/findAll/${instanceName}`);
-            const contactRes = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, {
-                method: 'GET',
-                headers: { 'apikey': evoKey }
-            });
-            if (contactRes.ok) {
-                const allContacts = await contactRes.json();
-                if (Array.isArray(allContacts)) {
-                    console.log(`[SYNC] ${allContacts.length} contatos encontrados na agenda.`);
-                    for (const c of allContacts) {
-                        const jid = c.id || c.jid || c.remoteJid;
-                        if (!jid) continue;
-                        const p = jid.split('@')[0];
-                        contactMap[p] = c.pushName || c.verifiedName || c.name;
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('[SYNC] Erro ao buscar contatos da agenda:', e.message);
-        }
 
-        // 2. Buscar Chats para registrar contatos ativos que não estão salvos na agenda
-        const chatEp = `${evoUrl}/chat/findChats/${instanceName}`;
-        console.log(`[SYNC] Buscando chats via: ${chatEp}`);
-        
-        const response = await fetch(chatEp, {
-            method: 'GET',
-            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
-        });
+        // 1. Buscar CONTATOS DA AGENDA - tenta múltiplos endpoints (v1 e v2)
+        const contactEndpoints = [
+            `${evoUrl}/contact/findContacts/${instanceName}`,
+            `${evoUrl}/contact/findAll/${instanceName}`,
+            `${evoUrl}/contacts/${instanceName}`
+        ];
+
+        for (const ep of contactEndpoints) {
+            try {
+                console.log(`[SYNC] Tentando endpoint de contatos: ${ep}`);
+                const res = await fetch(ep, { method: 'GET', headers: { 'apikey': evoKey } });
+                if (!res.ok) { console.log(`[SYNC] Endpoint ${ep} retornou ${res.status}. Tentando próximo...`); continue; }
+                
+                const raw = await res.json();
+                // A resposta pode ser um array direto ou estar aninhada em { contacts: [] } ou { data: [] }
+                const list = Array.isArray(raw) ? raw : (raw.contacts || raw.data || []);
+                
+                if (list.length > 0) {
+                    console.log(`[SYNC] ${list.length} contatos encontrados via ${ep}`);
+                    for (const c of list) {
+                        const jid = c.remoteJid || c.jid || c.id || '';
+                        if (!jid || jid.includes('@g.us')) continue;
+                        const phone = jid.split('@')[0];
+                        // Prioridade: pushName > verifiedName > name > formatado
+                        const name = c.pushName || c.verifiedName || c.name || c.notify || null;
+                        if (name) contactMap[phone] = name;
+                    }
+                    break; // Usou este endpoint com sucesso, sai do loop
+                }
+            } catch(e) {
+                console.error(`[SYNC] Erro no endpoint ${ep}:`, e.message);
+            }
+        }
+        console.log(`[SYNC] Total de nomes mapeados: ${Object.keys(contactMap).length}`);
+
+        // 2. Buscar Chats (para pegar contatos que tiveram mensagens mas não estão na agenda)
+        const chatEndpoints = [
+            `${evoUrl}/chat/findChats/${instanceName}`,
+            `${evoUrl}/chat/findAll/${instanceName}`
+        ];
 
         const contactsToUpsert = [];
         const processedJids = new Set();
-        
-        // Vamos sempre alimentar a lista de contatos baseada na agenda primeiro
+
+        // Primeiro, coloca todos os contatos da agenda mapeados
         for (const [phone, cName] of Object.entries(contactMap)) {
             processedJids.add(phone);
             contactsToUpsert.push({
                 company_id: companyId,
                 phone: phone,
-                name: cName || formatPhoneDisplay(phone),
+                name: cName,
                 updated_at: new Date().toISOString()
             });
         }
 
-        if (response.ok) {
-            const chats = await response.json();
-            if (Array.isArray(chats)) {
-                console.log(`[SYNC] ${chats.length} chats para mapear.`);
-                for (const chat of chats) {
-                    const jid = chat.id || chat.remoteJid || chat.jid;
-                    const isGroup = jid.includes('@g.us');
-                    const phone = isGroup ? jid : jid.split('@')[0];
+        for (const chatEp of chatEndpoints) {
+            try {
+                console.log(`[SYNC] Tentando endpoint de chats: ${chatEp}`);
+                const response = await fetch(chatEp, { method: 'GET', headers: { 'apikey': evoKey, 'Content-Type': 'application/json' } });
+                if (!response.ok) { console.log(`[SYNC] Chat endpoint ${chatEp} retornou ${response.status}.`); continue; }
 
-                    if (!jid || processedJids.has(phone)) continue;
-                    processedJids.add(phone);
+                const raw = await response.json();
+                const chats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
 
-                    // Tenta puxar o nome preferencialmente do PushName ou do Mapa
-                    const rawName = chat.pushName || chat.verifiedName || chat.name || contactMap[phone];
-                    const name = rawName ? rawName : formatPhoneDisplay(phone);
+                if (chats.length > 0) {
+                    console.log(`[SYNC] ${chats.length} chats encontrados.`);
+                    for (const chat of chats) {
+                        const jid = chat.id || chat.remoteJid || chat.jid || '';
+                        if (!jid || jid.includes('@g.us') || jid.includes('@broadcast')) continue;
+                        const phone = jid.split('@')[0];
+                        if (processedJids.has(phone)) continue;
+                        processedJids.add(phone);
 
-                    contactsToUpsert.push({
-                        company_id: companyId,
-                        phone: phone,
-                        name: name,
-                        updated_at: new Date().toISOString()
-                    });
+                        const rawName = chat.pushName || chat.verifiedName || chat.name || contactMap[phone];
+                        const name = rawName || formatPhoneDisplay(phone);
+                        contactsToUpsert.push({ company_id: companyId, phone, name, updated_at: new Date().toISOString() });
+                    }
+                    break;
                 }
+            } catch(e) {
+                console.error(`[SYNC] Erro em chat endpoint ${chatEp}:`, e.message);
             }
         }
 
-        // 3. Upsert de Contatos
+        // 3. Upsert de Contatos em lotes de 100
         if (contactsToUpsert.length > 0) {
             console.log(`[SYNC] Upsert de ${contactsToUpsert.length} contatos...`);
-            const { error: errC } = await supabase
-                .from('whatsapp_contacts')
-                .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
-            if (errC) console.error('[SYNC] Erro contatos:', errC.message);
+            const batchSize = 100;
+            for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
+                const batch = contactsToUpsert.slice(i, i + batchSize);
+                const { error: errC } = await supabase
+                    .from('whatsapp_contacts')
+                    .upsert(batch, { onConflict: 'company_id,phone' });
+                if (errC) console.error('[SYNC] Erro ao upsert contatos:', errC.message);
+            }
+            console.log(`[SYNC] Contatos sincronizados com sucesso!`);
+        } else {
+            console.log(`[SYNC] Nenhum contato encontrado para sincronizar.`);
         }
 
-        // A Sincronização NÃO irá mais criar conversas passadas na tela inteira.
-        // Apenas alimenta a agenda de contatos. Tickets nascem APENAS de novos atendimentos.
-        
-        console.log(`[SYNC] Concluído para ${instanceName}. Histórico limpo.`);
-        console.log(`[SYNC] Sincronização de ${instanceName} concluída.`);
+        // NÃO cria conversas durante sync - apenas alimenta a agenda.
+        console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
-        console.error(`[SYNC] Erro fatal em syncEvolutionData:`, err.message);
+        console.error(`[SYNC] Erro fatal:`, err.message);
     }
 }
 
@@ -793,55 +810,71 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     res.status(200).json({ received: true });
 
     const { companyId, connectionId } = req.params;
-    const { event, data, instance } = req.body;
+    const body = req.body;
 
-    console.log(`[WEBHOOK] Evento: ${event} | Instância: ${instance} | Empresa: ${companyId}`);
-    
-    // Log detalhado para MESSAGES_UPSERT ajuda a identificar se a Evolution está enviando o que esperamos
-    if (event === 'messages.upsert') {
-        console.log(`[WEBHOOK] Detalhes do Payload MESSAGES_UPSERT:`, JSON.stringify(data, null, 2));
-    } else {
-        console.log(`[WEBHOOK RAW] Payload:`, JSON.stringify(req.body, null, 2));
-    }
+    // A Evolution API pode enviar o evento em diferentes formatos de campo
+    const event = (body.event || body.type || body.status || '').toLowerCase();
+    const data = body.data || body;
+    const instance = body.instance || body.instanceName || connectionId;
 
-    if (!data) {
-        console.log(`[WEBHOOK] Recebido evento ${event} sem dados anexados.`);
+    console.log(`[WEBHOOK] ===== Evento recebido: "${event}" | Instância: ${instance} | Empresa: ${companyId} =====`);
+    console.log(`[WEBHOOK RAW]`, JSON.stringify(body, null, 2).substring(0, 1000)); // Limita para não sobrecarregar os logs
+
+    if (!event) {
+        console.log(`[WEBHOOK] Payload sem campo 'event'. Body keys: ${Object.keys(body).join(', ')}`);
         return;
     }
-    console.log(`[WEBHOOK] Processando ${event} para Empresa: ${companyId}`);
 
     // ----- QR CODE ATUALIZADO -----
-    if (event === 'qrcode.updated') {
-        const qrBase64 = data.qrcode?.base64 || data.base64; // Depende da versão da Evo
+    if (event === 'qrcode.updated' || event === 'qrcode_updated' || event === 'qr') {
+        const qrBase64 = data?.qrcode?.base64 || data?.base64 || data?.qr;
         if (qrBase64) {
             console.log(`[WEBHOOK] QR Code recebido, salvando no banco...`);
             await supabase.from('whatsapp_settings').update({ qr_code: qrBase64, is_connected: false }).eq('id', connectionId);
+        } else {
+            console.warn(`[WEBHOOK] Evento QR sem base64. Data:`, JSON.stringify(data));
         }
     }
 
     // ----- STATUS DE CONEXÃO -----
-    if (event === 'connection.update') {
-        const state = data.state || data.status; // 'connecting', 'open', 'close', 'refused'
-        console.log(`[WEBHOOK] Status de Conexão: ${state}`);
+    if (event === 'connection.update' || event === 'connection_update') {
+        const state = (data?.state || data?.status || '').toLowerCase();
+        console.log(`[WEBHOOK] Status de Conexão: "${state}"`);
 
         if (state === 'open' || state === 'connected') {
             await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null }).eq('id', connectionId);
-
             // Disparar sincronização em background
-            syncEvolutionData(instance, companyId, connectionId);
+            const instanceName = `conn_${connectionId}`;
+            syncEvolutionData(instanceName, companyId, connectionId);
         } else if (state === 'close' || state === 'disconnected' || state === 'refused') {
             await supabase.from('whatsapp_settings').update({ is_connected: false }).eq('id', connectionId);
-            // Em auth_failure, a evo exclui a sessão? Se sim, avisar.
         }
     }
 
     // ----- MENSAGEM RECEBIDA OU ENVIADA -----
-    // A Evolution API envia mensagens enviadas do celular do próprio cliente usando event 'messages.upsert' ou 'send.message'
-    if (event === 'messages.upsert' || event === 'send.message' || event === 'SEND_MESSAGE') {
-        const message = data.messages ? data.messages[0] : (data.message || data);
-        if (!message || (!message.key && !message.messageTimestamp)) return; // Ignora se vier payload vazio ou mal formatado
+    // Cobre event names de v1 e v2: messages.upsert, MESSAGES_UPSERT, messages_upsert, send.message, SEND_MESSAGE
+    const isMessageEvent = ['messages.upsert','messages_upsert','messages.update','send.message','send_message','message'].includes(event);
+    if (isMessageEvent) {
+        // O payload pode vir como { messages: [msg] } ou { message: msg } ou direto
+        let messages = [];
+        if (data?.messages && Array.isArray(data.messages)) {
+            messages = data.messages;
+        } else if (data?.message) {
+            messages = [data];
+        } else if (data?.key) {
+            messages = [data];
+        } else if (Array.isArray(data)) {
+            messages = data;
+        }
 
-        await processInboundMessage(message, companyId, connectionId);
+        console.log(`[WEBHOOK] ${messages.length} mensagem(ns) para processar.`);
+        for (const message of messages) {
+            if (!message || !message.key) {
+                console.log(`[WEBHOOK] Mensagem sem 'key', ignorando. Dados:`, JSON.stringify(message).substring(0, 200));
+                continue;
+            }
+            await processInboundMessage(message, companyId, connectionId);
+        }
     }
 });
 
