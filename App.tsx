@@ -46,6 +46,7 @@ import ManualPage from './components/ManualPage.tsx';
 import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
 import AIAssistant from './components/AIAssistant';
+import AICorrector from './components/AICorrector';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
 
@@ -774,6 +775,7 @@ const AppContent: React.FC = () => {
             >
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
+                <AICorrector currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
 
             </Layout>
         );
