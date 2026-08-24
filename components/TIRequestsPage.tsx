@@ -12,21 +12,23 @@ interface TIRequestsPageProps {
 
 const RequestModal: React.FC<{
     onClose: () => void;
+    selectableUsers: Array<{ id: string; full_name: string }>;
     onSubmit: (data: Omit<TIRequest, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt'>) => void;
-}> = ({ onClose, onSubmit }) => {
+}> = ({ onClose, selectableUsers, onSubmit }) => {
     const [requestType, setRequestType] = useState<TIRequestType>('Hardware');
     const [itemName, setItemName] = useState('');
     const [justification, setJustification] = useState('');
+    const [assignedUserId, setAssignedUserId] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!itemName.trim() || !justification.trim()) {
-            alert('Por favor, preencha todos os campos.');
+        if (!itemName.trim() || !justification.trim() || !assignedUserId) {
+            alert('Por favor, preencha todos os campos, incluindo o usuário responsável.');
             return;
         }
         setLoading(true);
-        await onSubmit({ requestType, itemName, justification });
+        await onSubmit({ requestType, itemName, justification, assignedUserId });
         setLoading(false);
     };
 
@@ -51,6 +53,20 @@ const RequestModal: React.FC<{
                         <label className="block text-sm font-medium text-brand-subtle-text">Justificativa</label>
                         <textarea value={justification} onChange={e => setJustification(e.target.value)} rows={4} required placeholder="Descreva por que você precisa deste item para o seu trabalho." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea>
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text">Usuário Responsável (TI / Admins)</label>
+                        <select
+                            value={assignedUserId}
+                            onChange={e => setAssignedUserId(e.target.value)}
+                            required
+                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                        >
+                            <option value="">Selecione um usuário</option>
+                            {selectableUsers.map(user => (
+                                <option key={user.id} value={user.id}>{user.full_name}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="flex justify-end space-x-3 pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
                         <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
@@ -68,6 +84,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
     const [isModalOpen, setModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'active' | 'finalized'>('active');
     const [loading, setLoading] = useState(true);
+    const [selectableUsers, setSelectableUsers] = useState<Array<{ id: string; full_name: string }>>([]);
 
     const fetchRequests = async () => {
         if (!currentUser?.company_id) return;
@@ -76,7 +93,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 .from('ti_requests')
                 .select(`
                     *,
-                    requester:requester_id(full_name, avatar_url)
+                    requester:requester_id(full_name, avatar_url),
+                    assigned:assigned_user_id(full_name, avatar_url)
                 `)
                 .eq('company_id', currentUser.company_id)
                 .order('created_at', { ascending: false });
@@ -92,6 +110,9 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                     requestType: d.request_type as TIRequestType,
                     itemName: d.item_name,
                     justification: d.justification,
+                    assignedUserId: d.assigned_user_id,
+                    assignedUserName: d.assigned?.full_name || 'Não atribuído',
+                    assignedUserAvatarUrl: d.assigned?.avatar_url,
                     status: d.status as TIRequestStatus,
                     submittedAt: d.created_at
                 }));
@@ -104,8 +125,42 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
         }
     };
 
+    const fetchSelectableUsers = async () => {
+        if (!currentUser?.company_id) return;
+        try {
+            // Primeiro, pegamos o ID do departamento de TI da empresa
+            const { data: deptData } = await supabase
+                .from('departments')
+                .select('id')
+                .eq('company_id', currentUser.company_id)
+                .ilike('name', 'TI')
+                .single();
+
+            const tiDeptId = deptData?.id;
+
+            // Agora buscamos usuários que são admins OU do departamento de TI
+            let query = supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('company_id', currentUser.company_id);
+
+            const filter = [`is_admin.eq.true`, `is_company_admin.eq.true`];
+            if (tiDeptId) {
+                filter.push(`department_id.eq.${tiDeptId}`);
+            }
+
+            const { data, error } = await query.or(filter.join(','));
+
+            if (error) throw error;
+            if (data) setSelectableUsers(data);
+        } catch (err) {
+            console.error('Error fetching selectable users:', err);
+        }
+    };
+
     useEffect(() => {
         fetchRequests();
+        fetchSelectableUsers();
     }, [currentUser?.id]);
 
     const handleNewRequest = async (data: Omit<TIRequest, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt'>) => {
@@ -118,6 +173,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                     request_type: data.requestType,
                     item_name: data.itemName,
                     justification: data.justification,
+                    assigned_user_id: data.assignedUserId,
                     status: 'Pendente'
                 }]);
 
@@ -225,22 +281,33 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                         ) : (
                             <table className="w-full text-sm text-left text-gray-500">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                                    <tr>
-                                        {isTIUser && <th scope="col" className="px-6 py-3">Solicitante</th>}
-                                        <th scope="col" className="px-6 py-3">Item</th>
-                                        <th scope="col" className="px-6 py-3">Tipo</th>
-                                        <th scope="col" className="px-6 py-3">Data de Envio</th>
-                                        <th scope="col" className="px-6 py-3">Status</th>
+                                        <tr>
+                                            {isTIUser && <th scope="col" className="px-6 py-3">Solicitante</th>}
+                                            <th scope="col" className="px-6 py-3">Item</th>
+                                            <th scope="col" className="px-6 py-3">Usuário</th>
+                                            <th scope="col" className="px-6 py-3">Tipo</th>
+                                            <th scope="col" className="px-6 py-3">Data de Envio</th>
+                                            <th scope="col" className="px-6 py-3">Status</th>
                                             {isTIUser && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
-                                    </tr>
-                                </thead>
-                                <tbody>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                         {filteredSubmissions.map(sub => (
-                                        <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
-                                            {isTIUser && <td className="px-6 py-4 font-medium text-gray-900">{sub.requesterName}</td>}
-                                            <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
-                                            <td className="px-6 py-4">{sub.requestType}</td>
-                                            <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
+                                            <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
+                                                {isTIUser && <td className="px-6 py-4 font-medium text-gray-900">{sub.requesterName}</td>}
+                                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center space-x-2">
+                                                        {sub.assignedUserAvatarUrl ? (
+                                                            <img src={sub.assignedUserAvatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500">?</div>
+                                                        )}
+                                                        <span>{sub.assignedUserName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">{sub.requestType}</td>
+                                                <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
                                             <td className="px-6 py-4">
                                                     {isTIUser && activeTab === 'active' ? (
                                                         <select
@@ -290,7 +357,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                     </div>
                 </Card>
             </div>
-            {isModalOpen && <RequestModal onClose={() => setModalOpen(false)} onSubmit={handleNewRequest} />}
+            {isModalOpen && <RequestModal onClose={() => setModalOpen(false)} selectableUsers={selectableUsers} onSubmit={handleNewRequest} />}
         </>
     );
 };

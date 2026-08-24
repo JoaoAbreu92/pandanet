@@ -381,6 +381,9 @@ export interface TIRequest {
   requestType: TIRequestType;
   itemName: string;
   justification: string;
+  assignedUserId?: string;
+  assignedUserName?: string;
+  assignedUserAvatarUrl?: string;
   status: TIRequestStatus;
   submittedAt: string; // YYYY-MM-DD
 }
