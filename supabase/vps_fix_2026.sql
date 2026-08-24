@@ -77,5 +77,30 @@ CREATE POLICY "Users can update conversations"
     company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
   );
 
+-- 7. Criar tabela whatsapp_contact_notes
+CREATE TABLE IF NOT EXISTS whatsapp_contact_notes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID,
+    conversation_id UUID NOT NULL REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
+    note_text TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- Ativar RLS na nova tabela
+ALTER TABLE whatsapp_contact_notes ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS para whatsapp_contact_notes
+DROP POLICY IF EXISTS "Users can manage contact notes" ON whatsapp_contact_notes;
+CREATE POLICY "Users can manage contact notes"
+  ON whatsapp_contact_notes
+  FOR ALL
+  USING (
+    company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
+  )
+  WITH CHECK (
+    company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
 -- Confirmação
 SELECT 'Atualização completa de tabelas, colunas e permissões RLS concluída com sucesso!' AS resultado;
