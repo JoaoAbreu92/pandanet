@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  whatsapp-backend:
+    container_name: pandanet_backend
+    build:
+      context: ./whatsapp-backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - COMPANY_ID=${COMPANY_ID:-1}
+      - PORT=3000
+    networks:
+      - pandanet_network
+      - supabase_default
+
+  pandanet-frontend:
+    container_name: pandanet_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - whatsapp-backend
+    networks:
+      - supabase_default
+      - pandanet_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  pandanet_network:
+    driver: bridge
+  supabase_default:
+    external: true
