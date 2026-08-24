@@ -58,9 +58,9 @@ O **PandaNet** é um software proprietário. O código-fonte presente neste repo
 
 Entre em contato para uma demonstração personalizada e orçamentos:
 
-📩 **Email:** [Seu Email Aqui]  
-💬 **WhatsApp:** [Seu Telefone/Link Aqui]  
-🔗 **LinkedIn:** [Seu Perfil Aqui]
+📩 **Email:** [ti@grupopixel.com.br]  
+💬 **WhatsApp:** []  
+🔗 **LinkedIn:** []
 
 ---
 
