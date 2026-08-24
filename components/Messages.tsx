@@ -429,7 +429,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const fetchConversations = async () => {
         if (!currentUser) return;
         try {
-            const isGhost = localStorage.getItem('pixel_is_impersonating') === 'true';
+            const isGhost = isGhostMode; // Usar a flag real do contexto
             let conversationIds: string[] = [];
 
             if (isGhost) {
@@ -488,18 +488,37 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                         return null; // Skip this conversation on error
                     }
 
+                    // Detecção de Conversas Corrompidas (Auto-limpeza)
+                    // Se não for grupo e tiver menos de 2 participantes reais (ou o outro sumiu), deletamos
+                    if (!conv.is_group && (!participants || participants.length < 2)) {
+                        console.warn(`[Cleanup] Conversa corrompida detectada (${conv.id}). Removendo...`);
+                        supabase.from('conversations').delete().eq('id', conv.id).then(({ error }) => {
+                            if (error) console.error("Erro ao limpar conversa corrompida:", error);
+                        });
+                        return null; // Não exibe na lista
+                    }
+
                     // Encontrar o "outro" usuário (ou todos se for Ghost)
                     const otherPart = participants?.find((p: any) => p.user_id !== currentUser.id) || participants?.[0];
                     const otherUser = otherPart ? (otherPart.profiles as any) : null;
 
+                    // Se o perfil do outro participante sumiu, também consideramos corrompida
+                    if (!conv.is_group && !otherUser) {
+                        console.warn(`[Cleanup] Conversa com perfil inexistente (${conv.id}). Removendo...`);
+                        supabase.from('conversations').delete().eq('id', conv.id).then(({ error }) => {
+                            if (error) console.error("Erro ao limpar conversa sem perfil:", error);
+                        });
+                        return null;
+                    }
+
                     // Se for ghost e não participo, mostro os nomes envolvidos
                     let displayName = '';
                     if (isGhost && !participants?.some(p => p.user_id === currentUser.id)) {
-                        displayName = participants?.map(p => (p.profiles as any)?.full_name).filter(Boolean).join(' & ') || 'Conversa Vazia';
+                        displayName = participants?.map(p => (p.profiles as any)?.full_name).filter(Boolean).join(' & ') || 'Conversa sem Nome';
                     } else {
                         displayName = conv.is_group
                             ? conv.group_name
-                            : (otherUser?.full_name || (otherPart ? 'Usuário Excluído' : 'Usuário Desconhecido'));
+                            : (otherUser?.full_name || 'Usuário Desconhecido');
                     }
 
                     const displayAvatar = conv.is_group
@@ -526,12 +545,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 }
             }));
 
-            // Filter out nulls and conversations with "Usuário Excluído" or "Usuário Desconhecido"
-            const filteredConversations = fullConversations.filter((c: any) =>
-                c !== null &&
-                c.participantName !== 'Usuário Excluído' &&
-                c.participantName !== 'Usuário Desconhecido'
-            );
+            // Filter out nulls
+            const filteredConversations = fullConversations.filter((c: any) => c !== null);
 
             console.log("Conversas filtradas e definidas no estado:", filteredConversations);
             setConversations(filteredConversations as Conversation[]);

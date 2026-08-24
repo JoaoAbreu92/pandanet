@@ -569,7 +569,17 @@ const AppContent: React.FC = () => {
                 'viewKnowledgeBase': 'kb',
                 'viewPolicies': 'policies',
                 'viewRecognition': 'wall',
-                'viewWhatsPanda': 'whatspanda'
+                'viewWhatsPanda': 'whatspanda',
+                'viewEmail': 'email',
+                'viewOnboarding': 'onboarding',
+                'viewJobs': 'jobs',
+                'viewTraining': 'training',
+                'viewSurveys': 'surveys',
+                'viewOrgChart': 'org-chart',
+                'viewMeuRH': 'meu-rh',
+                'viewDirectory': 'org-chart',
+                'viewInfoSec': 'infosec',
+                'viewKPIDashboard': 'kpis'
             };
 
             const featureId = featureMap[permission];
