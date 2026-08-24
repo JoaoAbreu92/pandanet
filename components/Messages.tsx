@@ -1020,21 +1020,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin';
-        if (!isAdmin) {
-            alert("Apenas administradores têm permissão para apagar conversas.");
+        const isMasterAdmin = (currentUser?.email === 'ti@grupopixel.com.br' || currentUser.id === MASTER_ADMIN_ID) && isGhostMode;
+        if (!isMasterAdmin) {
+            alert("Apenas o Administrador Master (em Modo Fantasma) tem permissão para apagar conversas permanentemente.");
             return;
         }
 
-        if (!window.confirm("Deseja apagar esta conversa da sua lista?")) return;
+        if (!window.confirm("ATENÇÃO: Deseja apagar esta conversa permanentemente DE TODO O BANCO DE DADOS? Ninguém mais terá acesso a ela.")) return;
 
         try {
-            // Force delete the participant connection, letting RLS or cascades handle it
+            // Force cascade deletion manually to avoid foreign key constraints failing if DB lacks cascade
+            await supabase.from('messages').delete().eq('conversation_id', convId);
+            await supabase.from('nudges').delete().eq('conversation_id', convId);
+            await supabase.from('conversation_participants').delete().eq('conversation_id', convId);
+
             const { error } = await supabase
-                .from('conversation_participants')
+                .from('conversations')
                 .delete()
-                .eq('conversation_id', convId)
-                .eq('user_id', currentUser.id);
+                .eq('id', convId);
 
             if (error) throw error;
 
@@ -1042,10 +1045,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
             // Remove locally instantly
             setConversations(prev => prev.filter(c => c.id !== convId));
+            alert("Conversa apagada de forma permanente.");
 
         } catch (err: any) {
             console.error("Erro deletar:", err);
-            alert("Erro ao apagar conversa: " + (err.message || "Você não tem permissão"));
+            alert("Erro ao apagar conversa: " + (err.message || "Você não tem permissão no banco de dados."));
         }
     };
 
@@ -1322,11 +1326,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                     <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin') && (
+                                                        {((currentUser.email === 'ti@grupopixel.com.br' || currentUser.id === MASTER_ADMIN_ID) && isGhostMode) && (
                                                             <button
                                                                 onClick={(e) => handleDeleteConversation(conv.id, e)}
                                                                 className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
-                                                                title="Apagar conversa"
+                                                                title="Apagar conversa permanentemente"
                                                             >
                                                                 <TrashIcon className="w-4 h-4" />
                                                             </button>
