@@ -1,3 +1,4 @@
+# .env e .env.* removidos da ignoração para garantir o build prod
 node_modules
 .git
 .gitignore
@@ -6,9 +7,6 @@ dist
 build
 docker-compose.yml
 Dockerfile
-.env
-.env.*
-!.env.production
 # Add other large/unnecessary files here
 *.log
 npm-debug.log*
