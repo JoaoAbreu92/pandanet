@@ -59,14 +59,21 @@ async function authMiddleware(req, res, next) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
+      console.error('[AUTH] Supabase error:', error?.message);
       if (!JWT_SECRET) return res.status(401).json({ error: 'Server misconfigured' });
-      const decodedUser = jwt.verify(token, JWT_SECRET);
-      req.user = { id: decodedUser.sub, email: decodedUser.email, role: decodedUser.role };
-      return next();
+      try {
+        const decodedUser = jwt.verify(token, JWT_SECRET);
+        req.user = { id: decodedUser.sub, email: decodedUser.email, role: decodedUser.role };
+        return next();
+      } catch (jwtErr) {
+        console.error('[AUTH] JWT verification failed:', jwtErr.message);
+        return res.status(401).json({ error: 'Invalid token (JWT)' });
+      }
     }
     req.user = user;
     next();
   } catch (error) {
+    console.error('[AUTH] Fatal error:', error.message);
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
