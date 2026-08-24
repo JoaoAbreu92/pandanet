@@ -675,8 +675,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
             <div className="pt-4">
                 {/* Tabs */}
-                <div className="border-b border-gray-200 mb-6">
-                    <nav className="-mb-px flex space-x-8">
+                <div className="border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar">
+                    <nav className="-mb-px flex space-x-8 min-w-max">
                         {isOwnProfile && (
                             <button
                                 onClick={() => setActiveTab('info')}

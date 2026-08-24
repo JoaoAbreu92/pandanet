@@ -438,18 +438,20 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
                             </button>
                         </div>
 
-                        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#11141d]">
-                            {['dados', 'kanban', 'etiqueta', 'anotacoes'].map(id => (
-                                <button
-                                    key={id}
-                                    onClick={() => setActiveTab(id as any)}
-                                    className={`flex-1 py-3 text-[10px] font-bold tracking-wider border-b-2 transition-all ${
-                                        activeTab === id ? 'border-emerald-500 text-emerald-600 dark:text-white' : 'border-transparent text-gray-400'
-                                    }`}
-                                >
-                                    {id.toUpperCase()}
-                                </button>
-                            ))}
+                        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#11141d] overflow-x-auto no-scrollbar">
+                            <div className="flex min-w-max w-full">
+                                {['dados', 'kanban', 'etiqueta', 'anotacoes'].map(id => (
+                                    <button
+                                        key={id}
+                                        onClick={() => setActiveTab(id as any)}
+                                        className={`flex-1 py-3 px-4 text-[10px] font-semibold tracking-wider border-b-2 transition-all whitespace-nowrap ${
+                                            activeTab === id ? 'border-emerald-500 text-emerald-600 dark:text-white' : 'border-transparent text-gray-400'
+                                        }`}
+                                    >
+                                        {id.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">

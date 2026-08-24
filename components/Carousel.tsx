@@ -95,27 +95,27 @@ const Carousel: React.FC = () => {
         setCurrentIndex(slideIndex);
     };
 
-    if (loading) return <div className="w-full h-[400px] bg-gray-100 rounded-2xl animate-pulse flex items-center justify-center text-gray-400">Carregando destaques...</div>;
+    if (loading) return <div className="w-full h-[200px] sm:h-[300px] md:h-[400px] bg-gray-100 rounded-2xl animate-pulse flex items-center justify-center text-gray-400">Carregando destaques...</div>;
     if (banners.length === 0) return null;
 
     return (
-        <div className="relative w-full h-[400px] group overflow-hidden rounded-2xl shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20">
+        <div className="relative w-full h-[200px] sm:h-[300px] md:h-[400px] group overflow-hidden rounded-2xl shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20">
             {/* Main Image Background */}
             <div
                 style={{ backgroundImage: `url(${banners[currentIndex].imageUrl})` }}
                 className="w-full h-full bg-center bg-cover duration-700 ease-in-out transform transition-transform"
             >
                 {/* Gradient Overlay for Text Readability */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex flex-col justify-center items-start text-left p-12 md:p-16">
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex flex-col justify-center items-start text-left p-6 sm:p-12 md:p-16">
                     <div className="max-w-2xl transform transition-all duration-700 translate-y-0 opacity-100 animate-fade-in-up">
-                        <h2 className="text-white text-4xl md:text-6xl font-extrabold drop-shadow-lg mb-4 md:mb-6 tracking-tight leading-tight">
+                        <h2 className="text-white text-lg sm:text-3xl md:text-5xl font-semibold drop-shadow-lg mb-2 sm:mb-4 md:mb-6 tracking-tight leading-tight">
                             {banners[currentIndex].title}
                         </h2>
-                        <p className="text-gray-100 text-xl md:text-2xl font-light drop-shadow-md mb-6 md:mb-8 leading-relaxed border-l-4 border-brand-primary pl-4">
+                        <p className="text-gray-100 text-xs sm:text-base md:text-xl font-light drop-shadow-md mb-3 sm:mb-6 md:mb-8 leading-relaxed border-l-4 border-brand-primary pl-4">
                             {banners[currentIndex].subtitle}
                         </p>
                         {banners[currentIndex].link && (
-                            <a href={banners[currentIndex].link} className="inline-block px-6 py-3 bg-brand-primary text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors shadow-lg">
+                            <a href={banners[currentIndex].link} className="inline-block px-3 py-1.5 sm:px-6 sm:py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors shadow-lg text-xs sm:text-base">
                                 Saiba Mais
                             </a>
                         )}

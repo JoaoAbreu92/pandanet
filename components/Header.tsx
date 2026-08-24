@@ -211,7 +211,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     <div className="hidden lg:flex items-center">
                         <button
                             onClick={testNotifications}
-                            className="flex items-center justify-center gap-1.5 h-8 px-3 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border-y border-l border-emerald-200"
+                            className="flex items-center justify-center gap-1.5 h-8 px-3 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-semibold border-y border-l border-emerald-200"
                             title="Ativar e Testar Notificações do Windows"
                         >
                             <PlayCircleIcon className="w-4 h-4" />
@@ -236,7 +236,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                             <button
                                                 key={sound.id}
                                                 onClick={() => changeSound(sound.id)}
-                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-bold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-semibold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
                                             >
                                                 <span>{sound.name}</span>
                                                 {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
@@ -297,8 +297,8 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                         {isDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[100] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 lg:hidden">
-                                    <p className="font-bold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{currentUser.role}</p>
+                                    <p className="font-semibold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">{currentUser.role}</p>
                                 </div>
                                 
                                 <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">

@@ -393,7 +393,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                                 const firstTabOfCat = allTabs.find(t => t.category === cat);
                                 if (firstTabOfCat) setActiveTab(firstTabOfCat.id);
                             }}
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${
                                 activeCategory === cat 
                                 ? 'bg-brand-primary text-white' 
                                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'

@@ -181,7 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                         </span>
                     )}
                 </div>
-                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${currentPage === page ? 'font-bold' : ''}`}>{label}</span>}
+                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${currentPage === page ? 'font-semibold' : ''}`}>{label}</span>}
 
                 {/* Visual indicator for active item */}
                 {currentPage === page && (
@@ -240,7 +240,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                                 </span>
                             )}
                         </div>
-                        {isOpen && <span className="ml-3.5 md:ml-4 truncate font-bold text-xs md:text-sm tracking-wide uppercase opacity-80">{label}</span>}
+                        {isOpen && <span className="ml-3.5 md:ml-4 truncate font-semibold text-xs md:text-sm tracking-wide uppercase opacity-80">{label}</span>}
                     </div>
                     {isOpen && <ChevronDownIcon className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
@@ -345,7 +345,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                             title="Painel SaaS"
                         >
                             <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
-                            {isOpen && <span className="ml-4 truncate font-bold">{t('sidebar.saas_panel')}</span>}
+                            {isOpen && <span className="ml-4 truncate font-semibold">{t('sidebar.saas_panel')}</span>}
                         </button>
                     </>
                 )}
@@ -357,7 +357,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 {companyLogo && (
                     <img src={companyLogo} alt={companyName} className="h-8 md:h-10 mx-auto object-contain" />
                 )}
-                <p className="text-xs md:text-sm font-bold text-gray-800 dark:text-gray-200 truncate mt-2">{companyName}</p>
+                <p className="text-xs md:text-sm font-semibold text-gray-800 dark:text-gray-200 truncate mt-2">{companyName}</p>
             </div>
         </aside>
     );

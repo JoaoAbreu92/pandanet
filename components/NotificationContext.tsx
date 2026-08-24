@@ -301,12 +301,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (currentUser?.id) {
             console.log('--- TESTE REALTIME: Iniciando para usuário:', currentUser.id);
             const channel = supabase
-                .channel(`notifications-global`) // Nome genérico
+                .channel(`user-notifications-${currentUser.id}`)
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${currentUser.id}`
+                    table: 'notifications'
                 }, (payload) => {
                     console.log('--- REALTIME EVENTO RECEBIDO ---', payload);
                     const newNotif = payload.new as any;
@@ -332,12 +331,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             // --- REALTIME: Internal Messages ---
             const messagesChannel = supabase
-                .channel('realtime-messages-count')
+                .channel(`user-messages-${currentUser.id}`)
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'messages',
-                    filter: `receiver_id=eq.${currentUser.id}`
+                    table: 'messages'
                 }, () => {
                     fetchNotifications();
                 })
@@ -349,12 +347,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             if (currentUser.company_id) {
                 whatsappChannel = supabase
-                    .channel('realtime-whatsapp-count')
+                    .channel(`company-whatsapp-count-${currentUser.company_id}`)
                     .on('postgres_changes', {
                         event: '*',
                         schema: 'public',
-                        table: 'whatsapp_conversations',
-                        filter: `company_id=eq.${currentUser.company_id}`
+                        table: 'whatsapp_conversations'
                     }, () => {
                         fetchNotifications();
                     })
@@ -362,12 +359,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
                 // Listen directly to incoming messages to trigger the global sound / Desktop Popup
                 whatsappMessagesChannel = supabase
-                    .channel('realtime-whatsapp-msgs-notify')
+                    .channel(`company-whatsapp-msgs-notify-${currentUser.company_id}`)
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
-                        table: 'whatsapp_messages',
-                        filter: `company_id=eq.${currentUser.company_id}`
+                        table: 'whatsapp_messages'
                     }, async (payload) => {
                         const newMsg = payload.new as any;
                         if (newMsg && newMsg.is_from_customer) {

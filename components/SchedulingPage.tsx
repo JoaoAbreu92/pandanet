@@ -979,52 +979,54 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             )}
 
             {/* Navigation Tabs */}
-            <div className="flex border-b border-slate-200 dark:border-slate-800">
-                <button
-                    onClick={() => setActiveTab('events')}
-                    className={`px-5 py-3 border-b-2 font-bold text-sm transition-all ${
-                        activeTab === 'events' 
-                            ? 'border-brand-primary text-brand-primary' 
-                            : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-                    }`}
-                >
-                    {mode === 'events' ? 'Nossos Espaços / Salas' : 'Suas Agendas'}
-                </button>
-                <button
-                    onClick={() => setActiveTab('bookings')}
-                    className={`px-5 py-3 border-b-2 font-bold text-sm transition-all relative ${
-                        activeTab === 'bookings' 
-                            ? 'border-brand-primary text-brand-primary' 
-                            : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Reservas Recebidas
-                    {bookings.filter(b => b.status === 'pending').length > 0 && (
-                        <span className="ml-2 bg-red-500 text-white rounded-full text-[10px] font-bold px-1.5 py-0.5">
-                            {bookings.filter(b => b.status === 'pending').length}
-                        </span>
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('templates')}
-                    className={`px-5 py-3 border-b-2 font-bold text-sm transition-all ${
-                        activeTab === 'templates' 
-                            ? 'border-brand-primary text-brand-primary' 
-                            : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Modelos de E-mail
-                </button>
-                <button
-                    onClick={() => setActiveTab('settings')}
-                    className={`px-5 py-3 border-b-2 font-bold text-sm transition-all ${
-                        activeTab === 'settings' 
-                            ? 'border-brand-primary text-brand-primary' 
-                            : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-                    }`}
-                >
-                    Configurações
-                </button>
+            <div className="border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
+                <div className="flex min-w-max">
+                    <button
+                        onClick={() => setActiveTab('events')}
+                        className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
+                            activeTab === 'events' 
+                                ? 'border-brand-primary text-brand-primary' 
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        {mode === 'events' ? 'Nossos Espaços / Salas' : 'Suas Agendas'}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('bookings')}
+                        className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all relative whitespace-nowrap ${
+                            activeTab === 'bookings' 
+                                ? 'border-brand-primary text-brand-primary' 
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        Reservas Recebidas
+                        {bookings.filter(b => b.status === 'pending').length > 0 && (
+                            <span className="ml-2 bg-red-500 text-white rounded-full text-[10px] font-bold px-1.5 py-0.5">
+                                {bookings.filter(b => b.status === 'pending').length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('templates')}
+                        className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
+                            activeTab === 'templates' 
+                                ? 'border-brand-primary text-brand-primary' 
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        Modelos de E-mail
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
+                            activeTab === 'settings' 
+                                ? 'border-brand-primary text-brand-primary' 
+                                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        Configurações
+                    </button>
+                </div>
             </div>
 
             {/* Content Tabs */}

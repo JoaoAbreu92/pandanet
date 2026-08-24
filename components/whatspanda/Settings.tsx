@@ -30,26 +30,28 @@ const Settings: React.FC = () => {
                 <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie etiquetas e chatbot do seu atendimento.</p>
             </div>
             
-            <div className="flex space-x-10 mb-10 px-4">
-                {[
-                    { id: 'tags', label: 'Etiquetas' },
-                    { id: 'chatbot', label: 'Chatbot' },
-                ].map((tab) => (
-                    <button 
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={`pb-4 px-2 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${
-                            activeTab === tab.id 
-                            ? 'text-emerald-500'
-                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
-                        }`}
-                    >
-                        {tab.label}
-                        {activeTab === tab.id && (
-                            <span className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-in slide-in-from-bottom-1 duration-300"></span>
-                        )}
-                    </button>
-                ))}
+            <div className="flex space-x-10 mb-10 px-4 overflow-x-auto no-scrollbar">
+                <div className="flex min-w-max">
+                    {[
+                        { id: 'tags', label: 'Etiquetas' },
+                        { id: 'chatbot', label: 'Chatbot' },
+                    ].map((tab) => (
+                        <button 
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`pb-4 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
+                                activeTab === tab.id 
+                                ? 'text-emerald-500'
+                                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {tab.label}
+                            {activeTab === tab.id && (
+                                <span className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-in slide-in-from-bottom-1 duration-300"></span>
+                            )}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">

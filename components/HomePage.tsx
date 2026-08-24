@@ -191,20 +191,18 @@ const MasterBanner: React.FC = () => {
                         <video
                             src={bannerData!.videoUrl}
                             autoPlay muted loop playsInline
-                            className="w-full object-cover"
-                            style={{ minHeight: '415px', maxHeight: '515px' }}
+                            className="w-full object-cover h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
                         />
                     ) : bannerData!.link ? (
                         <a href={bannerData!.link} target="_blank" rel="noopener noreferrer" className="block">
                             <img
                                 src={bannerData!.imageUrl}
                                 alt="Banner Master"
-                                className="w-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
-                                style={{ minHeight: '415px', maxHeight: '515px' }}
+                                className="w-full object-cover transition-transform duration-700 group-hover:scale-[1.02] h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
                             />
                             {bannerData!.buttonText && (
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-                                    <span className="px-8 py-3 bg-white/95 backdrop-blur text-gray-900 font-bold rounded-full shadow-2xl text-base hover:bg-white transition-all transform group-hover:scale-105">
+                                <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2">
+                                    <span className="px-4 py-2 sm:px-8 sm:py-3 bg-white/95 backdrop-blur text-gray-900 font-semibold rounded-full shadow-2xl text-xs sm:text-base hover:bg-white transition-all transform group-hover:scale-105">
                                         {bannerData!.buttonText}
                                     </span>
                                 </div>
@@ -214,8 +212,7 @@ const MasterBanner: React.FC = () => {
                         <img
                             src={bannerData!.imageUrl}
                             alt="Banner Master"
-                            className="w-full object-cover"
-                            style={{ minHeight: '415px', maxHeight: '515px' }}
+                            className="w-full object-cover h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
                         />
                     )}
 
