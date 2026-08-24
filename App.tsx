@@ -48,6 +48,7 @@ const AppContent: React.FC = () => {
     // Initialize currentUser as null, waiting for AuthContext
     const [currentUser, setCurrentUser] = useState<Employee | null>(null);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
+    const [companyLoading, setCompanyLoading] = useState(false);
 
     const [theme, setTheme] = useState<'light'>('light');
 
@@ -83,44 +84,52 @@ const AppContent: React.FC = () => {
         const loadInitialData = async () => {
             if (profile) {
                 setCurrentUser(profile);
+                setCompanyLoading(true);
 
-                if (profile.company_id) {
-                    const { data: company, error } = await supabase
-                        .from('companies')
-                        .select('*, plan:plans(*)')
-                        .eq('id', profile.company_id)
-                        .single();
+                try {
+                    if (profile.company_id) {
+                        const { data: company, error } = await supabase
+                            .from('companies')
+                            .select('*, plan:plans(*)')
+                            .eq('id', profile.company_id)
+                            .single();
 
-                    if (!error && company) {
-                        const mappedCompany = company as unknown as Company;
-                        setCurrentCompany(mappedCompany);
-                        setCompanyData(mappedCompany.data || {
-                            employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
-                            formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
-                            events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
-                        });
-                        setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
+                        if (!error && company) {
+                            const mappedCompany = company as unknown as Company;
+                            setCurrentCompany(mappedCompany);
+                            setCompanyData(mappedCompany.data || {
+                                employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
+                                formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
+                                events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                            });
+                            setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
+                        }
+                    } else if (profile.email === 'ti@acrilight.com.br') {
+                        // Fallback for Master Admin if profile is not linked yet
+                        const { data: company } = await supabase
+                            .from('companies')
+                            .select('*, plan:plans(*)')
+                            .eq('domain', 'grupopixel.com.br')
+                            .single();
+
+                        if (company) {
+                            const mappedCompany = company as unknown as Company;
+                            setCurrentCompany(mappedCompany);
+                            setCompanyData(mappedCompany.data || { employees: [] } as any);
+                            setCompanySettings(mappedCompany.settings || { companyName: 'Grupo Pixel' });
+                        }
                     }
-                } else if (profile.email === 'ti@acrilight.com.br') {
-                    // Fallback for Master Admin if profile is not linked yet
-                    const { data: company } = await supabase
-                        .from('companies')
-                        .select('*, plan:plans(*)')
-                        .eq('domain', 'grupopixel.com.br')
-                        .single();
-
-                    if (company) {
-                        const mappedCompany = company as unknown as Company;
-                        setCurrentCompany(mappedCompany);
-                        setCompanyData(mappedCompany.data || { employees: [] } as any);
-                        setCompanySettings(mappedCompany.settings || { companyName: 'Grupo Pixel' });
-                    }
+                } catch (err) {
+                    console.error("Error loading initial data:", err);
+                } finally {
+                    setCompanyLoading(false);
                 }
             } else {
                 setCurrentUser(null);
                 setCurrentCompany(null);
                 setCompanyData(null);
                 setCompanySettings(null);
+                setCompanyLoading(false);
             }
         };
         loadInitialData();
@@ -395,8 +404,13 @@ const AppContent: React.FC = () => {
         }
     };
 
-    if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div></div>;
+    if (loading || companyLoading) {
+        return <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+                <p className="text-gray-600 font-medium">Iniciando Pixel Intranet...</p>
+            </div>
+        </div>;
     }
 
     if (!session) {
