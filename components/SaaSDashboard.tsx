@@ -841,7 +841,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Crescimento de Empresas</h3>
                                 <div className="h-64 w-full">
-                                    <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                                    <ResponsiveContainer width="100%" height={250}>
                                         <AreaChart data={growthData}>
                                             <defs>
                                                 <linearGradient id="colorEmpresas" x1="0" y1="0" x2="0" y2="1">
@@ -863,7 +863,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Distribuição de Planos</h3>
                                 <div className="h-64 w-full flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                                    <ResponsiveContainer width="100%" height={250}>
                                         <PieChart>
                                             <Pie
                                                 data={planDistribution}
