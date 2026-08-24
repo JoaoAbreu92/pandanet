@@ -183,10 +183,10 @@ const MasterBanner: React.FC = () => {
     if (!hasContent && !canEdit) return null;
 
     return (
-        <div className="w-full flex flex-col items-center gap-4">
+        <div className="w-full flex flex-col items-center gap-4 overflow-hidden">
             {/* Banner exibido */}
             {hasContent && (
-                <div className="w-full max-w-[1280px] mx-auto relative group overflow-hidden rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="w-full relative group overflow-hidden rounded-none md:rounded-[2.5rem] shadow-2xl border-y md:border border-gray-100/50 dark:border-gray-800/50 animate-in fade-in slide-in-from-bottom-6 duration-1000">
                     {bannerData!.videoUrl ? (
                         <video
                             src={bannerData!.videoUrl}
@@ -235,9 +235,9 @@ const MasterBanner: React.FC = () => {
             {!hasContent && canEdit && (
                 <button
                     onClick={() => setIsEditing(true)}
-                    className="w-full max-w-[1280px] mx-auto h-24 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-3xl text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all text-base font-medium bg-gray-50/50 dark:bg-gray-800/50"
+                    className="w-full h-32 flex items-center justify-center gap-3 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-[2.5rem] text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all text-lg font-medium bg-gray-50/30 dark:bg-gray-800/30 hover:bg-white dark:hover:bg-gray-800 group"
                 >
-                    <span className="text-2xl">🖼️</span>
+                    <span className="text-3xl group-hover:scale-125 transition-transform">🖼️</span>
                     Adicionar Banner Global (Masteradmin)
                 </button>
             )}
