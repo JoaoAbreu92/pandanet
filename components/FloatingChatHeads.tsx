@@ -239,7 +239,8 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
                 .from('conversations')
                 .update({
                     last_message: textToSend,
-                    last_message_at: new Date().toISOString()
+                    last_message_at: new Date().toISOString(),
+                    is_closed: false
                 })
                 .eq('id', expandedChatHeadId);
 

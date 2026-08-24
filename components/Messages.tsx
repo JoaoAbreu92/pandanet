@@ -1076,10 +1076,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
 
                 if (error) throw error;
 
-                // Atualiza última mensagem da conversa
+                // Atualiza última mensagem da conversa e reabre se fechada
                 await supabase.from('conversations').update({
                     last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
-                    last_message_at: new Date().toISOString()
+                    last_message_at: new Date().toISOString(),
+                    is_closed: false
                 }).eq('id', selectedConversationId);
 
                 setNewMessageText('');
