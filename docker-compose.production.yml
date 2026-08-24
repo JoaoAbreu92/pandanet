@@ -6,6 +6,7 @@ services:
   # ============================================
   whatsapp-backend:
     container_name: pandanet_backend
+    image: pandanet-whatsapp-backend:latest
     build: 
       context: ./whatsapp-backend
       dockerfile: Dockerfile
@@ -39,6 +40,7 @@ services:
   # ============================================
   email-server:
     container_name: pandanet_email
+    image: pandanet-email-server:latest
     build:
       context: ./server
       dockerfile: Dockerfile
@@ -66,6 +68,7 @@ services:
   # ============================================
   pandanet-frontend:
     container_name: pandanet_frontend
+    image: pandanet-frontend:latest
     build:
       context: .
       dockerfile: Dockerfile
