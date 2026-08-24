@@ -1,9 +1,5 @@
 # 🐼 PandaNet — Intranet Corporativa Inteligente
 
-<div align="center">
-  <img alt="PandaNet Banner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 ---
 
 ## 🚀 Sobre o Projeto
@@ -47,52 +43,27 @@ Uma solução robusta para atendimento centralizado:
 | Camada | Tecnologia |
 | :--- | :--- |
 | **Frontend** | React 18 + TypeScript |
-| **Build Tool** | Vite |
 | **Styling** | Vanilla CSS (Modern Design System) |
 | **Backend/DB** | Supabase (PostgreSQL, Auth, Storage, Edge Functions) |
 | **WhatsApp Engine** | Node.js + @whiskeysockets/baileys |
 | **Infraestrutura** | Docker & Docker Compose |
-| **Gerenciamento** | Portainer |
 
 ---
 
-## 🛠️ Instalação Local
+## 💼 Licenciamento e Aquisição
 
-1. **Clonar o Repositório:**
-   ```bash
-   git clone https://github.com/SeuUsuario/pandanet.git
-   cd pandanet
-   ```
+O **PandaNet** é um software proprietário. O código-fonte presente neste repositório é para fins de demonstração técnica e portfólio. Não é permitida a cópia, distribuição ou uso comercial sem a devida autorização e aquisição de licença.
 
-2. **Instalar Dependências:**
-   ```bash
-   npm install
-   ```
+**Interessado em implementar o PandaNet na sua empresa ou adquirir o sistema?**
 
-3. **Configurar Variáveis:**
-   Crie um `.env.local` com suas chaves do Supabase:
-   ```env
-   VITE_SUPABASE_URL=seu_url
-   VITE_SUPABASE_ANON_KEY=sua_key
-   ```
+Entre em contato para uma demonstração personalizada e orçamentos:
 
-4. **Executar:**
-   ```bash
-   npm run dev
-   ```
-
----
-
-## 🐳 Deploy via Docker
-
-O projeto está pronto para rodar em produção via Docker Compose:
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
+📩 **Email:** [Seu Email Aqui]  
+💬 **WhatsApp:** [Seu Telefone/Link Aqui]  
+🔗 **LinkedIn:** [Seu Perfil Aqui]
 
 ---
 
 <div align="center">
-  <p>Desenvolvido com ❤️ para a excelência organizacional.</p>
+  <p>PandaNet — Levando a comunicação da sua empresa para o próximo nível.</p>
 </div>
