@@ -30,7 +30,7 @@ done
 
 # 5. Aplicar correções de banco de dados (RPCs, agent_id, etc.)
 echo "🗄️ Aplicando correções de banco de dados na VPS..."
-docker exec -i supabase-db psql -U postgres -d postgres < supabase/vps_fix_2026.sql
+docker exec -i supabase-db psql -U supabase_admin -d postgres < supabase/vps_fix_2026.sql
 if [ $? -eq 0 ]; then
     echo "✅ Correções de banco aplicadas com sucesso!"
 else

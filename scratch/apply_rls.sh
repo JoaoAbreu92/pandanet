@@ -35,7 +35,7 @@ echo "Caminho do psql no container: $PSQL_PATH"
 
 # 3. Executar o SQL do arquivo vps_fix_2026.sql diretamente (evita erros de escape e bash parser)
 echo "Executando SQL a partir de supabase/vps_fix_2026.sql..."
-docker exec -i $CONTAINER_ID $PSQL_PATH -U postgres -d postgres < supabase/vps_fix_2026.sql
+docker exec -i $CONTAINER_ID $PSQL_PATH -U supabase_admin -d postgres < supabase/vps_fix_2026.sql
 
 if [ $? -eq 0 ]; then
     echo "=== CONCLUÍDO COM SUCESSO ==="
