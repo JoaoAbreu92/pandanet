@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import { PencilIcon, XCircleIcon } from './icons';
+import { supabase } from '../supabaseClient';
 // FIX: Correcting the import path for types.
 import type { CompanySettings } from '../types';
 
@@ -23,12 +24,12 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                 const filePath = `branding/${fileName}`;
 
                 const { data, error } = await supabase.storage
-                    .from('company-branding')
+                    .from('chat-media')
                     .upload(filePath, newFile);
 
                 if (error) throw error;
 
-                const { data: { publicUrl } } = supabase.storage.from('company-branding').getPublicUrl(filePath);
+                const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
                 finalSettings.logoUrl = publicUrl;
                 delete (finalSettings as any)._newLogoFile;
             } catch (err: any) {
