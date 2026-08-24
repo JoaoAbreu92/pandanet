@@ -204,9 +204,18 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
             const parsed = await simpleParser(message.source);
 
+            const attachments = (parsed.attachments || []).map((att, index) => ({
+                id: index,
+                filename: att.filename || 'Sem nome',
+                contentType: att.contentType,
+                size: att.size,
+                partId: index // We'll use the index for simplicity in this pooled client setup
+            }));
+
             return res.json({
                 text: parsed.text,
-                html: parsed.html || parsed.textAsHtml // Fallback if no HTML part
+                html: parsed.html || parsed.textAsHtml,
+                attachments
             });
         } finally {
             lock.release();
@@ -252,19 +261,49 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
     const fromMailboxPath = fromPath || 'INBOX';
     if (!config || !uids || !toPath) return res.status(400).json({ error: 'Missing parameters' });
 
-    console.log(`[email-server] MOVE: UIDs ${uids.join(',')} from ${fromMailboxPath} to ${toPath}`);
+    const uidsNum = Array.isArray(uids) ? uids.map(Number) : [Number(uids)];
+    console.log(`[email-server] MOVE: UIDs ${uidsNum.join(',')} from ${fromMailboxPath} to ${toPath}`);
 
     try {
         const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(fromMailboxPath);
         try {
-            await client.messageMove(uids, toPath, { uid: true });
+            await client.messageMove(uidsNum, toPath, { uid: true });
             return res.json({ success: true });
         } finally {
             lock.release();
         }
     } catch (err) {
         console.error('[email-server] Move Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- ATTACHMENT DOWNLOAD ---
+app.post('/api/email/attachment', authMiddleware, async (req, res) => {
+    const { config, uid, path, attachmentId } = req.body;
+    if (!config || !uid || !attachmentId === undefined) return res.status(400).json({ error: 'Missing parameters' });
+
+    try {
+        const client = await getPooledClient(config);
+        const lock = await client.getMailboxLock(path || 'INBOX');
+        try {
+            const message = await client.fetchOne(Number(uid), { source: true }, { uid: true });
+            if (!message) return res.status(404).json({ error: 'Email not found' });
+
+            const parsed = await simpleParser(message.source);
+            const attachment = parsed.attachments[attachmentId];
+
+            if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+
+            res.setHeader('Content-Type', attachment.contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`);
+            return res.send(attachment.content);
+        } finally {
+            lock.release();
+        }
+    } catch (err) {
+        console.error('[email-server] Attachment Error:', err.message);
         return res.status(500).json({ error: err.message });
     }
 });

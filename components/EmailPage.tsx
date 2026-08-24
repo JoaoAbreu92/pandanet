@@ -51,6 +51,7 @@ interface EmailMessage {
     text?: string;
     flags: string[];
     metadata?: EmailMetadata; // Expanded locally
+    attachments?: Array<{ id: number; filename: string; contentType: string; size: number }>;
 }
 
 interface EmailMetadata {
@@ -249,7 +250,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             if (data.error) throw new Error(data.error);
 
             // Update local emails list with the body
-            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html } : e));
+            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments } : e));
 
             // Mark as seen locally if needed
             setEmails(prev => prev.map(e => {
@@ -267,8 +268,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 return {
                     ...prev,
                     text: data.text,
-                    html: data.html,
-                    flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen']
+                    html: data.html, 
+                    attachments: data.attachments,
+                    flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen'] 
                 };
             });
 
@@ -281,8 +283,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     return {
                         ...e,
                         text: data.text,
-                        html: data.html,
-                        flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen']
+                        html: data.html, 
+                        attachments: data.attachments,
+                        flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen'] 
                     };
                 });
             }
@@ -297,6 +300,41 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             console.error("Fetch Body Error:", err);
         } finally {
             setLoadingBody(false);
+        }
+    };
+
+    const downloadAttachment = async (email: EmailMessage, attachmentId: number, filename: string) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            const response = await fetch(`${EMAIL_SERVER_URL}/attachment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    config: settings,
+                    uid: email.uid,
+                    path: currentFolder,
+                    attachmentId
+                })
+            });
+
+            if (!response.ok) throw new Error('Falha ao baixar anexo');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err: any) {
+            alert('Erro ao baixar: ' + err.message);
         }
     };
     const toggleFlag = async (email: EmailMessage, flag: string, add: boolean) => {
@@ -314,7 +352,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         }
 
         // Update unseen count badge immediately when marking as read/unread
-        if (flag === '\\Seen' && currentFolder === 'INBOX') {
+        if (flag === '\\Seen') {
             const wasUnread = !(email.flags || []).includes('\\Seen');
             if (add && wasUnread) setUnseenCount(prev => Math.max(0, prev - 1));
             else if (!add && !wasUnread) setUnseenCount(prev => prev + 1);
@@ -458,7 +496,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         const { error } = await callEmailServer('move', {
             config: settings,
             uids: [email.uid],
-            path: trashPath
+            fromPath: currentFolder,
+            toPath: trashPath
         });
 
         if (error) {
@@ -533,10 +572,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
 
-    // Refresh when page changes
+    // Refresh when page or folder changes
     useEffect(() => {
         if (savedImapUser) fetchEmails();
-    }, [page, pageSize]);
+    }, [page, pageSize, currentFolder]);
 
     const sendEmail = async () => {
         setLoading(true);
@@ -1008,12 +1047,45 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     <span className="ml-2 text-gray-400">Carregando conteúdo...</span>
                                 </div>
                             ) : (
-                                <div
-                                    className="prose max-w-none text-gray-800"
-                                    dangerouslySetInnerHTML={{
+                                    <>
+                                        <div
+                                            className="prose max-w-none text-gray-800"
+                                            dangerouslySetInnerHTML={{
                                             __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || '<div class="text-gray-400 italic">Sem conteúdo disponível ou falha ao carregar.</div>')
                                         }}
                                     />
+
+                                        {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                            <div className="mt-8 border-t pt-6">
+                                                <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                                    <FolderIcon className="w-4 h-4" />
+                                                    Anexos ({selectedEmail.attachments.length})
+                                                </h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                    {selectedEmail.attachments.map(att => (
+                                                        <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-brand-primary transition-colors group">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-8 h-8 bg-white rounded flex items-center justify-center border text-gray-400">
+                                                                    <PaperAirplaneIcon className="w-4 h-4 rotate-90" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-medium text-gray-700 truncate">{att.filename}</p>
+                                                                    <p className="text-[10px] text-gray-400">{(att.size / 1024).toFixed(1)} KB</p>
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); downloadAttachment(selectedEmail, att.id, att.filename); }}
+                                                                className="p-2 text-gray-400 hover:text-brand-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                title="Baixar"
+                                                            >
+                                                                <ArrowPathIcon className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
                             )}
                         </div>
                     </div>
