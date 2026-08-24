@@ -110,9 +110,18 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [updateDuration, setUpdateDuration] = useState(15);
     const [updateDurationUnit, setUpdateDurationUnit] = useState<'hours' | 'days'>('hours');
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isSavingUser, setIsSavingUser] = useState(false);
     const [isAddingUser, setIsAddingUser] = useState(false);
     const [newUserForm, setNewUserForm] = useState({ name: '', email: '', password: '' });
-    const [isSavingUser, setIsSavingUser] = useState(false);
+
+    // NEW: Manual Settings State
+    const [manualLinks, setManualLinks] = useState<any[]>([]);
+    const [manualPromo, setManualPromo] = useState<any>({
+        title: 'O que falta para você ser nosso próximo caso de sucesso?',
+        description: 'Nossa equipe está pronta para te ajudar a extrair o máximo do sistema. Converse com seu analista para descobrir novos caminhos de eficiência.',
+        tag: 'Destaque',
+        image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop'
+    });
 
     // --- Buscar Dados ---
     const fetchData = async () => {
@@ -146,7 +155,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             const { data: updatesData } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
             if (updatesData) setSystemUpdates(updatesData);
 
-            // Fetch System Settings (Logo & Duration)
+            // Fetch System Settings (Logo & Duration & Manual Settings)
             const { data: settingsData } = await supabase
                 .from('system_settings')
                 .select('key, value');
@@ -160,6 +169,20 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                 const unit = settingsData.find(s => s.key === 'update_notification_unit')?.value;
                 if (unit) setUpdateDurationUnit(unit as any || 'hours');
+
+                const links = settingsData.find(s => s.key === 'manual_links')?.value;
+                if (links) {
+                    try { setManualLinks(JSON.parse(links)); } catch (e) { }
+                } else {
+                    setManualLinks([
+                        { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' }
+                    ]);
+                }
+
+                const promo = settingsData.find(s => s.key === 'manual_promo')?.value;
+                if (promo) {
+                    try { setManualPromo(JSON.parse(promo)); } catch (e) { }
+                }
             }
 
             // NEW: Fetch WhatsApp Status
@@ -199,7 +222,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         try {
             const updates: any[] = [
                 { key: 'update_notification_duration', value: updateDuration.toString() },
-                { key: 'update_notification_unit', value: updateDurationUnit }
+                { key: 'update_notification_unit', value: updateDurationUnit },
+                { key: 'manual_links', value: JSON.stringify(manualLinks) },
+                { key: 'manual_promo', value: JSON.stringify(manualPromo) }
             ];
 
             // If a new logo file was selected, upload it first
@@ -1313,6 +1338,84 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             </div>
                                         ))
                                     )}
+                                </div>
+                            </div>
+
+                            {/* MANUAL PAGE CONFIGURATION */}
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 xl:col-span-3">
+                                <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-6">Configurações da Central de Ajuda (Manual)</h3>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    {/* Promo Section */}
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-gray-600 dark:text-gray-300 border-b pb-2">Banner Promocional (Rodapé)</h4>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
+                                            <input type="text" value={manualPromo.title} onChange={(e) => setManualPromo({ ...manualPromo, title: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                                            <textarea value={manualPromo.description} onChange={(e) => setManualPromo({ ...manualPromo, description: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none h-20"></textarea>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tag (Ex: Destaque)</label>
+                                                <input type="text" value={manualPromo.tag} onChange={(e) => setManualPromo({ ...manualPromo, tag: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL Imagem</label>
+                                                <input type="text" value={manualPromo.image} onChange={(e) => setManualPromo({ ...manualPromo, image: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Links Section */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center border-b pb-2">
+                                            <h4 className="font-bold text-gray-600 dark:text-gray-300">Links Importantes</h4>
+                                            <button
+                                                onClick={() => setManualLinks([...manualLinks, { id: Date.now().toString(), title: 'Novo Link', description: '', icon: 'BookOpenIcon', type: 'info' }])}
+                                                className="text-xs font-bold text-emerald-600 flex items-center gap-1"
+                                            >
+                                                <PlusIcon className="w-4 h-4" /> Add Link
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {manualLinks.map((link, idx) => (
+                                                <div key={link.id || idx} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 relative group">
+                                                    <button
+                                                        onClick={() => setManualLinks(manualLinks.filter((_, i) => i !== idx))}
+                                                        className="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <XMarkIcon className="w-4 h-4" />
+                                                    </button>
+                                                    <input type="text" value={link.title} onChange={(e) => {
+                                                        const newLinks = [...manualLinks];
+                                                        newLinks[idx].title = e.target.value;
+                                                        setManualLinks(newLinks);
+                                                    }} className="w-full p-1 mb-2 border-b bg-transparent text-sm font-bold outline-none" placeholder="Título" />
+                                                    <input type="text" value={link.description} onChange={(e) => {
+                                                        const newLinks = [...manualLinks];
+                                                        newLinks[idx].description = e.target.value;
+                                                        setManualLinks(newLinks);
+                                                    }} className="w-full p-1 mb-2 border-b bg-transparent text-xs outline-none" placeholder="Descrição" />
+                                                    <select value={link.icon} onChange={(e) => {
+                                                        const newLinks = [...manualLinks];
+                                                        newLinks[idx].icon = e.target.value;
+                                                        setManualLinks(newLinks);
+                                                    }} className="w-full p-1 bg-transparent text-xs text-gray-500 outline-none">
+                                                        <option value="RocketLaunchIcon">Foguete</option>
+                                                        <option value="AcademicCapIcon">Capelo (Academia)</option>
+                                                        <option value="StarIcon">Estrela</option>
+                                                        <option value="BookOpenIcon">Livro</option>
+                                                        <option value="LightBulbIcon">Lâmpada</option>
+                                                        <option value="QuestionMarkCircleIcon">Interrogação</option>
+                                                    </select>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

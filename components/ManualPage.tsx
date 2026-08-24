@@ -18,14 +18,22 @@ import type { ManualVideo, ManualCategory, UpdatePatch } from '../types';
 import { supabase } from '../supabaseClient';
 
 const ManualPage: React.FC = () => {
-    const [categories, setCategories] = useState<ManualCategory[]>([
+    const [customLinks, setCustomLinks] = useState<any[]>([]);
+    const [customPromo, setCustomPromo] = useState<any>({
+        title: 'O que falta para você ser nosso próximo caso de sucesso?',
+        description: 'Nossa equipe está pronta para te ajudar a extrair o máximo do sistema. Converse com seu analista para descobrir novos caminhos de eficiência.',
+        tag: 'Destaque',
+        image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop'
+    });
+
+    const categories = customLinks.length > 0 ? customLinks : [
         { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' },
         { id: 'university', title: 'Universidade Panda', description: 'Implante o ERP de forma guiada.', icon: 'AcademicCapIcon', type: 'video' },
         { id: 'ecosystem', title: 'Ecossistema Digital', description: 'Portal com soluções complementares.', icon: 'StarIcon', type: 'info' },
         { id: 'certs', title: 'Certificações', description: 'Capacitação gratuita no sistema.', icon: 'BookOpenIcon', type: 'video' },
         { id: 'academy', title: 'Panda Academy', description: 'Cursos, palestras e entrevistas.', icon: 'LightBulbIcon', type: 'video' },
         { id: 'guide', title: 'Guia do Usuário', description: 'Manual completo com treinamentos.', icon: 'QuestionMarkCircleIcon', type: 'info' },
-    ]);
+    ];
     const [videos, setVideos] = useState<ManualVideo[]>([]);
     const [patches, setPatches] = useState<UpdatePatch[]>([]);
     const [loading, setLoading] = useState(true);
@@ -55,6 +63,25 @@ const ManualPage: React.FC = () => {
                         changes: p.description.split('\n').filter((l: string) => l.trim() !== '')
                     }));
                     setPatches(mappedPatches);
+                }
+
+                // Fetch System Settings for Manual configs
+                const { data: settingsData } = await supabase.from('system_settings').select('key, value').in('key', ['manual_links', 'manual_promo']);
+                if (settingsData) {
+                    const linksStr = settingsData.find(s => s.key === 'manual_links')?.value;
+                    const promoStr = settingsData.find(s => s.key === 'manual_promo')?.value;
+
+                    if (linksStr) {
+                        try {
+                            const parsedLinks = JSON.parse(linksStr);
+                            if (parsedLinks && Array.isArray(parsedLinks)) {
+                                setCustomLinks(parsedLinks);
+                            }
+                        } catch (e) { }
+                    }
+                    if (promoStr) {
+                        try { setCustomPromo(JSON.parse(promoStr)); } catch (e) { }
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching manual data:', error);
@@ -251,11 +278,10 @@ const ManualPage: React.FC = () => {
             <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm overflow-hidden relative">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div className="relative z-10">
-                        <span className="inline-block px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full mb-4 uppercase tracking-widest">Destaque</span>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">O que falta para você ser nosso próximo caso de sucesso?</h2>
-                        <p className="text-gray-600 mb-6 leading-relaxed">
-                            Nossa equipe está pronta para te ajudar a extrair o máximo do sistema. 
-                            Converse com seu analista para descobrir novos caminhos de eficiência.
+                        <span className="inline-block px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full mb-4 uppercase tracking-widest">{customPromo.tag || 'Destaque'}</span>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">{customPromo.title || 'O que falta para você ser nosso próximo caso de sucesso?'}</h2>
+                        <p className="text-gray-600 mb-6 leading-relaxed whitespace-pre-wrap">
+                            {customPromo.description || 'Nossa equipe está pronta para te ajudar a extrair o máximo do sistema.\nConverse com seu analista para descobrir novos caminhos de eficiência.'}
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
@@ -270,9 +296,9 @@ const ManualPage: React.FC = () => {
                     </div>
                     <div className="hidden md:block">
                         <img 
-                            src="https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop" 
+                            src={customPromo.image || "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop"} 
                             alt="Sucesso" 
-                            className="rounded-2xl shadow-xl border-4 border-white"
+                            className="rounded-2xl shadow-xl border-4 border-white max-h-72 object-cover"
                         />
                     </div>
                 </div>

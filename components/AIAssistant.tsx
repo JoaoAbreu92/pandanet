@@ -74,7 +74,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             let aiResponseText = '';
             
             if (provider === 'gemini') {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentUser.ai_api_key}`, {
+                const cleanKey = currentUser.ai_api_key.trim();
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -89,11 +90,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, não consegui processar sua mensagem.";
                 
             } else if (provider === 'openai') {
+                const cleanKey = currentUser.ai_api_key.trim();
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${currentUser.ai_api_key}`
+                        'Authorization': `Bearer ${cleanKey}`
                     },
                     body: JSON.stringify({
                         model: 'gpt-4o',
@@ -255,7 +257,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     // Render Behavior Specific Open View
     if (behavior === 'sidebar') {
         return (
-            <div className="fixed inset-y-0 right-0 w-[calc(100vw-2rem)] sm:w-[400px] md:w-[450px] z-50 animate-slide-in-right">
+            <div className="fixed inset-y-0 right-0 w-[calc(100vw-2rem)] sm:w-[400px] md:w-[450px] z-[100] animate-slide-in-right">
                 {renderChatBox()}
             </div>
         );
