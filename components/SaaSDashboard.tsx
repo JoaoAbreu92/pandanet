@@ -1949,14 +1949,29 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Modal onClose={closeModal} title={modalOpen.config ? "Configurar Menu" : (modalOpen.createPlan ? "Novo Plano" : "Editar Plano")} width="max-w-2xl">
                     <div className="p-6 overflow-y-auto max-h-[70vh]">
                         {(modalOpen.createPlan || modalOpen.editPlan) && (
-                            <div className="space-y-3 mb-6">
-                                <h4 className="font-bold text-gray-700">Detalhes do Plano</h4>
-                                <input type="text" placeholder="Nome" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="number" placeholder="Max Usuários" value={formData.userLimit || ''} onChange={(e) => handleInputChange('userLimit', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                    <input type="number" placeholder="Max Canais WhatsApp" value={formData.whatsappLimit || ''} onChange={(e) => handleInputChange('whatsappLimit', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                            <div className="space-y-4 mb-8">
+                                <h4 className="font-bold text-gray-700 dark:text-gray-200 border-b pb-2 mb-4">Detalhes do Plano</h4>
+                                
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Nome do Plano</label>
+                                    <input type="text" placeholder="Ex: Profissional" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
                                 </div>
-                                <input type="number" placeholder="Valor (R$)" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border rounded text-sm" />
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Limite de Usuários</label>
+                                        <input type="number" placeholder="Ex: 50" value={formData.userLimit || ''} onChange={(e) => handleInputChange('userLimit', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Canais WhatsApp</label>
+                                        <input type="number" placeholder="Ex: 5" value={formData.whatsappLimit || ''} onChange={(e) => handleInputChange('whatsappLimit', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Valor Mensal (R$)</label>
+                                    <input type="number" placeholder="Ex: 299.00" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
+                                </div>
                             </div>
                         )}
                         <ConfigFeaturesList />
