@@ -43,7 +43,7 @@ const BannerFormModal: React.FC<{
         if (imageFile) {
             const fileName = `banner_${Date.now()}_${imageFile.name}`;
             const { data, error: uploadError } = await supabase.storage
-                .from('announcements-media')
+                .from('chat-media')
                 .upload(fileName, imageFile);
 
             if (uploadError) {
@@ -52,7 +52,7 @@ const BannerFormModal: React.FC<{
             }
 
             const { data: { publicUrl } } = supabase.storage
-                .from('announcements-media')
+                .from('chat-media')
                 .getPublicUrl(fileName);
 
             finalImageUrl = publicUrl;

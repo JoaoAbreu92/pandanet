@@ -641,8 +641,8 @@ const AppContent: React.FC = () => {
                                 .eq('id', convs.id);
                         }
 
-                        // Abre o chat head flutuante
-                        handleMinimizeConversation(convs.id, targetName, targetAvatarUrl, targetUserId);
+                        // Redireciona diretamente para a tela de mensagens
+                        handleNavigate('messages', { conversationId: convs.id });
                         return;
                     }
                 }
@@ -671,13 +671,13 @@ const AppContent: React.FC = () => {
 
             if (partInsertError) throw partInsertError;
 
-            // 5. Abre o chat head flutuante
-            handleMinimizeConversation(newConv.id, targetName, targetAvatarUrl, targetUserId);
+            // Redireciona diretamente para a tela de mensagens
+            handleNavigate('messages', { conversationId: newConv.id });
 
         } catch (error: any) {
             console.error('Erro ao iniciar conversa direta:', error);
         }
-    }, [currentUser, handleMinimizeConversation]);
+    }, [currentUser, handleNavigate]);
 
     const handleUpdateUser = (updatedUser: Employee) => {
         if (companyData) {
@@ -835,7 +835,7 @@ const AppContent: React.FC = () => {
             case 'support-inbox': return <SupportInbox onNavigate={handleNavigate} />;
 
             case 'tickets': return <TicketPage />;
-            case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} onNavigate={handleNavigate} />;
+            case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} onNavigate={handleNavigate} initialContext={pageContext} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} onImpersonateUser={handleImpersonateUserStart} initialSearch={globalSearchTerm} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;

@@ -76,12 +76,10 @@ const Layout: React.FC<LayoutProps> = ({
         }
     }, [currentPage, setCurrentPage]);
 
-    // Initial check for mobile
+    // Sincronizar abertura da sidebar
     React.useEffect(() => {
-        if (window.innerWidth < 768) {
-            setSidebarOpen(false);
-        }
-    }, []);
+        setSidebarOpen(false);
+    }, [currentPage]);
 
     return (
         <div className={`flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-[#020617] ${isShaking ? 'nudge-shake' : ''}`}>
@@ -119,20 +117,46 @@ const Layout: React.FC<LayoutProps> = ({
                     />
                 )}
 
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    onNavigate={(page) => {
-                        onNavigate(page);
-                        if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
+                {/* Área invisível na extrema esquerda para acionar hover no desktop */}
+                {currentPage !== 'messages' && (
+                    <div
+                        className="hidden md:block fixed left-0 top-0 bottom-0 w-3 z-40 bg-transparent"
+                        onMouseEnter={() => {
+                            if (window.innerWidth >= 768) {
+                                setSidebarOpen(true);
+                            }
+                        }}
+                    />
+                )}
+
+                <div
+                    onMouseEnter={() => {
+                        if (window.innerWidth >= 768 && currentPage !== 'messages') {
+                            setSidebarOpen(true);
+                        }
                     }}
-                    currentPage={currentPage}
-                    currentUser={currentUser}
-                    companyName={companySettings.companyName}
-                    companyLogo={companySettings.logoUrl}
-                    isImpersonating={isImpersonating}
-                    isMasterAdmin={isMasterAdmin}
-                    customFeatures={currentCompany.custom_features}
-                />
+                    onMouseLeave={() => {
+                        if (window.innerWidth >= 768) {
+                            setSidebarOpen(false);
+                        }
+                    }}
+                    className="h-full z-45 flex-shrink-0"
+                >
+                    <Sidebar
+                        isOpen={isSidebarOpen}
+                        onNavigate={(page) => {
+                            onNavigate(page);
+                            if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
+                        }}
+                        currentPage={currentPage}
+                        currentUser={currentUser}
+                        companyName={companySettings.companyName}
+                        companyLogo={companySettings.logoUrl}
+                        isImpersonating={isImpersonating}
+                        isMasterAdmin={isMasterAdmin}
+                        customFeatures={currentCompany.custom_features}
+                    />
+                </div>
 
                 <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
                     <Header

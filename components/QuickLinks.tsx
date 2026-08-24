@@ -139,18 +139,18 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser }) => {
           </button>
         }
       >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
           {activeLinks.map((link) => (
             <button
               key={link.label}
               type="button"
               onClick={() => onNavigate(link.page)}
-              className="flex flex-col items-center justify-center p-3.5 sm:p-4 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-200 dark:hover:border-emerald-800/30 transition-all duration-200 group text-center"
+              className="flex flex-col items-center justify-center p-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-200 dark:hover:border-emerald-800/30 transition-all duration-200 group text-center h-24 w-full"
             >
-              <div className="text-brand-primary dark:text-emerald-450 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 mb-2 transition-transform duration-200 group-hover:scale-110">
+              <div className="text-brand-primary dark:text-emerald-450 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 mb-1.5 transition-transform duration-200 group-hover:scale-110 flex-shrink-0">
                 {renderIcon(link.iconName)}
               </div>
-              <span className="text-xs sm:text-sm font-semibold text-brand-subtle-text dark:text-gray-250 group-hover:text-emerald-850 dark:group-hover:text-emerald-300 text-center leading-tight truncate w-full">{link.label}</span>
+              <span className="text-[11px] font-semibold text-brand-subtle-text dark:text-gray-250 group-hover:text-emerald-850 dark:group-hover:text-emerald-300 text-center leading-tight break-words w-full">{link.label}</span>
             </button>
           ))}
           {activeLinks.length === 0 && (

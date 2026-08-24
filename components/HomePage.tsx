@@ -5,6 +5,7 @@ import Carousel from './Carousel';
 import RecognitionWall from './RecognitionWall';
 import CompanyPoll from './CompanyPoll';
 import QuickLinks from './QuickLinks';
+import MiniCalendar from './MiniCalendar';
 import { supabase } from '../supabaseClient';
 import type { Employee, AppData } from '../types';
 import Card from './Card';
@@ -1008,6 +1009,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                 {/* Right Sidebar */}
                 <div className="space-y-8">
                     <QuickLinks onNavigate={onNavigate} currentUser={currentUser} />
+                    <MiniCalendar onNavigate={onNavigate} currentUser={currentUser} employees={employees} />
                     <CompanyPoll />
                     <Birthdays employees={employees} />
                     <NewHires employees={employees} />

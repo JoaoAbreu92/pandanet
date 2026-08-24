@@ -68,9 +68,13 @@ export default defineConfig(({ mode }) => {
       build: {
         sourcemap: true
       },
+      optimizeDeps: {
+        include: ['use-sync-external-store/shim/with-selector']
+      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          'use-sync-external-store/shim/with-selector': path.resolve(__dirname, 'node_modules/use-sync-external-store/shim/with-selector.js')
         }
       }
     };

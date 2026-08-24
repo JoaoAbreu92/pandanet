@@ -20,6 +20,7 @@ import {
     UserGroupIcon as HeroUserGroupIcon,
     ArrowUturnLeftIcon,
     TrashIcon,
+    PencilIcon,
     ShareIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory, Page } from '../types';
@@ -95,9 +96,10 @@ interface CalendarPageProps {
     events?: CalendarEvent[];
     currentUser?: Employee | null;
     onNavigate?: (page: Page, context?: any) => void;
+    initialContext?: any;
 }
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, currentUser: propUser, onNavigate }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, currentUser: propUser, onNavigate, initialContext }) => {
     const { profile: contextUser } = useAuth();
     const currentUser = propUser || contextUser;
     const { addNotification } = useNotifications();
@@ -105,6 +107,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'year' | 'month' | 'week' | 'day'>('month');
+
+    useEffect(() => {
+        if (initialContext?.selectedDate) {
+            const parsed = new Date(initialContext.selectedDate + 'T12:00:00');
+            if (!isNaN(parsed.getTime())) {
+                setCurrentDate(parsed);
+                setView('day');
+            }
+        }
+    }, [initialContext]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [personalTasks, setPersonalTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -112,6 +124,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [isRSVPModalOpen, setRSVPModalOpen] = useState(false);
     const [declineReason, setDeclineReason] = useState('');
     const [selectedDayOptionsDate, setSelectedDayOptionsDate] = useState<Date | null>(null);
@@ -324,7 +337,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             const combinedStartTime = new Date(`${newEventData.date}T${newEventData.startTime}:00Z`).toISOString();
             const combinedEndTime = new Date(`${newEventData.date}T${newEventData.endTime}:00Z`).toISOString();
 
-            const { data, error } = await supabase.from('events').insert({
+            const eventPayload = {
                 company_id: currentUser.company_id,
                 title: newEventData.title,
                 description: newEventData.notes,
@@ -337,13 +350,35 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 invited_ids: newEventData.isPrivate ? [] : finalAttendees.filter(id => id !== currentUser.id),
                 creator_id: selectedCalendarUserId,
                 is_private: newEventData.isPrivate
-            }).select();
+            };
 
-            if (data && data[0]) {
-                const eventId = data[0].id;
+            let eventId = editingEventId;
 
-                // Notificar o dono do calendário se for outra pessoa
-                if (selectedCalendarUserId !== currentUser.id) {
+            if (editingEventId) {
+                const { error } = await supabase
+                    .from('events')
+                    .update(eventPayload)
+                    .eq('id', editingEventId);
+
+                if (error) throw error;
+                
+                // Excluir convites anteriores e recriá-los
+                await supabase.from('calendar_invites').delete().eq('event_id', editingEventId);
+            } else {
+                const { data, error } = await supabase
+                    .from('events')
+                    .insert(eventPayload)
+                    .select();
+
+                if (error) throw error;
+                if (data && data[0]) {
+                    eventId = data[0].id;
+                }
+            }
+
+            if (eventId) {
+                // Notificar o dono do calendário se for outra pessoa e for criação
+                if (!editingEventId && selectedCalendarUserId !== currentUser.id) {
                     await supabase.from('notifications').insert({
                         user_id: selectedCalendarUserId,
                         type: 'event',
@@ -378,8 +413,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 addNotification({
                                     user_id: userId,
                                     type: 'event',
-                                    title: 'Novo Convite de Evento',
-                                    description: `Você foi convidado para o evento: ${newEventData.title}`,
+                                    title: editingEventId ? 'Convite de Evento Atualizado' : 'Novo Convite de Evento',
+                                    description: editingEventId 
+                                        ? `O evento "${newEventData.title}" para o qual você foi convidado foi atualizado.`
+                                        : `Você foi convidado para o evento: ${newEventData.title}`,
                                     avatarUrl: currentUser?.avatarUrl,
                                     link: 'calendar'
                                 });
@@ -389,10 +426,53 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 }
 
                 setCreateModalOpen(false);
+                setEditingEventId(null);
                 // Pequeno delay para garantir que as notificações foram enviadas antes do reload
                 setTimeout(() => window.location.reload(), 500);
             }
         } catch (err) { console.error(err); }
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        if (!window.confirm("Tem certeza que deseja excluir este compromisso?")) return;
+        try {
+            // Deletar convites primeiro
+            await supabase.from('calendar_invites').delete().eq('event_id', eventId);
+            
+            // Deletar evento
+            const { error } = await supabase.from('events').delete().eq('id', eventId);
+            if (error) throw error;
+
+            alert("Compromisso excluído com sucesso!");
+            setDetailModalOpen(false);
+            window.location.reload();
+        } catch (err) {
+            console.error('Erro ao excluir evento:', err);
+            alert("Erro ao excluir o compromisso.");
+        }
+    };
+
+    const handleEditEvent = (event: CalendarEvent) => {
+        setEditingEventId(event.id);
+        
+        // Reverter convites para IDs de participantes
+        const attendeeIds = event.invitedIds || event.invites?.map(i => i.user_id) || [];
+        
+        setNewEventData({
+            title: event.title,
+            date: event.date,
+            startTime: event.startTime,
+            endTime: event.endTime,
+            category: event.category,
+            location: event.location,
+            attendees: attendeeIds,
+            departmentId: '',
+            notes: event.notes,
+            isPrivate: !!event.isPrivate
+        });
+        
+        setDetailModalOpen(false);
+        setCreateModalOpen(true);
     };
 
     const handleRSVP = async (status: 'accepted' | 'declined') => {
@@ -918,10 +998,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         </div>
                                         <button 
                                             onClick={() => {
-                                                setNewEventData(prev => ({
-                                                    ...prev,
-                                                    date: dateStr
-                                                }));
+                                                setEditingEventId(null);
+                                                setNewEventData({
+                                                    title: '',
+                                                    date: dateStr,
+                                                    startTime: '09:00',
+                                                    endTime: '10:00',
+                                                    category: 'Reunião',
+                                                    location: '',
+                                                    attendees: [],
+                                                    departmentId: '',
+                                                    notes: '',
+                                                    isPrivate: false
+                                                });
                                                 setCreateModalOpen(true);
                                             }}
                                             className="p-1 text-slate-400 hover:text-brand-primary hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all"
@@ -1148,12 +1237,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                 const hourStr = String(h).padStart(2, '0');
                                                 const nextHourStr = String((h + 1) % 24).padStart(2, '0');
 
-                                                setNewEventData(prev => ({
-                                                    ...prev,
+                                                setEditingEventId(null);
+                                                setNewEventData({
+                                                    title: '',
                                                     date: formattedDate,
                                                     startTime: `${hourStr}:00`,
-                                                    endTime: `${nextHourStr}:00`
-                                                }));
+                                                    endTime: `${nextHourStr}:00`,
+                                                    category: 'Reunião',
+                                                    location: '',
+                                                    attendees: [],
+                                                    departmentId: '',
+                                                    notes: '',
+                                                    isPrivate: false
+                                                });
                                                 setCreateModalOpen(true);
                                             }}
                                             className="opacity-0 group-hover:opacity-100 absolute inset-0 w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-brand-primary dark:hover:text-brand-primary transition-all font-black text-2xl"
@@ -1215,7 +1311,22 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <span className="hidden sm:inline">Compartilhar</span>
                     </button>
 
-                    <button onClick={() => setCreateModalOpen(true)} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
+                    <button onClick={() => {
+                        setEditingEventId(null);
+                        setNewEventData({
+                            title: '',
+                            date: new Date().toISOString().split('T')[0],
+                            startTime: '09:00',
+                            endTime: '10:00',
+                            category: 'Reunião',
+                            location: '',
+                            attendees: [],
+                            departmentId: '',
+                            notes: '',
+                            isPrivate: false
+                        });
+                        setCreateModalOpen(true);
+                    }} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
                         <PlusIcon className="w-5 h-5" /><span>{t('calendar.new_event')}</span>
                     </button>
                 </div>
@@ -1254,8 +1365,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-8 relative animate-scale-in">
                         <button onClick={() => setCreateModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
                         <div className="mb-6">
-                            <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100">{t('calendar.schedule_event')}</h3>
-                            <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.event_details')}</p>
+                            <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100">{editingEventId ? "Editar Evento" : t('calendar.schedule_event')}</h3>
+                            <p className="text-slate-500 dark:text-gray-400 font-medium">{editingEventId ? "Altere os dados do compromisso" : t('calendar.event_details')}</p>
                         </div>
                         <form onSubmit={handleCreateEvent} className="space-y-6">
                             <div className="space-y-2">
@@ -1355,8 +1466,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             )}
 
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setCreateModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">{t('calendar.cancel')}</button>
-                                <button type="submit" className="px-8 py-4 text-sm font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">{t('calendar.save')}</button>
+                                <button type="button" onClick={() => { setCreateModalOpen(false); setEditingEventId(null); }} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">{t('calendar.cancel')}</button>
+                                <button type="submit" className="px-8 py-4 text-sm font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">{editingEventId ? "Salvar Alterações" : t('calendar.save')}</button>
                             </div>
                         </form>
                     </div>
@@ -1479,7 +1590,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             return null;
                         })()}
 
-                        <button onClick={() => setDetailModalOpen(false)} className="w-full mt-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-xl">FECHAR</button>
+                        {/* Ações de Editar / Excluir se o usuário for criador ou admin */}
+                        {!selectedEvent.isSystem && (currentUser?.isAdmin || selectedEvent.creatorId === currentUser?.id) && (
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => handleEditEvent(selectedEvent)}
+                                    className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-850 dark:text-gray-150 font-black rounded-2xl transition-all active:scale-95 text-xs uppercase tracking-wider shadow-sm"
+                                >
+                                    <PencilIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                                    Editar
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteEvent(selectedEvent.id)}
+                                    className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-black rounded-2xl transition-all active:scale-95 text-xs uppercase tracking-wider shadow-sm"
+                                >
+                                    <TrashIcon className="w-4 h-4 text-rose-500" />
+                                    Excluir
+                                </button>
+                            </div>
+                        )}
+
+                        <button onClick={() => setDetailModalOpen(false)} className="w-full mt-4 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-xl">FECHAR</button>
                     </div>
                 </div>
             )}
@@ -1601,12 +1732,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
                                         const formattedDate = `${year}-${month}-${day}`;
 
-                                        setNewEventData(prev => ({
-                                            ...prev,
+                                        setEditingEventId(null);
+                                        setNewEventData({
+                                            title: '',
                                             date: formattedDate,
                                             startTime: '09:00',
-                                            endTime: '10:00'
-                                        }));
+                                            endTime: '10:00',
+                                            category: 'Reunião',
+                                            location: '',
+                                            attendees: [],
+                                            departmentId: '',
+                                            notes: '',
+                                            isPrivate: false
+                                        });
                                         setDayOptionsOpen(false);
                                         setCreateModalOpen(true);
                                     }}

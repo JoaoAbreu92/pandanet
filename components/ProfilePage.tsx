@@ -108,7 +108,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         company_id: data.company_id,
                         permissions: data.permissions || {},
                         following: data.following || [],
-                        status_text: data.status_text
+                        status_text: data.status_text,
+                        rg: data.rg || '',
+                        cpf: data.cpf || '',
+                        emergency_contact_name: data.emergency_contact_name || '',
+                        emergency_contact_phone: data.emergency_contact_phone || '',
+                        health_insurance: data.health_insurance || '',
+                        blood_type: data.blood_type || '',
+                        marital_status: data.marital_status || '',
+                        education_level: data.education_level || ''
                     };
                     // Manually append department_id as it might not be in Employee type definition yet
                     (freshUser as any).department_id = data.department_id;
@@ -147,7 +155,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             company_id: data.company_id,
                             following: data.following || [],
                             permissions: data.permissions || {},
-                            status_text: data.status_text
+                            status_text: data.status_text,
+                            rg: data.rg || '',
+                            cpf: data.cpf || '',
+                            emergency_contact_name: data.emergency_contact_name || '',
+                            emergency_contact_phone: data.emergency_contact_phone || '',
+                            health_insurance: data.health_insurance || '',
+                            blood_type: data.blood_type || '',
+                            marital_status: data.marital_status || '',
+                            education_level: data.education_level || ''
                         };
                         (mapped as any).department_id = data.department_id;
                         setTargetUser(mapped);
@@ -335,6 +351,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 ai_provider: tempUserData.ai_provider,
                 ai_behavior: tempUserData.ai_behavior,
                 status_text: (tempUserData as any).status_text,
+                rg: tempUserData.rg || null,
+                cpf: tempUserData.cpf || null,
+                emergency_contact_name: tempUserData.emergency_contact_name || null,
+                emergency_contact_phone: tempUserData.emergency_contact_phone || null,
+                health_insurance: tempUserData.health_insurance || null,
+                blood_type: tempUserData.blood_type || null,
+                marital_status: tempUserData.marital_status || null,
+                education_level: tempUserData.education_level || null,
                 updated_at: new Date().toISOString()
             };
 
@@ -394,7 +418,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     ai_api_key: freshProfile.ai_api_key,
                     ai_provider: freshProfile.ai_provider,
                     ai_behavior: freshProfile.ai_behavior,
-                    status_text: freshProfile.status_text
+                    status_text: freshProfile.status_text,
+                    rg: freshProfile.rg || '',
+                    cpf: freshProfile.cpf || '',
+                    emergency_contact_name: freshProfile.emergency_contact_name || '',
+                    emergency_contact_phone: freshProfile.emergency_contact_phone || '',
+                    health_insurance: freshProfile.health_insurance || '',
+                    blood_type: freshProfile.blood_type || '',
+                    marital_status: freshProfile.marital_status || '',
+                    education_level: freshProfile.education_level || '',
+                    status: freshProfile.status
                 };
                 
                 setTempUserData(reloadedUser);
@@ -854,6 +887,66 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                             ))}
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">RG</label>
+                                        <input name="rg" value={tempUserData.rg || ''} onChange={handleInputChange} placeholder="Apenas números" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">CPF</label>
+                                        <input name="cpf" value={tempUserData.cpf || ''} onChange={handleInputChange} placeholder="000.000.000-00" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Contato de Emergência (Nome)</label>
+                                        <input name="emergency_contact_name" value={tempUserData.emergency_contact_name || ''} onChange={handleInputChange} placeholder="Nome do contato" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Contato de Emergência (Telefone)</label>
+                                        <input name="emergency_contact_phone" value={tempUserData.emergency_contact_phone || ''} onChange={handleInputChange} placeholder="(XX) XXXXX-XXXX" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Plano de Saúde</label>
+                                        <input name="health_insurance" value={tempUserData.health_insurance || ''} onChange={handleInputChange} placeholder="Nome da operadora ou Não possui" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Tipo Sanguíneo</label>
+                                        <select name="blood_type" value={tempUserData.blood_type || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2">
+                                            <option value="">Não informado</option>
+                                            <option value="A+">A+</option>
+                                            <option value="A-">A-</option>
+                                            <option value="B+">B+</option>
+                                            <option value="B-">B-</option>
+                                            <option value="AB+">AB+</option>
+                                            <option value="AB-">AB-</option>
+                                            <option value="O+">O+</option>
+                                            <option value="O-">O-</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Estado Civil</label>
+                                        <select name="marital_status" value={tempUserData.marital_status || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2">
+                                            <option value="">Não informado</option>
+                                            <option value="Solteiro(a)">Solteiro(a)</option>
+                                            <option value="Casado(a)">Casado(a)</option>
+                                            <option value="Divorciado(a)">Divorciado(a)</option>
+                                            <option value="Viúvo(a)">Viúvo(a)</option>
+                                            <option value="União Estável">União Estável</option>
+                                            <option value="Outro">Outro</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-brand-subtle-text">Escolaridade</label>
+                                        <select name="education_level" value={tempUserData.education_level || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2">
+                                            <option value="">Não informado</option>
+                                            <option value="Ensino Médio">Ensino Médio</option>
+                                            <option value="Ensino Técnico">Ensino Técnico</option>
+                                            <option value="Superior Incompleto">Superior Incompleto</option>
+                                            <option value="Superior Completo">Superior Completo</option>
+                                            <option value="Pós-Graduação">Pós-Graduação</option>
+                                            <option value="Mestrado">Mestrado</option>
+                                            <option value="Doutorado">Doutorado</option>
+                                            <option value="Outro">Outro</option>
+                                        </select>
+                                    </div>
                                     <div className="sm:col-span-2">
                                         <label className="text-sm font-medium text-brand-subtle-text">Sobre mim</label>
                                         <textarea name="bio" value={tempUserData.bio || ''} onChange={handleInputChange} rows={3} placeholder="Fale um pouco sobre você..." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea>
@@ -905,6 +998,40 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                                     ? new Date(userData.joinDate.substring(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
                                                 : 'Não informada'}
                                         </p>
+                                    </div>
+                                    <div className="border-t pt-4 sm:col-span-2">
+                                        <h4 className="text-xs font-black text-brand-primary uppercase tracking-wider mb-2">Dados Confidenciais / Pessoais</h4>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">RG</h4>
+                                        <p className="text-brand-text">{userData.rg || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">CPF</h4>
+                                        <p className="text-brand-text">{userData.cpf || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Contato de Emergência</h4>
+                                        <p className="text-brand-text">
+                                            {userData.emergency_contact_name || 'Não informado'}
+                                            {userData.emergency_contact_phone ? ` - ${userData.emergency_contact_phone}` : ''}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Plano de Saúde</h4>
+                                        <p className="text-brand-text">{userData.health_insurance || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Tipo Sanguíneo</h4>
+                                        <p className="text-brand-text">{userData.blood_type || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Estado Civil</h4>
+                                        <p className="text-brand-text">{userData.marital_status || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Escolaridade</h4>
+                                        <p className="text-brand-text">{userData.education_level || 'Não informado'}</p>
                                     </div>
                                 </div>
                             </div>
