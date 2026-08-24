@@ -21,16 +21,16 @@ app.get('/', (req, res) => {
 });
 
 // Endpoint para iniciar sessão manualmente (ex: nova empresa cadastrada)
-app.post('/sessions/:companyId/start', async (req, res) => {
-  const { companyId } = req.params;
-  console.log(`[POST] /sessions/${companyId}/start - Recebido`); // Log de entrada
-  if (sessions.has(companyId)) {
-    return res.status(400).json({ status: 'error', message: 'Sessão já existe para esta empresa.' });
+app.post('/sessions/:companyId/start/:connectionId', async (req, res) => {
+  const { companyId, connectionId } = req.params;
+  console.log(`[POST] /sessions/${companyId}/start/${connectionId} - Recebido`); // Log de entrada
+  if (sessions.has(connectionId)) {
+    return res.status(400).json({ status: 'error', message: 'Sessão já existe para esta conexão.' });
   }
   try {
-    await connectToWhatsApp(companyId);
-    res.json({ status: 'success', message: `Iniciando sessão para empresa ${companyId}` });
-    console.log(`[SUCCESS] Sessão iniciada para ${companyId}`);
+    await connectToWhatsApp(companyId, connectionId);
+    res.json({ status: 'success', message: `Iniciando sessão para conexão ${connectionId}` });
+    console.log(`[SUCCESS] Sessão iniciada para ${connectionId}`);
   } catch (error) {
     console.error('Erro ao iniciar sessão:', error);
     res.status(500).json({ status: 'error', message: 'Falha ao iniciar sessão' });
@@ -38,38 +38,39 @@ app.post('/sessions/:companyId/start', async (req, res) => {
 });
 
 // Endpoint para parar sessão
-app.post('/sessions/:companyId/stop', async (req, res) => {
-  const { companyId } = req.params;
-  const sock = sessions.get(companyId);
+app.post('/sessions/:companyId/stop/:connectionId', async (req, res) => {
+  const { companyId, connectionId } = req.params;
+  const sock = sessions.get(connectionId);
   if (sock) {
     sock.end(undefined); // Encerra conexão
-    sessions.delete(companyId);
-    await updateCompanySettings(companyId, { is_connected: false });
-    res.json({ status: 'success', message: `Sessão encerrada para empresa ${companyId}` });
+    sessions.delete(connectionId);
+    await updateCompanySettings(connectionId, { is_connected: false });
+    res.json({ status: 'success', message: `Sessão encerrada para conexão ${connectionId}` });
   } else {
     res.status(404).json({ status: 'error', message: 'Sessão não encontrada.' });
   }
 });
 
 // Endpoint verificar status
-app.get('/sessions/:companyId/status', (req, res) => {
-  const { companyId } = req.params;
-  const isConnected = sessions.has(companyId);
-  res.json({ companyId, isConnected });
+app.get('/sessions/:companyId/status/:connectionId', (req, res) => {
+  const { companyId, connectionId } = req.params;
+  const isConnected = sessions.has(connectionId);
+  res.json({ companyId, connectionId, isConnected });
 });
 
 // Endpoint para listar TODAS as sessões ativas (SaaS Dashboard)
 app.get('/sessions/status/all', (req, res) => {
   const activeSessions = Array.from(sessions.keys());
-  res.json({ count: activeSessions.length, activeCompanyIds: activeSessions });
+  res.json({ count: activeSessions.length, activeConnectionIds: activeSessions });
 });
 
-// Inicialização: Carregar todas as empresas que têm configurações
+// Inicialização: Carregar todas as conexões WhatsApp
 async function startAllSessions() {
-  console.log('🔄 Buscando empresas para iniciar sessões WhatsApp...');
+  console.log('🔄 Buscando conexões para iniciar sessões WhatsApp...');
   const { data: settings, error } = await supabase
     .from('whatsapp_settings')
-    .select('company_id');
+    .select('id, company_id')
+    .eq('channel_type', 'whatsapp');
 
   if (error) {
     console.error('❌ Erro ao buscar configurações:', error);
@@ -77,10 +78,10 @@ async function startAllSessions() {
   }
 
   if (settings && settings.length > 0) {
-    console.log(`✅ Encontradas ${settings.length} empresas. Iniciando conexões...`);
+    console.log(`✅ Encontradas ${settings.length} conexões WhatsApp. Iniciando...`);
     for (const config of settings) {
-      connectToWhatsApp(config.company_id).catch(err =>
-        console.error(`❌ Erro ao conectar empresa ${config.company_id}:`, err)
+      connectToWhatsApp(config.company_id, config.id).catch(err =>
+        console.error(`❌ Erro ao conectar conexão ${config.id}:`, err)
       );
     }
   } else {

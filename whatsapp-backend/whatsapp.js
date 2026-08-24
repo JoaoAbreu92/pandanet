@@ -29,16 +29,16 @@ const sessions = new Map();
 const reconnectionAttempts = new Map();
 const MAX_RECONNECTION_ATTEMPTS = 10;
 
-async function connectToWhatsApp(companyId) {
-    if (!companyId) {
-        console.error('connectToWhatsApp: companyId is required');
+async function connectToWhatsApp(companyId, connectionId) {
+    if (!companyId || !connectionId) {
+        console.error('connectToWhatsApp: companyId and connectionId are required');
         return;
     }
 
-    console.log(`Starting WhatsApp session for company: ${companyId}`);
+    console.log(`Starting WhatsApp session for connection: ${connectionId} (Company: ${companyId})`);
 
-    // Create specific auth folder for this company
-    const authPath = `auth_info_baileys/${companyId}`;
+    // Create specific auth folder for this connection
+    const authPath = `auth_info_baileys/${connectionId}`;
     const { state, saveCreds } = await useMultiFileAuthState(authPath);
     const { version, isLatest } = await fetchLatestBaileysVersion();
     
@@ -61,37 +61,37 @@ async function connectToWhatsApp(companyId) {
             console.log('[QR CODE] Saving to DB for company:', companyId);
             qrcode.generate(qr, { small: true });
             // Save QR status to DB
-            await updateCompanySettings(companyId, { qr_code: qr, is_connected: false });
+            await updateCompanySettings(connectionId, { qr_code: qr, is_connected: false });
             console.log('[QR CODE] QR Code saved to DB successfully');
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            await updateCompanySettings(companyId, { is_connected: false });
+            await updateCompanySettings(connectionId, { is_connected: false });
 
             // Remove from sessions map on close
-            sessions.delete(companyId);
+            sessions.delete(connectionId);
 
             if (shouldReconnect) {
                 // Check reconnection attempts
-                const attempts = reconnectionAttempts.get(companyId) || 0;
+                const attempts = reconnectionAttempts.get(connectionId) || 0;
                 if (attempts < MAX_RECONNECTION_ATTEMPTS) {
-                    reconnectionAttempts.set(companyId, attempts + 1);
-                    console.log(`[RECONNECTION] Attempt ${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS} for company ${companyId}`);
-                    connectToWhatsApp(companyId);
+                    reconnectionAttempts.set(connectionId, attempts + 1);
+                    console.log(`[RECONNECTION] Attempt ${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS} for connection ${connectionId}`);
+                    connectToWhatsApp(companyId, connectionId);
                 } else {
-                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for company ${companyId}. Stopping.`);
+                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for connection ${connectionId}. Stopping.`);
                     // Do NOT clear QR code here, so user has time to scan it even if backend stops retrying temporarily
-                    await updateCompanySettings(companyId, { is_connected: false });
-                    reconnectionAttempts.delete(companyId);
+                    await updateCompanySettings(connectionId, { is_connected: false });
+                    reconnectionAttempts.delete(connectionId);
                 }
             } else {
                 console.log('Connection closed. You are logged out (or session corrupted).');
 
                 // 1. Force cleanup of auth folder to prevent loop
                 try {
-                    const authPath = `auth_info_baileys/${companyId}`;
+                    const authPath = `auth_info_baileys/${connectionId}`;
                     if (fs.existsSync(authPath)) {
                         fs.rmSync(authPath, { recursive: true, force: true });
                         console.log(`[AUTO-FIX] Deleted corrupted auth folder: ${authPath}`);
@@ -101,27 +101,27 @@ async function connectToWhatsApp(companyId) {
                 }
 
                 // 2. Set Disconnected but DO NOT CLEAR QR CODE
-                await updateCompanySettings(companyId, { is_connected: false });
+                await updateCompanySettings(connectionId, { is_connected: false });
 
-                sessions.delete(companyId);
+                sessions.delete(connectionId);
 
                 // 3. Retry connection as if it were a normal drop (since we cleaned the folder, next one is fresh)
-                const attempts = reconnectionAttempts.get(companyId) || 0;
+                const attempts = reconnectionAttempts.get(connectionId) || 0;
                 if (attempts < MAX_RECONNECTION_ATTEMPTS) {
-                    reconnectionAttempts.set(companyId, attempts + 1);
+                    reconnectionAttempts.set(connectionId, attempts + 1);
                     console.log(`[AUTO-RETRY] Restarting fresh session after cleanup (${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS})`);
-                    connectToWhatsApp(companyId);
+                    connectToWhatsApp(companyId, connectionId);
                 } else {
                     console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached even after cleanup. Stopping.`);
                     // We stopped, but the LAST generated QR code stays in DB for user to see/debug
                 }
             }
         } else if (connection === 'open') {
-            console.log('opened connection for company', companyId);
-            await updateCompanySettings(companyId, { is_connected: true, qr_code: null });
-            sessions.set(companyId, sock);
+            console.log('opened connection for connection', connectionId);
+            await updateCompanySettings(connectionId, { is_connected: true, qr_code: null });
+            sessions.set(connectionId, sock);
             // Reset reconnection attempts on successful connection
-            reconnectionAttempts.delete(companyId);
+            reconnectionAttempts.delete(connectionId);
         }
     });
 
@@ -143,7 +143,7 @@ async function connectToWhatsApp(companyId) {
 
         // Save to Supabase
         try {
-            await handleIncomingMessage(sock, msg, from, contactName, text, new Date(), false, companyId);
+            await handleIncomingMessage(sock, msg, from, contactName, text, new Date(), false, companyId, connectionId);
         } catch (e) {
             console.error('Error handling message:', e);
         }
@@ -288,15 +288,15 @@ async function syncHistory(companyId, contacts, messages) {
         
         // reuse handleIncomingMessage? 
         // We modify handleIncomingMessage to accept timestamp and 'isFromMe'
-        await handleIncomingMessage(null, msg, from, contactName, text, new Date(ts), isFromMe, companyId);
+        await handleIncomingMessage(null, msg, from, contactName, text, new Date(ts), isFromMe, companyId, null);
         count++;
     }
     console.log(`Synced ${count} messages from last 30 days.`);
 }
 
 // Helper to update settings in DB
-async function updateCompanySettings(companyId, updates) {
-    console.log(`[updateCompanySettings] Company ID: ${companyId}`);
+async function updateCompanySettings(connectionId, updates) {
+    console.log(`[updateCompanySettings] Connection ID: ${connectionId}`);
 
     // Trap for debugging
     if (updates.hasOwnProperty('qr_code') && updates.qr_code === null) {
@@ -309,7 +309,7 @@ async function updateCompanySettings(companyId, updates) {
         const { data, error } = await supabase
             .from('whatsapp_settings')
             .update(updates)
-            .eq('company_id', companyId)
+            .eq('id', connectionId)
             .select();
 
         if (error) {
@@ -322,7 +322,7 @@ async function updateCompanySettings(companyId, updates) {
     }
 }
 
-async function handleIncomingMessage(sock, msg, from, contactName, text, timestamp = new Date(), isFromMe = false, companyId) {
+async function handleIncomingMessage(sock, msg, from, contactName, text, timestamp = new Date(), isFromMe = false, companyId, connectionId) {
     if (!companyId) {
         console.log('Skipping DB save: companyId not set');
         return;
@@ -346,16 +346,21 @@ async function handleIncomingMessage(sock, msg, from, contactName, text, timesta
 
     if (!conv) {
         // Create new conversation
+        const insertData = {
+            company_id: companyId,
+            contact_phone: from,
+            contact_name: contactName,
+            status: 'aberto', // or 'pendente' default
+            unread_count: 1,
+            last_message_at: new Date().toISOString()
+        };
+        if (connectionId) {
+            insertData.connection_id = connectionId;
+        }
+
         const { data: newConv, error: createError } = await supabase
             .from('whatsapp_conversations')
-            .insert({
-                company_id: companyId,
-                contact_phone: from,
-                contact_name: contactName,
-                status: 'aberto', // or 'pendente' default
-                unread_count: 1,
-                last_message_at: new Date().toISOString()
-            })
+            .insert(insertData)
             .select()
             .single();
         
