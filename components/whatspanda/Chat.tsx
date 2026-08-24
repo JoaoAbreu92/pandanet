@@ -786,6 +786,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       query = query.eq('status', 'aberto').is('assigned_to', null);
     } else if (activeTab === 'meus') {
       query = query.eq('status', 'aberto').eq('assigned_to', userId);
+    } else if (activeTab === 'todos') {
+      query = query.eq('status', 'aberto');
     } else if (activeTab === 'fechados') {
       query = query.eq('status', 'fechado');
     }
@@ -1746,7 +1748,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
-            {(['meus', 'aguardando', 'fechados'] as const).map((tab) => (
+            {((isAdmin || permissions?.can_view_others_chats)
+              ? (['meus', 'aguardando', 'todos', 'fechados'] as const)
+              : (['meus', 'aguardando', 'fechados'] as const)
+            ).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
