@@ -549,6 +549,11 @@ BEGIN
 END $$;
 
 -- 2. Atualizar apply_tenant_policies para dar bypass nos Super Admins
+CREATE OR REPLACE FUNCTION public.get_user_company_id()
+RETURNS UUID AS $$
+  SELECT company_id FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE;
+
 CREATE OR REPLACE FUNCTION apply_tenant_policies()
 RETURNS VOID AS $$
 DECLARE
@@ -562,11 +567,11 @@ BEGIN
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I', t);
         EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
-                        USING (company_id = get_user_company_id() OR EXISTS (
+                        USING (company_id = public.get_user_company_id() OR EXISTS (
                             SELECT 1 FROM public.profiles 
                             WHERE id = auth.uid() AND is_admin = TRUE
                         )) 
-                        WITH CHECK (company_id = get_user_company_id() OR EXISTS (
+                        WITH CHECK (company_id = public.get_user_company_id() OR EXISTS (
                             SELECT 1 FROM public.profiles 
                             WHERE id = auth.uid() AND is_admin = TRUE
                         ))', t);
