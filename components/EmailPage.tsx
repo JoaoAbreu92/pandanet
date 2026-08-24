@@ -462,58 +462,84 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
 
     const handleSendEmail = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser || !composeData?.to) return;
+        if (!currentUser) return;
 
-        const newEmail = {
-            user_id: currentUser.id,
-            company_id: currentUser.company_id,
-            from_name: currentUser.name,
-            from_email: currentUser.email,
-            subject: composeData.subject || '(Sem assunto)',
-            content: composeData.body || '',
-            preview: composeData.body?.substring(0, 100) || '',
-            folder: 'sent',
-            is_read: true,
-            is_starred: false
-        };
-
-        const { data, error } = await supabase
-            .from('emails')
-            .insert({
-                ...newEmail,
-                attachments: (attachments as { file: File; preview: string; id: string }[]).map(a => ({
-                    name: a.file.name,
-                    size: (a.file.size / 1024).toFixed(1) + ' KB',
-                    type: a.file.type
-                }))
-            })
-            .select()
-            .single();
-
-        if (!error && data) {
-            // Se as configurações de servidor estiverem preenchidas, tenta enviar via SMTP real
-            if (serverConfig.smtp_host && serverConfig.user && serverConfig.pass) {
-                await supabase.functions.invoke('email-handler', {
-                    body: {
-                        action: 'send-email',
-                        settings: serverConfig,
-                        emailData: {
-                            ...newEmail,
-                            to: composeData.to,
-                            body: newEmail.content
-                        }
-                    }
+        try {
+            if (!composeData?.to) {
+                addNotification({
+                    title: 'Campo Obrigatório',
+                    message: 'Por favor, informe o destinatário.',
+                    type: 'error',
+                    user_id: currentUser.id
                 });
+                return;
             }
 
-            setEmails(prev => [data, ...prev]);
-            setIsComposeOpen(false);
-            setComposeData(null);
-            setAttachments([]);
+            const newEmail = {
+                user_id: currentUser.id,
+                company_id: currentUser.company_id,
+                from_name: currentUser.name,
+                from_email: currentUser.email,
+                subject: composeData.subject || '(Sem assunto)',
+                content: composeData.body || '',
+                preview: composeData.body?.substring(0, 100) || '',
+                folder: 'sent',
+                is_read: true,
+                is_starred: false
+            };
+
+            const { data, error } = await supabase
+                .from('emails')
+                .insert({
+                    ...newEmail,
+                    attachments: (attachments as { file: File; preview: string; id: string }[]).map(a => ({
+                        name: a.file.name,
+                        size: (a.file.size / 1024).toFixed(1) + ' KB',
+                        type: a.file.type
+                    }))
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                // Se as configurações de servidor estiverem preenchidas, tenta enviar via SMTP real
+                if (serverConfig.smtp_host && serverConfig.user && serverConfig.pass) {
+                    const { data: result, error: invokeError } = await supabase.functions.invoke('email-handler', {
+                        body: {
+                            action: 'send-email',
+                            settings: serverConfig,
+                            emailData: {
+                                ...newEmail,
+                                to: composeData.to,
+                                body: newEmail.content
+                            }
+                        }
+                    });
+
+                    if (invokeError || !result?.success) {
+                        throw new Error(invokeError?.message || result?.error || 'Falha ao processar envio no servidor');
+                    }
+                }
+
+                setEmails(prev => [data, ...prev]);
+                setIsComposeOpen(false);
+                setComposeData(null);
+                setAttachments([]);
+                addNotification({
+                    title: 'E-mail Enviado',
+                    message: 'Sua mensagem foi enviada com sucesso.',
+                    type: 'success',
+                    user_id: currentUser.id
+                });
+            }
+        } catch (err: any) {
+            console.error('Send Error:', err);
             addNotification({
-                title: 'E-mail Enviado',
-                message: 'Sua mensagem foi enviada com sucesso.',
-                type: 'success',
+                title: 'Erro ao Enviar',
+                message: err.message || 'Não foi possível enviar sua mensagem.',
+                type: 'error',
                 user_id: currentUser.id
             });
         }

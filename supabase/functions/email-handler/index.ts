@@ -14,47 +14,34 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceRole);
 
-// Helpers de conexão Socket
-async function testConnection(host: string, port: number, timeout = 3000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+// Helpers de conexão Socket com logs
+async function testConnection(host: string, port: number, timeout = 5000) {
   try {
     const conn = await Deno.connect({ hostname: host, port });
     conn.close();
-    clearTimeout(id);
     return { ok: true };
   } catch (e: any) {
-    clearTimeout(id);
     return { ok: false, error: e.message };
   }
 }
 
 async function probeTls(host: string, port: number, timeout = 5000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
   try {
     const conn = await Deno.connectTls({ hostname: host, port });
     conn.close();
-    clearTimeout(id);
     return { ok: true };
   } catch (e: any) {
-    clearTimeout(id);
     return { ok: false, error: e.message };
   }
 }
 
-// Helper Brevo API Auth
 async function testBrevoAuth(apiKey: string) {
   const response = await fetch('https://api.brevo.com/v3/account', {
     headers: { 'api-key': apiKey }
   });
-  if (!response.ok) {
-    return { ok: false };
-  }
-  return { ok: true };
+  return { ok: response.ok, status: response.status };
 }
 
-// Helper Send via Brevo
 async function sendEmailBrevo(apiKey: string, sender: string, to: string, subject: string, html: string) {
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
@@ -73,32 +60,33 @@ async function sendEmailBrevo(apiKey: string, sender: string, to: string, subjec
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(`Brevo Error: ${data.message || response.statusText}`);
+    throw new Error(`Brevo API: ${data.message || response.statusText}`);
   }
   return data;
 }
 
-console.log("Edge Function 'email-handler' V39 iniciada.");
+console.log("Edge Function 'email-handler' V41 iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  if (req.method === 'GET') {
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Edge Function Online (V39). Send & Sync fully supported.' 
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-  }
+  let debugLogs: string[] = [];
+  const log = (msg: string) => {
+    console.log(msg);
+    debugLogs.push(msg);
+  };
 
   try {
-    if (req.method !== 'POST') throw new Error(`Método ${req.method} não suportado.`);
+    if (req.method === 'GET') {
+      return new Response(JSON.stringify({ success: true, message: 'V41 Online' }), { headers: corsHeaders });
+    }
+
     const payload = await req.json().catch(() => ({}));
     const { action, settings, emailData } = payload;
     if (!action) throw new Error("Ação ausente.");
 
-    console.log(`[V39] Ação: ${action}`);
+    log(`[V41] Ação iniciada: ${action}`);
 
-    // Configs de SMTP e IMAP
     const smtpPort = Number(settings?.smtp_port) || (settings?.smtp_ssl ? 465 : 587);
     const imapPort = Number(settings?.imap_port) || (settings?.imap_ssl ? 993 : 143);
     const useImapSsl = settings?.imap_ssl ?? (imapPort === 993);
@@ -111,7 +99,7 @@ Deno.serve(async (req) => {
       smtpPass = parts[1];
     }
 
-    const isBrevo = settings?.smtp_host?.includes('brevo');
+    const isBrevo = settings?.smtp_host?.toLowerCase().includes('brevo');
     const hasBrevoKey = settings?.brevo_api_key || smtpPass?.startsWith('xkeysib-');
     const brevoKey = settings?.brevo_api_key || (hasBrevoKey ? smtpPass : null);
 
@@ -119,35 +107,45 @@ Deno.serve(async (req) => {
     // TEST-CONNECTION
     // ==========================================
     if (action === 'test-connection') {
-      let smtpResult: any = { status: 'rejected', reason: new Error("Pendente") };
-      let imapResult: any = { status: 'rejected', reason: new Error("Pendente") };
+      log(`Testando SMTP em ${settings.smtp_host}:${smtpPort} (SSL: ${settings.smtp_ssl})`);
 
-      try {
-        if (isBrevo && brevoKey) {
+      let smtpStatus = "Falhou";
+      if (isBrevo && brevoKey) {
+        log("Modo Brevo detectado.");
           const auth = await testBrevoAuth(brevoKey);
-          smtpResult = auth.ok ? { status: 'fulfilled', value: "Brevo OK" } : { status: 'rejected', reason: new Error("API Key inválida") };
+        if (auth.ok) {
+          smtpStatus = "Brevo OK";
+          log("Brevo Autenticado com sucesso.");
         } else {
-          const p = (smtpPort === 465) ? await probeTls(settings.smtp_host, smtpPort) : await testConnection(settings.smtp_host, smtpPort);
-          smtpResult = p.ok ? { status: 'fulfilled', value: "SMTP OK" } : { status: 'rejected', reason: new Error(p.error) };
+          throw new Error(`Brevo Auth falhou (Status ${auth.status})`);
         }
-      } catch (e: any) { smtpResult = { status: 'rejected', reason: e }; }
-
-      try {
-        const p = useImapSsl ? await probeTls(settings.imap_host, imapPort) : await testConnection(settings.imap_host, imapPort);
-        imapResult = p.ok ? { status: 'fulfilled', value: "IMAP OK" } : { status: 'rejected', reason: new Error(p.error) };
-      } catch (e: any) { imapResult = { status: 'rejected', reason: e }; }
-
-      if (smtpResult.status === 'fulfilled') {
-        const warn = imapResult.status === 'rejected' ? ` (Aviso IMAP: ${imapResult.reason.message})` : "";
-        return new Response(JSON.stringify({ success: true, message: `${smtpResult.value}${warn}` }), { headers: corsHeaders });
+      } else {
+          const p = (smtpPort === 465) ? await probeTls(settings.smtp_host, smtpPort) : await testConnection(settings.smtp_host, smtpPort);
+        if (p.ok) {
+          smtpStatus = "SMTP Conectado";
+          log("Socket SMTP estabelecido.");
+        } else {
+          throw new Error(`Erro SMTP Socket: ${p.error}`);
+        }
       }
-      return new Response(JSON.stringify({ success: false, error: smtpResult.reason?.message }), { headers: corsHeaders });
+
+      log(`Testando IMAP em ${settings.imap_host}:${imapPort} (SSL: ${useImapSsl})`);
+      const imapP = useImapSsl ? await probeTls(settings.imap_host, imapPort) : await testConnection(settings.imap_host, imapPort);
+      let imapMsg = imapP.ok ? "IMAP Conectado" : `IMAP Erro: ${imapP.error}`;
+      log(imapMsg);
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: `${smtpStatus} | ${imapMsg}`,
+        debug: debugLogs
+      }), { headers: corsHeaders });
     }
 
     // ==========================================
     // SYNC-EMAILS
     // ==========================================
     if (action === 'sync-emails') {
+      log(`Iniciando Sincronização IMAP...`);
       const client = new ImapFlow({
         host: settings.imap_host,
         port: imapPort,
@@ -159,8 +157,10 @@ Deno.serve(async (req) => {
       });
 
       await client.connect();
+      log("Conectado ao IMAP para sincronização.");
       const lock = await client.getMailboxLock('INBOX');
       const latestMessages = [];
+      log("Listando últimas mensagens...");
       for await (const message of client.list({ seq: '1:20' }, { envelope: true, preview: true })) {
           latestMessages.push({
             user_id: settings.user_id,
@@ -178,12 +178,16 @@ Deno.serve(async (req) => {
       }
       lock.release();
       await client.logout();
+      log(`Encontradas ${latestMessages.length} mensagens. Salvando no DB...`);
 
       if (latestMessages.length > 0) {
+        if (!supabaseUrl || !supabaseServiceRole) {
+          throw new Error("Configuração interna do Supabase (URL/Key) ausente na Edge Function.");
+        }
         const { error: dbError } = await supabase.from('emails').upsert(latestMessages, { onConflict: 'message_id' });
-          if (dbError) throw dbError;
+        if (dbError) throw dbError;
       }
-      return new Response(JSON.stringify({ success: true, count: latestMessages.length }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ success: true, count: latestMessages.length, debug: debugLogs }), { headers: corsHeaders });
     }
 
     // ==========================================
@@ -192,12 +196,13 @@ Deno.serve(async (req) => {
     if (action === 'send-email') {
       if (!emailData) throw new Error("Dados do e-mail ausentes.");
       const { from_email, to, subject, body } = emailData;
+      log(`Enviando e-mail para ${to}...`);
 
       if (isBrevo && brevoKey) {
-        console.log(`[V39] Enviando via Brevo API...`);
+        log(`Usando Brevo API.`);
         await sendEmailBrevo(brevoKey, from_email || settings.user, to, subject, body);
       } else {
-        console.log(`[V39] Enviando via SMTP...`);
+        log(`Usando SMTP Tradicional.`);
         const transporter = nodemailer.createTransport({
           host: settings.smtp_host,
           port: smtpPort,
@@ -212,13 +217,14 @@ Deno.serve(async (req) => {
           html: body
         });
       }
-      return new Response(JSON.stringify({ success: true, message: "Sucesso!" }), { headers: corsHeaders });
+      log("E-mail enviado com sucesso!");
+      return new Response(JSON.stringify({ success: true, message: "Sucesso!", debug: debugLogs }), { headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'V39 OK' }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ success: true, message: 'Ação Processada', debug: debugLogs }), { headers: corsHeaders });
 
   } catch (error: any) {
-    console.error(`[V39 ERROR]`, error.message);
-    return new Response(JSON.stringify({ success: false, error: error.message }), { headers: corsHeaders });
+    log(`[ERROR] ${error.message}`);
+    return new Response(JSON.stringify({ success: false, error: error.message, debug: debugLogs }), { headers: corsHeaders });
   }
 })
