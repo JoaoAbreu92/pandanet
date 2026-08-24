@@ -171,21 +171,21 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     {/* Botão AI Assistant no Header */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('toggle-panda-ai'))}
-                        className="p-2.5 text-brand-primary bg-brand-primary/5 hover:bg-brand-primary/10 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-xl transition-all active:scale-95 group relative border border-brand-primary/10"
+                        className="hidden lg:flex p-2.5 text-brand-primary bg-brand-primary/5 hover:bg-brand-primary/10 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-xl transition-all active:scale-95 group relative border border-brand-primary/10"
                         title="Abrir Assistente com IA"
                     >
                         <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                         <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
                     </button>
                     {currentUser.email === 'ti@grupopixel.com.br' && (
-                        <>
-                            {/* Diagnóstico Master Admin - Agora no Header */}
+                        <div className="hidden lg:flex items-center space-x-2">
+                             {/* Diagnóstico Master Admin - Agora no Header */}
                             <button
                                 onClick={onToggleDebug}
                                 className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all active:scale-95 group"
                                 title="Painel de Diagnóstico Lateral"
                             >
-                                <BugAntIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                                < BugAntIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
                             </button>
 
                             {/* Botão de Verificação (Engrenagem) - Redireciona para página de diagnóstico */}
@@ -204,11 +204,11 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             >
                                 <ArrowPathIcon className="w-5 h-5 text-red-400" />
                             </button>
-                        </>
+                        </div>
                     )}
 
                     {/* Botão de Ativar Sons + Selector */}
-                    <div className="flex items-center">
+                    <div className="hidden lg:flex items-center">
                         <button
                             onClick={testNotifications}
                             className="flex items-center justify-center gap-1.5 h-8 px-3 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border-y border-l border-emerald-200"
@@ -251,30 +251,32 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     {/* Botão de Tema (Sol/Lua) */}
                     <button
                         onClick={toggleTheme}
-                        className="p-2 text-gray-500 rounded-full hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:bg-gray-700"
+                        className="hidden lg:flex p-2 text-gray-500 rounded-full hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:bg-gray-700"
                         title={theme === 'light' ? t('theme.dark') : t('theme.light')}
                     >
                         {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                     </button>
 
                     {/* Botão de Idioma (Ciclo PT -> EN -> ES) com Bandeiras */}
-                    <button
-                        onClick={() => {
-                            const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es'];
-                            const next = langs[(langs.indexOf(language) + 1) % langs.length];
-                            setLanguage(next);
-                        }}
-                        className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-lg hover:bg-gray-200 transition-all dark:bg-gray-700 dark:hover:bg-gray-600"
-                        title={t('language.select')}
-                    >
-                        {language === 'pt' ? (
-                            <img src="https://flagcdn.com/w40/br.png" alt="Brasil" className="w-5 h-auto rounded-sm shadow-sm" />
-                        ) : language === 'en' ? (
-                            <img src="https://flagcdn.com/w40/us.png" alt="USA" className="w-5 h-auto rounded-sm shadow-sm" />
-                        ) : (
-                            <img src="https://flagcdn.com/w40/es.png" alt="Spain" className="w-5 h-auto rounded-sm shadow-sm" />
-                        )}
-                    </button>
+                    <div className="hidden lg:flex">
+                        <button
+                            onClick={() => {
+                                const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es'];
+                                const next = langs[(langs.indexOf(language) + 1) % langs.length];
+                                setLanguage(next);
+                            }}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-lg hover:bg-gray-200 transition-all dark:bg-gray-700 dark:hover:bg-gray-600"
+                            title={t('language.select')}
+                        >
+                            {language === 'pt' ? (
+                                <img src="https://flagcdn.com/w40/br.png" alt="Brasil" className="w-5 h-auto rounded-sm shadow-sm" />
+                            ) : language === 'en' ? (
+                                <img src="https://flagcdn.com/w40/us.png" alt="USA" className="w-5 h-auto rounded-sm shadow-sm" />
+                            ) : (
+                                <img src="https://flagcdn.com/w40/es.png" alt="Spain" className="w-5 h-auto rounded-sm shadow-sm" />
+                            )}
+                        </button>
+                    </div>
 
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
@@ -293,17 +295,40 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             </div>
                         </button>
                         {isDropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-56 bg-white rounded-md shadow-lg py-1 z-[100] dark:bg-gray-800 dark:border dark:border-gray-700">
-                                <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 text-left">
-                                    <UserCircleIcon className="w-5 h-5 mr-2" /> {t('header.profile')}
+                            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[100] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 lg:hidden">
+                                    <p className="font-bold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{currentUser.role}</p>
+                                </div>
+                                
+                                <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                    <UserCircleIcon className="w-5 h-5 mr-3 text-emerald-500" /> {t('header.profile')}
                                 </button>
+                                
+                                {/* Mobile Only Items */}
+                                <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
+                                    <button onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                        {theme === 'light' ? <MoonIcon className="w-5 h-5 mr-3 text-slate-500" /> : <SunIcon className="w-5 h-5 mr-3 text-yellow-500" />} {theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+                                    </button>
+                                    <button onClick={() => { const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es']; setLanguage(langs[(langs.indexOf(language) + 1) % langs.length]); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                        <SparklesIcon className="w-5 h-5 mr-3 text-blue-500" /> Idioma: {language.toUpperCase()}
+                                    </button>
+                                    <button onClick={() => { window.dispatchEvent(new CustomEvent('toggle-panda-ai')); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                        <SparklesIcon className="w-5 h-5 mr-3 text-brand-primary" /> Panda IA
+                                    </button>
+                                    <button onClick={() => { testNotifications(); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                        <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> Ativar Sons
+                                    </button>
+                                </div>
+
                                 {currentUser.isAdmin && !isImpersonating && (
-                                    <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 text-left">
-                                        <Cog6ToothIcon className="w-5 h-5 mr-2" /> {t('sidebar.admin')}
+                                    <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
+                                        <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
                                     </button>
                                 )}
-                                <button type="button" onClick={() => { onLogout(); }} className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 text-left">
-                                    <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" /> {t('header.logout')}
+                                
+                                <button type="button" onClick={() => { onLogout(); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 text-left border-t border-gray-50 dark:border-white/5 mt-1">
+                                    <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" /> {t('header.logout')}
                                 </button>
                             </div>
                         )}

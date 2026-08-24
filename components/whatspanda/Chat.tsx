@@ -28,7 +28,15 @@ import {
   X,
   Plus,
   Image as ImageIcon,
-  Sticker
+  Sticker,
+  Trash2,
+  Download,
+  File as FileIcon,
+  Video,
+  Volume2,
+  Calendar,
+  AlertCircle,
+  Menu
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -1059,19 +1067,62 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
                     }`}
                   >
-                    {msg.media_type === 'image' ? (
-                      <img src={msg.media_url || ''} alt="Image" className="rounded-lg max-w-full h-auto cursor-pointer" onClick={() => window.open(msg.media_url || '')} />
-                    ) : msg.media_type === 'audio' ? (
-                      <audio controls className="w-full min-w-[200px] h-10 mt-1">
-                        <source src={msg.media_url || ''} type="audio/mpeg" />
-                      </audio>
-                    ) : msg.media_type === 'video' ? (
-                      <video controls className="rounded-lg max-w-full h-auto">
-                        <source src={msg.media_url || ''} type="video/mp4" />
-                      </video>
-                    ) : (
-                      <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
-                    )}
+                    <div className="space-y-2">
+                      {(msg.media_type?.includes('image') || msg.media_type === 'sticker') ? (
+                        <div className="relative group">
+                          <img 
+                            src={msg.media_url || ''} 
+                            alt="Mídia" 
+                            className="rounded-xl max-w-full h-auto cursor-pointer border border-white/10 shadow-sm" 
+                            onClick={() => window.open(msg.media_url || '_blank')} 
+                          />
+                          <a 
+                            href={msg.media_url || ''} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ) : msg.media_type?.includes('audio') ? (
+                        <div className="flex flex-col gap-1 min-w-[200px]">
+                          <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                            <Volume2 className="w-4 h-4" />
+                            <span>Mensagem de Áudio</span>
+                          </div>
+                          <audio controls className="w-full h-10">
+                            <source src={msg.media_url || ''} type="audio/mpeg" />
+                          </audio>
+                        </div>
+                      ) : msg.media_type?.includes('video') ? (
+                        <div className="relative group rounded-xl overflow-hidden shadow-sm">
+                          <video controls className="max-w-full h-auto">
+                            <source src={msg.media_url || ''} type="video/mp4" />
+                          </video>
+                        </div>
+                      ) : msg.media_url ? (
+                        <a 
+                          href={msg.media_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-white/10 dark:bg-white/5 rounded-xl border border-white/20 hover:border-emerald-400 transition-all group"
+                        >
+                          <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg group-hover:scale-110 transition-transform">
+                            <FileIcon className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate">Arquivo / Documento</p>
+                            <p className="text-[10px] opacity-60 uppercase font-bold tracking-tighter">Clique para baixar</p>
+                          </div>
+                          <Download className="w-4 h-4 opacity-40 group-hover:opacity-100" />
+                        </a>
+                      ) : null}
+
+                      {msg.message_text && (
+                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
+                      )}
+                    </div>
                     <div className="flex justify-end items-center gap-1.5 mt-2 opacity-60">
                       <span className="text-[10px] font-medium uppercase tracking-tight">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

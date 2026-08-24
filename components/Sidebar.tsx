@@ -125,7 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             <button
                 type="button"
                 onClick={() => onNavigate(page)}
-                className={`w-full flex items-center p-3 rounded-xl transition-all duration-300 relative group 
+                className={`w-full flex items-center p-2.5 md:p-3 rounded-xl transition-all duration-300 relative group 
                     ${currentPage === page
                         ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30 dark:shadow-brand-primary/10 scale-[1.02] border border-white/10'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
@@ -133,14 +133,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
             >
                 <div className="relative">
-                    <Icon className={`w-6 h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : ''}`} />
+                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : ''}`} />
                     {badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
                             {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                     )}
                 </div>
-                {isOpen && <span className={`ml-4 truncate font-medium ${currentPage === page ? 'font-bold' : ''}`}>{label}</span>}
+                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${currentPage === page ? 'font-bold' : ''}`}>{label}</span>}
 
                 {/* Visual indicator for active item */}
                 {currentPage === page && (
@@ -186,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                         e.stopPropagation();
                         toggleMenu(menuKey);
                     }}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 relative group
+                    className={`w-full flex items-center justify-between p-2.5 md:p-3 rounded-xl transition-all duration-300 relative group
                         ${isActive
                             ? 'bg-brand-primary/10 text-brand-primary dark:text-brand-primary border border-brand-primary/20'
                             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
@@ -194,16 +194,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 >
                     <div className="flex items-center">
                         <div className="relative">
-                            <Icon className="w-6 h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
+                            <Icon className="w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
                             {menuBadgeCount > 0 && !openMenus[menuKey] && (
                                 <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900 animate-pulse">
                                     {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
                                 </span>
                             )}
                         </div>
-                        {isOpen && <span className="ml-4 truncate font-bold text-sm tracking-wide uppercase opacity-80">{label}</span>}
+                        {isOpen && <span className="ml-3.5 md:ml-4 truncate font-bold text-xs md:text-sm tracking-wide uppercase opacity-80">{label}</span>}
                     </div>
-                    {isOpen && <ChevronDownIcon className={`w-4 h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
+                    {isOpen && <ChevronDownIcon className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
                 {openMenus[menuKey] && isOpen && (
                     <div className="pl-4 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-500">
@@ -229,14 +229,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
             ${isImpersonating ? 'border-t-4 border-t-red-500' : ''}
         `}>
-            <div className="h-24 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
-                <div className="hover:scale-105 transition-transform duration-300">
-                    <Logo showText={isOpen} className={isOpen ? 'h-12' : 'h-10'} />
+            <div className="h-20 md:h-24 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
+                <div className="hover:scale-105 transition-transform duration-300 transition-all">
+                    <Logo showText={isOpen} className={isOpen ? 'h-10 md:h-12' : 'h-8 md:h-10'} />
                 </div>
             </div>
             <nav
                 ref={navRef}
-                className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar"
+                className="flex-1 px-3 md:px-4 py-4 md:py-6 space-y-1.5 md:space-y-2 overflow-y-auto no-scrollbar"
             >
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
                 <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
@@ -316,11 +316,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 )}
             </nav>
             {/* Company Logo Footer */}
-            <div className={`mt-auto p-4 border-t border-gray-100 text-center bg-white ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
+            <div className={`mt-auto p-3 lg:p-4 border-t border-gray-100 dark:border-white/5 text-center bg-white/50 dark:bg-white/5 backdrop-blur-sm 
+                ${isOpen ? 'block' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
-                    <img src={companyLogo} alt={companyName} className="h-10 mx-auto object-contain" />
+                    <img src={companyLogo} alt={companyName} className="h-8 md:h-10 mx-auto object-contain" />
                 )}
-                <p className="text-sm font-bold text-gray-800 truncate mt-2">{companyName}</p>
+                <p className="text-xs md:text-sm font-bold text-gray-800 dark:text-gray-200 truncate mt-2">{companyName}</p>
             </div>
         </aside>
     );
