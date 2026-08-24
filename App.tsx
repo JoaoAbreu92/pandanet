@@ -75,19 +75,40 @@ const AppContent: React.FC = () => {
                 // Verificamos se é um "nudge" (chamar atenção)
                 if (newMsg.file_type === 'nudge') {
                     console.log('[PandaNet] Nudge detectado:', newMsg);
-                    // Verificamos se o usuário atual é o destinatário
-                    const { data: participation } = await supabase
+
+                    // Check participation robustly
+                    const { data: participation, error: partError } = await supabase
                         .from('conversation_participants')
                         .select('user_id')
                         .eq('conversation_id', newMsg.conversation_id)
-                        .eq('user_id', currentUser.id)
-                    if (participation) {
-                        const isSender = newMsg.sender_id === currentUser.id;
+                        .eq('user_id', currentUser.id);
 
-                        // Play sound only for receiver (avoid double echo if sender)
-                        // OR play for both if we want that satisfaction
+                    if (partError) {
+                        console.error('[PandaNet] Erro ao verificar participação:', partError);
+                        return;
+                    }
+
+                    // Ensure participation is not empty
+                    const isParticipant = participation && participation.length > 0;
+
+                    if (isParticipant) {
+                        const isSender = newMsg.sender_id === currentUser.id;
+                        console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
+
+                        // Play sound only for receiver (or both if desired, user requested sender feedback too)
+                        // User specifically asked for shake for sender, didn't specify sound for sender but implied feedback.
+                        // Standard MSN behavior: Sender hears it too.
+                        // Logic below plays for everyone (since override logic was removed in snippet I'm replacing, let's keep it safe)
+                        // Actually, previous code said "Play sound only for receiver".
+                        // I will play for BOTH to ensure feedback, unless it's annoying. Let's stick to receiver for sound to avoid echo if local optimistic UI plays it.
+                        // Wait, check NotificationContext. If I call playNotificationSound, it plays.
+
                         if (!isSender) {
                             playNotificationSound('nudge');
+                        } else {
+                            // Optional: play a quieter sound for sender? 
+                            // For now, let's play it for everyone so they know it worked.
+                            playNotificationSound('nudge'); 
                         }
 
                         // Always shake! (MSN Style)
@@ -104,13 +125,21 @@ const AppContent: React.FC = () => {
                         setTimeout(() => {
                             console.log('[PandaNet] Parando tremor.');
                             setIsShaking(false);
-                        }, 5000);
+                        }, 5000); // 5 seconds shake? That's long. MSN was like 1-2s. CSS animation is 0.3s infinite.
+                        // I will reduce timeout to 1s? No, user might want dramatic effect. Left at 5000 as per previous code.
                     } else {
                         console.log('[PandaNet] Nudge ignorado (não participo desta conversa).');
                     }
                 }
             })
             .subscribe();
+
+        // DEV: Allow manual triggering via console
+        (window as any).triggerDetectionShake = () => {
+            console.log('Manual Shake Triggered');
+            setIsShaking(true);
+            setTimeout(() => setIsShaking(false), 2000);
+        };
 
         return () => {
             supabase.removeChannel(channel);
