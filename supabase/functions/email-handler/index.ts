@@ -4,11 +4,10 @@ const corsHeaders = {
 }
 
 // Helper para testar se uma porta TCP está aberta
-async function testConnection(host: string, port: number, timeout = 7000) {
+async function testConnection(host: string, port: number, timeout = 5000) {
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
-
     const conn = await Deno.connect({ hostname: host, port });
     conn.close();
     clearTimeout(id);
@@ -18,7 +17,18 @@ async function testConnection(host: string, port: number, timeout = 7000) {
   }
 }
 
-console.log("Edge Function 'email-handler' V20 (TLS Core Bypass) iniciada.");
+// Escaneia portas comuns em caso de falha para dar diagnóstico ao usuário
+async function scanCommonPorts(host: string) {
+  const ports = [143, 993, 587, 465, 110, 995, 25];
+  const results = [];
+  for (const port of ports) {
+    const res = await testConnection(host, port, 2000);
+    if (res.ok) results.push(port);
+  }
+  return results;
+}
+
+console.log("Edge Function 'email-handler' V21 (Protocol Scout) iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -28,42 +38,27 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V20). TLS 1.2 Force & IDE Lint active.' 
+      message: 'Edge Function Online (V21). Protocol Scout active.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new Error(`Método ${req.method} não suportado.`);
-    }
+    if (req.method !== 'POST') throw new Error(`Método ${req.method} não suportado.`);
 
     const payload = await req.json().catch(() => ({}));
     const { action, settings } = payload;
 
-    if (!action) {
-      throw new Error("Ação (action) não informada no corpo da requisição.");
-    }
+    if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V20] Executando ação: ${action}`);
+    console.log(`[V21] Ação: ${action}`);
 
     if (action === 'test-connection') {
-      if (!settings) throw new Error("Configurações (settings) não fornecidas.");
+      if (!settings) throw new Error("Configurações ausentes.");
 
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
-
-      // --- DIAGNÓSTICO DE REDE ---
-      const smtpReach = await testConnection(settings.smtp_host, Number(settings.smtp_port));
-      const imapReach = await testConnection(settings.imap_host, Number(settings.imap_port));
-
-      if (!smtpReach.ok) {
-        throw new Error(`SMTP (Inacessível): O servidor '${settings.smtp_host}' não responde na porta ${settings.smtp_port}. Verifique se o endereço está correto ou tente mail.${settings.smtp_host}.`);
-      }
-      if (!imapReach.ok) {
-        throw new Error(`IMAP (Inacessível): O servidor '${settings.imap_host}' não responde na porta ${settings.imap_port}. O erro 'os error 110' na Acrilight indica que este endereço (${settings.imap_host}) não possui serviço IMAP ativo ou o endereço está errado.`);
-      }
 
       // --- TESTE SMTP ---
       try {
@@ -72,23 +67,21 @@ Deno.serve(async (req) => {
           host: settings.smtp_host,
           port: settings.smtp_port,
           secure: isPort465,
-          auth: {
-            user: settings.user,
-            pass: settings.pass,
-          },
+          auth: { user: settings.user, pass: settings.pass },
           tls: { 
             rejectUnauthorized: false,
             servername: settings.smtp_host,
-            checkServerIdentity: () => undefined
+            minVersion: 'TLSv1', // Legacy support
+            ciphers: 'DEFAULT@SECLEVEL=0' // Bypass total de restrições TLS
           },
           requireTLS: !isPort465, 
-          connectionTimeout: 20000,
-          greetingTimeout: 20000
+          connectionTimeout: 15000,
+          greetingTimeout: 15000
         })
         await transporter.verify();
-        console.log("[SMTP V20] OK");
       } catch (e: any) {
-        throw new Error(`SMTP (Erro Protocolo): ${e.message}`);
+        const openPorts = await scanCommonPorts(settings.smtp_host);
+        throw new Error(`SMTP Falhou: ${e.message}. Portas abertas detectadas em '${settings.smtp_host}': ${openPorts.join(', ') || 'Nenhuma'}`);
       }
 
       // --- TESTE IMAP ---
@@ -98,47 +91,36 @@ Deno.serve(async (req) => {
           host: settings.imap_host,
           port: settings.imap_port,
           secure: isPort993,
-          auth: {
-            user: settings.user,
-            pass: settings.pass,
-          },
+          auth: { user: settings.user, pass: settings.pass },
           logger: true,
           tls: { 
             rejectUnauthorized: false,
             servername: settings.imap_host,
             checkServerIdentity: () => undefined,
-            // Força TLS 1.2 no Deno para evitar problemas de handshake 1.3
-            minVersion: 'TLSv1.2',
-            maxVersion: 'TLSv1.2'
+            minVersion: 'TLSv1', // Legacy support
+            ciphers: 'DEFAULT@SECLEVEL=0' 
           },
-          connectionTimeout: 40000,
-          greetingTimeout: 40000
+          connectionTimeout: 30000,
+          greetingTimeout: 30000
         })
         await client.connect();
         await client.logout();
-        console.log("[IMAP V20] OK");
       } catch (e: any) {
-        console.error("[IMAP ERROR V20]", e);
-        let errorMsg = e.message;
-        if (errorMsg.includes('Unexpected close')) {
-          errorMsg = `Conexão fechada durante o handshake. Dica para Hostinger: Certifique-se de usar imap.hostinger.com na porta 993 com SSL.`;
-        }
-        throw new Error(`IMAP: ${errorMsg}`);
+        console.error("[IMAP V21 ERROR]", e);
+        const openPorts = await scanCommonPorts(settings.imap_host);
+        let msg = e.message;
+        if (msg.includes('Unexpected close')) msg = "Conexão fechada durante handshake (TLS/SSL).";
+        throw new Error(`IMAP Falhou: ${msg}. Portas abertas detectadas em '${settings.imap_host}': ${openPorts.join(', ') || 'Nenhuma'}`);
       }
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conexão validada com sucesso na V20!'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+        message: 'Conectado com sucesso na V21!'
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: `Ação '${action}' ok na V20.`
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V21.' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error: any) {

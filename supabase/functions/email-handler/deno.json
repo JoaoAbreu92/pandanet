@@ -3,7 +3,8 @@
     "allowJs": true,
     "lib": [
       "deno.window",
-      "deno.ns"
+      "deno.ns",
+      "esnext"
     ],
     "strict": false
   },
