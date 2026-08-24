@@ -226,8 +226,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
     try {
       const updateData: any = { status: newStatus };
-      if (assignToMe && activeProfile?.id) {
-        updateData.assigned_to = activeProfile.id;
+      
+      // Aceitar Atendimento: sempre atribuir ao usuário logado
+      if (newStatus === 'aberto' && assignToMe) {
+        const userId = activeProfile?.id || profile?.id;
+        if (!userId) {
+          alert('Não foi possível identificar o usuário logado. Faça login novamente.');
+          return;
+        }
+        updateData.assigned_to = userId;
+      }
+      
+      // Finalizar: limpa o assigned_to para voltar ao pool se reaberto
+      if (newStatus === 'fechado') {
+        // mantém assigned_to para histórico
       }
 
       const { error } = await supabase
@@ -237,12 +249,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
 
       if (error) throw error;
 
-      // Update local state to reflect change immediately
+      // Remove da lista atual (mudou de aba) e atualiza o objeto selecionado
       setConversations(prev => prev.filter(c => c.id !== conversationId));
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(prev => prev ? { ...prev, ...updateData } : null);
-        // Se mudou de aba, talvez deselecionar ou apenas atualizar o objeto local
       }
+      
+      // Recarrega a lista para refletir mudanças
+      setTimeout(() => fetchConversations(), 500);
 
     } catch (err: any) {
       alert('Erro ao atualizar status: ' + err.message);

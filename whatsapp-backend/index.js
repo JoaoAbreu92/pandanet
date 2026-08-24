@@ -300,41 +300,61 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
 
         // Garantir que o número está limpo e tem código do país
         let phoneNumber = (conv.contact_phone || '').replace(/\D/g, '');
+        
+        // Validar tamanho do número (Brasil: 12-13 dígitos com DDI 55)
+        if (phoneNumber.length > 13 || phoneNumber.length < 10) {
+            console.error(`[SEND API] Número inválido: "${phoneNumber}" (${phoneNumber.length} dígitos). Contato pode ter sido importado com erro de sincronização.`);
+            return res.status(400).json({ 
+                error: 'Número de telefone inválido', 
+                details: `O número "${conv.contact_phone}" não é um número WhatsApp válido. Delete este contato/conversa e sincronize novamente.` 
+            });
+        }
+        
         if (!phoneNumber.startsWith('55') && phoneNumber.length <= 11) {
             phoneNumber = '55' + phoneNumber;
         }
         console.log(`[SEND API] Enviando para: ${phoneNumber} | Instância: ${instanceName}`);
 
-        // 2. Send via Evolution API - tenta v2 primeiro, depois v1 como fallback
+        // 2. Send via Evolution API
+        // Esta versão da Evolution requer o formato textMessage (v1)
         let sendRes = null;
         let sendOk = false;
 
-        // Formato v2
-        const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        // Tenta formato v1 PRIMEIRO (textMessage) - é o que esta versão da Evo requer
+        const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ number: phoneNumber, text: message })
+            body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
         });
-        try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
-        console.log(`[SEND API] Resposta v2 (${sendReqV2.status}):`, JSON.stringify(sendRes));
+        try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
+        console.log(`[SEND API] Resposta textMessage (${sendReqV1.status}):`, JSON.stringify(sendRes));
 
-        if (sendReqV2.ok && sendRes?.key) {
+        if (sendReqV1.ok && !sendRes?.error) {
             sendOk = true;
         } else {
-            // Formato v1
-            const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+            // Tenta formato v2 como fallback (text direto)
+            const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
+                body: JSON.stringify({ number: phoneNumber, text: message })
             });
-            try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
-            console.log(`[SEND API] Resposta v1 (${sendReqV1.status}):`, JSON.stringify(sendRes));
-            if (sendReqV1.ok) sendOk = true;
+            try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
+            console.log(`[SEND API] Resposta text (${sendReqV2.status}):`, JSON.stringify(sendRes));
+            if (sendReqV2.ok && !sendRes?.error) sendOk = true;
         }
 
         if (!sendOk) {
-            console.error('[SEND API] AMBOS OS FORMATOS FALHARAM:', JSON.stringify(sendRes));
-            return res.status(500).json({ error: 'Failed to send message via WhatsApp', details: sendRes });
+            const detail = sendRes?.response?.message || sendRes;
+            console.error('[SEND API] FALHA NO ENVIO:', JSON.stringify(detail));
+            
+            // Verifica se o número não existe no WhatsApp
+            if (Array.isArray(detail) && detail[0]?.exists === false) {
+                return res.status(400).json({ 
+                    error: 'Número não encontrado no WhatsApp', 
+                    details: `O número ${phoneNumber} não está cadastrado no WhatsApp.` 
+                });
+            }
+            return res.status(500).json({ error: 'Falha ao enviar mensagem via WhatsApp', details: detail });
         }
 
         // 3. Save message in Supabase
@@ -371,6 +391,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         res.status(500).json({ error: 'Internal server error while sending message' });
     }
 });
+
 
 
 // API: Reparar Webhooks
