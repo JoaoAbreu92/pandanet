@@ -323,6 +323,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             // --- REALTIME: WhatsPanda Conversations ---
             let whatsappChannel: any = null;
+            let whatsappMessagesChannel: any = null; // New channel for inbound messages
+
             if (currentUser.company_id) {
                 whatsappChannel = supabase
                     .channel('realtime-whatsapp-count')
@@ -335,6 +337,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         fetchNotifications();
                     })
                     .subscribe();
+
+                // Listen directly to incoming messages to trigger the global sound / Desktop Popup
+                whatsappMessagesChannel = supabase
+                    .channel('realtime-whatsapp-msgs-notify')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'whatsapp_messages',
+                        filter: `company_id=eq.${currentUser.company_id}`
+                    }, async (payload) => {
+                        const newMsg = payload.new as any;
+                        if (newMsg && newMsg.is_from_customer) {
+                            console.log('[PandaNet] Nova mensagem WhatsPanda -> Disparando Som Global');
+                            playNotificationSound('message');
+
+                            // Fetch o nome do contato para exibir no Popup
+                            const { data: convInfo } = await supabase
+                                .from('whatsapp_conversations')
+                                .select('contact_name, assigned_to')
+                                .eq('id', newMsg.conversation_id)
+                                .maybeSingle();
+                                
+                            const contatoNome = convInfo?.contact_name || 'Alguém';
+                            
+                            // Notifica todos na aba ou de acordo com assign. Mas como o cliente pediu global:
+                            showDesktopNotification(
+                                'WhatsPanda: Mensagem Recebida', 
+                                `${contatoNome}: ${newMsg.message_text ? newMsg.message_text.slice(0, 40) : 'Enviou uma Mídia'}`, 
+                                '/logo.png'
+                            );
+                            
+                            fetchNotifications();
+                        }
+                    })
+                    .subscribe();
             }
 
             return () => {
@@ -342,6 +379,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 supabase.removeChannel(channel);
                 supabase.removeChannel(messagesChannel);
                 if (whatsappChannel) supabase.removeChannel(whatsappChannel);
+                if (whatsappMessagesChannel) supabase.removeChannel(whatsappMessagesChannel);
             };
         }
     }, [currentUser?.id, currentUser?.company_id, fetchNotifications, playNotificationSound, showDesktopNotification]);

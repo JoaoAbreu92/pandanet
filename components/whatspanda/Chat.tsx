@@ -539,13 +539,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      // Buscar grupos: is_group = true OU JID com @g.us
-      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
+      // Buscar grupos: is_group = true OU JID contendo '-' que é marca registrada de grupo do Evolution
+      query = query.or('is_group.eq.true,contact_phone.ilike.%-%');
     } else if (chatTypeFilter === 'private') {
       // Remover grupos
       query = query
         .neq('is_group', true)
-        .not('contact_phone', 'ilike', '%@g.us%');
+        .not('contact_phone', 'ilike', '%-%');
     }
     // Se for 'all', não aplica filtro e mostra ambos
 
