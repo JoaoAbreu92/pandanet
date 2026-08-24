@@ -17,6 +17,7 @@ const TicketPage: React.FC = () => {
     const [isFormOpen, setFormOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [loading, setLoading] = useState(true);
+    const [currentTab, setCurrentTab] = useState<'active' | 'archived'>('active');
 
     const fetchTickets = async () => {
         if (!currentUser?.company_id) {
@@ -75,7 +76,9 @@ const TicketPage: React.FC = () => {
                     createdAt: new Date(t.created_at).toLocaleDateString('pt-BR'),
                     lastUpdate: new Date(t.updated_at || t.created_at).toLocaleDateString('pt-BR'),
                     comments: t.comments || [],
-                    hasNotification: false // Simple logic for now
+                    hasNotification: false, // Simple logic for now
+                    media_urls: t.media_urls || [],
+                    media_type: t.media_type
                 }));
                 setTickets(formattedTickets);
             }
@@ -117,6 +120,28 @@ const TicketPage: React.FC = () => {
     const handleCreateTicket = async (ticketData: any) => {
         if (!currentUser) return;
         try {
+            let mediaUrls: string[] = [];
+
+            if (ticketData.mediaFiles && ticketData.mediaFiles.length > 0) {
+                for (const file of ticketData.mediaFiles) {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Math.random()}.${fileExt}`;
+                    const filePath = `ticket-media/${currentUser.id}/${fileName}`;
+
+                    const { error: uploadError, data } = await supabase.storage
+                        .from('intranet-content') // Assuming a generic content bucket
+                        .upload(filePath, file);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('intranet-content')
+                        .getPublicUrl(filePath);
+
+                    mediaUrls.push(publicUrl);
+                }
+            }
+
             const { error } = await supabase
                 .from('tickets')
                 .insert([{
@@ -128,7 +153,9 @@ const TicketPage: React.FC = () => {
                     department_id: ticketData.department_id || null,
                     assigned_to_id: ticketData.assigned_to_id || null,
                     status: 'Aberto',
-                    comments: []
+                    comments: [],
+                    media_urls: mediaUrls,
+                    media_type: ticketData.mediaType
                 }]);
 
             if (error) throw error;
@@ -207,15 +234,43 @@ const TicketPage: React.FC = () => {
         currentUser?.team?.toUpperCase() === 'TI' ||
         (currentUser as any).is_company_admin;
 
-    const userTickets = isTechOrAdmin
+    const filteredTickets = isTechOrAdmin
         ? tickets
         : tickets.filter(t => (t as any).requester_id === currentUser?.id || t.assignedToId === currentUser?.id);
+
+    const userTickets = filteredTickets.filter(t => {
+        const isArchived = t.status === 'Resolvido' || t.status === 'Fechado';
+        return currentTab === 'archived' ? isArchived : !isArchived;
+    });
 
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando chamados...</div>;
 
     return (
         <>
-            <Card title="Central de Suporte (Chamados)" headerAction={
+            <div className="mb-4">
+                <div className="border-b border-gray-200">
+                    <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
+                        <li className="mr-2">
+                            <button
+                                onClick={() => setCurrentTab('active')}
+                                className={`inline-block p-4 border-b-2 rounded-t-lg ${currentTab === 'active' ? 'text-brand-primary border-brand-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                            >
+                                Chamados Ativos
+                            </button>
+                        </li>
+                        <li className="mr-2">
+                            <button
+                                onClick={() => setCurrentTab('archived')}
+                                className={`inline-block p-4 border-b-2 rounded-t-lg ${currentTab === 'archived' ? 'text-brand-primary border-brand-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
+                            >
+                                Histórico (Resolvidos/Fechados)
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <Card title={currentTab === 'active' ? "Central de Suporte (Chamados Ativos)" : "Histórico de Chamados"} headerAction={
                 <button
                     onClick={() => { console.log('Button CLICKED'); handleRepairForm(); }}
                     className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-50 cursor-pointer"

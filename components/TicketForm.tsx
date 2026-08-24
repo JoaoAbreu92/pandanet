@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Ticket, TicketPriority, Employee } from '../types';
+import { PhotoIcon, VideoCameraIcon, XCircleIcon } from './icons';
 
 interface TicketFormProps {
     onSubmit: (ticket: any) => void;
@@ -15,6 +16,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
     const [priority, setPriority] = useState<TicketPriority>('Média');
     const [departmentId, setDepartmentId] = useState<string>('');
     const [assignedTo, setAssignedTo] = useState<string>('');
+    const [mediaFiles, setMediaFiles] = useState<{ file: File; url: string; type: 'image' | 'video' }[]>([]);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const videoInputRef = React.useRef<HTMLInputElement>(null);
 
     // Pre-select TI department if exists
     React.useEffect(() => {
@@ -36,7 +40,43 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
             priority,
             department_id: departmentId || null,
             assigned_to_id: assignedTo || null,
+            mediaFiles: mediaFiles.map(m => m.file),
+            mediaType: mediaFiles.length > 0 ? mediaFiles[0].type : null
         });
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        if (type === 'video') {
+            const file = files[0] as File;
+            if (file.size > 10 * 1024 * 1024) {
+                alert('O vídeo deve ter no máximo 10MB.');
+                return;
+            }
+            setMediaFiles([{ file, url: URL.createObjectURL(file), type: 'video' }]);
+        } else {
+            const remaining = 4 - mediaFiles.filter(m => m.type === 'image').length;
+            const toAdd = files.slice(0, remaining).map(file => ({
+                file: file as File,
+                url: URL.createObjectURL(file as File),
+                type: 'image' as const
+            }));
+            setMediaFiles(prev => {
+                const currentImages = prev.filter(m => m.type === 'image');
+                if (currentImages.length + toAdd.length > 4) {
+                    alert('Você pode adicionar no máximo 4 fotos.');
+                    return prev;
+                }
+                // Se adicionar imagem, remove vídeo se houver
+                return [...currentImages, ...toAdd];
+            });
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setMediaFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const technicians = allEmployees.filter(e => {
@@ -108,7 +148,6 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
                     required
                 ></textarea>
             </div>
-
             {((departmentId && technicians.length > 0) || (!departmentId && allEmployees.length > 0)) && (
                 <div>
                     <label htmlFor="assignedTo" className="block text-sm font-medium text-brand-text">
@@ -127,6 +166,54 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
                     </select>
                 </div>
             )}
+
+            <div className="space-y-2">
+                <label className="block text-sm font-medium text-brand-text">Anexar Mídia (Opcional)</label>
+                <p className="text-xs text-brand-subtle-text mb-2">Adicione fotos (max 4) ou 1 vídeo (max 10MB) para ajudar a descrever o problema.</p>
+                <div className="flex space-x-2">
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={mediaFiles.some(m => m.type === 'video') || mediaFiles.filter(m => m.type === 'image').length >= 4}
+                        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        <PhotoIcon className="w-5 h-5 text-emerald-500" />
+                        <span>Foto</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => videoInputRef.current?.click()}
+                        disabled={mediaFiles.length > 0}
+                        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        <VideoCameraIcon className="w-5 h-5 text-blue-500" />
+                        <span>Vídeo</span>
+                    </button>
+                </div>
+                <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={(e) => handleFileChange(e, 'image')} />
+                <input type="file" ref={videoInputRef} hidden accept="video/*" onChange={(e) => handleFileChange(e, 'video')} />
+
+                {mediaFiles.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                        {mediaFiles.map((media, idx) => (
+                            <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border bg-gray-50">
+                                {media.type === 'image' ? (
+                                    <img src={media.url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <video src={media.url} className="w-full h-full object-cover" />
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => removeFile(idx)}
+                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <XCircleIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             <div className="flex justify-end space-x-3 pt-2">
                 <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">

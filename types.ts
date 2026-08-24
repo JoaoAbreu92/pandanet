@@ -285,6 +285,8 @@ export interface Ticket {
   comments: TicketComment[];
   hasNotification?: boolean;
   rating?: number;
+  media_urls?: string[];
+  media_type?: 'image' | 'video';
 }
 
 export type CalendarEventCategory = 'Reunião' | 'Evento da Empresa' | 'Feriado' | 'Aniversário';

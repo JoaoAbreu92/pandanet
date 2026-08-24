@@ -99,6 +99,25 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                         <p className="text-brand-subtle-text whitespace-pre-wrap">{ticket.description}</p>
                     </div>
 
+                    {ticket.media_urls && ticket.media_urls.length > 0 && (
+                        <div>
+                            <h4 className="font-semibold text-brand-text mb-2">Anexos ({ticket.media_type === 'image' ? 'Fotos' : 'Vídeo'})</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {ticket.media_urls.map((url, idx) => (
+                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-50">
+                                        {ticket.media_type === 'image' ? (
+                                            <a href={url} target="_blank" rel="noopener noreferrer">
+                                                <img src={url} alt={`Anexo ${idx + 1}`} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                                            </a>
+                                        ) : (
+                                            <video src={url} controls className="w-full h-full object-cover" />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {isRequester && ticket.status === 'Resolvido' && (
                         <div className="p-4 bg-emerald-50 rounded-lg">
                             {ticket.rating ? (
