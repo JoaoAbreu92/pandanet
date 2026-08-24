@@ -104,7 +104,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 });
 
                 if (!response.ok) {
-                    throw new Error(`OpenAI API error: ${response.status}`);
+                    const errData = await response.json().catch(() => ({}));
+                    console.error("OpenAI Error Details:", errData);
+                    throw new Error(`OpenAI API error: ${response.status} - ${errData?.error?.message || 'Erro desconhecido'}`);
                 }
                 const data = await response.json();
                 aiResponseText = data.choices?.[0]?.message?.content || "Desculpe, não consegui processar sua mensagem.";
@@ -136,7 +138,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 id: Date.now().toString(),
                 user_id: currentUser.id,
                 role: 'assistant',
-                content: "Ocorreu um erro ao processar sua mensagem. Verifique se sua API Key é autêntica e possui saldo.",
+                content: `Ocorreu um erro ao processar sua mensagem. Detalhe técnico: ${err.message}`,
                 created_at: new Date().toISOString()
             }]);
         } finally {
