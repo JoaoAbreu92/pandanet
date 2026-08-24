@@ -266,11 +266,11 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
 // API: Enviar Mensagem
 router.post('/messages/send/:conversationId', authMiddleware, async (req, res) => {
     const { conversationId } = req.params;
-    const { message } = req.body;
+    const { message, mediaUrl, mediaType } = req.body;
     const userId = req.user?.id; // from authMiddleware
 
-    if (!message) {
-        return res.status(400).json({ error: 'Message text is required' });
+    if (!message && !mediaUrl) {
+        return res.status(400).json({ error: 'Message text or media is required' });
     }
 
     try {
@@ -316,31 +316,69 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         console.log(`[SEND API] Enviando para: ${phoneNumber} | Instância: ${instanceName}`);
 
         // 2. Send via Evolution API
-        // Esta versão da Evolution requer o formato textMessage (v1)
         let sendRes = null;
         let sendOk = false;
 
-        // Tenta formato v1 PRIMEIRO (textMessage) - é o que esta versão da Evo requer
-        const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-            method: 'POST',
-            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
-        });
-        try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
-        console.log(`[SEND API] Resposta textMessage (${sendReqV1.status}):`, JSON.stringify(sendRes));
+        // Função auxiliar para mapear MIME types para tipos da Evolution API
+        const getEvoMediaType = (mime) => {
+            if (!mime) return 'document';
+            if (mime.startsWith('image/')) return 'image';
+            if (mime.startsWith('video/')) return 'video';
+            if (mime.startsWith('audio/')) return 'audio';
+            return 'document';
+        };
 
-        if (sendReqV1.ok && !sendRes?.error) {
-            sendOk = true;
-        } else {
-            // Tenta formato v2 como fallback (text direto)
-            const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        if (mediaUrl) {
+            const isSticker = mediaType === 'sticker';
+            const endpoint = isSticker ? 'sendSticker' : 'sendMedia';
+            
+            const body = isSticker ? {
+                number: phoneNumber,
+                stickerMessage: {
+                    sticker: mediaUrl
+                }
+            } : {
+                number: phoneNumber,
+                mediaMessage: {
+                    mediatype: getEvoMediaType(mediaType),
+                    caption: message || '',
+                    media: mediaUrl
+                }
+            };
+
+            const sendReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phoneNumber, text: message })
+                body: JSON.stringify(body)
             });
-            try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
-            console.log(`[SEND API] Resposta text (${sendReqV2.status}):`, JSON.stringify(sendRes));
-            if (sendReqV2.ok && !sendRes?.error) sendOk = true;
+            
+            try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
+            console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes));
+            if (sendReq.ok && !sendRes?.error) sendOk = true;
+
+        } else {
+            // Tenta formato v1 PRIMEIRO (textMessage) - é o que esta versão da Evo requer
+            const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                method: 'POST',
+                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
+            });
+            try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
+            console.log(`[SEND API] Resposta textMessage (${sendReqV1.status}):`, JSON.stringify(sendRes));
+
+            if (sendReqV1.ok && !sendRes?.error) {
+                sendOk = true;
+            } else {
+                // Tenta formato v2 como fallback (text direto)
+                const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                    method: 'POST',
+                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number: phoneNumber, text: message })
+                });
+                try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
+                console.log(`[SEND API] Resposta text (${sendReqV2.status}):`, JSON.stringify(sendRes));
+                if (sendReqV2.ok && !sendRes?.error) sendOk = true;
+            }
         }
 
         if (!sendOk) {
@@ -364,6 +402,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 company_id: conv.company_id,
                 conversation_id: conversationId,
                 message_text: message,
+                media_url: mediaUrl || undefined,
+                media_type: mediaType || undefined,
                 is_from_customer: false,
                 sent_by: userId,
                 whatsapp_message_id: sendRes?.key?.id || undefined

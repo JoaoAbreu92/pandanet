@@ -23,7 +23,12 @@ import {
   Smartphone,
   LayoutGrid,
   List,
-  RefreshCcw
+  RefreshCcw,
+  Smile,
+  X,
+  Plus,
+  Image as ImageIcon,
+  Sticker
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -81,6 +86,29 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   
   // State para filtros avancados
   const [showFilters, setShowFilters] = useState(false);
+  
+  // States para Arquivos e Figurinhas
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [stickerTab, setStickerTab] = useState<'gallery' | 'saved'>('gallery');
+  const [customStickers, setCustomStickers] = useState<string[]>(() => {
+    const saved = localStorage.getItem('custom_stickers');
+    return saved ? JSON.parse(saved) : [
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif'
+    ];
+  });
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const stickerUploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('custom_stickers', JSON.stringify(customStickers));
+  }, [customStickers]);
   const [filterConnection, setFilterConnection] = useState<string[]>([]);
   const [filterQueue, setFilterQueue] = useState<string[]>([]);
   const [filterAssignee, setFilterAssignee] = useState<string[]>([]);
@@ -431,24 +459,107 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .eq('id', conversationId);
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation || !currentUser?.company_id) return;
+  // --- Funções de Mídia e Figurinhas ---
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { 
+        alert('O arquivo excede o limite de 10MB.'); 
+        return; 
+      }
+      setAttachedFile(file);
+    }
+  };
 
-    let messageToSend = newMessage;
-    
-    // Add signature if enabled - Using either configured signature or user name as fallback
-    if (useSignature) {
-        const signatureText = activeProfile?.whatsapp_signature || activeProfile?.name || '';
-        if (signatureText) {
-            messageToSend = `*${signatureText}*:\n${messageToSend}`;
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('file') !== -1) {
+            const file = items[i].getAsFile();
+            if (file) {
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('O arquivo colado excede o limite de 10MB.');
+                    return;
+                }
+                setAttachedFile(file);
+            }
         }
     }
+  };
 
-    setNewMessage(''); // Clear input optimistically
-    const conversationId = selectedConversation.id;
-    const companyId = currentUser.company_id;
+  const removeSticker = (url: string) => {
+    setCustomStickers(prev => prev.filter(s => s !== url));
+  };
+
+  const handleUploadSticker = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.includes('gif') && !file.type.includes('image')) {
+        alert('Por favor, selecione um GIF ou imagem.');
+        return;
+    }
 
     try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `stickers/${currentUser?.id}/${fileName}`;
+
+        const { data, error } = await supabase.storage
+            .from('chat-media')
+            .upload(filePath, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        setCustomStickers(prev => [...prev, publicUrl]);
+    } catch (err) {
+        console.error('Erro no upload do GIF:', err);
+        alert('Falha ao subir o GIF.');
+    }
+  };
+
+  const handleSendSticker = (url: string) => {
+    handleSendMessage(undefined, 'sticker', url);
+    setShowStickerPicker(false);
+  };
+  
+  const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
+    if (e) e.preventDefault();
+    if (!newMessage.trim() && !attachedFile && type !== 'sticker') return;
+    if (!selectedConversation || !currentUser?.company_id) return;
+
+    const messageText = type === 'text' ? newMessage : '';
+    const stickerUrl = type === 'sticker' ? content : null;
+
+    let messageWithSignature = messageText;
+    if (messageText && useSignature && profile?.name) {
+      messageWithSignature = `${messageText}\n\n*Atenciosamente: ${profile.name}*`;
+    }
+
+    try {
+        let uploadedFileUrl = null;
+        let fileType = null;
+
+        if (attachedFile) {
+            const fileExt = attachedFile.name.split('.').pop();
+            const fileName = `${Date.now()}.${fileExt}`;
+            const filePath = `whatsapp/${selectedConversation.id}/${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('chat-media')
+                .upload(filePath, attachedFile);
+
+            if (uploadError) {
+                console.error('Falha no upload:', uploadError);
+                alert(`Erro ao subir arquivo: ${uploadError.message}`);
+                return;
+            } else if (uploadData) {
+                const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                uploadedFileUrl = publicUrl;
+                fileType = attachedFile.type;
+            }
+        }
+
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (!token) throw new Error("No active session");
@@ -459,7 +570,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ message: messageToSend })
+            body: JSON.stringify({ 
+                message: messageWithSignature,
+                mediaUrl: uploadedFileUrl || stickerUrl,
+                mediaType: type === 'sticker' ? 'sticker' : fileType
+            })
         });
 
         if (!response.ok) {
@@ -467,11 +582,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             throw new Error(errorData.error || 'Failed to send message');
         }
 
-        // The backend will handle inserting the message into Supabase
+        setNewMessage('');
+        setAttachedFile(null);
+        setShowStickerPicker(false);
+        // Recarregar mensagens após o envio
+        fetchMessages(selectedConversation.id);
     } catch (error) {
         console.error('Error sending message:', error);
         alert('Erro ao enviar mensagem.');
-        setNewMessage(messageToSend); // Restore input on failure
     }
   };
 
@@ -962,14 +1080,102 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
             {/* Input Area */}
             <div className="px-3 py-2 md:px-6 md:py-5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-[max(env(safe-area-inset-bottom),8px)] md:pb-5 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
+              
+              {/* Sticker Picker UI */}
+              {showStickerPicker && (
+                <div className="absolute bottom-[100%] left-4 right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
+                  <div className="flex border-b border-slate-100 dark:border-white/5">
+                    <button onClick={() => setStickerTab('gallery')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${stickerTab === 'gallery' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}>Padrão</button>
+                    <button onClick={() => setStickerTab('saved')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}>Meus Gifs</button>
+                    <button onClick={() => setShowStickerPicker(false)} className="px-4 text-slate-400 hover:text-red-500"><X className="w-5 h-5" /></button>
+                  </div>
+                  <div className="p-4 max-h-64 overflow-y-auto grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                    {(stickerTab === 'gallery' ? [
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
+                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e6/512.gif'
+                    ] : customStickers).map((url, i) => (
+                      <div key={i} className="relative group aspect-square">
+                        <img 
+                          src={url} 
+                          alt="sticker" 
+                          className="w-full h-full object-contain cursor-pointer hover:scale-110 transition-transform" 
+                          onClick={() => handleSendSticker(url)}
+                        />
+                        {stickerTab === 'saved' && (
+                          <button onClick={() => removeSticker(url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
+                        )}
+                      </div>
+                    ))}
+                    {stickerTab === 'saved' && (
+                      <button 
+                        onClick={() => stickerUploadRef.current?.click()}
+                        className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all"
+                      >
+                        <Plus className="w-6 h-6" />
+                        <span className="text-[10px] font-bold mt-1">NOVO</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Attachment Preview */}
+              {attachedFile && (
+                <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-between border border-emerald-100 dark:border-emerald-500/20 animate-in slide-in-from-bottom-2">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400">
+                      <Paperclip className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <p className="text-sm font-bold text-slate-700 dark:text-emerald-50 truncate">{attachedFile.name}</p>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{(attachedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setAttachedFile(null)} className="p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-400 hover:text-red-500 rounded-xl transition-all">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
               <div className="flex-1 bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileAttach} 
+                  className="hidden" 
+                />
+                <input 
+                  type="file" 
+                  ref={stickerUploadRef} 
+                  onChange={handleUploadSticker} 
+                  className="hidden" 
+                  accept="image/*,.gif"
+                />
+
                 <button
+                  onClick={() => fileInputRef.current?.click()}
                   className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
                   disabled={!canSendMedia}
-                  title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
+                  title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar Arquivo"}
                 >
                   <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
                 </button>
+
+                <button
+                  onClick={() => setShowStickerPicker(!showStickerPicker)}
+                  className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
+                  disabled={!canSendMedia}
+                  title={!canSendMedia ? "Sem permissão para enviar figurinhas" : "Figurinhas / Gifs"}
+                >
+                  <Smile className="w-5 h-5 md:w-5 md:h-5" />
+                </button>
+
                 <div className="flex flex-col items-center justify-center px-1 mb-2">
                   <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
                   <button
@@ -983,6 +1189,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
+                  onPaste={handlePaste}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -996,7 +1203,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 />
                 <button
                   onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || !canSendMessagesResult}
+                  disabled={(!newMessage.trim() && !attachedFile) || !canSendMessagesResult}
                   className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-brand-primary/20 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
                   title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
                 >
