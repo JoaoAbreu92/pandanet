@@ -1878,7 +1878,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
-            {((isAdmin || permissions?.can_view_others_chats)
+            {(isAdmin
               ? (['meus', 'aguardando', 'todos', 'fechados'] as const)
               : (['meus', 'aguardando', 'fechados'] as const)
             ).map((tab) => {

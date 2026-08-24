@@ -192,6 +192,29 @@ async function runAutoMigration() {
         console.log('[MIGRATION] Verificando e aplicando correção de segurança RLS para whatsapp_conversations...');
         await supabase.rpc('exec_sql', {
             sql: `
+                -- Drop conflicting SELECT policies
+                DROP POLICY IF EXISTS "Users can view conversations from their company" ON public.whatsapp_conversations;
+                DROP POLICY IF EXISTS "whatsapp_conversations_isolation_v2" ON public.whatsapp_conversations;
+                DROP POLICY IF EXISTS "conversations_isolation" ON public.whatsapp_conversations;
+                DROP POLICY IF EXISTS "Restricted view for Whatsapp Conversations" ON public.whatsapp_conversations;
+
+                -- Drop conflicting UPDATE policies
+                DROP POLICY IF EXISTS "Agents can update conversations" ON public.whatsapp_conversations;
+
+                -- Helper to fetch whatspanda_permissions
+                CREATE OR REPLACE FUNCTION public.get_user_whatspanda_permissions()
+                RETURNS JSONB
+                LANGUAGE plpgsql
+                SECURITY DEFINER
+                SET search_path = public
+                STABLE
+                AS $$
+                BEGIN
+                  RETURN (SELECT COALESCE(whatspanda_permissions, '{}'::jsonb) FROM public.profiles WHERE id = auth.uid());
+                END;
+                $$;
+
+                -- Helper to fetch assigned queues
                 CREATE OR REPLACE FUNCTION public.get_user_assigned_queues()
                 RETURNS JSONB
                 LANGUAGE plpgsql
@@ -217,7 +240,11 @@ async function runAutoMigration() {
                       OR
                       (
                         queue_id IS NOT NULL 
-                        AND public.get_user_assigned_queues() ? queue_id::text
+                        AND (
+                          (public.get_user_whatspanda_permissions()->>'can_see_all_departments')::boolean = true
+                          OR
+                          public.get_user_assigned_queues() ? queue_id::text
+                        )
                       )
                       OR
                       (assigned_to IS NULL AND queue_id IS NULL)
@@ -237,7 +264,11 @@ async function runAutoMigration() {
                       OR
                       (
                         queue_id IS NOT NULL 
-                        AND public.get_user_assigned_queues() ? queue_id::text
+                        AND (
+                          (public.get_user_whatspanda_permissions()->>'can_see_all_departments')::boolean = true
+                          OR
+                          public.get_user_assigned_queues() ? queue_id::text
+                        )
                       )
                       OR
                       (assigned_to IS NULL AND queue_id IS NULL)
