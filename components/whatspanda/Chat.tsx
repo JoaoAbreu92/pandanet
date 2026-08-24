@@ -198,7 +198,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       // Clear bell notifications for this conversation
       markNotificationsByLink('/whatspanda');
     }
-  }, [selectedConversation, markNotificationsByLink]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConversation?.id]);
 
   const [isUserReading, setIsUserReading] = useState(false);
 
@@ -350,9 +351,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      query = query.eq('is_group', true);
+      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
     } else if (chatTypeFilter === 'private') {
-      query = query.or('is_group.eq.false,is_group.is.null');
+      query = query.or('is_group.eq.false,is_group.is.null').not('contact_phone', 'ilike', '%@g.us%');
     }
 
     // Logica de visibilidade:
@@ -587,11 +588,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     let messageWithSignature = messageText;
     const targetProfile = activeProfile || profile; // Fallback para perfil
-    const nameObj = (targetProfile as any)?.full_name || targetProfile?.name;
 
-    if (messageText && useSignature && nameObj && !isEmojiOnly && !isSticker) {
-      const signatureText = targetProfile?.whatsapp_signature || `*Atenciosamente: ${nameObj}*`;
-      messageWithSignature = `${messageText}\n\n${signatureText}`;
+    if (messageText && useSignature && targetProfile && !isEmojiOnly && !isSticker) {
+      const signatureText = targetProfile.whatsapp_signature;
+      if (signatureText && signatureText.trim() !== '') {
+        messageWithSignature = `${messageText}\n\n${signatureText}`;
+      }
     }
 
     try {
