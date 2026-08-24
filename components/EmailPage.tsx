@@ -826,7 +826,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
                 const emailList = data.emails || [];
                 const mergedEmails = emailList.map((email: any) => {
-                    const meta = allMeta?.find((m: any) => m.message_id === (email.messageId || email.uid));
+                    const emailId = email.messageId || email.uid;
+                    const meta = allMeta?.find((m: any) => m.message_id === emailId);
                     const isLocallySeen = locallySeenUids.has(email.uid);
                     const currentFlags = email.flags || [];
                     const finalFlags = isLocallySeen && !currentFlags.includes('\\Seen')
@@ -1229,13 +1230,18 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         // For now let's hope the Edge Function returns 'messageId'
 
         // Prefer messageId for persistence as UID can change
-        const messageId = email.messageId || (email as any).messageId || email.uid;
+        const messageId = email.messageId || email.uid;
 
-        await supabase.from('email_metadata').upsert({
+        const { error } = await supabase.from('email_metadata').upsert({
             user_id: currentUser.id,
             message_id: messageId,
             tags: newTags
         }, { onConflict: 'user_id,message_id' });
+
+        if (error) {
+            console.error('[EmailPage] Error saving tags:', error);
+            showToast('Erro ao sincronizar etiqueta com o servidor.', 'error');
+        }
     };
 
     const filteredEmails = emails.filter(email => {
@@ -1921,7 +1927,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 <div
                                                     className="prose max-w-none text-gray-800"
                                                     dangerouslySetInnerHTML={{
-                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`).replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
+                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`, {
+                                                            RETURN_TRUSTED_TYPE: true,
+                                                            ADD_TAGS: ['iframe', 'style'],
+                                                            ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling']
+                                                        }).toString().replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
                                                     }}
                                                 />
                                             </div>

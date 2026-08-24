@@ -603,6 +603,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                             company_id: companyId, 
                             phone, 
                             name: g.subject || g.name || 'Grupo Sem Nome', 
+                            is_group: true, // Marcar explicitamente como grupo
                             updated_at: new Date().toISOString() 
                         });
                     }
@@ -623,7 +624,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             console.log(`[SYNC] Salvando ${contactsToUpsert.length} contatos...`);
             await supabase.from('whatsapp_contacts').upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
 
-            const groupEntries = contactsToUpsert.filter(c => c.phone && (c.phone.length > 15 || c.phone.includes('-')));
+            const groupEntries = contactsToUpsert.filter(c => c.is_group === true || (c.phone && (c.phone.length > 15 || c.phone.includes('-'))));
             for (const group of groupEntries) {
                 try {
                     const { data: existing } = await supabase.from('whatsapp_conversations').select('id').eq('company_id', companyId).eq('contact_phone', group.phone).maybeSingle();
@@ -901,7 +902,16 @@ async function uploadMediaToSupabase(base64, mediatype, companyId) {
             return null;
         }
 
-        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        let { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        
+        // CORREÇÃO: Se estivermos em ambiente de produção (VPS), o SUPABASE_URL é interno (Docker).
+        // Precisamos retornar uma URL que o NAVEGADOR do cliente consiga acessar.
+        const publicBase = process.env.PUBLIC_SUPABASE_URL; // Ex: http://77.37.43.60:8000
+        if (publicBase && publicUrl.includes('supabase-kong:8000')) {
+            publicUrl = publicUrl.replace('http://supabase-kong:8000', publicBase);
+            console.log(`[STORAGE] URL Interna detectada. Trocando por Pública: ${publicUrl}`);
+        }
+
         console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
         return publicUrl;
     } catch (e) {
