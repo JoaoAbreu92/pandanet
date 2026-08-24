@@ -56,6 +56,46 @@ const Channels: React.FC = () => {
         };
     }, [profile?.company_id, user?.user_metadata?.company_id]); // Only re-run if company_id changes
 
+    // Polling mechanism as fallback when on QR step
+    useEffect(() => {
+        if (step !== 'qr') return;
+
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
+        console.log('[Polling] Starting QR code polling...');
+
+        const pollInterval = setInterval(async () => {
+            console.log('[Polling] Checking for QR code...');
+            const { data } = await supabase
+                .from('whatsapp_settings')
+                .select('qr_code, is_connected')
+                .eq('company_id', companyId)
+                .maybeSingle();
+
+            if (data) {
+                console.log('[Polling] QR Code:', data.qr_code ? 'EXISTS' : 'NULL');
+                console.log('[Polling] Is Connected:', data.is_connected);
+
+                if (data.qr_code && !qrCode) {
+                    console.log('[Polling] QR Code found! Updating state...');
+                    setQrCode(data.qr_code);
+                }
+
+                if (data.is_connected) {
+                    console.log('[Polling] Connected! Switching to connected step...');
+                    setIsConnected(true);
+                    setStep('connected');
+                }
+            }
+        }, 2000); // Poll every 2 seconds
+
+        return () => {
+            console.log('[Polling] Stopping QR code polling');
+            clearInterval(pollInterval);
+        };
+    }, [step, profile?.company_id, user?.user_metadata?.company_id, qrCode]);
+
     const fetchSettings = async () => {
         setLoading(true);
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
