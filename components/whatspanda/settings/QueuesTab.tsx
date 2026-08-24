@@ -106,14 +106,14 @@ const QueuesTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">Filas de Atendimento</h3>
-                    <p className="text-sm text-gray-500">Gerencie as filas para organizar os atendimentos.</p>
+                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Filas de Atendimento</h3>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie as filas para organizar os atendimentos com eficiência.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Fila
@@ -121,53 +121,54 @@ const QueuesTab: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-8 text-gray-500">Carregando filas...</div>
+                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando filas...</div>
             ) : (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-2xl">
+                        <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
+                            <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Nome</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Descrição</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Status</th>
+                                    <th className="px-8 py-5 text-right text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {queues.map((queue) => (
-                                <tr key={queue.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {queues.map((queue) => (
+                                 <tr key={queue.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+                                     <td className="px-8 py-6 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: queue.color }}></div>
-                                            <span className="font-medium text-gray-900">{queue.name}</span>
+                                             <div className="w-4 h-4 rounded-full mr-4 shadow-[0_0_12px_rgba(0,0,0,0.2)] group-hover:scale-125 transition-transform" style={{ backgroundColor: queue.color, boxShadow: `0 0 15px ${queue.color}40` }}></div>
+                                             <span className="font-black text-gray-900 dark:text-white tracking-tight text-base">{queue.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                     <td className="px-8 py-6 whitespace-nowrap text-[11px] font-bold text-gray-500 dark:text-gray-400 opacity-80 uppercase tracking-widest">
                                         {queue.description || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                     <td className="px-8 py-6 whitespace-nowrap">
                                         <button 
                                             onClick={() => handleToggleActive(queue)}
-                                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                queue.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                             className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all ${queue.is_active
+                                                     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                     : 'bg-red-500/10 text-red-500 border-red-500/20'
                                             }`}
                                         >
                                             {queue.is_active ? 'Ativo' : 'Inativo'}
                                         </button>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => handleOpenModal(queue)} className="text-blue-600 hover:text-blue-900 mr-4">
-                                            <Edit2 className="w-4 h-4" />
+                                     <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
+                                         <button onClick={() => handleOpenModal(queue)} className="p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-xl transition-all duration-300 mr-3">
+                                             <Edit2 className="w-4.5 h-4.5" />
                                         </button>
-                                        <button onClick={() => handleDelete(queue.id)} className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="w-4 h-4" />
+                                         <button onClick={() => handleDelete(queue.id)} className="p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-xl transition-all duration-300">
+                                             <Trash2 className="w-4.5 h-4.5" />
                                         </button>
                                     </td>
                                 </tr>
                             ))}
-                            {queues.length === 0 && (
+                                {queues.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={4} className="px-8 py-20 text-center text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
                                         Nenhuma fila cadastrada.
                                     </td>
                                 </tr>
@@ -179,66 +180,66 @@ const QueuesTab: React.FC = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-gray-900">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
+                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {editingQueue ? 'Editar Fila' : 'Nova Fila'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="p-8 space-y-8">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Fila</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
                                     placeholder="Ex: Suporte Técnico"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Descrição</label>
                                 <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400 resize-none"
                                     rows={3}
                                     placeholder="Descrição opcional..."
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
-                                <div className="flex gap-2">
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Identidade Visual (Cor)</label>
+                                <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
                                     {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'].map((c) => (
                                         <button
                                             key={c}
                                             onClick={() => setColor(c)}
-                                            className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-gray-900' : 'border-transparent'}`}
-                                            style={{ backgroundColor: c }}
+                                            className={`w-10 h-10 rounded-2xl transition-all duration-300 transform ${color === c ? 'scale-125 ring-4 ring-white dark:ring-white/20 shadow-xl' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                                            style={{ backgroundColor: c, boxShadow: color === c ? `0 0 20px ${c}60` : 'none' }}
                                         />
                                     ))}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
-                                <Check className="w-4 h-4 mr-2" />
-                                Salvar
+                                <Check className="w-5 h-5 mr-3" />
+                                Salvar Fila
                             </button>
                         </div>
                     </div>

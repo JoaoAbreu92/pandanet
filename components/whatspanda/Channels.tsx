@@ -208,70 +208,72 @@ const Channels: React.FC = () => {
     };
 
     return (
-        <div className="p-8 max-w-6xl mx-auto h-full flex flex-col">
+        <div className="p-8 max-w-6xl mx-auto h-full flex flex-col dark:bg-transparent transition-colors duration-500">
 
             {view === 'list' && (
-                <div className="animate-in fade-in duration-300">
-                    <div className="flex justify-between items-center mb-6">
+                <div className="animate-in fade-in duration-500">
+                    <div className="flex justify-between items-center mb-10 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">Canais de Atendimento</h2>
-                            <p className="text-gray-500">Gerencie seus números de WhatsApp e redes sociais.</p>
+                            <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Canais de Atendimento</h2>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie seus números de WhatsApp e redes sociais.</p>
                         </div>
                         <button
                             onClick={handleNew}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
                         >
-                            <Plus className="w-5 h-5" /> Adicionar Canal
+                            <Plus className="w-4 h-4" /> Adicionar Canal
                         </button>
                     </div>
 
                     {loading ? (
-                        <div className="flex justify-center p-10"><RefreshCw className="w-8 h-8 animate-spin text-emerald-500" /></div>
+                        <div className="flex justify-center p-20"><RefreshCw className="w-10 h-10 animate-spin text-emerald-500 opacity-50" /></div>
                     ) : channels.length === 0 ? (
-                        <div className="bg-white border border-gray-100 rounded-2xl p-12 flex flex-col items-center text-center">
-                            <MessageSquare className="w-16 h-16 text-gray-200 mb-4" />
-                            <h3 className="text-xl font-bold text-gray-800">Nenhum canal configurado</h3>
-                            <p className="text-gray-500 mt-2 max-w-md">Adicione contas de WhatsApp, Instagram, Telegram ou Messenger para começar a atender seus clientes.</p>
-                            <button onClick={handleNew} className="mt-6 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-6 py-2 rounded-lg font-medium transition-colors">
+                            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-[2.5rem] p-20 flex flex-col items-center text-center shadow-2xl">
+                                <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-8 border border-white/10">
+                                    <MessageSquare className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                                </div>
+                                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Nenhum canal configurado</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mt-3 max-w-md font-medium">Adicione contas de WhatsApp, Instagram, Telegram ou Messenger para começar a atender seus clientes com excelência.</p>
+                                <button onClick={handleNew} className="mt-10 px-10 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20">
                                 Configurar Primeiro Canal
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {channels.map(channel => (
-                                <div key={channel.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100">
+                                <div key={channel.id} className="bg-white dark:bg-white/5 border border-gray-100 dark:border-white/5 rounded-[2rem] p-8 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group backdrop-blur-sm">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center border border-gray-100 dark:border-white/5 shadow-inner group-hover:scale-110 transition-transform duration-500">
                                                 {getChannelIcon(channel.channel_type)}
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-900 leading-tight">{channel.connection_name}</h3>
-                                                <span className="text-xs text-gray-500 capitalize">{channel.channel_type || 'whatsapp'}</span>
+                                                <h3 className="font-black text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{channel.connection_name}</h3>
+                                                <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60">{channel.channel_type || 'whatsapp'}</span>
                                             </div>
                                         </div>
-                                        <div className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${channel.is_connected ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border ${channel.is_connected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
                                             {channel.is_connected ? 'Conectado' : 'Desconectado'}
                                         </div>
                                     </div>
 
                                     {channel.channel_type === 'whatsapp' && (
-                                        <p className="text-sm text-gray-600 mb-4 font-mono">{channel.phone_number}</p>
+                                        <p className="text-xs font-black text-gray-500 dark:text-gray-400 mb-6 bg-gray-100 dark:bg-white/5 py-2 px-4 rounded-xl inline-block tracking-widest">{channel.phone_number}</p>
                                     )}
 
-                                    <div className="flex gap-2 mt-4 pt-4 border-t border-gray-50">
-                                        <button onClick={() => handleEdit(channel)} className="flex-1 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors flex justify-center items-center gap-1">
+                                    <div className="flex gap-3 mt-4 pt-6 border-t border-gray-50 dark:border-white/5">
+                                        <button onClick={() => handleEdit(channel)} className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:text-white dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                             <Edit2 className="w-3.5 h-3.5" /> Editar
                                         </button>
 
                                         {channel.channel_type === 'whatsapp' && !channel.is_connected && (
-                                            <button onClick={() => { setCurrentId(channel.id); setView('qr'); }} className="flex-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors flex justify-center items-center gap-1">
+                                            <button onClick={() => { setCurrentId(channel.id); setView('qr'); }} className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                                 <QrCode className="w-3.5 h-3.5" /> QR Code
                                             </button>
                                         )}
 
-                                        <button onClick={() => handleDelete(channel.id)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                                            <Trash2 className="w-4 h-4" />
+                                        <button onClick={() => handleDelete(channel.id)} className="p-2.5 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all duration-300">
+                                            <Trash2 className="w-4.5 h-4.5" />
                                         </button>
                                     </div>
                                 </div>
@@ -282,31 +284,35 @@ const Channels: React.FC = () => {
             )}
 
             {view === 'form' && (
-                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-xl mx-auto border border-gray-100 animate-in fade-in zoom-in duration-300">
-                    <button onClick={() => setView('list')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
-                        <ArrowLeft className="w-4 h-4" /> Voltar para lista
+                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-10 rounded-[3rem] shadow-2xl w-full max-w-2xl mx-auto border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500">
+                    <button onClick={() => setView('list')} className="group flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-emerald-500 mb-10 transition-all">
+                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Voltar para lista
                     </button>
 
-                    <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
-                            {getChannelIcon(channelType)}
+                    <div className="text-center mb-10">
+                        <div className="w-24 h-24 bg-emerald-50/50 dark:bg-emerald-500/10 text-emerald-500 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-emerald-500/20 shadow-xl group">
+                            <div className="group-hover:scale-110 transition-transform duration-500">
+                                {getChannelIcon(channelType)}
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900">{currentId ? 'Editar Canal' : 'Configurar Novo Canal'}</h2>
+                        <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">{currentId ? 'Editar Canal' : 'Configurar Novo Canal'}</h2>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-8">
                         {!currentId && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Plataforma</label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Selecione a Plataforma</label>
+                                <div className="grid grid-cols-4 gap-4">
                                     {(['whatsapp', 'telegram', 'instagram', 'messenger'] as const).map(type => (
                                         <button
                                             key={type}
                                             onClick={() => setChannelType(type)}
-                                            className={`py-3 px-2 flex flex-col items-center justify-center gap-2 border rounded-xl transition-all ${channelType === type ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                                            className={`py-6 px-3 flex flex-col items-center justify-center gap-3 border rounded-3xl transition-all duration-300 ${channelType === type ? 'border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 ring-4 ring-emerald-500/20 shadow-lg' : 'border-gray-100 dark:border-white/5 bg-white/50 dark:bg-white/5 hover:border-gray-300 dark:hover:border-white/20'}`}
                                         >
-                                            {getChannelIcon(type)}
-                                            <span className="text-[10px] font-bold text-gray-600 capitalize">{type}</span>
+                                            <div className={`${channelType === type ? 'scale-110' : 'opacity-60'} transition-all`}>
+                                                {getChannelIcon(type)}
+                                            </div>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${channelType === type ? 'text-emerald-500' : 'text-gray-500'}`}>{type}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -314,52 +320,58 @@ const Channels: React.FC = () => {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nome de Exibição (Interno)</label>
+                            <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome de Exibição (Interno)</label>
                             <input 
                                 type="text" 
                                 value={connectionName}
                                 onChange={e => setConnectionName(e.target.value)}
                                 placeholder="Ex: Suporte Nível 1"
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                                className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
                             />
                         </div>
 
                         {channelType === 'whatsapp' && (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Número do Telefone</label>
+                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Número do Telefone</label>
                                     <input
                                         type="text"
                                         value={phoneNumber}
                                         onChange={e => setPhoneNumber(e.target.value)}
                                         placeholder="Ex: 5511999999999"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                                        className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
+
                                     />
                                 </div>
-                                <div className="pt-4 border-t border-gray-100">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <PhoneOff className="w-5 h-5 text-red-500" />
-                                            <span className="font-medium text-gray-900">Rejeitar Chamadas (Áudio/Vídeo)?</span>
+                                <div className="pt-8 border-t border-gray-100 dark:border-white/5">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-red-500/10 rounded-xl">
+                                                <PhoneOff className="w-5 h-5 text-red-500" />
+                                            </div>
+                                            <div>
+                                                <span className="font-black text-gray-900 dark:text-white tracking-tight">Rejeitar Chamadas?</span>
+                                                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Áudio e Vídeo</p>
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => setRejectCalls(!rejectCalls)}
-                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${rejectCalls ? 'bg-red-500' : 'bg-gray-200'}`}
+                                            className={`relative inline-flex h-7 w-14 items-center rounded-full transition-all duration-500 ${rejectCalls ? 'bg-red-500 shadow-lg shadow-red-500/30' : 'bg-gray-200 dark:bg-white/10'}`}
                                         >
-                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${rejectCalls ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-500 ${rejectCalls ? 'translate-x-8 shadow-md' : 'translate-x-1'}`} />
                                         </button>
                                     </div>
 
                                     {rejectCalls && (
-                                        <div className="animate-in slide-in-from-top-2 duration-200">
-                                            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                                        <div className="animate-in slide-in-from-top-4 duration-500 bg-red-500/5 dark:bg-red-500/10 p-6 rounded-[2rem] border border-red-500/10">
+                                            <label className="block text-[11px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <MessageSquare className="w-4 h-4" /> Mensagem de Rejeição Automática
                                             </label>
                                             <textarea
                                                 value={rejectionMessage}
                                                 onChange={e => setRejectionMessage(e.target.value)}
-                                                rows={3}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                                                rows={4}
+                                                className="w-full px-5 py-3.5 bg-white dark:bg-black/20 border border-red-500/20 rounded-2xl focus:ring-2 focus:ring-red-500/20 dark:text-white transition-all font-medium text-sm resize-none"
                                             />
                                         </div>
                                     )}
@@ -368,26 +380,26 @@ const Channels: React.FC = () => {
                         )}
 
                         {channelType !== 'whatsapp' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                                    <Key className="w-4 h-4" /> Token da API / Page Access Token
+                            <div className="bg-blue-500/5 dark:bg-blue-500/10 p-8 rounded-[2.5rem] border border-blue-500/10">
+                                <label className="block text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-3">
+                                    <Key className="w-4.5 h-4.5" /> Token da API / Page Access Token
                                 </label>
                                 <input
                                     type="password"
                                     value={apiToken}
                                     onChange={e => setApiToken(e.target.value)}
                                     placeholder={`Cole aqui o token do ${channelType}`}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-mono text-sm"
+                                    className="w-full px-6 py-4 bg-white dark:bg-black/20 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500/20 dark:text-white transition-all font-mono text-xs tracking-widest"
                                 />
-                                <p className="text-xs text-gray-500 mt-2">
-                                    {channelType === 'telegram' ? 'Obtenha este token através do @BotFather no Telegram.' : 'Obtenha este token no painel Meta for Developers.'}
+                                <p className="text-[10px] text-blue-500/70 dark:text-blue-400/60 mt-4 font-bold uppercase tracking-widest leading-relaxed">
+                                    {channelType === 'telegram' ? 'Obtenha este token através do @BotFather no Telegram.' : 'Obtenha este token no painel oficial Meta for Developers.'}
                                 </p>
                             </div>
                         )}
 
                         <button 
                             onClick={handleSaveConfig}
-                            className="w-full py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 mt-4"
+                            className="w-full py-5 bg-emerald-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 mt-6"
                         >
                             <Save className="w-5 h-5" />
                             {channelType === 'whatsapp' ? 'Salvar e Ver QR Code' : 'Salvar e Conectar'}
@@ -397,48 +409,53 @@ const Channels: React.FC = () => {
             )}
 
             {view === 'qr' && (
-                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg text-center border border-gray-100 animate-in fade-in zoom-in duration-300 mx-auto">
+                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-12 rounded-[3.5rem] shadow-2xl w-full max-w-xl text-center border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500 mx-auto">
                     {isConnected ? (
-                        <>
-                            <div className="mb-6 flex justify-center">
-                                <div className="w-20 h-20 rounded-full flex items-center justify-center bg-green-100 text-green-600">
-                                    <CheckCircle className="w-10 h-10 animate-in zoom-in" />
+                        <div className="py-10">
+                            <div className="mb-10 flex justify-center">
+                                <div className="w-28 h-28 rounded-[2.5rem] flex items-center justify-center bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 shadow-2xl shadow-emerald-500/20">
+                                    <CheckCircle className="w-14 h-14 animate-in zoom-in spin-in-90 duration-700" />
                                 </div>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">WhatsApp Conectado!</h2>
-                            <p className="text-gray-500 mb-6">Aguarde, retornando aos canais...</p>
-                        </>
+                            <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">WhatsApp Conectado!</h2>
+                            <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] opacity-70">Sua sessão foi iniciada com sucesso. Redirecionando...</p>
+                        </div>
                     ) : (
                         <>
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Escaneie o QR Code</h2>
-                            <p className="text-gray-500 mb-6">Abra o WhatsApp &gt; Aparelhos Conectados &gt; Conectar</p>
+                                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">Escaneie o QR Code</h2>
+                                <p className="text-gray-500 dark:text-gray-400 text-[11px] font-black uppercase tracking-widest mb-10 opacity-80 leading-relaxed">
+                                    Abra o WhatsApp em seu celular <br />
+                                    <span className="text-emerald-500">Menu &gt; Aparelhos Conectados &gt; Conectar</span>
+                                </p>
 
-                                <div className="bg-white p-4 inline-block border-4 border-gray-900 rounded-xl mb-6">
+                                <div className="bg-white p-8 inline-block border-[12px] border-slate-900 dark:border-white/5 rounded-[3rem] shadow-2xl mb-10 transform scale-110">
                                     {qrCode ? (
-                                        <QRCode value={qrCode} size={256} />
+                                        <div className="rounded-2xl overflow-hidden shadow-inner">
+                                            <QRCode value={qrCode} size={256} fgColor="#0f172a" />
+                                        </div>
                                     ) : (
-                                        <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-2">
-                                            <RefreshCw className="w-8 h-8 animate-spin" />
-                                            <span className="text-sm font-medium">Iniciando Sessão...</span>
+                                            <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-transparent text-gray-400 space-y-4">
+                                                <RefreshCw className="w-10 h-10 animate-spin text-emerald-500 opacity-50" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Iniciando Sessão...</span>
                                         </div>
                                     )}
                                 </div>
                         </>
                     )}
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-4 mt-6">
                         <button
                             onClick={() => {
                                 const companyId = profile?.company_id || user?.user_metadata?.company_id;
                                 if (companyId && currentId) startSession(companyId, currentId);
                             }}
-                            className="text-sm text-emerald-600 hover:text-emerald-800 underline font-medium"
+                            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-black uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/10"
                         >
                             Refazer / Forçar Início
                         </button>
                         <button
                             onClick={() => setView('list')}
-                            className="text-sm text-gray-500 hover:text-gray-900 underline mt-4"
+                            className="text-[10px] text-gray-400 hover:text-gray-200 font-black uppercase tracking-[0.2em] py-2 transition-all"
                         >
                             Cancelar e Voltar
                         </button>

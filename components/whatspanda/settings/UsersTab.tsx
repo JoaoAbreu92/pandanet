@@ -159,14 +159,14 @@ const UsersTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">Usuários e Permissões</h3>
-                    <p className="text-sm text-gray-500">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
+                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Usuários e Permissões</h3>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Usuário
@@ -174,64 +174,63 @@ const UsersTab: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-8 text-gray-500">Carregando usuários...</div>
+                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando usuários...</div>
             ) : (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-2xl">
+                        <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
+                            <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissões</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Usuário</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Permissões</th>
+                                    <th className="px-8 py-5 text-right text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                 {agents.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colSpan={3} className="px-8 py-20 text-center text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
                                             Nenhum usuário configurado para o WhatsPanda.
                                         </td>
                                     </tr>
                                 )}
                             {agents.map((agent) => (
-                                <tr key={agent.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                <tr key={agent.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+                                    <td className="px-8 py-6 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10">
+                                            <div className="flex-shrink-0 h-12 w-12 group-hover:scale-110 transition-transform duration-500">
                                                 {agent.avatarUrl ? (
-                                                    <img className="h-10 w-10 rounded-full object-cover" src={agent.avatarUrl} alt="" />
+                                                    <img className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white dark:ring-white/10 shadow-lg" src={agent.avatarUrl} alt="" />
                                                 ) : (
-                                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                                        <User className="w-5 h-5 text-gray-500" />
+                                                        <div className="h-12 w-12 rounded-2xl bg-gray-100 dark:bg-white/10 flex items-center justify-center border border-white/10 text-gray-500 dark:text-gray-400">
+                                                            <User className="w-6 h-6" />
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{agent.name}</div>
-                                                <div className="text-sm text-gray-500">{agent.role}</div>
+                                            <div className="ml-5">
+                                                <div className="text-base font-black text-gray-900 dark:text-white tracking-tight">{agent.name}</div>
+                                                <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-70">{agent.role}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-8 py-6 whitespace-nowrap">
                                         <div className="flex flex-wrap gap-2">
                                             {agent.whatspanda_permissions?.can_manage_settings && (
-                                                <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 flex items-center">
-                                                    <Shield className="w-3 h-3 mr-1" /> Admin
+                                                <span className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center">
+                                                    <Shield className="w-3.5 h-3.5 mr-2" /> Admin
                                                 </span>
                                             )}
                                             {agent.whatspanda_permissions?.can_view_chats && (
-                                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center">
-                                                    <MessageSquare className="w-3 h-3 mr-1" /> Chats
+                                                <span className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center">
+                                                    <MessageSquare className="w-3.5 h-3.5 mr-2" /> Chats
                                                 </span>
                                             )}
-                                            {/* Add more badges as needed */}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => handleOpenModal(agent)} className="text-blue-600 hover:text-blue-900 mr-4">
+                                    <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => handleOpenModal(agent)} className="p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-xl transition-all duration-300 mr-3">
                                             <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleRemoveAgent(agent.id)} className="text-red-600 hover:text-red-900">
+                                        <button onClick={() => handleRemoveAgent(agent.id)} className="p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-xl transition-all duration-300">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </td>
@@ -244,43 +243,43 @@ const UsersTab: React.FC = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-gray-900">
-                                {editingAgent ? 'Editar Permissões' : 'Adicionar Usuário ao WhatsPanda'}
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
+                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                {editingAgent ? 'Editar Permissões' : 'Adicionar Usuário'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-6">
+                        <div className="p-8 overflow-y-auto space-y-10 custom-scrollbar">
                             {/* User Select */}
                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Funcionário</label>
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Funcionário</label>
                                 <select 
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium appearance-none"
                                     value={selectedEmployeeId}
                                     onChange={(e) => setSelectedEmployeeId(e.target.value)}
                                     disabled={!!editingAgent}
                                 >
                                     <option value="">Selecione um funcionário...</option>
                                     {allEmployees.map(emp => (
-                                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.email})</option>
+                                        <option key={emp.id} value={emp.id} className="dark:bg-slate-900">{emp.name} ({emp.email})</option>
                                     ))}
                                 </select>
                              </div>
 
                             {/* Allowed Channels */}
                             <div>
-                                <h4 className="text-sm font-medium text-gray-900 mb-3 block">Canais Permitidos</h4>
-                                <div className="space-y-2 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <h4 className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Canais Permitidos</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 bg-gray-50/50 dark:bg-white/5">
                                     {channels.length === 0 ? (
-                                        <p className="text-sm text-gray-500">Nenhum canal configurado.</p>
+                                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest col-span-full py-4 text-center opacity-50 italic">Nenhum canal configurado.</p>
                                     ) : (
                                         channels.map((channel) => (
-                                            <div key={channel.id} className="flex items-center">
+                                            <div key={channel.id} className="flex items-center group/item hover:translate-x-1 transition-transform">
                                                 <input
                                                     id={`channel-${channel.id}`}
                                                     type="checkbox"
@@ -293,10 +292,11 @@ const UsersTab: React.FC = () => {
                                                             setPermissions({ ...permissions, allowed_connections: current.filter(id => id !== channel.id) });
                                                         }
                                                     }}
-                                                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                    className="h-5 w-5 rounded-lg border-gray-300/50 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 bg-white dark:bg-white/5 transition-all"
                                                 />
-                                                <label htmlFor={`channel-${channel.id}`} className="ml-2 text-sm text-gray-700 font-medium">
-                                                    {channel.connection_name} <span className="text-gray-500 font-normal capitalize">({channel.channel_type || 'whatsapp'})</span>
+                                                <label htmlFor={`channel-${channel.id}`} className="ml-4 text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer group-hover/item:text-emerald-500 transition-colors">
+                                                    {channel.connection_name} <br />
+                                                    <span className="text-[9px] text-gray-500 dark:text-gray-500 uppercase tracking-widest font-black opacity-60">({channel.channel_type || 'whatsapp'})</span>
                                                 </label>
                                             </div>
                                         ))
@@ -306,29 +306,29 @@ const UsersTab: React.FC = () => {
 
                             {/* Permissions Toggles */}
                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 mb-3">Permissões de Acesso</h4>
-                                <div className="space-y-3">
+                                <h4 className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Permissões de Acesso</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                                     {[
-                                        { key: 'can_view_contacts', label: 'Ver Contatos', desc: 'Pode visualizar a lista de contatos.' },
-                                        { key: 'can_edit_contacts', label: 'Editar Contatos', desc: 'Pode criar e editar contatos.' },
-                                        { key: 'can_view_chats', label: 'Acessar Chats', desc: 'Pode visualizar conversas e histórico.' },
-                                        { key: 'can_send_messages', label: 'Enviar Mensagens', desc: 'Pode enviar mensagens de texto.' },
-                                        { key: 'can_send_media', label: 'Enviar Mídia', desc: 'Pode enviar fotos, vídeos e áudios.' },
-                                        { key: 'can_manage_settings', label: 'Gerenciar Configurações', desc: 'Acesso total às configurações do WhatsPanda.' },
+                                        { key: 'can_view_contacts', label: 'Ver Contatos', desc: 'Visualizar lista de contatos.' },
+                                        { key: 'can_edit_contacts', label: 'Editar Contatos', desc: 'Criar e editar contatos.' },
+                                        { key: 'can_view_chats', label: 'Acessar Chats', desc: 'Ver conversas e histórico.' },
+                                        { key: 'can_send_messages', label: 'Enviar Mensagens', desc: 'Enviar mensagens de texto.' },
+                                        { key: 'can_send_media', label: 'Enviar Mídia', desc: 'Enviar fotos, vídeos e áudios.' },
+                                        { key: 'can_manage_settings', label: 'Gerenciar Configurações', desc: 'Acesso total às configurações.' },
                                     ].map((perm) => (
-                                        <div key={perm.key} className="flex items-start">
-                                            <div className="flex h-5 items-center">
+                                        <div key={perm.key} className="flex items-start group/perm cursor-pointer" onClick={() => handlePermissionChange(perm.key as keyof WhatsAppPermissions)}>
+                                            <div className="flex h-6 items-center">
                                                 <input
                                                     id={perm.key}
                                                     type="checkbox"
                                                     checked={(permissions as any)[perm.key]}
-                                                    onChange={() => handlePermissionChange(perm.key as keyof WhatsAppPermissions)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                    readOnly
+                                                    className="h-5 w-5 rounded-lg border-gray-300/50 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 bg-white dark:bg-white/5 transition-all cursor-pointer"
                                                 />
                                             </div>
-                                            <div className="ml-3 text-sm">
-                                                <label htmlFor={perm.key} className="font-medium text-gray-700">{perm.label}</label>
-                                                <p className="text-gray-500">{perm.desc}</p>
+                                            <div className="ml-4 text-sm">
+                                                <label htmlFor={perm.key} className="font-black text-gray-900 dark:text-white group-hover/perm:text-emerald-500 transition-colors cursor-pointer tracking-tight">{perm.label}</label>
+                                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60 mt-1">{perm.desc}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -336,19 +336,19 @@ const UsersTab: React.FC = () => {
                              </div>
                         </div>
 
-                        <div className="mt-8 flex justify-end gap-3">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={!selectedEmployeeId}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Check className="w-4 h-4 mr-2" />
+                                <Check className="w-5 h-5 mr-3" />
                                 Salvar Permissões
                             </button>
                         </div>

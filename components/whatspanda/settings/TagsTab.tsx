@@ -102,14 +102,14 @@ const TagsTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900">Etiquetas (Tags)</h3>
-                    <p className="text-sm text-gray-500">Organize seus contatos e atendimentos com etiquetas.</p>
+                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Etiquetas (Tags)</h3>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Organize seus contatos e atendimentos com etiquetas personalizadas.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Tag
@@ -117,35 +117,45 @@ const TagsTab: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-8 text-gray-500">Carregando tags...</div>
+                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando etiquetas...</div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {tags.map((tag) => (
-                        <div key={tag.id} className="bg-white p-4 rounded-lg border border-gray-200 flex justify-between items-center hover:shadow-sm transition-shadow">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-opacity-10" style={{ backgroundColor: tag.color + '20' }}>
-                                    <Tag className="w-5 h-5" style={{ color: tag.color }} />
+                        <div key={tag.id} className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 flex justify-between items-center hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-opacity-10 shadow-inner group-hover:scale-110 transition-transform duration-500" style={{ backgroundColor: tag.color + '20' }}>
+                                    <Tag className="w-6 h-6" style={{ color: tag.color }} />
                                 </div>
                                 <div>
-                                    <h4 className="font-medium text-gray-900">{tag.name}</h4>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${tag.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <h4 className="font-black text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{tag.name}</h4>
+                                    <button
+                                        onClick={() => handleToggleActive(tag)}
+                                        className={`mt-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border transition-all ${tag.is_active
+                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                : 'bg-red-500/10 text-red-500 border-red-500/20'
+                                            }`}
+                                    >
                                         {tag.is_active ? 'Ativo' : 'Inativo'}
-                                    </span>
+                                    </button>
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => handleOpenModal(tag)} className="text-gray-400 hover:text-blue-600">
+                                <button onClick={() => handleOpenModal(tag)} className="p-2 text-gray-400 hover:text-blue-500 bg-gray-100 dark:bg-white/5 hover:bg-blue-500/10 rounded-xl transition-all">
                                     <Edit2 className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleDelete(tag.id)} className="text-gray-400 hover:text-red-600">
+                                <button onClick={() => handleDelete(tag.id)} className="p-2 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all">
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>
                     ))}
                      {tags.length === 0 && (
-                        <div className="col-span-3 text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                            Nenhuma etiqueta cadastrada.
+                            <div className="col-span-full bg-white/50 dark:bg-white/5 backdrop-blur-xl border border-dashed border-gray-200 dark:border-white/10 rounded-[2.5rem] p-20 flex flex-col items-center text-center shadow-xl">
+                                <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/5">
+                                    <Tag className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                                </div>
+                                <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Nenhuma etiqueta cadastrada</h3>
+                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest opacity-60">Comece criando etiquetas para organizar seus atendimentos.</p>
                         </div>
                     )}
                 </div>
@@ -153,56 +163,56 @@ const TagsTab: React.FC = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-gray-900">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
+                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {editingTag ? 'Editar Tag' : 'Nova Tag'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="p-8 space-y-8">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Tag</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
                                     placeholder="Ex: Cliente VIP"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
-                                <div className="flex gap-2 flex-wrap">
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Cor da Tag</label>
+                                <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
                                     {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#000000'].map((c) => (
                                         <button
                                             key={c}
                                             onClick={() => setColor(c)}
-                                            className={`w-8 h-8 rounded-full border-2 ${color === c ? 'border-gray-900' : 'border-transparent'}`}
-                                            style={{ backgroundColor: c }}
+                                            className={`w-10 h-10 rounded-2xl transition-all duration-300 transform ${color === c ? 'scale-125 ring-4 ring-white dark:ring-white/20 shadow-xl' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                                            style={{ backgroundColor: c, boxShadow: color === c ? `0 0 20px ${c}60` : 'none' }}
                                         />
                                     ))}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-6 flex justify-end gap-3">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
-                                <Check className="w-4 h-4 mr-2" />
-                                Salvar
+                                <Check className="w-5 h-5 mr-3" />
+                                Salvar Tag
                             </button>
                         </div>
                     </div>

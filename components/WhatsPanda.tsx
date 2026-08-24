@@ -75,9 +75,9 @@ const WhatsPanda: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#F4F7F6] overflow-hidden relative font-sans text-brand-text">
+    <div className="flex h-screen bg-[#F4F7F6] dark:bg-[#020617] overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
       {/* WhatsPanda Sidebar - Izing Pro Style (Desktop) */}
-      <div className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+      <div className="hidden md:flex w-64 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-500">
 
         {/* Header / Logo Area */}
         <div className="flex items-center gap-3 px-2 mb-8 mt-2">
@@ -85,8 +85,8 @@ const WhatsPanda: React.FC = () => {
             <MessageCircle className="w-5 h-5 fill-current" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight leading-none">WhatsPanda</h1>
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-600">Pro</span>
+            <h1 className="text-xl font-black text-gray-800 dark:text-white tracking-tighter leading-none font-brand">WhatsPanda</h1>
+            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Pro</span>
           </div>
         </div>
 
@@ -97,10 +97,10 @@ const WhatsPanda: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setCurrentView(item.view as View)}
-              className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group relative border
                 ${currentView === item.view
-                  ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500/20'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                : 'text-gray-500 dark:text-gray-400 border-transparent hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
                 }`}
             >
               <div className={`${currentView === item.view ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors duration-200`}>
@@ -112,22 +112,22 @@ const WhatsPanda: React.FC = () => {
 
               {/* Active Indicator Line */}
               {currentView === item.view && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-500 rounded-r-md" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
               )}
             </button>
           ))}
         </div>
 
         {/* Current User Info (Optional footer area) */}
-        <div className="mt-auto pt-4 border-t border-gray-100 flex items-center gap-3 px-2">
+        <div className="mt-auto pt-6 border-t border-gray-100 dark:border-white/5 flex items-center gap-3 px-2">
           <img
             src={profile?.avatarUrl || `https://ui-avatars.com/api/?name=${profile?.name}&background=10b981&color=fff`}
             alt="Avatar"
             className="w-9 h-9 rounded-full ring-2 ring-emerald-50"
           />
           <div className="flex flex-col truncate">
-            <span className="text-sm font-bold text-gray-800 truncate">{profile?.name || 'Usuário'}</span>
-            <span className="text-[10px] text-gray-400 truncate uppercase font-semibold">{profile?.role || 'Atendente'}</span>
+            <span className="text-sm font-black text-gray-800 dark:text-white truncate tracking-tight">{profile?.name || 'Usuário'}</span>
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate uppercase font-bold tracking-widest">{profile?.role || 'Atendente'}</span>
           </div>
         </div>
       </div>
@@ -151,7 +151,7 @@ const WhatsPanda: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6]`}>
+      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6] dark:bg-transparent`}>
         {renderView()}
       </div>
     </div>

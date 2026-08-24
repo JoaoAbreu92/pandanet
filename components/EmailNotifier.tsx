@@ -5,7 +5,7 @@ import { useNotifications } from './NotificationContext';
 
 const EmailNotifier: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addNotification, playNotificationSound, showDesktopNotification, setModuleUnreadCount } = useNotifications();
+    const { addNotification, playNotificationSound, showDesktopNotification, setModuleUnreadCount, moduleUnreadCounts } = useNotifications();
     const [lastUnseenCount, setLastUnseenCount] = useState<number | null>(null);
     const [settings, setSettings] = useState<any>(null);
 
@@ -93,6 +93,12 @@ const EmailNotifier: React.FC = () => {
             }
         };
 
+        // Sincroniza o lastUnseenCount se o contador global mudar (pro vindo da EmailPage)
+        const globalCount = moduleUnreadCounts['email'];
+        if (globalCount !== undefined && globalCount !== lastUnseenCount) {
+            setLastUnseenCount(globalCount);
+        }
+
         // Check immediately
         checkEmails();
 
@@ -100,7 +106,7 @@ const EmailNotifier: React.FC = () => {
         const interval = setInterval(checkEmails, 30000); 
 
         return () => clearInterval(interval);
-    }, [settings, lastUnseenCount]); // Re-run if settings change or count updates
+    }, [settings, lastUnseenCount, moduleUnreadCounts, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]); // Re-run if settings change or count updates
 
     return null; // Componente visualmente invisível
 };

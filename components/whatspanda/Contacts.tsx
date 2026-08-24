@@ -133,77 +133,77 @@ const Contacts: React.FC = () => {
     );
 
     return (
-        <div className="flex h-full flex-col bg-gray-50">
+        <div className="flex h-full flex-col bg-gray-50 dark:bg-transparent transition-colors duration-500">
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+            <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border-b border-gray-200 dark:border-white/5 p-8 flex justify-between items-center shadow-lg">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Contatos</h2>
-                    <p className="text-gray-500 text-sm">Gerencie sua base de contatos do WhatsApp.</p>
+                    <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Contatos</h2>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie sua base de contatos do WhatsApp.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-4">
                     <button
                         onClick={handleSyncContacts}
                         disabled={syncing}
-                        className={`flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm gap-2 ${syncing ? 'opacity-70 cursor-wait' : ''}`}
+                        className={`flex items-center px-6 py-3 bg-blue-600/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-xl border border-blue-500/20 gap-2 font-black text-xs uppercase tracking-widest ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                         title="Sincronizar Contatos do WhatsApp"
                     >
-                        <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
-                        <span className="font-medium">{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
+                        <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                        <span>{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
                     </button>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                        className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
                     >
-                        <Plus className="w-5 h-5 mr-2" />
+                        <Plus className="w-4 h-4 mr-2" />
                         Novo Contato
                     </button>
                 </div>
             </div>
 
             {/* Toolbar */}
-            <div className="p-4 bg-white border-b border-gray-200 flex gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <div className="p-6 bg-white/50 dark:bg-slate-900/20 border-b border-gray-200 dark:border-white/5 flex gap-4 backdrop-blur-md">
+                <div className="relative flex-1 max-w-md group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
                     <input
                         type="text"
                         placeholder="Buscar por nome ou telefone..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                        className="w-full pl-12 pr-6 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all text-sm dark:text-white placeholder-gray-400 font-medium"
                     />
                 </div>
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 {loading ? (
-                    <div className="text-center py-10 text-gray-500">Carregando contatos...</div>
+                    <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs">Carregando contatos...</div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredContacts.map(contact => (
-                            <div key={contact.id} className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
-                                            <User className="w-6 h-6" />
+                            <div key={contact.id} className="bg-white/50 dark:bg-white/5 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 p-6 flex flex-col group backdrop-blur-sm">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-gray-100 dark:bg-white/10 rounded-2xl flex items-center justify-center text-gray-500 dark:text-gray-300 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                                            <User className="w-7 h-7" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-gray-900">{contact.name}</h3>
-                                            <p className="text-sm text-gray-500">{contact.phone}</p>
+                                            <h3 className="font-black text-gray-900 dark:text-white tracking-tight text-lg">{contact.name}</h3>
+                                            <p className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-80">{contact.phone}</p>
                                         </div>
                                     </div>
                                     <button 
                                         onClick={() => handleOpenModal(contact)}
-                                        className="text-gray-400 hover:text-green-600 p-1 rounded-full hover:bg-green-50 transition-colors"
+                                        className="text-gray-400 hover:text-emerald-500 p-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-all duration-300 transform group-hover:rotate-12"
                                     >
-                                        <Edit2 className="w-4 h-4" />
+                                        <Edit2 className="w-5 h-5" />
                                     </button>
                                 </div>
 
-                                <div className="mt-auto space-y-3">
+                                <div className="mt-auto space-y-4">
                                     {/* Queue Info */}
-                                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                                        <Layers className="w-3.5 h-3.5" />
+                                    <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400">
+                                        <Layers className="w-4 h-4 text-emerald-500" />
                                         <span>
                                             {availableQueues.find(q => q.id === contact.queue_id)?.name || 'Sem Fila'}
                                         </span>
@@ -217,16 +217,16 @@ const Contacts: React.FC = () => {
                                                 return tag ? (
                                                     <span 
                                                         key={tagId} 
-                                                        className="px-2 py-0.5 text-[10px] rounded-full font-medium"
-                                                        style={{ backgroundColor: tag.color + '20', color: tag.color }}
+                                                        className="px-3 py-1 text-[9px] rounded-lg font-black uppercase tracking-widest border"
+                                                        style={{ backgroundColor: tag.color + '15', color: tag.color, borderColor: tag.color + '30' }}
                                                     >
                                                         {tag.name}
                                                     </span>
                                                 ) : null;
                                             })
                                         ) : (
-                                            <span className="text-xs text-gray-400 italic flex items-center gap-1">
-                                                <Tag className="w-3 h-3" /> Sem etiquetas
+                                                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2 italic">
+                                                    <Tag className="w-3.5 h-3.5" /> Sem etiquetas
                                             </span>
                                         )}
                                     </div>
@@ -234,7 +234,7 @@ const Contacts: React.FC = () => {
                             </div>
                         ))}
                         {filteredContacts.length === 0 && (
-                            <div className="col-span-full py-12 text-center text-gray-400">
+                                <div className="col-span-full py-20 text-center text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] text-xs opacity-50">
                                 Nenhum contato encontrado.
                             </div>
                         )}
@@ -246,83 +246,83 @@ const Contacts: React.FC = () => {
             
             {/* Contact Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="text-xl font-bold text-gray-900">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
+                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {editingContact ? 'Editar Contato' : 'Novo Contato'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        
-                        <div className="p-6 overflow-y-auto space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome Completo</label>
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                                        className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
                                         placeholder="Ex: Maria Silva"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefone (WhatsApp)</label>
+                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Telefone (WhatsApp)</label>
                                     <input
                                         type="text"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                                        className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
                                         placeholder="Ex: 5511999999999"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Anotações</label>
+                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Anotações</label>
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                                    rows={3}
+                                    className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400 resize-none"
+                                    rows={4}
                                     placeholder="Observações sobre o cliente..."
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Fila Preferencial</label>
+                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Fila Preferencial</label>
                                     <select
                                         value={selectedQueue}
                                         onChange={(e) => setSelectedQueue(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                                        className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium appearance-none"
                                     >
                                         <option value="">Nenhuma</option>
                                         {availableQueues.map(q => (
-                                            <option key={q.id} value={q.id}>{q.name}</option>
+                                            <option key={q.id} value={q.id} className="dark:bg-slate-900">{q.name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Etiquetas</label>
-                                    <div className="flex flex-wrap gap-2 border border-gray-200 rounded-lg p-3 bg-gray-50 min-h-[50px]">
+                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Etiquetas</label>
+                                    <div className="flex flex-wrap gap-2 border border-gray-100 dark:border-white/5 rounded-2xl p-4 bg-gray-100/30 dark:bg-white/5 min-h-[60px]">
                                         {availableTags.map(tag => (
                                             <button
                                                 key={tag.id}
                                                 onClick={() => toggleTag(tag.id)}
-                                                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
                                                     selectedTags.includes(tag.id)
-                                                    ? 'ring-2 ring-offset-1'
-                                                    : 'opacity-60 hover:opacity-100'
+                                                    ? 'scale-105 shadow-lg brightness-110'
+                                                    : 'opacity-40 hover:opacity-100'
                                                 }`}
                                                 style={{ 
-                                                    backgroundColor: tag.color + '20', 
+                                                    backgroundColor: tag.color + '25', 
                                                     color: tag.color,
-                                                    boxShadow: selectedTags.includes(tag.id) ? `0 0 0 2px ${tag.color}` : 'none'
+                                                    border: `1px solid ${tag.color}40`,
+                                                    boxShadow: selectedTags.includes(tag.id) ? `0 4px 12px ${tag.color}30` : 'none'
                                                 }}
                                             >
                                                 {tag.name}
@@ -334,18 +334,18 @@ const Contacts: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-2.5 text-gray-700 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg transition-all font-medium"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-medium shadow-md shadow-green-600/20 flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
-                                <Check className="w-5 h-5 mr-2" />
+                                <Check className="w-5 h-5 mr-3" />
                                 Salvar Contato
                             </button>
                         </div>

@@ -5,11 +5,18 @@
 @layer base {
   body {
     color: #1e293b;
-    /* slate-800 / brand-text fallback */
     background-color: #f8fafc;
-    /* slate-50 */
-    background-image: linear-gradient(to bottom right, #f8fafc, #f1f5f9), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2364748b' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    background-blend-mode: multiply;
+    background-image: radial-gradient(at 0% 0%, rgba(248, 250, 252, 1) 0, transparent 50%), 
+                      radial-gradient(at 100% 0%, rgba(241, 245, 249, 1) 0, transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background-color: #020617; /* Deep Slate 950 */
+    background-image: radial-gradient(at 0% 0%, rgba(15, 23, 42, 1) 0, transparent 50%), 
+                      radial-gradient(at 100% 0%, rgba(2, 6, 23, 1) 0, transparent 50%);
+    color: #f1f5f9;
   }
 
   /* Global smooth transitions */
@@ -86,29 +93,55 @@
   /* Premium Components - Standard CSS to eliminate lint warnings */
   .premium-card {
     background-color: white;
-    border-radius: 0.75rem;
-    /* rounded-xl */
-    border-width: 1px;
-    border-color: #f3f4f6;
-    /* gray-100 */
-    transition-property: all;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 300ms;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .premium-card {
+    background-color: rgba(30, 41, 59, 0.4);
+    backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
   }
 
   .premium-card:hover {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .premium-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .dark .glass-effect {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .premium-shadow {
-    box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .premium-shadow {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
   .premium-border {
-    border-width: 1px;
-    border-color: rgba(243, 244, 246, 0.5);
-    /* gray-100/50 */
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
+  
+  .dark .premium-border {
+    border-color: rgba(255, 255, 255, 0.05);
   }
 }
 

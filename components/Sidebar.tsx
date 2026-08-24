@@ -96,16 +96,30 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         }
 
         return (
-            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative group ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={badgeCount > 0 ? `${label} (${badgeCount})` : label}>
+            <button
+                type="button"
+                onClick={() => onNavigate(page)}
+                className={`w-full flex items-center p-3 rounded-xl transition-all duration-300 relative group 
+                    ${currentPage === page
+                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30 dark:shadow-brand-primary/10 scale-[1.02] border border-white/10'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
+                    } ${isOpen ? '' : 'justify-center'}`}
+                title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
+            >
                 <div className="relative">
-                    <Icon className="w-6 h-6 flex-shrink-0" />
+                    <Icon className={`w-6 h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : ''}`} />
                     {badgeCount > 0 && (
-                        <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm animate-in fade-in zoom-in duration-300 border border-white dark:border-slate-900">
+                        <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
                             {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                     )}
                 </div>
-                {isOpen && <span className="ml-4 truncate">{label}</span>}
+                {isOpen && <span className={`ml-4 truncate font-medium ${currentPage === page ? 'font-bold' : ''}`}>{label}</span>}
+
+                {/* Visual indicator for active item */}
+                {currentPage === page && (
+                    <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                )}
             </button>
         );
     };
@@ -128,22 +142,30 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         return (
             <div>
-                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 relative ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'}`}>
+                <button
+                    onClick={() => toggleMenu(menuKey)}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 relative group
+                        ${isActive
+                            ? 'bg-brand-primary/10 text-brand-primary dark:text-brand-primary border border-brand-primary/20'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
+                        }`}
+                >
                     <div className="flex items-center">
                         <div className="relative">
-                            <Icon className="w-6 h-6 flex-shrink-0" />
+                            <Icon className="w-6 h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
                             {menuBadgeCount > 0 && !openMenus[menuKey] && (
-                                <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900">
+                                <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900 animate-pulse">
                                     {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
                                 </span>
                             )}
                         </div>
-                        {isOpen && <span className="ml-4 truncate font-semibold">{label}</span>}
+                        {isOpen && <span className="ml-4 truncate font-bold text-sm tracking-wide uppercase opacity-80">{label}</span>}
                     </div>
-                    {isOpen && <ChevronDownIcon className={`w-5 h-5 transition-transform ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
+                    {isOpen && <ChevronDownIcon className={`w-4 h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
                 {openMenus[menuKey] && isOpen && (
-                    <div className="pl-8 pt-2 space-y-1 animate-in slide-in-from-top-2 duration-300">
+                    <div className="pl-4 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-500">
+                        <div className="absolute left-6 top-0 bottom-0 w-px bg-gray-100 dark:bg-white/5" />
                         {children}
                     </div>
                 )}
@@ -159,12 +181,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-slate-900 dark:border-slate-800 premium-card
-            fixed md:relative z-50 h-full
+        <aside className={`transition-all duration-500 ease-in-out flex-shrink-0 flex flex-col shadow-2xl 
+            bg-white dark:bg-slate-900/80 dark:backdrop-blur-xl border-r border-gray-200 dark:border-white/5 
+            fixed md:relative z-50 h-full overflow-hidden
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
+            ${isImpersonating ? 'border-t-4 border-t-red-500' : ''}
         `}>
-            <div className="h-24 flex items-center justify-center bg-white border-b border-gray-100 dark:border-slate-800">
-                <Logo showText={isOpen} className={isOpen ? 'h-12' : 'h-10'} />
+            <div className="h-24 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
+                <div className="hover:scale-105 transition-transform duration-300">
+                    <Logo showText={isOpen} className={isOpen ? 'h-12' : 'h-10'} />
+                </div>
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />

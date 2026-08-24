@@ -12,18 +12,24 @@ const Settings: React.FC = () => {
 
     if (!canAccess) {
         return (
-            <div className="p-8 text-center text-red-500">
-                <h2 className="text-xl font-bold">Acesso Negado</h2>
-                <p>Você não tem permissão para acessar esta área.</p>
+            <div className="p-20 text-center flex flex-col items-center justify-center h-full animate-in fade-in duration-700">
+                <div className="w-24 h-24 bg-red-500/10 rounded-[2rem] flex items-center justify-center mb-8 border border-red-500/20 shadow-2xl shadow-red-500/20">
+                    <span className="text-4xl font-black text-red-500">!</span>
+                </div>
+                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-3">Acesso Negado</h2>
+                <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-70">Você não tem permissão para acessar esta área.</p>
             </div>
         );
     }
 
     return (
-        <div className="p-6 h-full flex flex-col overflow-hidden">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">Configurações</h2>
+        <div className="p-10 h-full flex flex-col overflow-hidden dark:bg-transparent transition-colors duration-500">
+            <div className="mb-10 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
+                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Configurações</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie usuários, filas e etiquetas do seu atendimento.</p>
+            </div>
             
-            <div className="flex space-x-6 border-b border-gray-200 mb-6">
+            <div className="flex space-x-10 mb-10 px-4">
                 {[
                     { id: 'users', label: 'Usuários' },
                     { id: 'queues', label: 'Filas' },
@@ -32,24 +38,26 @@ const Settings: React.FC = () => {
                     <button 
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+                        className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.2em] transition-all relative ${
                             activeTab === tab.id 
-                            ? 'text-green-600' 
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'text-emerald-500'
+                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
                         }`}
                     >
                         {tab.label}
                         {activeTab === tab.id && (
-                            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-green-600 rounded-t-full"></span>
+                            <span className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-in slide-in-from-bottom-1 duration-300"></span>
                         )}
                     </button>
                 ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-                {activeTab === 'users' && <UsersTab />}
-                {activeTab === 'queues' && <QueuesTab />}
-                {activeTab === 'tags' && <TagsTab />}
+            <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {activeTab === 'users' && <UsersTab />}
+                    {activeTab === 'queues' && <QueuesTab />}
+                    {activeTab === 'tags' && <TagsTab />}
+                </div>
             </div>
         </div>
     );

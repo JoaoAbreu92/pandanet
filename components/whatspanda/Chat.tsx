@@ -180,25 +180,27 @@ const Chat: React.FC = () => {
   const filteredConversations = conversations.filter(c => c.status === activeTab);
 
   return (
-    <div className="flex h-full bg-[#f8fafc] overflow-hidden relative font-sans text-brand-text">
+    <div className="flex h-full bg-[#f8fafc] dark:bg-transparent overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
       {/* Sidebar: Conversations List */}
-      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white border-r border-slate-200 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10`}>
+      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
-        <div className="p-4 border-b border-slate-200 bg-white">
+        <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-white dark:bg-transparent">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 tracking-tight">
+            <h2 className="text-xl font-black flex items-center gap-2 text-slate-800 dark:text-white tracking-tighter uppercase text-sm opacity-80">
               Atendimentos
             </h2>
-            <div className={`w-2 h-2 rounded-full ring-4 shadow-sm ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-50' : 'bg-red-500 ring-red-50'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
+            <div className={`w-3 h-3 rounded-full ring-4 shadow-lg ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-500/20 animate-pulse' : 'bg-red-500 ring-red-500/20'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
           </div>
           
           {/* Tabs */}
-          <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
+          <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
             {(['aberto', 'pendente', 'fechado'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg capitalize transition-all duration-200 ${activeTab === tab ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                className={`flex-1 py-2 text-xs font-black rounded-xl capitalize transition-all duration-300 ${activeTab === tab
+                  ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-xl scale-[1.02]'
+                  : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/5'
                 }`}
               >
                 {tab}
@@ -208,13 +210,13 @@ const Chat: React.FC = () => {
         </div>
 
         {/* Search and Actions */}
-        <div className="p-3 border-b border-slate-100 bg-white space-y-3">
+        <div className="p-3 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-transparent space-y-3">
           <div className="relative group">
             <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
             <input
               type="text" 
               placeholder="Buscar atendimento..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 dark:text-white"
             />
           </div>
           {isAdmin && (
@@ -238,12 +240,14 @@ const Chat: React.FC = () => {
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-2 bg-slate-50">
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-2 bg-slate-50/50 dark:bg-transparent">
           {filteredConversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => setSelectedConversation(conv)}
-              className={`p-3 rounded-xl border cursor-pointer hover:shadow-md transition-all duration-300 relative overflow-hidden ${selectedConversation?.id === conv.id ? 'bg-white border-emerald-500 shadow-[0_4px_20px_rgba(16,185,129,0.08)]' : 'bg-white border-slate-200 shadow-sm hover:border-emerald-300'
+              className={`p-3 rounded-2xl border cursor-pointer hover:shadow-lg transition-all duration-300 relative overflow-hidden group ${selectedConversation?.id === conv.id
+                ? 'bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 shadow-sm hover:border-emerald-300 dark:hover:bg-white/10'
               }`}
             >
               {/* Active bar */}
@@ -271,16 +275,16 @@ const Chat: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <h3 className={`font-bold text-sm truncate ${selectedConversation?.id === conv.id ? 'text-emerald-700' : 'text-slate-800'}`}>
+                  <h3 className={`font-black text-sm truncate tracking-tight transition-colors ${selectedConversation?.id === conv.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
                     {conv.contact_name || conv.contact_phone}
                   </h3>
                 </div>
-                <span className={`text-[10px] font-semibold whitespace-nowrap mt-0.5 ${selectedConversation?.id === conv.id ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-black uppercase tracking-widest whitespace-nowrap mt-1 ${selectedConversation?.id === conv.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
                     {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
-              <div className="flex justify-between items-center mt-1">
-                <p className="text-xs text-slate-500 truncate max-w-[140px] font-medium">
+              <div className="flex justify-between items-center mt-2 pl-10">
+                <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-bold tracking-tight opacity-70 group-hover:opacity-100">
                     {conv.contact_phone}
                 </p>
                 {conv.unread_count > 0 ? (
@@ -305,13 +309,13 @@ const Chat: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#F3F6F8] relative`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
-        <div className="absolute inset-0 bg-white/70 pointer-events-none" /> {/* Overlay to soften the background */}
+      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#F3F6F8] dark:bg-[#020617] relative transition-colors duration-500`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
+        <div className="absolute inset-0 bg-white/70 dark:bg-[#020617]/90 pointer-events-none" /> {/* Overlay to soften the background */}
 
         {selectedConversation ? (
           <div className="relative z-10 flex flex-col h-full"> {/* Container for z-index */}
             {/* Chat Header */}
-            <div className="px-5 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200 flex justify-between items-center shadow-sm z-20">
+            <div className="px-6 py-4 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex justify-between items-center shadow-lg z-20">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedConversation(null)}
@@ -319,20 +323,20 @@ const Chat: React.FC = () => {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="w-11 h-11 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white shadow-sm overflow-hidden">
+                <div className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white dark:ring-white/10 shadow-lg overflow-hidden transition-all duration-300">
                   <User className="w-6 h-6" />
                 </div>
                 <div className="min-w-0 flex flex-col">
-                  <h3 className="font-bold text-slate-800 text-base truncate leading-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs font-semibold text-slate-500 truncate">{selectedConversation.contact_phone}</p>
+                  <h3 className="font-black text-slate-800 dark:text-white text-lg truncate leading-tight tracking-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-[11px] font-black text-slate-500 dark:text-gray-400 truncate opacity-80">{selectedConversation.contact_phone}</p>
 
                     {selectedConversation.channel && (
-                      <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1">
-                        {selectedConversation.channel.channel_type === 'instagram' ? <Instagram className="w-3 h-3 text-pink-500" /> :
-                          selectedConversation.channel.channel_type === 'messenger' ? <MessageCircle className="w-3 h-3 text-blue-500" /> :
-                            selectedConversation.channel.channel_type === 'telegram' ? <Send className="w-3 h-3 text-sky-500" /> :
-                              <Smartphone className="w-3 h-3 text-emerald-500" />}
+                      <span className="text-[10px] bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-gray-300 font-black px-3 py-1 rounded-full border border-slate-200 dark:border-white/5 flex items-center gap-1.5 uppercase tracking-widest shadow-sm">
+                        {selectedConversation.channel.channel_type === 'instagram' ? <Instagram className="w-3.5 h-3.5 text-pink-500" /> :
+                          selectedConversation.channel.channel_type === 'messenger' ? <MessageCircle className="w-3.5 h-3.5 text-blue-500" /> :
+                            selectedConversation.channel.channel_type === 'telegram' ? <Send className="w-3.5 h-3.5 text-sky-500" /> :
+                              <Smartphone className="w-3.5 h-3.5 text-emerald-500" />}
                         {selectedConversation.channel.connection_name || 'WhatsApp'}
                       </span>
                     )}
@@ -378,14 +382,14 @@ const Chat: React.FC = () => {
                   className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
                 >
                   <div
-                    className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2.5 shadow-sm relative filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.04)] ${msg.is_from_customer
-                      ? 'bg-white text-slate-800 rounded-tl-sm border border-slate-100'
-                      : 'bg-[#dafde0] text-slate-800 rounded-tr-sm border border-[#c4f2cd]'
+                    className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-5 py-3 shadow-xl relative backdrop-blur-md border ${msg.is_from_customer
+                      ? 'bg-white/90 dark:bg-white/5 text-slate-800 dark:text-white rounded-tl-sm border-slate-100 dark:border-white/10'
+                      : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
                     }`}
                   >
                     <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
-                    <div className="flex justify-end items-center gap-1.5 mt-1.5">
-                      <span className="text-[10px] font-semibold text-slate-400">
+                    <div className="flex justify-end items-center gap-1.5 mt-2 opacity-60">
+                      <span className="text-[10px] font-black uppercase tracking-tighter">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {!msg.is_from_customer && (
@@ -399,10 +403,10 @@ const Chat: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="px-4 py-3 bg-white border-t border-slate-200 z-20 flex gap-2">
-              <div className="flex-1 bg-slate-50 rounded-2xl flex items-end p-1.5 border border-slate-200 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-50 focus-within:bg-white transition-all">
+            <div className="px-6 py-5 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20">
+              <div className="flex-1 bg-gray-100/50 dark:bg-white/5 rounded-3xl flex items-end p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-2xl transition-all duration-300">
                 <button
-                  className={`p-2 rounded-xl transition-colors ${canSendMedia ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-700' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                  className={`p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
                   disabled={!canSendMedia}
                   title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
                 >
@@ -419,28 +423,28 @@ const Chat: React.FC = () => {
                   }}
                   placeholder={canSendMessagesResult ? "Escreva uma mensagem..." : "Apenas leitura"}
                   disabled={!canSendMessagesResult}
-                  className="flex-1 max-h-32 min-h-[40px] py-2 px-3 bg-transparent text-sm resize-none focus:outline-none disabled:text-slate-500"
+                  className="flex-1 max-h-40 min-h-[44px] py-3 px-4 bg-transparent text-sm resize-none focus:outline-none dark:text-white placeholder-gray-400 font-medium"
                   rows={1}
                 />
                 <button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim() || !canSendMessagesResult}
-                  className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:bg-slate-300 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-emerald-500/20 mb-px"
+                  className="p-3 bg-brand-primary text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-xl shadow-brand-primary/20 mb-px ml-2"
                   title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
                 >
-                  <Send className="w-5 h-5 ml-0.5" />
+                  <Send className="w-5 h-5 ml-1" />
                 </button>
               </div>
             </div>
           </div>
         ) : (
             <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
-              <div className="bg-white/60 backdrop-blur-md p-10 rounded-3xl shadow-xl flex flex-col items-center max-w-sm text-center border border-white/40">
-                <div className="w-20 h-20 bg-gradient-to-tr from-emerald-100 to-emerald-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner ring-1 ring-emerald-100">
-                  <MessageCircle className="w-10 h-10 text-emerald-500" />
+              <div className="bg-white/50 dark:bg-slate-900/60 backdrop-blur-3xl p-12 rounded-[2.5rem] shadow-2xl flex flex-col items-center max-w-sm text-center border border-white/20 dark:border-white/5">
+                <div className="w-24 h-24 bg-gradient-to-tr from-emerald-500 to-emerald-400 rounded-3xl flex items-center justify-center mb-8 shadow-2xl shadow-emerald-500/20 transform rotate-3">
+                  <MessageCircle className="w-12 h-12 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">WhatsPanda Pro</h2>
-                <p className="text-sm font-medium text-slate-500 leading-relaxed">Selecione um atendimento ao lado para visualizar as mensagens e interagir com o cliente.</p>
+                <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-4 tracking-tighter font-brand">WhatsPanda Pro</h2>
+                <p className="text-sm font-bold text-slate-500 dark:text-gray-400 leading-relaxed opacity-80">Selecione um atendimento ao lado para visualizar as mensagens e interagir com o cliente.</p>
               </div>
           </div>
         )}
@@ -448,47 +452,47 @@ const Chat: React.FC = () => {
 
       {/* Right Sidebar: Contact Info */}
       {selectedConversation && (
-        <div className={`w-[280px] bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
+        <div className={`w-[320px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
           {/* Contact Header Component / Modal Wrapper Alternative */}
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center xl:hidden">
             <span className="font-bold text-slate-700">Detalhes</span>
             <button onClick={() => setShowContactSidebar(false)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-500"><CheckCheck className="w-5 h-5" /></button>
           </div>
 
-          <div className="p-6 flex flex-col items-center border-b border-slate-100">
-            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4 ring-4 ring-white shadow-md">
-              <User className="w-12 h-12 text-slate-300" />
+          <div className="p-8 flex flex-col items-center border-b border-slate-100 dark:border-white/5">
+            <div className="w-32 h-32 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 ring-8 ring-white dark:ring-white/10 shadow-2xl overflow-hidden transition-all duration-300">
+              <User className="w-16 h-16 text-slate-300" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 text-center leading-tight">{selectedConversation.contact_name || 'Sem nome'}</h3>
-            <p className="text-slate-500 text-sm font-semibold mt-1">{selectedConversation.contact_phone}</p>
+            <h3 className="text-xl font-black text-slate-800 dark:text-white text-center leading-tight tracking-tight">{selectedConversation.contact_name || 'Sem nome'}</h3>
+            <p className="text-slate-500 dark:text-gray-400 text-sm font-black mt-2 opacity-80">{selectedConversation.contact_phone}</p>
             </div>
 
-          <div className="p-6 flex-1 overflow-y-auto space-y-5">
+          <div className="p-8 flex-1 overflow-y-auto space-y-8 custom-scrollbar">
             <div>
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Informações do Ticket</h4>
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-3">
-                <div className="flex items-center gap-3 text-sm text-slate-700">
-                  <Clock className="w-4 h-4 text-slate-400" />
+              <h4 className="text-[11px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">Informações do Ticket</h4>
+              <div className="bg-gray-100/50 dark:bg-white/5 rounded-2xl p-5 border border-transparent dark:border-white/5 space-y-4">
+                <div className="flex items-center gap-4 text-sm text-slate-700 dark:text-gray-200">
+                  <Clock className="w-5 h-5 text-emerald-500" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-slate-500">Última Interação</span>
-                    <span className="font-semibold">{new Date(selectedConversation.last_message_at).toLocaleDateString()} às {new Date(selectedConversation.last_message_at).toLocaleTimeString().slice(0, 5)}</span>
+                    <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-gray-500">Última Interação</span>
+                    <span className="font-bold">{new Date(selectedConversation.last_message_at).toLocaleDateString()} às {new Date(selectedConversation.last_message_at).toLocaleTimeString().slice(0, 5)}</span>
                   </div>
                 </div>
                     </div>
                 </div>
 
             <div>
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Ações Rápidas</h4>
-              <div className="space-y-2">
-                <button className="w-full flex items-center justify-center py-2.5 px-4 bg-emerald-50 text-emerald-700 font-bold text-sm rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
+              <h4 className="text-[11px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">Ações Rápidas</h4>
+              <div className="space-y-3">
+                <button className="w-full flex items-center justify-center py-4 px-6 bg-brand-primary/10 dark:bg-emerald-500/10 text-brand-primary dark:text-emerald-400 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-brand-primary hover:text-white dark:hover:bg-emerald-500 dark:hover:text-white transition-all duration-300 border border-brand-primary/20">
                   Ver Perfil CRM
                 </button>
-                <button className="w-full flex items-center justify-center py-2.5 px-4 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors border border-red-100">
+                <button className="w-full flex items-center justify-center py-4 px-6 bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white transition-all duration-300 border border-red-500/20">
                   Encerrar Atendimento
                 </button>
               </div>
-                </div>
             </div>
+          </div>
         </div>
       )}
 

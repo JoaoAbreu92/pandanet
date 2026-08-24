@@ -14,6 +14,8 @@ import {
     SparklesIcon,
     LockClosedIcon,
     BellIcon,
+    ChatBubbleLeftRightIcon,
+    ChevronDownIcon,
 } from './icons';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
 import { supabase } from '../supabaseClient';
@@ -1264,14 +1266,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
 
     return (
-        <div className="flex h-full bg-white overflow-hidden">
+        <div className="flex h-full bg-transparent overflow-hidden">
             {/* Left Sidebar: Conversations/Contacts/Teams */}
-            <div className={`w-full md:w-80 lg:w-96 bg-white border-r flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b">
-                    <div className="flex bg-gray-100 rounded-md p-1">
-                        <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'conversations' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Chat</button>
-                        <button onClick={() => setActiveTab('contacts')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'contacts' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Contatos</button>
-                        <button onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'teams' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Equipes</button>
+            <div className={`w-full md:w-80 lg:w-96 bg-white/80 dark:bg-[#020617]/40 backdrop-blur-xl border-r border-gray-200 dark:border-white/5 flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-4 border-b border-gray-100 dark:border-white/5">
+                    <div className="flex bg-gray-100 dark:bg-white/5 rounded-xl p-1">
+                        <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'conversations' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Chat</button>
+                        <button onClick={() => setActiveTab('contacts')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'contacts' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Contatos</button>
+                        <button onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Equipes</button>
                     </div>
                 </div>
                 
@@ -1307,8 +1309,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             }).map(conv => {
                                 // Online status logic would require presence tracking (realtime), omitted for basic scope
                                 return (
-                                    <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group">
-                                        <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 premium-card ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
+                                    <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group px-2 py-1">
+                                        <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
+                                            ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
+                                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'}`}>
                                             <div className="relative">
                                                 <img
                                                     src={conv.participantAvatarUrl}
@@ -1324,8 +1328,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                 {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
+                                                <div className="flex justify-between items-center mb-0.5">
+                                                    <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
                                                         {((profile?.email === 'ti@grupopixel.com.br' || profile?.id === MASTER_ADMIN_ID) && isGhostMode) && (
@@ -1378,18 +1382,20 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 </li>
                             )}
                             {conversations.filter(c => c.isGroup && c.is_closed !== true).map(conv => (
-                                <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
-                                    <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
+                                <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="px-2 py-1">
+                                    <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
+                                        ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
+                                        : 'border-transparent hover:bg-gray-100 dark:hover:bg-white/5'}`}>
                                         <div className="relative">
-                                            <img src={conv.participantAvatarUrl} alt={conv.participantName} className="w-10 h-10 rounded-full border-2 border-gray-400" />
-                                            {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
+                                            <img src={conv.participantAvatarUrl} alt={conv.participantName} className="w-10 h-10 rounded-full border-2 border-gray-100 dark:border-white/10" />
+                                            {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full shadow-lg border-2 border-white dark:border-slate-900">{conv.unreadCount}</span>}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-center">
-                                                <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
-                                                <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
+                                            <div className="flex justify-between items-center mb-0.5">
+                                                <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
+                                                <p className="text-[10px] text-gray-400 font-medium uppercase">{conv.lastMessageTimestamp}</p>
                                             </div>
-                                            <p className="text-sm text-brand-subtle-text truncate">{conv.lastMessage}</p>
+                                            <p className="text-sm text-brand-subtle-text truncate opacity-80">{conv.lastMessage}</p>
                                         </div>
                                     </div>
                                 </li>
@@ -1415,7 +1421,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 {selectedConversationId ? (
                     <>
                         {/* Header */}
-                        <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center shadow-sm z-10 relative">
+                        <div className="bg-white/70 dark:bg-[#020617]/60 backdrop-blur-xl border-b border-gray-200 dark:border-white/5 p-4 flex justify-between items-center z-10 relative">
                             <div className="flex items-center space-x-3">
                                 <button onClick={() => setSelectedConversationId(null)} className="md:hidden -ml-2 mr-2 p-2 text-gray-500 rounded-full hover:bg-gray-100">
                                     <ChevronLeftIcon className="w-6 h-6" />
@@ -1428,10 +1434,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             <span className="bg-red-100 text-red-600 text-[10px] uppercase font-black px-2 py-0.5 rounded-full border border-red-200">Encerrado</span>
                                         )}
                                     </div>
-                                    <p className="text-xs font-medium">
+                                    <p className="text-xs font-bold tracking-tight">
                                         {selectedConversation?.participantId && onlineUsers.has(selectedConversation.participantId)
-                                            ? <span className="text-emerald-500 flex items-center gap-1">● Online</span>
-                                            : <span className="text-gray-400 flex items-center gap-1">○ Offline</span>
+                                            ? <span className="text-emerald-500 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> ONLINE</span>
+                                            : <span className="text-gray-400 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" /> OFFLINE</span>
                                         }
                                     </p>
                                 </div>
@@ -1544,7 +1550,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
                             <div ref={messagesEndRef} />
                         </div>
-                        <div className="p-4 bg-white border-t border-gray-100 z-10 relative shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
+                        <div className="p-4 bg-white/70 dark:bg-[#020617]/60 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative">
                             {selectedConversation?.is_closed ? (
                                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center animate-pulse">
                                     <p className="text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
@@ -1564,9 +1570,9 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                     {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                                     <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
                                         {showEmojiPicker && (
-                                                <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap w-64 max-h-60 overflow-y-auto z-40">
+                                                <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-3 flex flex-wrap w-72 max-h-64 overflow-y-auto z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                                 {availableEmojis.map(emoji => (
-                                                    <button key={emoji} type="button" onClick={() => setNewMessageText(prev => prev + emoji)} className="text-2xl p-1 hover:bg-gray-200 rounded-md">
+                                                    <button key={emoji} type="button" onClick={() => setNewMessageText(prev => prev + emoji)} className="text-2xl p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors">
                                                         {emoji}
                                                     </button>
                                                 ))}
@@ -1611,13 +1617,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             onChange={(e) => setNewMessageText(e.target.value)}
                                             onPaste={handlePaste}
                                             placeholder="Digite uma mensagem..."
-                                            className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary h-10"
+                                                className="flex-1 w-full px-5 py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-11 text-sm transition-all duration-300 dark:text-white"
                                         />
-                                        <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessageText.trim() && !attachedFile)}>
+                                            <button type="submit" className="p-2.5 bg-brand-primary text-white rounded-2xl hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-lg shadow-brand-primary/20" disabled={(!newMessageText.trim() && !attachedFile)}>
                                             <PaperAirplaneIcon className="w-6 h-6" />
                                         </button>
                                         {showStickerPicker && (
-                                            <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-3 w-72 z-50 animate-fade-in-up">
+                                                <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-4 w-80 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
                                                     <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
@@ -1670,11 +1676,19 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             )}
                         </div>
                     </>
-                ) : (<div className="flex-1 flex-col items-center justify-center text-gray-500 hidden md:flex"> <p className="text-lg">Selecione uma conversa</p><p className="text-sm">Escolha uma pessoa da lista para ver as mensagens.</p> </div>)}
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-500 hidden md:flex p-12 text-center bg-gradient-to-b from-transparent to-gray-50/30 dark:to-white/5">
+                        <div className="w-24 h-24 bg-brand-primary/10 rounded-full flex items-center justify-center mb-6 animate-bounce">
+                            <ChatBubbleLeftRightIcon className="w-12 h-12 text-brand-primary" />
+                        </div>
+                        <p className="text-xl font-bold text-gray-900 dark:text-white mb-2">Selecione uma conversa</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">Escolha uma pessoa ou equipe da lista ao lado para começar a interagir.</p>
+                    </div>
+                )}
             </div>
 
             {/* Right Sidebar: Sticky Notes (Local Only) */}
-            <div className="hidden lg:flex flex-col w-72 bg-gray-50 border-l p-4 overflow-hidden">
+            <div className="hidden lg:flex flex-col w-72 bg-gray-50/50 dark:bg-[#020617]/40 backdrop-blur-xl border-l border-gray-100 dark:border-white/5 p-4 overflow-hidden">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-gray-700 flex items-center gap-2">
                         <span className="text-xl">📝</span> Notas Rápidas
@@ -1695,7 +1709,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     {notes.map((note) => {
                         const color = NOTE_COLORS.find(c => c.id === note.colorId) || NOTE_COLORS[0];
                         return (
-                            <div key={note.id} className={`p-3 relative rounded-lg shadow-sm ${color.bg} ${color.border} border group animate-fade-in-up transition-all hover:scale-102`}>
+                            <div key={note.id} className={`p-3 relative rounded-2xl shadow-sm ${color.bg} ${color.border} border opacity-90 group animate-fade-in-up transition-all hover:scale-105 hover:opacity-100`}>
                                 <button onClick={() => handleDeleteNote(note.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 transition-opacity">
                                     <XCircleIcon className="w-4 h-4" />
                                 </button>
@@ -1704,7 +1718,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                         );
                     })}
                     {notes.length === 0 && (
-                        <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                        <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
                             <p className="text-sm">Nenhuma nota ainda.</p>
                         </div>
                     )}
@@ -1718,7 +1732,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             if (noteWarning && notes.length < 6) setNoteWarning(false);
                         }}
                         placeholder="Nova nota..."
-                        className="w-full p-2 border rounded-md text-sm mb-2 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                        className="w-full p-3 bg-white/50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl text-sm mb-3 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
