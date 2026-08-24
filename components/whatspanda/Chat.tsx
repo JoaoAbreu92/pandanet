@@ -1237,6 +1237,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
                 uploadedFileUrl = publicUrl;
                 fileType = attachedFile.type;
+                console.log(`[SEND] Upload OK. URL: ${publicUrl} | MIME: ${fileType}`);
+            } else {
+                console.error('[SEND] Upload retornou sem dados e sem erro.');
+                alert('Erro inesperado no upload do arquivo. Tente novamente.');
+                return;
             }
         }
 
@@ -1258,8 +1263,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to send message');
+            let errorMsg = `HTTP ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorData.details || JSON.stringify(errorData);
+            } catch (_) {
+                errorMsg = await response.text().catch(() => errorMsg);
+            }
+            throw new Error(errorMsg);
         }
 
         setNewMessage('');
@@ -1269,9 +1280,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         fetchMessages(selectedConversation.id);
         // Forçar scroll para baixo para ver a própria mensagem enviada
         scrollToBottom(true);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error sending message:', error);
-        alert('Erro ao enviar mensagem.');
+        alert(`Erro ao enviar mensagem: ${error?.message || error}`);
     }
   };
 

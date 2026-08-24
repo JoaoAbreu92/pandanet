@@ -376,15 +376,28 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 fileName: fileName,
                 caption: message || ''
             };
+            console.log(`[SEND API] Enviando para Evolution: endpoint=${endpoint} | body=`, JSON.stringify(body).substring(0, 500));
 
-            const sendReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
-                method: 'POST',
-                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 120000); // 120s timeout
+
+            let sendReq;
+            try {
+                sendReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
+                    method: 'POST',
+                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: controller.signal
+                });
+            } catch (fetchErr) {
+                clearTimeout(timeout);
+                console.error(`[SEND API] Erro de rede/timeout ao enviar mídia:`, fetchErr.message);
+                return res.status(504).json({ error: `Timeout ou erro de rede ao enviar mídia para WhatsApp: ${fetchErr.message}` });
+            }
+            clearTimeout(timeout);
             
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
-            console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes));
+            console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes).substring(0, 500));
             if (sendReq.ok && !sendRes?.error) sendOk = true;
 
         } else {
