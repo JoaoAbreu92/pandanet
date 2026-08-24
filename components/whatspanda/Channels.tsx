@@ -87,21 +87,7 @@ const Channels: React.FC = () => {
         }
     };
 
-    const startSession = async (companyId: string) => {
-        try {
-            await fetch(`/api/sessions/${companyId}/start`, { method: 'POST' });
-        } catch (error) {
-            console.error('Erro ao iniciar sessão:', error);
-        }
-    };
 
-    const stopSession = async (companyId: string) => {
-        try {
-            await fetch(`/api/sessions/${companyId}/stop`, { method: 'POST' });
-        } catch (error) {
-            console.error('Erro ao parar sessão:', error);
-        }
-    };
 
     const handleSaveConfig = async () => {
         if (!connectionName || !phoneNumber) {
