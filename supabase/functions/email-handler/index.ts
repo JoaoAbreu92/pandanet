@@ -1,6 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
-import nodemailer from "npm:nodemailer@6.9.7"
-import { ImapFlow } from "npm:imapflow@1.0.141"
+import { createClient } from "@supabase/supabase-js"
+import nodemailer from "nodemailer"
+import { ImapFlow } from "imapflow"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
