@@ -131,6 +131,32 @@ const mockFeedPosts: Post[] = [
     }
 ];
 
+const mockTrainings: any[] = [
+    { id: 1, title: 'Onboarding: Bem-vindo à PandaNet', duration: '15 min', thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60', category: 'RH' },
+    { id: 2, title: 'Segurança da Informação: Básico', duration: '30 min', thumbnail: 'https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=800&auto=format&fit=crop&q=60', category: 'TI' },
+    { id: 3, title: 'Cultura e Valores', duration: '20 min', thumbnail: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&auto=format&fit=crop&q=60', category: 'RH' },
+];
+
+const mockKBArticles: any[] = [
+    { id: 1, title: 'Como configurar a VPN?', category: 'Rede', views: 342, content: 'Passo a passo para conectar...' },
+    { id: 2, title: 'Solicitando acesso ao Jira', category: 'Acessos', views: 128, content: 'Abra um chamado na categoria...' },
+    { id: 3, title: 'Configuração de impressora', category: 'Hardware', views: 56, content: 'Encontre o IP da impressora...' },
+    { id: 4, title: 'Reset de senha do e-mail', category: 'Contas', views: 890, content: 'Acesse o portal de self-service...' },
+];
+
+const mockServices: any[] = [
+    { id: 1, name: 'Rede Interna (Wi-Fi)', status: 'operational', uptime: '99.9%' },
+    { id: 2, name: 'Servidor de Arquivos', status: 'operational', uptime: '99.8%' },
+    { id: 3, name: 'E-mail (Exchange)', status: 'operational', uptime: '100%' },
+    { id: 4, name: 'ERP System', status: 'maintenance', uptime: '95.5%' },
+    { id: 5, name: 'VPN Access', status: 'operational', uptime: '98.2%' },
+];
+
+const mockSecurityAlerts: any[] = [
+    { id: 1, title: 'Atualização Crítica do Windows', description: 'Todos os computadores serão reiniciados automaticamente hoje às 20:00 para aplicação de patch de segurança.', level: 'warning', date: '2024-08-01' },
+    { id: 2, title: 'Nova Política de Senhas', description: 'A partir do próximo mês, as senhas deverão ter no mínimo 12 caracteres.', level: 'info', date: '2024-07-25' },
+];
+
 // FIX: Explicitly typed acmeData with AppData to fix type-widening issues and allow for removing redundant casts.
 const acmeData: AppData = {
     employees: [
@@ -165,11 +191,16 @@ const acmeData: AppData = {
     documents: mockDocuments,
     benefits: mockBenefits,
     polls: mockPolls,
-    feedPosts: mockFeedPosts
+    feedPosts: mockFeedPosts,
+    events: [], // Initialize events
+    trainings: mockTrainings,
+    kbArticles: mockKBArticles,
+    services: mockServices,
+    securityAlerts: mockSecurityAlerts
 };
 
 // FIX: Explicitly typed globexData with AppData to ensure type consistency.
-const globexData: AppData = { ...acmeData, polls: [], employees: [{ id: 1, name: 'Carlos Silva', email: 'carlos@globex.com', password: '123', role: 'Diretor de Vendas', team: 'Vendas', avatarUrl: 'https://i.pravatar.cc/150?u=carlos@globex.com', joinDate: '2020-02-02', birthDate: '1985-10-10', isAdmin: true, isOnline: true, permissions: { ...basePermissions }, phone: '(11) 91111-2222', officeLocation: 'São Paulo', bio: 'Liderando equipes de vendas para o sucesso.', following: [] }] };
+const globexData: AppData = { ...acmeData, polls: [], events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], employees: [{ id: 1, name: 'Carlos Silva', email: 'carlos@globex.com', password: '123', role: 'Diretor de Vendas', team: 'Vendas', avatarUrl: 'https://i.pravatar.cc/150?u=carlos@globex.com', joinDate: '2020-02-02', birthDate: '1985-10-10', isAdmin: true, isOnline: true, permissions: { ...basePermissions }, phone: '(11) 91111-2222', officeLocation: 'São Paulo', bio: 'Liderando equipes de vendas para o sucesso.', following: [] }] };
 
 export const mockCompanies: Company[] = [
     {

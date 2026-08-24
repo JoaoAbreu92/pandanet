@@ -49,7 +49,12 @@ export {
   ChatBubbleLeftIcon,
   XMarkIcon,
   AtSymbolIcon,
-  UserGroupIcon, // Added
-  HashtagIcon,   // Added
-  CakeIcon       // Added
+  UserGroupIcon,
+  HashtagIcon,
+  CakeIcon,
+  MapPinIcon,
+  ClockIcon,
+  PlayCircleIcon,
+  ArrowDownTrayIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';

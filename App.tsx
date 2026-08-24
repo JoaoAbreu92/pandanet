@@ -25,6 +25,13 @@ import SaaSDashboard from './components/SaaSDashboard';
 import AdminPage from './components/AdminPage';
 import AnnouncementDetailPage from './components/AnnouncementDetailPage';
 import FeedPage from './components/FeedPage';
+import EventsPage from './components/EventsPage';
+import TrainingPage from './components/TrainingPage';
+import SurveysPage from './components/SurveysPage';
+import PoliciesPage from './components/PoliciesPage';
+import KnowledgeBasePage from './components/KnowledgeBasePage';
+import StatusPage from './components/StatusPage';
+import InfoSecPage from './components/InfoSecPage';
 import { fetchAnnouncements } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -84,6 +91,49 @@ const App: React.FC = () => {
             loadAnnouncements();
         }
     }, [authStage, currentCompany]);
+
+    // Sync Teams to Conversations
+    useEffect(() => {
+        if (companyData && currentUser) {
+            const currentTeams = Array.from(new Set(companyData.employees.map(e => e.team).filter(t => t && t !== 'Sem Equipe')));
+
+            setCompanyData(prevData => {
+                if (!prevData) return null;
+
+                let updatedConversations = [...prevData.conversations];
+                let hasChanges = false;
+
+                currentTeams.forEach((teamName: string) => {
+                    // Check if conversation for this team exists
+                    const exists = updatedConversations.find(c => c.isGroup && c.groupName === teamName);
+
+                    // Check if current user is in this team
+                    const isMember = prevData.employees.some(e => e.id === currentUser.id && e.team === teamName);
+
+                    if (!exists && isMember) {
+                        // Create new group conversation
+                        const newConversation: Conversation = {
+                            id: Date.now() + Math.random(), // Simple ID generation
+                            participantName: teamName, // Reused for display
+                            groupName: teamName,
+                            isGroup: true,
+                            participantAvatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(teamName)}&background=random`,
+                            messages: [],
+                            lastMessage: 'Grupo criado',
+                            lastMessageTimestamp: 'Agora',
+                            unreadCount: 0
+                        };
+                        updatedConversations.push(newConversation);
+                        hasChanges = true;
+                    }
+                    // Note: Handling removal if user leaves team is complex without more state, 
+                    // but for now we ensure they have it if they are in it.
+                });
+
+                return hasChanges ? { ...prevData, conversations: updatedConversations } : prevData;
+            });
+        }
+    }, [companyData?.employees, currentUser?.team]); // Re-run when employees or user team changes
 
     const handleLogout = () => {
         // Since auth is removed, we just reset to the default state or refresh
@@ -242,6 +292,80 @@ const App: React.FC = () => {
         }
     };
 
+    const handleJoinEvent = (eventId: number) => {
+        if (!companyData || !currentUser) return;
+
+        const updatedEvents = companyData.events.map(event => {
+            if (event.id === eventId) {
+                const isAttending = event.attendees.includes(currentUser.id);
+                const newAttendees = isAttending
+                    ? event.attendees.filter(id => id !== currentUser.id)
+                    : [...event.attendees, currentUser.id];
+
+                // If joining, remove from declined list if present
+                const newDeclined = (event.declined || []).filter(d => d.userId !== currentUser.id);
+
+                return { ...event, attendees: newAttendees, declined: newDeclined };
+            }
+            return event;
+        });
+
+        setCompanyData({ ...companyData, events: updatedEvents });
+    };
+
+    const handleDeclineEvent = (eventId: number, reason: string) => {
+        if (!companyData || !currentUser) return;
+
+        const updatedEvents = companyData.events.map(event => {
+            if (event.id === eventId) {
+                // Remove from attendees if present
+                const newAttendees = event.attendees.filter(id => id !== currentUser.id);
+                // Add to declined list
+                const currentDeclined = event.declined || [];
+                const newDeclined = [...currentDeclined.filter(d => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
+
+                return { ...event, attendees: newAttendees, declined: newDeclined };
+            }
+            return event;
+        });
+
+        setCompanyData({ ...companyData, events: updatedEvents });
+    };
+
+    // Check for Event Invites
+    useEffect(() => {
+        if (companyData && currentUser) {
+            const pendingInvites = companyData.events.filter(event =>
+                (event.invitees || []).includes(currentUser.id) &&
+                !event.attendees.includes(currentUser.id) &&
+                !(event.declined || []).some(d => d.userId === currentUser.id)
+            );
+
+            if (pendingInvites.length > 0) {
+                const inviteNotification: Notification = {
+                    id: 'event-invites', // Fixed ID to prevent duplicates/stacking for the same concept
+                    type: 'event', // Reusing event type or could be 'alert'
+                    title: 'Convocações Pendentes',
+                    description: `Você tem ${pendingInvites.length} evento(s) com presença obrigatória pendente.`,
+                    timestamp: 'Agora',
+                    isRead: false,
+                    linkTo: 'events',
+                    actionLabel: 'Ver Eventos'
+                };
+
+                setNotifications(prev => {
+                    // Avoid duplicate if already top
+                    if (prev.length > 0 && prev[0].id === 'event-invites' && prev[0].description === inviteNotification.description) return prev;
+                    // Remove old invite notification if exists and add new one
+                    return [inviteNotification, ...prev.filter(n => n.id !== 'event-invites')];
+                });
+            } else {
+                // Remove notification if cleared
+                setNotifications(prev => prev.filter(n => n.id !== 'event-invites'));
+            }
+        }
+    }, [companyData?.events, currentUser?.id]);
+
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
 
@@ -267,6 +391,13 @@ const App: React.FC = () => {
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
             case 'admin': return currentUser.isAdmin ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p>Acesso negado.</p>;
+            case 'training': return canAccess('viewTraining') ? <TrainingPage trainings={companyData.trainings} /> : null;
+            case 'surveys': return canAccess('viewSurveys') ? <SurveysPage polls={companyData.polls} /> : null;
+            case 'policies': return canAccess('viewPolicies') ? <PoliciesPage policies={companyData.documents} /> : null;
+            case 'knowledge-base': return canAccess('viewKnowledgeBase') ? <KnowledgeBasePage articles={companyData.kbArticles} /> : null;
+            case 'service-status': return canAccess('viewServiceStatus') ? <StatusPage services={companyData.services} /> : null;
+            case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage alerts={companyData.securityAlerts} /> : null;
+            case 'events': return <EventsPage events={companyData.events} onJoinEvent={handleJoinEvent} onDeclineEvent={handleDeclineEvent} currentUser={currentUser} />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
             default: return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
         }

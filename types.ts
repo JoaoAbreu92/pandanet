@@ -22,6 +22,7 @@ export type Page =
   | 'documentos'
   | 'documentos'
   | 'feed'
+  | 'events' // New Page
   // New RH Pages
   | 'training'
   | 'surveys'
@@ -76,6 +77,53 @@ export interface UpcomingEvent {
   date: string; // e.g., 'AGO 02'
   time: string;
   location: string;
+}
+
+export interface Event {
+  id: number;
+  title: string;
+  description: string;
+  date: string; // YYYY-MM-DD
+  time: string;
+  location: string;
+  imageUrl?: string;
+  category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro';
+  imageType?: 'url' | 'upload';
+  invitees?: number[]; // User IDs of specifically invited/convoked users
+  attendees: number[]; // User IDs who CONFIRMED
+  declined?: { userId: number; reason: string }[]; // Users who declined and why
+}
+
+export interface TrainingModule {
+  id: number;
+  title: string;
+  duration: string;
+  thumbnail: string;
+  videoUrl?: string;
+  category?: string;
+}
+
+export interface KBArticle {
+  id: number;
+  title: string;
+  category: string;
+  views: number;
+  content: string;
+}
+
+export interface ServiceStatusItem {
+  id: number;
+  name: string;
+  status: 'operational' | 'maintenance' | 'outage';
+  uptime: string;
+}
+
+export interface SecurityAlert {
+  id: number;
+  title: string;
+  description: string;
+  level: 'info' | 'warning' | 'critical';
+  date: string;
 }
 
 export interface EmployeePermissions {
@@ -181,6 +229,9 @@ export interface Conversation {
   lastMessage: string;
   lastMessageTimestamp: string;
   unreadCount: number;
+  isGroup?: boolean;
+  groupName?: string;
+  admins?: number[];
 }
 
 export type TicketStatus = 'Aberto' | 'Em Andamento' | 'Resolvido' | 'Fechado';
@@ -344,6 +395,11 @@ export interface AppData {
   benefits: Benefit[];
   polls: Poll[];
   feedPosts: Post[];
+  events: Event[];
+  trainings: TrainingModule[];
+  kbArticles: KBArticle[];
+  services: ServiceStatusItem[];
+  securityAlerts: SecurityAlert[];
 }
 
 export interface CompanySettings {

@@ -1,0 +1,40 @@
+import React from 'react';
+import { RocketLaunchIcon, PlayCircleIcon } from './icons';
+import type { TrainingModule } from '../types';
+
+interface TrainingPageProps {
+    trainings: TrainingModule[];
+}
+
+const TrainingPage: React.FC<TrainingPageProps> = ({ trainings }) => {
+
+    return (
+        <div className="p-6 max-w-7xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <RocketLaunchIcon className="w-8 h-8 mr-2 text-brand-primary" />
+                Treinamentos e Desenvolvimento
+            </h1>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {trainings.map(training => (
+                    <div key={training.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group cursor-pointer">
+                        <div className="relative h-48">
+                            <img src={training.thumbnail} alt={training.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                <PlayCircleIcon className="w-16 h-16 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                            </div>
+                            <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">{training.duration}</span>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-bold text-gray-800 group-hover:text-brand-primary transition-colors">{training.title}</h3>
+                            <button className="mt-3 w-full py-2 bg-gray-50 text-brand-primary font-medium rounded-lg hover:bg-brand-primary hover:text-white transition-colors text-sm">
+                                Iniciar Curso
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+export default TrainingPage;

@@ -10,6 +10,8 @@ import {
     ChevronLeftIcon,
     PlusIcon,
     TrashIcon,
+    UserGroupIcon,
+    XMarkIcon,
 } from './icons';
 import type { Conversation, Message, Employee } from '../types';
 
@@ -53,17 +55,15 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
     const [typingStatus, setTypingStatus] = useState<Record<number, boolean>>({});
 
+    const [showMembersModal, setShowMembersModal] = useState(false);
+
     // Sticky Notes State
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNoteText, setNewNoteText] = useState('');
     const [noteWarning, setNoteWarning] = useState(false);
 
     // Teams State
-    const [teams, setTeams] = useState<Team[]>([
-        { id: 1, name: 'Squad Alpha', members: [1, 2], creatorId: 1 }
-    ]);
-    const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-    const [newTeamName, setNewTeamName] = useState('');
+
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
@@ -160,18 +160,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
     };
 
     // Teams Logic
-    const handleCreateTeam = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newTeamName.trim()) return;
-        const newTeam: Team = { id: Date.now(), name: newTeamName, members: [currentUser.id], creatorId: currentUser.id };
-        setTeams([...teams, newTeam]);
-        setNewTeamName('');
-        setIsCreatingTeam(false);
-    };
 
-    const handleDeleteTeam = (teamId: number) => {
-        setTeams(teams.filter(t => t.id !== teamId));
-    };
 
 
     const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
@@ -180,6 +169,10 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
             <div className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
                 <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1" />
                 <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
+                    {/* Show name for other users in group chats */}
+                    {!isMe && selectedConversation?.isGroup && (
+                        <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
+                    )}
                     <div className="relative">
                         {message.replyingTo && (
                             <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md text-gray-500 border-l-2 border-green-400 ${isMe ? 'bg-emerald-100' : 'bg-gray-200'}`}>
@@ -250,36 +243,30 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                         <ul> {companyEmployees.filter(e => e.name !== currentUser.name).map(emp => (<li key={emp.id} className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50"> <img src={emp.avatarUrl} alt={emp.name} className={`w-10 h-10 rounded-full border-2 ${emp.isOnline ? 'border-green-500' : 'border-gray-400'}`} /> <div className="flex-1 min-w-0"> <p className="text-sm font-semibold text-brand-text truncate">{emp.name}</p> <p className="text-sm text-brand-subtle-text truncate">{emp.role}</p> </div> </li>))} </ul>
                     )}
                     {activeTab === 'teams' && (
-                        <div className="p-4">
-                            <button onClick={() => setIsCreatingTeam(true)} className="w-full flex items-center justify-center gap-2 p-2 mb-4 bg-brand-primary/10 text-brand-primary rounded-md font-medium hover:bg-brand-primary/20">
-                                <PlusIcon className="w-4 h-4" />
-                                <span>Criar Equipe</span>
-                            </button>
-                            {isCreatingTeam && (
-                                <form onSubmit={handleCreateTeam} className="mb-4">
-                                    <input autoFocus type="text" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} placeholder="Nome da equipe" className="w-full p-2 border rounded-md mb-2 text-sm" />
-                                    <div className="flex gap-2">
-                                        <button type="submit" className="flex-1 bg-brand-primary text-white text-xs py-1 rounded">Criar</button>
-                                        <button type="button" onClick={() => setIsCreatingTeam(false)} className="flex-1 bg-gray-200 text-gray-700 text-xs py-1 rounded">Cancelar</button>
-                                    </div>
-                                </form>
+                        <ul>
+                            {conversations.filter(c => c.isGroup).length === 0 && (
+                                <li className="p-4 text-center text-sm text-gray-400">
+                                    Nenhuma equipe encontrada.
+                                </li>
                             )}
-                            <ul className="space-y-2">
-                                {teams.map(team => (
-                                    <li key={team.id} className="p-3 bg-gray-50 rounded-lg border hover:border-brand-primary transition-colors">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-gray-800">{team.name}</h4>
-                                            {team.creatorId === currentUser.id && (
-                                                <button onClick={() => handleDeleteTeam(team.id)} className="text-gray-400 hover:text-red-500">
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
-                                            )}
+                            {conversations.filter(c => c.isGroup).map(conv => (
+                                <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
+                                    <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
+                                        <div className="relative">
+                                            <img src={conv.participantAvatarUrl} alt={conv.participantName} className="w-10 h-10 rounded-full border-2 border-gray-400" />
+                                            {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-1">{team.members.length} membros</p>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
+                                                <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
+                                            </div>
+                                            <p className="text-sm text-brand-subtle-text truncate">{conv.lastMessage}</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </div>
             </div>
@@ -303,6 +290,15 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                     )}
                                 </div>
                             </div>
+                            {selectedConversation.isGroup && (
+                                <button
+                                    onClick={() => setShowMembersModal(true)}
+                                    className="p-2 text-gray-500 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
+                                    title="Ver membros"
+                                >
+                                    <UserGroupIcon className="w-6 h-6" />
+                                </button>
+                            )}
                         </div>
                         <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto"> {selectedConversation.messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))} <div ref={messagesEndRef} /> </div>
                         <div className="p-4 bg-white border-t">
@@ -381,6 +377,59 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                     </p>
                 </div>
             </div>
+            {/* Team Members Modal */}
+            {showMembersModal && selectedConversation?.isGroup && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-bold text-gray-900">Membros do Grupo</h3>
+                            <button
+                                onClick={() => setShowMembersModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <XMarkIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-0 max-h-[60vh] overflow-y-auto">
+                            {(() => {
+                                const teamName = selectedConversation.groupName;
+                                const members = companyEmployees.filter(e => e.team === teamName);
+
+                                if (members.length === 0) {
+                                    return <div className="p-4 text-center text-gray-500">Nenhum membro encontrado.</div>;
+                                }
+
+                                return (
+                                    <ul className="divide-y divide-gray-100">
+                                        {members.map(member => (
+                                            <li key={member.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors">
+                                                <div className="relative">
+                                                    <img src={member.avatarUrl} alt={member.name} className="w-10 h-10 rounded-full border border-gray-200" />
+                                                    {member.isOnline && (
+                                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-semibold text-gray-900 text-sm">{member.name}</p>
+                                                    <p className="text-xs text-gray-500">{member.role}</p>
+                                                </div>
+                                                {member.id === selectedConversation.admins?.[0] && (
+                                                    <span className="text-[10px] bg-brand-primary/10 text-brand-primary px-2 py-1 rounded-full font-medium">Admin</span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )
+                            })()}
+                        </div>
+                        <div className="p-4 border-t bg-gray-50 text-right">
+                            <span className="text-xs text-gray-500">
+                                Total: {companyEmployees.filter(e => e.team === selectedConversation.groupName).length} membros
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

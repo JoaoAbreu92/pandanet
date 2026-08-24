@@ -97,6 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" />
                 <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" />
+                <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} />
 
                 <hr className="my-4 border-gray-200 dark:border-gray-700" />
 
