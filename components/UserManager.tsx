@@ -387,57 +387,153 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         setModalOpen(true);
     };
 
+    const getBase64ImageFromURL = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.setAttribute('crossOrigin', 'anonymous');
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0);
+                const dataURL = canvas.toDataURL('image/png');
+                resolve(dataURL);
+            };
+            img.onerror = error => reject(error);
+            img.src = url;
+        });
+    };
+
     const generatePDFHistory = async (userId: string, userName: string) => {
         const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text(`Histórico de Conversas - ${userName}`, 14, 22);
-        doc.setFontSize(11);
-        doc.setTextColor(100);
-        doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, 14, 30);
 
         try {
-            // Busca mensagens enviadas por este usuário ou recebidas em conversas que ele participa
-            const { data: messages, error } = await supabase
+            // 1. Obter Logo da Empresa ou Sistema
+            let logoUrl = '';
+            if (profile?.company_id) {
+                const { data: company } = await supabase
+                    .from('companies')
+                    .select('settings')
+                    .eq('id', profile.company_id)
+                    .maybeSingle();
+                logoUrl = (company?.settings as any)?.companyLogo;
+            }
+
+            if (!logoUrl || logoUrl === '/logo.png') {
+                const { data: systemLogo } = await supabase
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'main_logo')
+                    .maybeSingle();
+                logoUrl = systemLogo?.value || '/logo.png';
+            }
+
+            // 2. Adicionar Logo ao PDF
+            if (logoUrl) {
+                try {
+                    const base64Logo = await getBase64ImageFromURL(logoUrl);
+                    doc.addImage(base64Logo, 'PNG', 14, 10, 30, 30, undefined, 'FAST');
+                } catch (e) {
+                    console.warn('Erro ao carregar logo para o PDF:', e);
+                }
+            }
+
+            // 3. Cabeçalho
+            doc.setFontSize(22);
+            doc.setTextColor(16, 185, 129); // Brand Primary
+            doc.text('Relatório de Histórico', 50, 25);
+
+            doc.setFontSize(14);
+            doc.setTextColor(31, 41, 55);
+            doc.text(`Usuário: ${userName}`, 50, 35);
+
+            doc.setFontSize(10);
+            doc.setTextColor(107, 114, 128);
+            const now = new Date();
+            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`, 14, 45);
+
+            // 4. Buscar mensagens (Enviadas e Recebidas em conversas do usuário)
+            // Primeiro pegamos os IDs de conversa onde o usuário participa
+            const { data: participations } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id')
+                .eq('user_id', userId);
+
+            const conversationIds = participations?.map(p => p.conversation_id) || [];
+
+            let query = supabase
                 .from('messages')
                 .select(`
                     id, 
                     text, 
                     created_at, 
                     sender_id,
-                    profiles:sender_id(full_name),
-                    conversation:conversation_id(
-                        conversation_participants(user_id, profiles(full_name))
-                    )
+                    profiles:sender_id(full_name)
                 `)
-                .or(`sender_id.eq.${userId},conversation_id.in.(select conversation_id from conversation_participants where user_id = '${userId}')`)
                 .order('created_at', { ascending: true });
+
+            if (conversationIds.length > 0) {
+                query = query.or(`sender_id.eq.${userId},conversation_id.in.(${conversationIds.map(id => `'${id}'`).join(',')})`);
+            } else {
+                query = query.eq('sender_id', userId);
+            }
+
+            const { data: messages, error } = await query;
 
             if (error) throw error;
 
             const tableData = messages?.map(m => [
                 new Date(m.created_at).toLocaleString('pt-BR'),
                 (m.profiles as any)?.full_name || 'Usuário Excluído',
-                m.text
+                m.text || '[Arquivo/Midia]'
             ]) || [];
 
             (doc as any).autoTable({
-                startY: 40,
+                startY: 50,
                 head: [['Data/Hora', 'Remetente', 'Mensagem']],
                 body: tableData,
                 theme: 'striped',
-                headStyles: { fillStyle: '#10b981' }
+                headStyles: {
+                    fillColor: [16, 185, 129],
+                    textColor: [255, 255, 255],
+                    fontSize: 11,
+                    fontStyle: 'bold'
+                },
+                alternateRowStyles: {
+                    fillColor: [249, 250, 251]
+                },
+                margin: { top: 50 },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3
+                },
+                columnStyles: {
+                    0: { cellWidth: 35 },
+                    1: { cellWidth: 40 },
+                    2: { cellWidth: 'auto' }
+                }
             });
 
             doc.save(`historico_${userName.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+            return true;
         } catch (err) {
             console.error('Erro ao gerar PDF:', err);
             alert('Não foi possível gerar o PDF de histórico.');
+            return false;
         }
     };
 
     const handleDelete = async (userId: string, userName: string) => {
         if (window.confirm(`AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente e afetará todo o banco de dados. \n\nUm PDF com o histórico de conversas será gerado antes da exclusão. Continuar?`)) {
-            await generatePDFHistory(userId, userName);
+            const pdfSuccess = await generatePDFHistory(userId, userName);
+
+            if (!pdfSuccess) {
+                if (!window.confirm("Falha ao gerar PDF de histórico. Deseja excluir mesmo assim?")) {
+                    return;
+                }
+            }
+
             try {
                 const { error } = await supabase.from('profiles').delete().eq('id', userId);
                 if (error) throw error;

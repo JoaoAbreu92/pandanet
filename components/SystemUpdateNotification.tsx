@@ -74,17 +74,79 @@ const SystemUpdateNotification: React.FC = () => {
         setIsVisible(false);
     };
 
-    const handleDownloadNota = () => {
-        // Mock download logic
-        const content = `Nota de Atualização PandaNet - Versão ${latestUpdate.version}\n\n${latestUpdate.description}`;
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `PandaNet_Nota_Atualizacao_${latestUpdate.version}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    const getBase64ImageFromURL = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.setAttribute('crossOrigin', 'anonymous');
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0);
+                const dataURL = canvas.toDataURL('image/png');
+                resolve(dataURL);
+            };
+            img.onerror = error => reject(error);
+            img.src = url;
+        });
+    };
+
+    const handleDownloadNota = async () => {
+        const { default: jsPDF } = await import('jspdf');
+        const doc = new jsPDF();
+
+        try {
+            // 1. Obter Logo do PandaNet (System Settings)
+            const { data: systemLogo } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'main_logo')
+                .maybeSingle();
+
+            const logoUrl = systemLogo?.value || '/logo.png';
+
+            // 2. Adicionar Logo
+            try {
+                const base64Logo = await getBase64ImageFromURL(logoUrl);
+                doc.addImage(base64Logo, 'PNG', 14, 10, 25, 25, undefined, 'FAST');
+            } catch (e) {
+                console.warn('Erro ao carregar logo para o PDF da nota:', e);
+            }
+
+            // 3. Cabeçalho da Nota de Atualização
+            doc.setFontSize(22);
+            doc.setTextColor(220, 38, 38); // Red-600
+            doc.text('Nota de Atualização PandaNet', 45, 22);
+
+            doc.setFontSize(16);
+            doc.setTextColor(31, 41, 55);
+            doc.text(`Versão: ${latestUpdate.version}`, 45, 32);
+
+            // Linha separadora
+            doc.setDrawColor(229, 231, 235);
+            doc.line(14, 40, 196, 40);
+
+            // 4. Conteúdo
+            doc.setFontSize(12);
+            doc.setTextColor(55, 65, 81);
+            doc.setFont('helvetica', 'normal');
+
+            const splitDescription = doc.splitTextToSize(latestUpdate.description, 170);
+            doc.text(splitDescription, 14, 50);
+
+            // 5. Rodapé
+            doc.setFontSize(10);
+            doc.setTextColor(156, 163, 175);
+            const now = new Date();
+            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`, 14, 285);
+            doc.text('© PandaNet - Sistema de Gestão Inteligente', 130, 285);
+
+            doc.save(`PandaNet_Nota_Atualizacao_${latestUpdate.version}.pdf`);
+        } catch (err) {
+            console.error('Erro ao gerar PDF da nota:', err);
+            alert('Erro ao gerar PDF da nota de atualização.');
+        }
     };
 
     if (!isVisible || !latestUpdate) return null;
@@ -107,7 +169,7 @@ const SystemUpdateNotification: React.FC = () => {
                     className="flex items-center space-x-1 bg-white text-red-600 px-3 py-1 rounded-full text-xs font-bold hover:bg-red-50 transition-colors shadow-sm"
                 >
                     <ArrowDownTrayIcon className="w-4 h-4" />
-                    <span>BAIXAR NOTA</span>
+                    <span>BAIXAR PDF</span>
                 </button>
                 <button onClick={handleDismiss} className="hover:text-red-200 transition-colors">
                     <XMarkIcon className="w-5 h-5" />
