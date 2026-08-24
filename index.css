@@ -28,8 +28,8 @@
 
   /* Enhancement for scrollbars */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+      height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -37,16 +37,32 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: #d1d5db;
-    /* gray-300 */
+    background-color: #e2e8f0;
     border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #9ca3af;
-    /* gray-400 */
+    background-color: #cbd5e1;
+    }
+    
+    /* Hide scrollbar utility */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    
+    /* Show on hover utility */
+    .hover-scrollbar:hover {
+      scrollbar-width: auto;
+      -ms-overflow-style: auto;
+    }
+    
+    .hover-scrollbar:hover::-webkit-scrollbar {
+      display: block;
   }
 
   /* Utility to prevent horizontal overflow */

@@ -12,6 +12,7 @@ import {
     UserGroupIcon,
     XMarkIcon,
     SparklesIcon,
+    LockClosedIcon,
 } from './icons';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
 import { supabase } from '../supabaseClient';
@@ -45,6 +46,8 @@ const availableEmojis = [
     '🧑‍🚒', '👮', '🕵️', '💂', '🥷', '👷', '🤴',
     '👸', '👳', '👲', '🧕'
 ];
+
+const MASTER_ADMIN_ID = 'bd6b9e1b-52c0-482a-8caa-96f11677b261';
 
 const NOTE_COLORS = [
     { id: 'blue', bg: 'bg-blue-100', border: 'border-blue-200' },
@@ -306,6 +309,7 @@ const Messages: React.FC<MessagesProps> = () => {
                         messages: [],
                         isGroup: conv.is_group,
                         groupName: conv.group_name,
+                        is_closed: !!conv.is_closed,
                         admins: [],
                         lastMessageTimestamp: conv.last_message_at ? new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
                     };
@@ -322,6 +326,7 @@ const Messages: React.FC<MessagesProps> = () => {
                 c.participantName !== 'Usuário Desconhecido'
             );
 
+            console.log("Conversas filtradas e definidas no estado:", filteredConversations);
             setConversations(filteredConversations as Conversation[]);
 
         } catch (error) {
@@ -335,11 +340,13 @@ const Messages: React.FC<MessagesProps> = () => {
 
         // Subscrição para atualizações de novas conversas/mensagens
         const channel = supabase
-            .channel('public:conversations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-                fetchConversations(); // Atualiza última mensagem na lista
-                // Usa a Ref para sempre ter o ID mais atual
+            .channel('public:messages_and_convs')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+                console.log("Mudança em conversas detectada:", payload);
+                fetchConversations();
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                fetchConversations();
                 if (selectedConvRef.current) {
                     fetchMessages(selectedConvRef.current);
                 }
@@ -402,6 +409,17 @@ const Messages: React.FC<MessagesProps> = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Deselecionar se a conversa for fechada (Suporte)
+    useEffect(() => {
+        if (selectedConversationId) {
+            const current = conversations.find(c => c.id === selectedConversationId);
+            if (current && current.is_closed === true) {
+                console.log("Chat encerrado detectado, limpando seleção:", selectedConversationId);
+                setSelectedConversationId(null);
+            }
+        }
+    }, [conversations, selectedConversationId]);
 
     const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
         if (e) e.preventDefault();
@@ -550,8 +568,31 @@ const Messages: React.FC<MessagesProps> = () => {
     const handleStartConversation = async (contactId: string) => {
         try {
             setLoading(true);
-            // 1. Verificar se já existe uma conversa 1:1 entre esses usuários
-            // Buscamos conversas onde AMBOS participam
+            // 1. Se for o Master Admin (Suporte VIP), usamos um RPC especial para evitar RLS cross-tenant
+            if (contactId === MASTER_ADMIN_ID) {
+                const { data: convId, error: rpcError } = await supabase.rpc('get_or_create_support_conversation', {
+                    admin_id: currentUser.id,
+                    master_id: contactId
+                });
+
+                if (rpcError) throw rpcError;
+
+                if (convId) {
+                    // Garantir que a conversa não esteja fechada ao reabrir
+                    await supabase
+                        .from('conversations')
+                        .update({ is_closed: false })
+                        .eq('id', convId);
+
+                    setSelectedConversationId(convId);
+                    setActiveTab('conversations');
+                    setLoading(false);
+                    await fetchConversations();
+                    return;
+                }
+            }
+
+            // 1. Verificar se já existe uma conversa 1:1 entre esses usuários (Lógica padrão)
             const { data: participations, error: partError } = await supabase
                 .from('conversation_participants')
                 .select('conversation_id')
@@ -564,16 +605,33 @@ const Messages: React.FC<MessagesProps> = () => {
             if (myConvIds.length > 0) {
                 const { data: commonPart, error: commonError } = await supabase
                     .from('conversation_participants')
-                    .select('conversation_id')
+                    .select('conversation_id, user_id')
                     .in('conversation_id', myConvIds)
                     .eq('user_id', contactId);
 
-                // If found, just select it
                 if (commonPart && commonPart.length > 0) {
-                    setSelectedConversationId(commonPart[0].conversation_id);
-                    setActiveTab('conversations');
-                    setLoading(false);
-                    return;
+                    // Verificar se não é grupo
+                    const { data: convs } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .eq('id', commonPart[0].conversation_id)
+                        .eq('is_group', false)
+                        .single();
+
+                    if (convs) {
+                        // Se for suporte VIP e estiver fechado, reabre
+                        if (contactId === MASTER_ADMIN_ID) {
+                            await supabase
+                                .from('conversations')
+                                .update({ is_closed: false })
+                                .eq('id', convs.id);
+                        }
+
+                        setSelectedConversationId(convs.id);
+                        setActiveTab('conversations');
+                        setLoading(false);
+                        return;
+                    }
                 }
             }
 
@@ -608,6 +666,26 @@ const Messages: React.FC<MessagesProps> = () => {
             alert('Erro ao iniciar conversa: ' + (error.message || error));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCloseConversation = async () => {
+        if (!selectedConversationId) return;
+        if (!window.confirm("Deseja encerrar este suporte? O chat será bloqueado para novas mensagens.")) return;
+
+        try {
+            const { error } = await supabase
+                .from('conversations')
+                .update({ is_closed: true })
+                .eq('id', selectedConversationId);
+
+            if (error) throw error;
+
+            setConversations(prev => prev.map(c => c.id === selectedConversationId ? { ...c, is_closed: true } : c));
+            // Trigger refresh to block input
+            await fetchConversations();
+        } catch (err: any) {
+            alert("Erro ao encerrar suporte: " + err.message);
         }
     };
 
@@ -801,7 +879,7 @@ const Messages: React.FC<MessagesProps> = () => {
     if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
+        <div className="flex h-full bg-white overflow-hidden">
             {/* Left Sidebar: Conversations/Contacts/Teams */}
             <div className={`w-full md:w-80 lg:w-96 bg-white border-r flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b">
@@ -811,6 +889,22 @@ const Messages: React.FC<MessagesProps> = () => {
                         <button onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'teams' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Equipes</button>
                     </div>
                 </div>
+                
+                {/* Suporte VIP para Admins */}
+                {(currentUser.isCompanyAdmin || currentUser.isAdmin || currentUser.role === 'Super Admin' || currentUser.role === 'admin') && 
+                 currentUser.id !== MASTER_ADMIN_ID && currentUser.email !== 'ti@grupopixel.com.br' && (
+                    <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
+                        <button 
+                            onClick={() => handleStartConversation(MASTER_ADMIN_ID)}
+                            className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-red-700 transition-all shadow-lg active:scale-95 group-hover:shadow-red-200"
+                        >
+                            <SparklesIcon className="w-5 h-5 animate-pulse" />
+                            SOLICITAR SUPORTE VIP (MASTER TI)
+                        </button>
+                    </div>
+                )}
+
                 <div className="overflow-y-auto flex-1">
                     {activeTab === 'conversations' && (
                         <ul>
@@ -819,7 +913,13 @@ const Messages: React.FC<MessagesProps> = () => {
                                     Nenhuma conversa. Vá em "Contatos" para iniciar uma.
                                 </div>
                             )}
-                            {conversations.filter(c => !c.isGroup).map(conv => {
+                            {conversations.filter(c => {
+                                const shouldShow = !c.isGroup && c.is_closed !== true;
+                                if (c.participantName === 'Master TI') {
+                                    console.log('Filtrando Master TI:', { id: c.id, is_closed: c.is_closed, shouldShow });
+                                }
+                                return shouldShow;
+                            }).map(conv => {
                                 // Online status logic would require presence tracking (realtime), omitted for basic scope
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
@@ -859,7 +959,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                     Nenhuma equipe encontrada.
                                 </li>
                             )}
-                            {conversations.filter(c => c.isGroup).map(conv => (
+                            {conversations.filter(c => c.isGroup && c.is_closed !== true).map(conv => (
                                 <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
                                     <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
                                         <div className="relative">
@@ -904,36 +1004,157 @@ const Messages: React.FC<MessagesProps> = () => {
                                 </button>
                                 <img src={selectedConversation?.participantAvatarUrl} alt={selectedConversation?.participantName} className="w-10 h-10 rounded-full object-cover" />
                                 <div>
-                                    <p className="font-bold text-brand-text">{selectedConversation?.participantName}</p>
-                                    {/* Online/Typing status removed for MVP as it requires Realtime Presence */}
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-brand-text">{selectedConversation?.participantName}</p>
+                                        {selectedConversation?.is_closed && (
+                                            <span className="bg-red-100 text-red-600 text-[10px] uppercase font-black px-2 py-0.5 rounded-full border border-red-200">Encerrado</span>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-gray-500">Panda Offline</p>
                                 </div>
                             </div>
-                            {selectedConversation?.isGroup && (
-                                <div className="flex items-center space-x-1">
-                                    <div className="relative">
-                                        <button
-                                            onClick={() => setShowStickerPicker(!showStickerPicker)}
-                                            className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors"
-                                            title="Figurinhas e GIFs"
-                                        >
-                                            <FaceSmileIcon className="w-5 h-5" />
+                            <div className="flex items-center space-x-2">
+                                {currentUser.id === MASTER_ADMIN_ID && !selectedConversation?.is_closed && (
+                                    <button 
+                                        onClick={handleCloseConversation}
+                                        className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all border border-slate-200 hover:border-red-200"
+                                    >
+                                        <LockClosedIcon className="w-4 h-4" />
+                                        <span className="hidden sm:inline">ENCERRAR SUPORTE</span>
+                                        <span className="sm:hidden">FECHAR</span>
+                                    </button>
+                                )}
+                                {selectedConversation?.isGroup && (
+                                    <div className="flex items-center space-x-1">
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setShowStickerPicker(!showStickerPicker)}
+                                                className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors"
+                                                title="Figurinhas e GIFs"
+                                            >
+                                                <FaceSmileIcon className="w-5 h-5" />
+                                            </button>
+                                            {showStickerPicker && (
+                                                <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border p-3 z-50 animate-in fade-in slide-in-from-bottom-2 w-64 lg:w-80">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Figurinhas</h4>
+                                                        <button onClick={() => setShowStickerPicker(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {customStickers.map((url, i) => (
+                                                            <div key={i} className="relative group aspect-square">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSendSticker(url)}
+                                                                    className="w-full h-full hover:scale-110 transition-transform p-1 rounded hover:bg-gray-50 flex items-center justify-center overflow-hidden"
+                                                                >
+                                                                    <img src={url} alt="Sticker" className="max-w-full max-h-full object-contain" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); removeSticker(url); }}
+                                                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                >
+                                                                    <XMarkIcon className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        <div className="flex flex-col gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleAddManualGif}
+                                                                className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                                title="Adicionar por Link"
+                                                            >
+                                                                <PlusIcon className="w-5 h-5 text-gray-400" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => stickerUploadRefHeader.current?.click()}
+                                                                className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                                title="Subir GIF"
+                                                            >
+                                                                <PaperClipIcon className="w-5 h-5 text-gray-400" />
+                                                            </button>
+                                                            <input type="file" ref={stickerUploadRefHeader} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 pt-3 border-t">
+                                                        <p className="text-[10px] text-gray-400 text-center">Integração com GIPHY em breve</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors">
+                                            <PaperClipIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar">
+                            {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
+                            <div ref={messagesEndRef} />
+                        </div>
+                        <div className="p-4 bg-white border-t border-gray-100 z-10 relative shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
+                            {selectedConversation?.is_closed ? (
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center animate-pulse">
+                                    <p className="text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
+                                        <LockClosedIcon className="w-4 h-4" />
+                                        ESTE CHAT DE SUPORTE FOI ENCERRADO
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-1">Abra um novo chamado se precisar de mais ajuda.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
+                                    {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
+                                    <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
+                                        {showEmojiPicker && (
+                                            <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap w-64 max-h-60 overflow-y-auto z-50">
+                                                {availableEmojis.map(emoji => (
+                                                    <button key={emoji} type="button" onClick={() => setNewMessageText(prev => prev + emoji)} className="text-2xl p-1 hover:bg-gray-200 rounded-md">
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
+                                            <FaceSmileIcon className="w-6 h-6" />
+                                        </button>
+                                        <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary">
+                                            <SparklesIcon className="w-6 h-6" />
+                                        </button>
+                                        <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
+                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
+                                            <PaperClipIcon className="w-6 h-6" />
+                                        </button>
+                                        <input
+                                            type="text"
+                                            value={newMessageText}
+                                            onChange={(e) => setNewMessageText(e.target.value)}
+                                            onPaste={handlePaste}
+                                            placeholder="Digite uma mensagem..."
+                                            className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary h-10"
+                                        />
+                                        <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessageText.trim() && !attachedFile)}>
+                                            <PaperAirplaneIcon className="w-6 h-6" />
                                         </button>
                                         {showStickerPicker && (
-                                            <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border p-3 z-50 animate-in fade-in slide-in-from-bottom-2 w-64 lg:w-80">
+                                            <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-3 w-72 z-50 animate-fade-in-up">
                                                 <div className="flex justify-between items-center mb-3">
-                                                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Figurinhas</h4>
-                                                    <button onClick={() => setShowStickerPicker(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                                                    <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
+                                                    <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
                                                 </div>
-                                                <div className="grid grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                                                     {customStickers.map((url, i) => (
                                                         <div key={i} className="relative group aspect-square">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleSendSticker(url)}
-                                                                className="w-full h-full hover:scale-110 transition-transform p-1 rounded hover:bg-gray-50 flex items-center justify-center overflow-hidden"
+                                                                className="w-full h-full hover:scale-110 transition-transform bg-gray-50 rounded-lg p-1 flex items-center justify-center overflow-hidden"
                                                             >
-                                                                <img src={url} alt="Sticker" className="max-w-full max-h-full object-contain" />
+                                                                <img src={url} alt="sticker" className="max-w-full max-h-full object-contain" />
                                                             </button>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); removeSticker(url); }}
@@ -947,123 +1168,30 @@ const Messages: React.FC<MessagesProps> = () => {
                                                         <button
                                                             type="button"
                                                             onClick={handleAddManualGif}
-                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
                                                             title="Adicionar por Link"
                                                         >
-                                                            <PlusIcon className="w-5 h-5 text-gray-400" />
+                                                            <PlusIcon className="w-4 h-4 text-gray-400 mr-1" />
+                                                            <span className="text-[10px] text-gray-400">Lin</span>
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => stickerUploadRefHeader.current?.click()}
-                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                            onClick={() => stickerUploadRefInput.current?.click()}
+                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
                                                             title="Subir GIF"
                                                         >
-                                                            <PaperClipIcon className="w-5 h-5 text-gray-400" />
+                                                            <PaperClipIcon className="w-4 h-4 text-gray-400 mr-1" />
+                                                            <span className="text-[10px] text-gray-400">Up</span>
                                                         </button>
-                                                        <input type="file" ref={stickerUploadRefHeader} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
+                                                        <input type="file" ref={stickerUploadRefInput} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
                                                     </div>
                                                 </div>
-                                                <div className="mt-3 pt-3 border-t">
-                                                    <p className="text-[10px] text-gray-400 text-center">Integração com GIPHY em breve</p>
-                                                </div>
+                                                <p className="text-[10px] text-gray-400 mt-3 text-center">Mais itens em breve!</p>
                                             </div>
                                         )}
-                                    </div>
-                                    <button className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors">
-                                        <PaperClipIcon className="w-5 h-5" />
-                                    </button>
-                                </div>
+                                    </form>
+                                </>
                             )}
-                        </div>
-                        <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
-                            {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
-                            <div ref={messagesEndRef} />
-                        </div>
-                        <div className="p-4 bg-white border-t border-gray-100 z-10 relative shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
-                            {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
-                            {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
-                            <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
-                                {showEmojiPicker && (
-                                    <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap w-64 max-h-60 overflow-y-auto z-50">
-                                        {availableEmojis.map(emoji => (
-                                            <button key={emoji} type="button" onClick={() => setNewMessageText(prev => prev + emoji)} className="text-2xl p-1 hover:bg-gray-200 rounded-md">
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
-                                    <FaceSmileIcon className="w-6 h-6" />
-                                </button>
-                                <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary">
-                                    <SparklesIcon className="w-6 h-6" />
-                                </button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
-                                    <PaperClipIcon className="w-6 h-6" />
-                                </button>
-                                <input
-                                    type="text"
-                                    value={newMessageText}
-                                    onChange={(e) => setNewMessageText(e.target.value)}
-                                    onPaste={handlePaste}
-                                    placeholder="Digite uma mensagem..."
-                                    className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary h-10"
-                                />
-                                <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessageText.trim() && !attachedFile)}>
-                                    <PaperAirplaneIcon className="w-6 h-6" />
-                                </button>
-                                {showStickerPicker && (
-                                    <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-3 w-72 z-50 animate-fade-in-up">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
-                                            <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                                            {customStickers.map((url, i) => (
-                                                <div key={i} className="relative group aspect-square">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleSendSticker(url)}
-                                                        className="w-full h-full hover:scale-110 transition-transform bg-gray-50 rounded-lg p-1 flex items-center justify-center overflow-hidden"
-                                                    >
-                                                        <img src={url} alt="sticker" className="max-w-full max-h-full object-contain" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); removeSticker(url); }}
-                                                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    >
-                                                        <XMarkIcon className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <div className="flex flex-col gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddManualGif}
-                                                    className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
-                                                    title="Adicionar por Link"
-                                                >
-                                                    <PlusIcon className="w-4 h-4 text-gray-400 mr-1" />
-                                                    <span className="text-[10px] text-gray-400">Lin</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => stickerUploadRefInput.current?.click()}
-                                                    className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
-                                                    title="Subir GIF"
-                                                >
-                                                    <PaperClipIcon className="w-4 h-4 text-gray-400 mr-1" />
-                                                    <span className="text-[10px] text-gray-400">Up</span>
-                                                </button>
-                                                <input type="file" ref={stickerUploadRefInput} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-gray-400 mt-3 text-center">Mais itens em breve!</p>
-                                    </div>
-                                )}
-                            </form>
                         </div>
                     </>
                 ) : (<div className="flex-1 flex-col items-center justify-center text-gray-500 hidden md:flex"> <p className="text-lg">Selecione uma conversa</p><p className="text-sm">Escolha uma pessoa da lista para ver as mensagens.</p> </div>)}

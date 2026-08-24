@@ -65,6 +65,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const [localPlans, setLocalPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
     const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // Estado para usuários no modal
+    const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
@@ -95,6 +96,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 // Idealmente faríamos um join com count de profiles, mas por agora pegamos apenas as empresas
                 setLocalCompanies(companiesData as unknown as Company[] || []);
             }
+            // Fetch System Updates
+            const { data: updatesData, error: updatesError } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
+            if (updatesError) console.error('Error fetching updates', updatesError);
+            else setSystemUpdates(updatesData || []);
         } catch (e) {
             console.error(e);
         } finally {
@@ -398,6 +403,25 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         closeModal();
     };
 
+    const submitUpdateForm = async () => {
+        if (!formData.version || !formData.description) {
+            alert('Preencha os campos obrigatórios');
+            return;
+        }
+        const { error } = await supabase.from('system_updates').insert([{
+            version: formData.version,
+            description: formData.description,
+            active: true
+        }]);
+        if (error) {
+            showToast('Erro ao publicar atualização: ' + error.message, 'error');
+        } else {
+            showToast('Atualização publicada com sucesso!', 'success');
+            fetchData();
+            closeModal();
+        }
+    };
+
 
     // --- Handlers Genéricos ---
     const handleInputChange = (field: string, value: string) => {
@@ -487,7 +511,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
                                 <p className="text-sm text-gray-500 font-medium">Versão do Sistema</p>
-                                <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">1.0.6 beta</h2>
+                                <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">1.0.7 beta</h2>
                                 <p className="text-xs text-green-500 mt-1 font-semibold">Sistema Atualizado</p>
                             </div>
                             <MetricCardSimple title="Empresas Cadastradas" value={totalCompanies} icon={BuildingOfficeIcon} />
@@ -621,6 +645,45 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* SETTINGS / UPDATES */}
+                {activeTab === 'settings' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-2">
+                                <AdjustmentsHorizontalIcon className="w-5 h-5 text-gray-800 dark:text-white" />
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Configurações & Atualizações</h2>
+                            </div>
+                            <button
+                                onClick={() => openModal('newUpdate')}
+                                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2 transition-colors shadow-md"
+                            >
+                                <PlusIcon className="w-4 h-4" /> Postar Atualização
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                                <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-4">Histórico de Versões</h3>
+                                <div className="space-y-4">
+                                    {systemUpdates.length === 0 ? (
+                                        <p className="text-sm text-gray-400 italic">Nenhuma atualização registrada.</p>
+                                    ) : (
+                                        systemUpdates.map(upd => (
+                                            <div key={upd.id} className="border-l-4 border-red-500 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-r-lg">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="font-bold text-brand-text dark:text-white">Versão {upd.version}</span>
+                                                    <span className="text-[10px] text-gray-400">{new Date(upd.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                                <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{upd.description}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -800,6 +863,38 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                             <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
                             <button onClick={handleDeletePlan} className="px-6 py-2 bg-red-600 text-white rounded text-xs font-bold uppercase">Excluir</button>
                         </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* New Update Modal */}
+            {modalOpen.newUpdate && (
+                <Modal onClose={closeModal} title="Nova Atualização do Sistema" width="max-w-2xl">
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Versão</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: 1.0.7 beta"
+                                value={formData.version || ''}
+                                onChange={(e) => handleInputChange('version', e.target.value)}
+                                className="w-full p-3 border rounded text-sm outline-none focus:border-red-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mudanças (Logs)</label>
+                            <textarea
+                                placeholder="Descreva as atualizações realizadas..."
+                                value={formData.description || ''}
+                                onChange={(e) => handleInputChange('description', e.target.value)}
+                                className="w-full p-3 border rounded text-sm outline-none focus:border-red-500 h-48 resize-none"
+                            ></textarea>
+                        </div>
+                        <p className="text-xs text-red-500 font-medium">* Ao salvar, uma notificação será enviada para todas as empresas.</p>
+                    </div>
+                    <div className="p-6 border-t flex justify-end gap-2">
+                        <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
+                        <button onClick={submitUpdateForm} className="px-6 py-2 bg-red-600 text-white rounded font-bold text-xs uppercase shadow-md">Publicar</button>
                     </div>
                 </Modal>
             )}

@@ -249,6 +249,7 @@ export interface Reaction {
 
 export interface Conversation {
   id: string; // Changed to string
+  is_closed?: boolean;
   participantName: string;
   participantAvatarUrl: string;
   messages: Message[];
