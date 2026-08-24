@@ -60,6 +60,21 @@ const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({ userBadge, onClose 
     const fetchPostData = async () => {
         setLoading(true);
         try {
+            // Garante que temos o company_id correto
+            let companyId = userBadge.company_id;
+            if (!companyId) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('company_id')
+                    .eq('id', currentUser.id)
+                    .single();
+                companyId = profile?.company_id;
+            }
+
+            if (!companyId) {
+                throw new Error("Company ID não informado.");
+            }
+
             // Buscar todos os posts de premiação de selo para encontrar o correspondente
             const { data, error } = await supabase
                 .from('posts')
@@ -69,7 +84,7 @@ const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({ userBadge, onClose 
                     post_reactions(id, emoji, user_id),
                     comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
                 `)
-                .eq('company_id', userBadge.company_id)
+                .eq('company_id', companyId)
                 .like('content', `[BADGE_AWARD]%`);
 
             if (error) throw error;
@@ -87,9 +102,11 @@ const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({ userBadge, onClose 
                 setPost(formatPost(matchedPost));
             } else {
                 // Se o post do selo não existir no mural (ex: legado), criar na hora para suportar comentários
-                const createdPost = await createBadgePost();
+                const createdPost = await createBadgePost(companyId);
                 if (createdPost) {
                     setPost(formatPost(createdPost));
+                } else {
+                    console.error('Não foi possível carregar ou criar o post do selo.');
                 }
             }
         } catch (err) {
@@ -120,7 +137,7 @@ const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({ userBadge, onClose 
         };
     };
 
-    const createBadgePost = async () => {
+    const createBadgePost = async (companyId: string) => {
         try {
             // Buscar nome de quem concedeu o selo
             let awardedByName = 'Administrador';
@@ -162,8 +179,8 @@ const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({ userBadge, onClose 
             const { data: newPost, error } = await supabase
                 .from('posts')
                 .insert({
-                    author_id: userBadge.awarded_by || userBadge.user_id,
-                    company_id: userBadge.company_id,
+                    author_id: currentUser.id, // IMPORTANTE: Autor precisa ser o usuário logado para passar no RLS
+                    company_id: companyId,
                     content: `[BADGE_AWARD]${JSON.stringify(awardPayload)}`,
                     media_url: null,
                     media_type: null,
