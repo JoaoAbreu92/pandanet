@@ -697,49 +697,27 @@ const AppContent: React.FC = () => {
     }
 
     // Fallback: Repair Profile
+    // Fallback: If session exists but profile is missing, and it's not loading
     if (session && (!currentUser || !currentUser.company_id) && !loading) {
-        const handleRepairProfile = async () => {
-            if (!session.user.email) return;
-            const userEmail = session.user.email.toLowerCase();
-            const isMaster = userEmail === 'ti@grupopixel.com.br';
-            let domain = isMaster ? 'grupopixel.com.br' : userEmail.split('@')[1];
-            domain = domain.trim().toLowerCase();
-
-            try {
-                const { data: cos } = await supabase.from('companies').select('id, responsible_email').ilike('domain', domain);
-                if (cos && cos.length > 0) {
-                    const companyId = cos[0].id;
-                    const isResp = (cos[0].responsible_email || '').toLowerCase() === userEmail;
-
-                    await supabase.from('profiles').upsert({
-                        id: session.user.id,
-                        full_name: isMaster ? 'Master TI' : (session.user.user_metadata?.full_name || userEmail.split('@')[0]),
-                        email: userEmail,
-                        company_id: companyId,
-                        role: isMaster ? 'Super Admin' : (isResp ? 'admin' : 'employee'),
-                        is_admin: isMaster || isResp,
-                        is_company_admin: isMaster || isResp
-                    }, { onConflict: 'id' });
-
-                    window.location.reload();
-                } else {
-                    alert("Domínio " + domain + " não autorizado.");
-                }
-            } catch (e: any) {
-                alert("Erro: " + e.message);
-            }
-        };
-
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-emerald-100">
-                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Quase lá!</h2>
-                    <p className="text-gray-600 mb-8 leading-relaxed">Configuramos sua conta automaticamente. Clique abaixo para finalizar seu acesso.</p>
-                    <button onClick={handleRepairProfile} className="w-full px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all shadow-md mb-4">Finalizar Acesso</button>
-                    <button onClick={handleLogout} className="w-full px-6 py-3 text-gray-400 font-medium hover:text-gray-600 transition-colors">Voltar ao Login</button>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Acesso Não Autorizado</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed">
+                        Não encontramos um perfil ativo para sua conta ou seu acesso foi removido.
+                        Por favor, entre em contato com o administrador da sua empresa.
+                    </p>
+                    <button
+                        onClick={handleLogout}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-red-200"
+                    >
+                        Sair do Sistema
+                    </button>
                 </div>
             </div>
         );

@@ -545,6 +545,23 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         console.log(`[UserManager] Iniciando backup e deleção: ${userName} (${userId})`);
 
         try {
+            // 1. Limpeza do JSONB da Empresa (Legacy cache)
+            const companyId = profile?.company_id;
+            if (companyId) {
+                console.log(`[UserManager] Limpando JSONB da empresa: ${companyId}`);
+                const { data: company } = await supabase.from('companies').select('data').eq('id', companyId).single();
+                if (company?.data && Array.isArray(company.data.employees)) {
+                    const updatedEmployees = company.data.employees.filter((e: any) => e.id !== userId);
+                    if (updatedEmployees.length !== company.data.employees.length) {
+                        await supabase.from('companies').update({
+                            data: { ...company.data, employees: updatedEmployees }
+                        }).eq('id', companyId);
+                        console.log(`[UserManager] JSONB atualizado.`);
+                    }
+                }
+            }
+
+            // 2. Deletar na tabela Profiles
             console.log(`[UserManager] Deletando usuário no Supabase: ${userId}`);
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
 
@@ -578,6 +595,18 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     const handleReject = async (userId: string) => {
         if (!window.confirm("Tem certeza que deseja rejeitar este usuário? Ele será removido do sistema.")) return;
         try {
+            // Limpeza JSONB
+            const companyId = profile?.company_id;
+            if (companyId) {
+                const { data: company } = await supabase.from('companies').select('data').eq('id', companyId).single();
+                if (company?.data && Array.isArray(company.data.employees)) {
+                    const updatedEmployees = company.data.employees.filter((e: any) => e.id !== userId);
+                    await supabase.from('companies').update({
+                        data: { ...company.data, employees: updatedEmployees }
+                    }).eq('id', companyId);
+                }
+            }
+
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
             if (error) throw error;
             setUsers(users.filter(u => u.id !== userId));
