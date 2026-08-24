@@ -1116,7 +1116,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.closed_by = null;
       }
 
-      // Enviar mensagem de encerramento se configurado no canal
+      // 1. Atualizar o status da conversa no Supabase primeiro
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update(updateData)
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      // 2. Enviar mensagem de encerramento se configurado no canal
       const targetConv = conversations.find(c => c.id === conversationId) || selectedConversation;
       const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
       const closeMsg = conn?.close_message;
@@ -1125,7 +1133,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (token) {
-          const res = await fetch(`/api/whatsapp/messages/send/${conversationId}`, {
+          fetch(`/api/whatsapp/messages/send/${conversationId}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1135,20 +1143,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               message: closeMsg.trim(),
               keepClosed: true
             })
+          }).catch(err => {
+            console.error('Erro ao enviar mensagem de encerramento automática:', err);
           });
-          if (!res.ok) {
-            throw new Error('Falha ao enviar mensagem de encerramento automática pelo servidor.');
-          }
-        } else {
-          throw new Error('Usuário não autenticado.');
         }
-      } else {
-        const { error } = await supabase
-          .from('whatsapp_conversations')
-          .update(updateData)
-          .eq('id', conversationId);
-
-        if (error) throw error;
       }
 
       // Remove da lista atual (mudou de aba) e atualiza o objeto selecionado

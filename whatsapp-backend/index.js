@@ -2436,7 +2436,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 // Reabrir se estiver fechada
                 let nextStatus = conv.status;
                 let extraUpdates = {};
-                if (conv.status === 'fechado') {
+                if (conv.status === 'fechado' && !isFromMe) {
                     nextStatus = 'aberto';
                     extraUpdates = {
                         assigned_to: null,

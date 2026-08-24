@@ -4,6 +4,36 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.2.1 beta
+29/07/2026
+🗞️ Nota de Atualização - PandaNet v1.2.1 Beta
+
+Esta atualização foca em robustez e isolamento absoluto de segurança de dados nas filas de atendimento do WhatsPanda, correção na entrega automática de mensagens de conclusão de chamados, e novas opções de gerenciamento de permissões e privacidade para grupos de WhatsApp e PandaMail.
+
+🚀 O que há de novo?
+
+🔒 WhatsPanda: Isolamento Absoluto de Filas e Setores
+- **Isolamento Inviolável**: Removemos qualquer atalho ou bypass visual que permitia a operadores visualizarem setores não permitidos. Agora, se o atendente não for administrador, suas telas e o banco de dados (regras RLS do Supabase) o limitam estritamente ao array de filas atribuído (`assigned_queues`).
+- **Aba "Todas" Restrita**: O filtro e aba visual "Todas" (Todos os atendimentos) foi removido dos atendentes comuns, passando a ser exclusivo de Administradores e Super Administradores.
+- **Visualização Filtrada**: A listagem de conexões e setores nos filtros avançados agora exibe apenas os canais e setores permitidos ao operador logado.
+- **Pré-seleção de Conexões**: Ao carregar a tela de chat, todos os canais de conexões autorizados ao operador vêm marcados por padrão nos filtros avançados, agilizando o fluxo.
+
+👥 WhatsPanda: Controle de Acesso Estrito a Grupos de WhatsApp
+- **Isolamento de Grupos**: Novo sistema de controle de privacidade para conversas em grupo do WhatsApp.
+- **Botão "Gerenciar Acesso ao Grupo"**: Administradores podem clicar no botão de gestão de acesso diretamente no cabeçalho das conversas de grupo para determinar quais operadores têm autorização de leitura e envio.
+- **Opções de Lote e Global**: Possibilidade de liberar acesso a todos os grupos globalmente na conexão ou replicar as permissões de acesso configuradas para todos os grupos em lote com um único clique.
+
+🤖 WhatsPanda: Correção na Mensagem de Encerramento Automático
+- **Fluxo de Conclusão Consistente**: Corrigimos o bug em que a mensagem de encerramento automático reabria o ticket fechado por causa do receptor de webhooks. Agora, o status é salvo imediatamente no Supabase e a mensagem é enviada sem que a conversa volte a ficar ativa.
+- **Sincronização Bilateral de Celular (fromMe)**: Incluímos suporte a webhooks singulares (`message.upsert` / `message_upsert`) da Evolution API v2, garantindo que qualquer mensagem enviada ou respondida diretamente pelo celular físico ou WhatsApp Web sincronize 100% de forma imediata no painel.
+
+📧 PandaMail: Painel de Controle de Contas e Visualização Global
+- **Limite de 1 Conta por Operador**: Operadores comuns são limitados a cadastrar no máximo 1 conta de e-mail por padrão, prevenindo uso excessivo.
+- **Toggle de Override do Admin**: O administrador pode liberar cadastros múltiplos para funcionários a qualquer momento nas configurações.
+- **Visualização Global Dinâmica**: Administradores agora possuem um switch em tempo real para visualizar todas as caixas de e-mail cadastradas na empresa.
+
+---
+
 Versão 1.2.0 beta teste
 24/07/2026
 🗞️ Nota de Atualização - PandaNet v1.2.0 Beta Teste
