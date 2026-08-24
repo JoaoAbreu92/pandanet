@@ -248,6 +248,14 @@ const CRMSales: React.FC<{
                                         <th className="px-6 py-4">Quantidade</th>
                                         <th className="px-6 py-4">Próximo Faturamento</th>
                                     </>
+                                    ) : activeTab === 'payments' ? (
+                                        <>
+                                            <th className="px-6 py-4">Valor Pago</th>
+                                            <th className="px-6 py-4">Fatura Ref.</th>
+                                            <th className="px-6 py-4">Data Pagamento</th>
+                                            <th className="px-6 py-4">Cliente</th>
+                                            <th className="px-6 py-4">Modo Pagamento</th>
+                                        </>
                                 ) : (
                                     <>
                                                 <th className="px-6 py-4">Valor</th>
@@ -269,7 +277,8 @@ const CRMSales: React.FC<{
                                         {activeTab === 'invoices' ? `INV-${item.id.slice(0, 6)}` :
                                             activeTab === 'proposals' ? `PROP-${item.id.slice(0, 6)}` :
                                                 activeTab === 'estimates' ? `EST-${item.id.slice(0, 6)}` :
-                                                    activeTab === 'items' ? item.description : item.id.slice(0, 8)}
+                                                    activeTab === 'payments' ? `PAG-${item.id.slice(0, 6)}` :
+                                                        activeTab === 'items' ? item.description : item.id.slice(0, 8)}
                                     </td>
 
                                     {activeTab === 'items' ? (
@@ -292,8 +301,30 @@ const CRMSales: React.FC<{
                                                 {item.next_billing_cycle ? new Date(item.next_billing_cycle).toLocaleDateString() : '-'}
                                             </td>
                                             </>
-                                        ) : (
+                                        ) : activeTab === 'payments' ? (
                                             <>
+                                                <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
+                                                    {item.amount ? `R$ ${item.amount.toLocaleString()}` : '-'}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-400">
+                                                    {item.invoice ? `INV-${item.invoice.id.slice(0, 6)}` : '-'}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-500">
+                                                    {new Date(item.date || item.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {item.customer?.name ? (
+                                                        <button onClick={() => onViewCustomer?.(item.customer_id)} className="text-blue-500 font-medium hover:underline">
+                                                            {item.customer.name}
+                                                        </button>
+                                                    ) : <span className="text-gray-400">{item.customer_id || '-'}</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-500">
+                                                    {item.payment_mode || '-'}
+                                                </td>
+                                            </>
+                                            ) : (
+                                                <>
                                                     <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
                                                         {item.total ? `R$ ${item.total.toLocaleString()}` :
                                                             item.value ? `R$ ${item.value.toLocaleString()}` :
@@ -323,7 +354,7 @@ const CRMSales: React.FC<{
                                                     <td className="px-6 py-4 text-gray-500">
                                                         {item.duedate || item.open_till ? new Date(item.duedate || item.open_till).toLocaleDateString() : '-'}
                                                     </td>
-                                        </>
+                                                </>
                                     )}
 
                                     <td className="px-6 py-4">

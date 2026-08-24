@@ -1646,14 +1646,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
                             <div ref={messagesEndRef} />
                         </div>
-                        <div className="p-4 bg-white/70 dark:bg-[#020617]/60 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative">
+                        <div className="p-2 md:p-4 bg-white/90 dark:bg-[#020617]/80 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative pb-[max(env(safe-area-inset-bottom),8px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
                             {selectedConversation?.is_closed ? (
-                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center animate-pulse">
-                                    <p className="text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
+                                <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200 text-center animate-pulse">
+                                    <p className="text-xs md:text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
                                         <LockClosedIcon className="w-4 h-4" />
                                         ESTE CHAT DE SUPORTE FOI ENCERRADO
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-1">Abra um novo chamado se precisar de mais ajuda.</p>
+                                    <p className="text-[10px] md:text-xs text-gray-400 mt-1">Abra um novo chamado se precisar de mais ajuda.</p>
                                 </div>
                             ) : (
                                 <>
@@ -1664,7 +1664,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                         />
                                     )}
                                     {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
-                                    <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
+                                        <form onSubmit={handleSendMessage} className="relative flex items-center space-x-1.5 md:space-x-3">
                                         {showEmojiPicker && (
                                                 <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-3 flex flex-wrap w-72 max-h-64 overflow-y-auto z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                                 {availableEmojis.map(emoji => (
@@ -1675,33 +1675,33 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             </div>
                                         )}
 
-                                        <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
-                                            <FaceSmileIcon className="w-6 h-6" />
+                                            <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
+                                                <FaceSmileIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
-                                        <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary">
-                                            <SparklesIcon className="w-6 h-6" />
+                                            <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary hidden md:inline-flex flex-shrink-0">
+                                                <SparklesIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
                                         <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
-                                            <PaperClipIcon className="w-6 h-6" />
+                                            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
+                                                <PaperClipIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
 
                                             {/* Nudge Button */}
-                                            <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                                            <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
                                                 <button
                                                     type="button"
                                                     onClick={handleSendNudge}
                                                     disabled={!!cooldownTimeouts[selectedConversationId || '']}
-                                                    className={`p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
+                                                    className={`p-1.5 md:p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
                                                             ? 'text-gray-400 cursor-not-allowed'
                                                             : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
                                                         }`}
                                                     title="Chamar Atenção (MSN Nudge)"
                                                 >
-                                                    <BellIcon className={`w-6 h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
+                                                    <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
                                                         }`} />
                                                     {cooldownTimeouts[selectedConversationId || ''] && (
-                                                        <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[28px] text-center border border-white">
+                                                        <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[24px] md:min-w-[28px] text-center border border-white">
                                                             {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
                                                         </span>
                                                     )}
@@ -1712,11 +1712,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             value={newMessageText}
                                             onChange={(e) => setNewMessageText(e.target.value)}
                                             onPaste={handlePaste}
-                                            placeholder="Digite uma mensagem..."
-                                                className="flex-1 w-full px-5 py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-11 text-sm transition-all duration-300 dark:text-white"
+                                                placeholder="Mensagem"
+                                                className="flex-1 w-full px-3 md:px-5 py-2 md:py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl md:rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-10 md:h-11 text-[15px] transition-all duration-300 dark:text-white"
                                         />
-                                            <button type="submit" className="p-2.5 bg-brand-primary text-white rounded-2xl hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-lg shadow-brand-primary/20" disabled={(!newMessageText.trim() && !attachedFile)}>
-                                            <PaperAirplaneIcon className="w-6 h-6" />
+                                            <button type="submit" className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full flex-shrink-0 hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md md:shadow-lg shadow-brand-primary/20 ml-1 md:ml-0" disabled={(!newMessageText.trim() && !attachedFile)}>
+                                                <PaperAirplaneIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
                                         {showStickerPicker && (
                                                 <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-4 w-80 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">

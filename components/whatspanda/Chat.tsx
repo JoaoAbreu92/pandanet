@@ -403,14 +403,14 @@ const Chat: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="px-6 py-5 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20">
-              <div className="flex-1 bg-gray-100/50 dark:bg-white/5 rounded-3xl flex items-end p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-2xl transition-all duration-300">
+            <div className="px-3 py-2 md:px-6 md:py-5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-[max(env(safe-area-inset-bottom),8px)] md:pb-5 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
+              <div className="flex-1 bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
                 <button
-                  className={`p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                  className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
                   disabled={!canSendMedia}
                   title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
                 >
-                  <Paperclip className="w-5 h-5" />
+                  <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
                 </button>
                 <textarea
                   value={newMessage}
@@ -421,18 +421,18 @@ const Chat: React.FC = () => {
                       canSendMessagesResult && handleSendMessage();
                     }
                   }}
-                  placeholder={canSendMessagesResult ? "Escreva uma mensagem..." : "Apenas leitura"}
+                  placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
                   disabled={!canSendMessagesResult}
-                  className="flex-1 max-h-40 min-h-[44px] py-3 px-4 bg-transparent text-sm resize-none focus:outline-none dark:text-white placeholder-gray-400 font-medium"
+                  className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent text-[15px] resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
                   rows={1}
                 />
                 <button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim() || !canSendMessagesResult}
-                  className="p-3 bg-brand-primary text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-xl shadow-brand-primary/20 mb-px ml-2"
+                  className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-brand-primary/20 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
                   title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
                 >
-                  <Send className="w-5 h-5 ml-1" />
+                  <Send className="w-5 h-5 md:ml-1" />
                 </button>
               </div>
             </div>

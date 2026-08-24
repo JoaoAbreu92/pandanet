@@ -216,11 +216,11 @@ const simpleParser = require('mailparser').simpleParser;
 app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
     const { config, uid, path } = req.body;
     const mailboxPath = path || 'INBOX';
-    const uidNum = Number(uid);
+    const uidStr = String(uid);
 
     if (!config || !uid) return res.status(400).json({ error: 'Missing config or uid' });
 
-    console.log(`[email-server] FETCH BODY: UID ${uid} in ${mailboxPath}`);
+    console.log(`[email-server] FETCH BODY: UID ${uidStr} in ${mailboxPath}`);
 
     try {
         const client = await getPooledClient(config);
@@ -235,7 +235,7 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
         const lock = await client.getMailboxLock(finalPath);
         try {
-            const message = await client.fetchOne(uidNum, { source: true }, { uid: true });
+            const message = await client.fetchOne(uidStr, { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });
 
             const parsed = await simpleParser(message.source);
@@ -327,7 +327,7 @@ app.post('/api/email/attachment', authMiddleware, async (req, res) => {
         const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(path || 'INBOX');
         try {
-            const message = await client.fetchOne(Number(uid), { source: true }, { uid: true });
+            const message = await client.fetchOne(String(uid), { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });
 
             const parsed = await simpleParser(message.source);
@@ -443,12 +443,17 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
                 sentFolder = sentBox.path;
             } else {
                 // 2. Try common names (Case Insensitive)
-                const fuzzySent = boxes.find(b =>
-                    b.path.toLowerCase() === 'sent' ||
-                    b.path.toLowerCase() === 'sent messages' ||
-                    b.path.toLowerCase() === 'enviados' ||
-                    b.path.toLowerCase().endsWith('.sent')
-                );
+                const fuzzySent = boxes.find(b => {
+                    const lcPath = b.path.toLowerCase();
+                    return lcPath === 'sent' ||
+                        lcPath === 'sent items' ||
+                        lcPath === 'sent messages' ||
+                        lcPath === 'enviados' ||
+                        lcPath === 'itens enviados' ||
+                        lcPath.includes('.sent') ||
+                        lcPath.includes(' sent') ||
+                        lcPath.includes('enviad');
+                });
                 if (fuzzySent) sentFolder = fuzzySent.path;
             }
 
