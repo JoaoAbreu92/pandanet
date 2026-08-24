@@ -6,6 +6,7 @@ import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
 
 interface ProfilePageProps {
+    userId?: string;
     currentUser: Employee;
     onUpdateUser: (user: Employee) => void;
     feedPosts?: Post[];
@@ -13,15 +14,61 @@ interface ProfilePageProps {
     allEmployees?: Employee[];
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, feedPosts = [], setFeedPosts, allEmployees = [] }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdateUser, feedPosts = [], setFeedPosts, allEmployees = [] }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [targetUser, setTargetUser] = useState<Employee | null>(null);
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
-    const [activeTab, setActiveTab] = useState<'info' | 'activity'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'activity'>(userId && userId !== currentUser.id ? 'activity' : 'info');
+    const [loading, setLoading] = useState(false);
+
+    const isOwnProfile = !userId || userId === currentUser.id;
 
     useEffect(() => {
-        setTempUserData(currentUser);
-    }, [currentUser]);
+        if (isOwnProfile) {
+            setTargetUser(currentUser);
+            setTempUserData(currentUser);
+            setActiveTab('info');
+        } else {
+            const fetchTargetUser = async () => {
+                setLoading(true);
+                try {
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', userId)
+                        .single();
+                    if (data) {
+                        const mapped: Employee = {
+                            id: data.id,
+                            name: data.full_name,
+                            email: data.email,
+                            role: data.role,
+                            team: data.team,
+                            avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name)}&background=random`,
+                            coverUrl: data.cover_url,
+                            bio: data.bio,
+                            phone: data.phone,
+                            officeLocation: data.office_location,
+                            joinDate: data.join_date,
+                            birthDate: data.birth_date,
+                            isAdmin: data.is_admin,
+                            company_id: data.company_id,
+                            following: data.following || [],
+                            permissions: data.permissions || {}
+                        };
+                        setTargetUser(mapped);
+                    }
+                } catch (err) {
+                    console.error("Error fetching target user:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchTargetUser();
+            setActiveTab('activity');
+        }
+    }, [userId, currentUser]);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
@@ -130,14 +177,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
         }
     };
 
+    const effectiveUser = targetUser || currentUser;
+
     const filteredPosts = useMemo(() => {
-        const followingIds = currentUser.following || [];
+        const userIdToFilter = effectiveUser.id;
         return feedPosts.filter(post =>
-            post.authorId === currentUser.id || // Meus posts
-            followingIds.includes(post.authorId) || // Quem eu sigo
-            post.mentions.includes(currentUser.id) // Menções a mim
+            post.authorId === userIdToFilter || // Posts do usuário do perfil
+            post.mentions.includes(userIdToFilter) // Menções ao usuário do perfil
         ).sort((a, b) => b.id - a.id);
-    }, [feedPosts, currentUser]);
+    }, [feedPosts, effectiveUser]);
 
     // Feed manipulation handlers (copied logic, ideally should be shared context or hook)
     const handleToggleReaction = (postId: number, emoji: string) => {
@@ -189,11 +237,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
         });
     };
 
-    const userData = isEditing ? tempUserData : currentUser;
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando perfil...</div>;
+
+    const userData = isEditing ? tempUserData : effectiveUser;
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-brand-text">Meu Perfil</h2>
+            <h2 className="text-2xl font-bold text-brand-text">{isOwnProfile ? 'Meu Perfil' : `Perfil de ${userData.name}`}</h2>
 
             <div className="relative">
                 <div className="h-48 bg-gray-200 rounded-t-lg relative group">
@@ -245,17 +295,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                 {/* Tabs */}
                 <div className="border-b border-gray-200 mb-6">
                     <nav className="-mb-px flex space-x-8">
-                        <button
-                            onClick={() => setActiveTab('info')}
-                            className={`${activeTab === 'info' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                        >
-                            Informações Pessoais
-                        </button>
+                        {isOwnProfile && (
+                            <button
+                                onClick={() => setActiveTab('info')}
+                                className={`${activeTab === 'info' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                            >
+                                Informações Pessoais
+                            </button>
+                        )}
                         <button
                             onClick={() => setActiveTab('activity')}
                             className={`${activeTab === 'activity' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
-                            Minha Atividade
+                            {isOwnProfile ? 'Minha Atividade' : 'Atividade'}
                         </button>
                     </nav>
                 </div>

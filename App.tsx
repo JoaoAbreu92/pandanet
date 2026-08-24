@@ -66,7 +66,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'chamados', 'calendario', 'diretorio', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -363,9 +363,9 @@ const AppContent: React.FC = () => {
             case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages />;
-            case 'chamados': return <TicketPage currentUser={currentUser} companyData={companyData} />;
-            case 'calendario': return <CalendarPage events={companyData.events} />;
-            case 'diretorio': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
+            case 'tickets': return <TicketPage />;
+            case 'calendar': return <CalendarPage events={companyData.events} />;
+            case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;

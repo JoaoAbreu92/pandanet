@@ -171,6 +171,10 @@ export interface EmployeePermissions {
   viewKnowledgeBase: boolean;
   viewServiceStatus: boolean;
   viewInfoSec: boolean;
+
+  // New Global Permissions
+  createEvents: boolean;
+  manageMarketplace: boolean;
 }
 
 export interface Employee {

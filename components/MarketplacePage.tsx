@@ -302,13 +302,15 @@ const MarketplacePage: React.FC = () => {
                     <h1 className="text-3xl font-bold text-brand-text">Marketplace da Empresa</h1>
                     <p className="text-brand-subtle-text mt-1">Encontre equipamentos usados com um ótimo custo-benefício!</p>
                 </div>
-                <button
-                    onClick={() => setSellModalOpen(true)}
-                    className="mt-4 md:mt-0 flex items-center space-x-2 px-6 py-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
-                >
-                    <PlusCircleIcon className="w-5 h-5" />
-                    <span>Anunciar um Item</span>
-                </button>
+                {currentUser?.permissions?.manageMarketplace && (
+                    <button
+                        onClick={() => setSellModalOpen(true)}
+                        className="mt-4 md:mt-0 flex items-center space-x-2 px-6 py-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
+                    >
+                        <PlusCircleIcon className="w-5 h-5" />
+                        <span>Anunciar um Item</span>
+                    </button>
+                )}
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">

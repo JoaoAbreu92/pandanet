@@ -73,7 +73,10 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
         try {
             const { data, error } = await supabase
                 .from('ti_requests')
-                .select('*')
+                .select(`
+                    *,
+                    requester:requester_id(full_name, avatar_url)
+                `)
                 .eq('company_id', currentUser.company_id)
                 .order('created_at', { ascending: false });
 
@@ -83,8 +86,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 const formatted: TIRequest[] = data.map((d: any) => ({
                     id: d.id,
                     requesterId: d.requester_id,
-                    requesterName: currentUser.name, // Since we filter by current user's company and later filter for current user
-                    requesterAvatarUrl: currentUser.avatarUrl,
+                    requesterName: d.requester?.full_name || 'Desconhecido',
+                    requesterAvatarUrl: d.requester?.avatar_url,
                     requestType: d.request_type as TIRequestType,
                     itemName: d.item_name,
                     justification: d.justification,
@@ -139,7 +142,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
         }
     };
 
-    const userSubmissions = submissions.filter(sub => sub.requesterId === currentUser.id);
+    const isTIUser = currentUser.department_name === 'TI';
+    const displaySubmissions = isTIUser ? submissions : submissions.filter(sub => sub.requesterId === currentUser.id);
 
     return (
         <>
@@ -156,7 +160,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 </div>
 
 
-                <Card title="Minhas Solicitações">
+                <Card title={isTIUser ? "Solicitações da Empresa" : "Minhas Solicitações"}>
                     <div className="overflow-x-auto">
                         {loading ? (
                             <p className="text-center text-brand-subtle-text py-8">Carregando solicitações...</p>
@@ -164,6 +168,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                             <table className="w-full text-sm text-left text-gray-500">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                     <tr>
+                                        {isTIUser && <th scope="col" className="px-6 py-3">Solicitante</th>}
                                         <th scope="col" className="px-6 py-3">Item</th>
                                         <th scope="col" className="px-6 py-3">Tipo</th>
                                         <th scope="col" className="px-6 py-3">Data de Envio</th>
@@ -171,8 +176,9 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {userSubmissions.map(sub => (
+                                    {displaySubmissions.map(sub => (
                                         <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
+                                            {isTIUser && <td className="px-6 py-4 font-medium text-gray-900">{sub.requesterName}</td>}
                                             <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
                                             <td className="px-6 py-4">{sub.requestType}</td>
                                             <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
@@ -184,7 +190,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                 </tbody>
                             </table>
                         )}
-                        {!loading && userSubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">Você ainda não fez nenhuma solicitação.</p>}
+                        {!loading && displaySubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">Nenhuma solicitação encontrada.</p>}
                     </div>
                 </Card>
             </div>

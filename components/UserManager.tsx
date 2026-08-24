@@ -43,6 +43,8 @@ const UserFormModal: React.FC<{
             canPostText: true,
             canPostImage: true,
             canPostVideo: true,
+            createEvents: false,
+            manageMarketplace: false,
         },
     });
 
@@ -211,6 +213,21 @@ const UserFormModal: React.FC<{
                                     <label className="flex items-center space-x-2 text-brand-text">
                                         <input type="checkbox" name="viewInfoSec" checked={formData.permissions.viewInfoSec} onChange={handlePermissionChange} className="rounded text-brand-primary" />
                                         <span className="text-sm">Segurança da Info.</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* New Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Permissões Especiais</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="createEvents" checked={formData.permissions.createEvents} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Criar Eventos</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="manageMarketplace" checked={formData.permissions.manageMarketplace} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Gerenciar Marketplace</span>
                                     </label>
                                 </div>
                             </div>

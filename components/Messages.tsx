@@ -473,12 +473,11 @@ const Messages: React.FC<MessagesProps> = () => {
                     .from('conversation_participants')
                     .select('conversation_id')
                     .in('conversation_id', myConvIds)
-                    .eq('user_id', contactId)
-                    .single();
+                    .eq('user_id', contactId);
 
                 // If found, just select it
-                if (commonPart) {
-                    setSelectedConversationId(commonPart.conversation_id);
+                if (commonPart && commonPart.length > 0) {
+                    setSelectedConversationId(commonPart[0].conversation_id);
                     setActiveTab('conversations');
                     setLoading(false);
                     return;
