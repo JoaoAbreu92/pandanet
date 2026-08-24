@@ -85,7 +85,11 @@ const CompanyPoll: React.FC = () => {
             }
           ]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase Vote Insert Error:', error);
+          alert(`Erro ao registrar voto: ${error.message} (${error.code})`);
+          throw error;
+        }
 
         setHasVoted(true);
         fetchLatestPoll(); // Refresh data

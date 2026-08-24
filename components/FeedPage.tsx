@@ -549,12 +549,19 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
                         <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
                         <hr className="mb-4" />
-                        <div className="flex justify-around">
-                            <div><p className="font-bold text-brand-text">{posts.filter(p => p.authorId === currentUser.id).length}</p><p className="text-[10px] text-brand-subtle-text uppercase">Posts</p></div>
-                            <div className="border-x px-6">
-                                <p className="font-bold text-brand-text">{allEmployees.length}</p><p className="text-[10px] text-brand-subtle-text uppercase">Usuários</p>
+                        <div className="flex justify-between items-center px-2">
+                            <div className="text-center flex-1">
+                                <p className="font-bold text-brand-text text-base leading-none">{(currentUser.following || []).length}</p>
+                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Seguidores</p>
                             </div>
-                            <div><p className="font-bold text-brand-text">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p><p className="text-[10px] text-brand-subtle-text uppercase">Interações</p></div>
+                            <div className="text-center flex-1 border-x border-gray-100">
+                                <p className="font-bold text-brand-text text-base leading-none">{allEmployees.length}</p>
+                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Usuários</p>
+                            </div>
+                            <div className="text-center flex-1">
+                                <p className="font-bold text-brand-text text-base leading-none">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p>
+                                <p className="text-[9px] text-brand-subtle-text uppercase mt-1">Interações</p>
+                            </div>
                         </div>
                     </Card>
                     <RecognitionWidget recognitions={localRecognitions} onRecognize={() => setShowRecognitionModal(true)} />
