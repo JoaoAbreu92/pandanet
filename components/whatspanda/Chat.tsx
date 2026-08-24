@@ -164,7 +164,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     const words = newMessage.split(/\s+/);
     words.pop(); // Remove o atalho ex: "/pix"
     const prefix = words.join(' ');
-    const updatedMessage = prefix ? `${prefix} ${msg.message}` : msg.message;
+    const updatedMessage = prefix ? `${prefix} ${msg.message_text}` : msg.message_text;
     setNewMessage(updatedMessage);
     setShowQuickMsgPopup(false);
   };
@@ -3227,7 +3227,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                                     <span className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-1.5 py-0.5 rounded">
                                       /{msg.shortcut}
                                     </span>
-                                    <p className="text-xs text-slate-700 dark:text-slate-200 truncate w-full font-medium">{msg.message}</p>
+                                    <p className="text-xs text-slate-700 dark:text-slate-200 truncate w-full font-medium">{msg.message_text}</p>
                                   </button>
                                 ))
                               )}

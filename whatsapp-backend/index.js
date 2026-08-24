@@ -2880,6 +2880,55 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
 
 const activeCreations = new Map(); // key: `${companyId}_${fromPhone}` -> Promise<conversationId>
 
+async function transcribeAudioInBackground(messageId, base64Audio, mimeType, geminiKey) {
+    if (!geminiKey || !base64Audio) return;
+    try {
+        console.log(`[AUDIO-TRANS] Iniciando transcrição para mensagem ${messageId}...`);
+        
+        let cleanBase64 = base64Audio;
+        if (cleanBase64.includes(';base64,')) {
+            cleanBase64 = cleanBase64.split(';base64,')[1];
+        }
+
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+        let normalMimeType = mimeType || 'audio/ogg';
+        if (normalMimeType.includes(';')) {
+            normalMimeType = normalMimeType.split(';')[0];
+        }
+
+        const result = await model.generateContent([
+            {
+                inlineData: {
+                    data: cleanBase64,
+                    mimeType: normalMimeType
+                }
+            },
+            "Transcreva este áudio em português exatamente como foi falado. Retorne APENAS o texto da transcrição, sem nenhuma introdução, explicação, aspas ou comentário."
+        ]);
+
+        const response = await result.response;
+        const transcript = response.text().trim();
+
+        if (transcript) {
+            console.log(`[AUDIO-TRANS] Transcrição concluída: "${transcript}"`);
+            
+            const { error } = await supabase
+                .from('whatsapp_messages')
+                .update({ message_text: `🎵 Áudio: "${transcript}"` })
+                .eq('id', messageId);
+
+            if (error) {
+                console.error(`[AUDIO-TRANS] Erro ao salvar transcrição:`, error.message);
+            }
+        }
+    } catch (err) {
+        console.error(`[AUDIO-TRANS] Erro na transcrição da mensagem ${messageId}:`, err.message);
+    }
+}
+
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
     try {
         const isFromMe = message.key?.fromMe;
@@ -2975,12 +3024,13 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             }
         }
 
-        // 0. Verificar se o contato está bloqueado ou com bot desabilitado
+        // 0. Verificar se o contato está bloqueado ou com bot desabilitado e transcrição desabilitada
         let disableBotForContact = false;
+        let disableTranscription = false;
         if (!isGroup) {
             const { data: contact } = await supabase
                 .from('whatsapp_contacts')
-                .select('is_blocked, disable_bot')
+                .select('is_blocked, disable_bot, disable_transcription')
                 .eq('company_id', companyId)
                 .eq('phone', fromPhone)
                 .maybeSingle();
@@ -2992,6 +3042,9 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             }
             if (contact?.disable_bot) {
                 disableBotForContact = true;
+            }
+            if (contact?.disable_transcription) {
+                disableTranscription = true;
             }
         }
 
@@ -3058,6 +3111,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         let mediaType = null;
         let mimeType = null;
         let fileName = null;
+        let base64 = null;
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
         
         if (mediaMsg) {
@@ -3083,7 +3137,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             // DOWNLOAD E UPLOAD DE MÍDIA
             const instanceName = `conn_${connectionId}`;
             try {
-                const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
+                base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
                 if (base64) {
                     mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId, mimeType, fileName);
                     if (mediaUrl) {
@@ -3327,6 +3381,30 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     throw insertErr;
                 } else {
                     addDebugLog('MSG_INSERT_OK', `Mensagem ${msgId} salva com sucesso na conv ${conversationId}`);
+                    
+                    if (mediaType === 'audio' && base64 && !disableTranscription) {
+                        if (!geminiKey) {
+                            try {
+                                const { data: settings } = await supabase
+                                    .from('whatsapp_settings')
+                                    .select('gemini_api_key')
+                                    .eq('id', connectionId)
+                                    .maybeSingle();
+                                if (settings) geminiKey = settings.gemini_api_key;
+                            } catch (err) {}
+                        }
+                        if (geminiKey) {
+                            const { data: insertedMsg } = await supabase
+                                .from('whatsapp_messages')
+                                .select('id')
+                                .eq('whatsapp_message_id', msgId)
+                                .maybeSingle();
+                            
+                            if (insertedMsg) {
+                                transcribeAudioInBackground(insertedMsg.id, base64, mimeType, geminiKey);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -3907,6 +3985,48 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
             syncEvolutionData(instanceName, companyId, connectionId);
         } else if (state === 'close' || state === 'disconnected' || state === 'refused') {
             await supabase.from('whatsapp_settings').update({ is_connected: false }).eq('id', connectionId);
+        }
+    }
+
+    // ----- MENSAGEM EXCLUÍDA / APAGADA (REVOKE) -----
+    const isRevokeEvent = ['messages.revoke', 'messages_revoke', 'message.revoke', 'message_revoke'].includes(event);
+    if (isRevokeEvent) {
+        try {
+            console.log(`[WEBHOOK] Evento de mensagem excluída (revoke) recebido.`);
+            const revokedMsgId = data?.key?.id || data?.id || (data?.message?.key?.id);
+            if (revokedMsgId) {
+                console.log(`[WEBHOOK-REVOKE] Buscando mensagem whatsapp_message_id = ${revokedMsgId}`);
+                
+                const { data: originalMsg } = await supabase
+                    .from('whatsapp_messages')
+                    .select('id, message_text, media_type')
+                    .eq('whatsapp_message_id', revokedMsgId)
+                    .maybeSingle();
+
+                if (originalMsg) {
+                    let updatedText = originalMsg.message_text || '';
+                    const tag = '🚫 [Mensagem apagada pelo usuário]';
+                    
+                    if (!updatedText.includes(tag)) {
+                        if (originalMsg.media_type) {
+                            updatedText = `${tag} (${originalMsg.media_type === 'image' ? 'Imagem' : originalMsg.media_type === 'audio' ? 'Áudio' : originalMsg.media_type === 'video' ? 'Vídeo' : 'Arquivo'}) ${updatedText ? ': ' + updatedText : ''}`;
+                        } else {
+                            updatedText = `${tag}: ${updatedText}`;
+                        }
+
+                        await supabase
+                            .from('whatsapp_messages')
+                            .update({ message_text: updatedText })
+                            .eq('id', originalMsg.id);
+                        
+                        console.log(`[WEBHOOK-REVOKE] Mensagem ${revokedMsgId} marcada como excluída com sucesso.`);
+                    }
+                } else {
+                    console.log(`[WEBHOOK-REVOKE] Mensagem original ${revokedMsgId} não encontrada no banco.`);
+                }
+            }
+        } catch (revokeErr) {
+            console.error('[WEBHOOK-REVOKE] Erro ao processar mensagem excluída:', revokeErr.message);
         }
     }
 
