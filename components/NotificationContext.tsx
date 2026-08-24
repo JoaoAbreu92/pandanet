@@ -318,6 +318,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 return;
             }
 
+            // Criar canal de notificações com alta importância para Android (permite popup e som)
+            if (Capacitor.getPlatform() === 'android') {
+                try {
+                    await PushNotifications.createChannel({
+                        id: 'default',
+                        name: 'PandaNet Notificações',
+                        description: 'Canal de notificações padrão da PandaNet',
+                        importance: 5, // 5 = IMPORTANCE_HIGH (banner de popup e som)
+                        visibility: 1, // VISIBILITY_PUBLIC
+                        sound: 'default',
+                        vibration: true
+                    });
+                    console.log('[PandaNet] Canal FCM para Android criado.');
+                } catch (chErr) {
+                    console.error('[PandaNet] Erro ao criar canal FCM:', chErr);
+                }
+            }
+
             // Register with Apple / Google to receive push via APNS/FCM
             await PushNotifications.register();
 
