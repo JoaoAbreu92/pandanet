@@ -1631,7 +1631,7 @@ async function importHistoricalMessages(conv, instanceName) {
         // Tentar diferentes endpoints e estruturas de payload da Evolution API
         const attempts = [
             { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } }, limit: 100 }) },
-            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ remoteJid, count: 100 }) },
+            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { remoteJid }, limit: 100 }) },
             { url: `${evoUrl}/chat/getMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } } }) },
         ];
 
@@ -1689,6 +1689,37 @@ async function importHistoricalMessages(conv, instanceName) {
 
             if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) { skipped++; continue; }
             if (msgId && existingIds.has(msgId)) { skipped++; continue; }
+
+            // --- VERIFICAÇÃO RIGOROSA DE ISOLAMENTO DE CONVERSA ---
+            const cleanMsgPhone = remoteJid.split('@')[0].replace(/\D/g, '');
+            const cleanConvPhone = contact_phone.replace(/\D/g, '');
+
+            if (is_group) {
+                // Se a conversa é um GRUPO, a mensagem DEVE vir com o remoteJid do grupo
+                const isMatchingGroup = remoteJid === contact_phone ||
+                                        remoteJid.includes(cleanConvPhone) ||
+                                        cleanMsgPhone === cleanConvPhone;
+                if (!isMatchingGroup) {
+                    console.warn(`[HIST-IMPORT] BLOQUEADO VAZAMENTO: Mensagem de ${remoteJid} descartada pois não pertence ao grupo ${contact_phone}`);
+                    skipped++;
+                    continue;
+                }
+            } else {
+                // Se a conversa é PRIVADA, a mensagem NÃO PODE ser de grupo e DEVE pertencer a este número
+                if (remoteJid.includes('@g.us')) {
+                    console.warn(`[HIST-IMPORT] BLOQUEADO VAZAMENTO: Mensagem de grupo ${remoteJid} descartada em conversa privada ${contact_phone}`);
+                    skipped++;
+                    continue;
+                }
+                const isMatchingPhone = cleanMsgPhone === cleanConvPhone ||
+                                        (cleanMsgPhone.endsWith(cleanConvPhone) && cleanConvPhone.length >= 8) ||
+                                        (cleanConvPhone.endsWith(cleanMsgPhone) && cleanMsgPhone.length >= 8);
+                if (!isMatchingPhone) {
+                    console.warn(`[HIST-IMPORT] BLOQUEADO VAZAMENTO: Mensagem de ${remoteJid} descartada pois não pertence ao contato ${contact_phone}`);
+                    skipped++;
+                    continue;
+                }
+            }
 
             const getRealMsg = (m) => {
                 if (!m) return {};
@@ -2631,8 +2662,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         if (!text && !mediaMsg) return;
 
-        // 1. Localizar ou Criar Conversa (Evitando condições de corrida concorrente)
-        const creationKey = `${companyId}_${fromPhone}`;
+        // 1. Localizar ou Criar Conversa (Evitando condições de corrida concorrente e garantindo isolamento total por canal e tipo)
+        const creationKey = `${companyId}_${connectionId || 'default'}_${fromPhone}_${isGroup ? 'group' : 'private'}`;
         let conv;
         let conversationId;
         let isNewConversation = false;
@@ -2647,12 +2678,18 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             conv = existingConv;
         } else {
             const creationPromise = (async () => {
-                let { data: existingList, error: findErr } = await supabase
+                let query = supabase
                     .from('whatsapp_conversations')
                     .select('*')
                     .eq('company_id', companyId)
                     .eq('contact_phone', fromPhone)
-                    .order('created_at', { ascending: true });
+                    .eq('is_group', isGroup);
+
+                if (connectionId) {
+                    query = query.eq('connection_id', connectionId);
+                }
+
+                let { data: existingList, error: findErr } = await query.order('created_at', { ascending: true });
 
                 if (findErr) {
                     console.error('[MSG] Erro ao buscar conversas existentes:', findErr.message);
