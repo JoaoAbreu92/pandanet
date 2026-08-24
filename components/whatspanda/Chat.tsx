@@ -1923,6 +1923,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     <Download className="w-5 h-5" />
                   </button>
                 )}
+                {!isGhostMode && (
+                  <button
+                    onClick={() => {
+                      setIsTransferModalOpen(true);
+                      setTransferSearch('');
+                    }}
+                    className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+                    title="Transferir Atendimento"
+                  >
+                    <CornerUpRight className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={() => setShowContactSidebar(!showContactSidebar)}
                   className={`p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
@@ -2554,6 +2566,23 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </>
               )}
             </button>
+            {!isGhostMode && (
+              <button 
+                onClick={() => {
+                  const targetConv = conversations.find(c => c.id === contextMenu.conversationId);
+                  if (targetConv) {
+                    setSelectedConversation(targetConv);
+                    setIsTransferModalOpen(true);
+                    setTransferSearch('');
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors font-medium border-t border-slate-100 dark:border-white/5"
+              >
+                <CornerUpRight className="w-4 h-4 text-indigo-500" />
+                Transferir Atendimento
+              </button>
+            )}
           </div>
         </>
       )}
