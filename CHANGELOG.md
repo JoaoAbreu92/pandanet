@@ -4,10 +4,25 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
-Versão 1.1.9 beta teste
-03/07/2026
-🗞️ Nota de Atualização - PandaNet v1.1.9 Beta Teste
-Esta grande atualização traz a consolidação de melhorias de privacidade, automação de fluxos de atendimento no WhatsPanda, reestruturação estética dos menus de solicitação no Portal Meu RH e correções críticas de usabilidade e sincronização.
+Versão 1.2.0 beta teste
+24/07/2026
+🗞️ Nota de Atualização - PandaNet v1.2.0 Beta Teste
+Esta grande atualização traz a consolidação de melhorias de privacidade, automação de fluxos de atendimento no WhatsPanda, reestruturação estética dos menus de solicitação no Portal Meu RH, correções críticas no disparador de campanhas em massa, controle de chatbot e resiliência total de sincronização em tempo real.
+
+🚀 O que há de novo?
+
+📢 WhatsPanda: Disparador de Campanhas Estável & Histórico
+- **Disparos Confiáveis**: Correção de erros 400 (Bad Request) e 404 (Not Found) nas requisições do disparador, garantindo compatibilidade com o formato de mídias e instâncias da Evolution API v2.
+- **Histórico de Envio no Painel**: Exibição da mensagem e do link da mídia programada diretamente nos cards da lista de campanhas, permitindo fácil consulta de campanhas finalizadas ou ativas.
+- **Status Realtime de Conclusão**: O modal de alvos agora detecta em tempo real a conclusão da campanha e exibe um banner de sucesso visual de finalização.
+
+🤖 WhatsPanda: Inibição de Robô & Opções Customizadas
+- **Mensagem Personalizada de Erro**: Nova opção nas configurações do chatbot que permite customizar o texto enviado quando o cliente digita uma opção inexistente do menu.
+- **Inibir Bot por Contato**: Switch "Desabilitar Robô" adicionado à barra de detalhes do contato, impedindo que chatbots ou triagem inteligência (Gemini) respondam àquele cliente específico.
+- **Controle de Loops de Menu**: Nova opção visual para limitar a quantidade de tentativas que o chatbot repete o menu antes de transferir para a fila humana de atendimento.
+
+⚡ WhatsPanda: Alta Resiliência de Sincronização Realtime
+- **Auto-Reconexão no Foco**: Adicionados escutadores globais de foco e visibilidade. Toda vez que o atendente foca na aba ou abre o app nativo no celular, o sistema força a reconexão imediata do WebSocket e recarrega os chats e mensagens por garantia, eliminando falhas de atraso ou mensagens invisíveis.
 
 🚀 O que há de novo?
 
