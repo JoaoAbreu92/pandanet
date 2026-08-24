@@ -2131,41 +2131,44 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         </div>
 
                         {/* Metadata */}
-                        <div className="p-6 pb-2">
-                            <div className="flex flex-col mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold">
-                                        {selectedEmail.from.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-gray-900 dark:text-white tracking-tight">{selectedEmail.from}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-2">
-                                                Para: <span className="truncate max-w-[200px]">{selectedEmail.to || 'mim'}</span>
-                                                <button onClick={() => setShowDetails(!showDetails)} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors rounded text-[10px] font-bold uppercase cursor-pointer">
-                                                    {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
-                                                </button>
-                                            </div>
-                                            {selectedEmail.cc && (
-                                                <div className="text-[10px] opacity-80 truncate max-w-[300px]">
-                                                    Cc: {selectedEmail.cc}
+                        <div className="p-4 sm:p-6 pb-2">
+                            <div className="flex flex-col mb-4 gap-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold flex-shrink-0">
+                                            {selectedEmail.from.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-bold text-gray-900 dark:text-white tracking-tight truncate max-w-[200px] xs:max-w-[250px] sm:max-w-none" title={selectedEmail.from}>{selectedEmail.from}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-0.5">
+                                                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                                    <span className="flex-shrink-0">Para:</span>
+                                                    <span className="truncate max-w-[120px] xs:max-w-[180px] sm:max-w-[300px]" title={selectedEmail.to || 'mim'}>{selectedEmail.to || 'mim'}</span>
+                                                    <button onClick={() => setShowDetails(!showDetails)} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors rounded text-[10px] font-bold uppercase cursor-pointer flex-shrink-0">
+                                                        {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                                                    </button>
                                                 </div>
-                                            )}
+                                                {selectedEmail.cc && (
+                                                    <div className="text-[10px] opacity-80 truncate max-w-[150px] xs:max-w-[220px] sm:max-w-[400px]" title={selectedEmail.cc}>
+                                                        Cc: {selectedEmail.cc}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full">
+                                    <div className="text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full w-fit sm:ml-auto">
                                         {new Date(selectedEmail.date).toLocaleString()}
                                     </div>
                                 </div>
-
+ 
                                 {showDetails && (
                                     <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-white/5 text-xs text-gray-600 dark:text-gray-300 space-y-2 relative overflow-hidden break-words">
-                                        <div><strong>De:</strong> {selectedEmail.from}</div>
-                                        <div><strong>Para:</strong> {selectedEmail.to || (selectedEmail.from === settings.imap_user ? 'mim' : '-')}</div>
-                                        {selectedEmail.cc && <div><strong>Cc:</strong> {selectedEmail.cc}</div>}
-                                        <div><strong>Data:</strong> {new Date(selectedEmail.date).toString()}</div>
-                                        <div><strong>Assunto:</strong> {selectedEmail.subject}</div>
-                                        {selectedEmail.messageId && <div><strong>Mensagem-ID:</strong> {selectedEmail.messageId}</div>}
+                                        <div className="break-all sm:break-words"><strong>De:</strong> {selectedEmail.from}</div>
+                                        <div className="break-all sm:break-words"><strong>Para:</strong> {selectedEmail.to || (selectedEmail.from === settings.imap_user ? 'mim' : '-')}</div>
+                                        {selectedEmail.cc && <div className="break-all sm:break-words"><strong>Cc:</strong> {selectedEmail.cc}</div>}
+                                        <div className="break-all sm:break-words"><strong>Data:</strong> {new Date(selectedEmail.date).toString()}</div>
+                                        <div className="break-all sm:break-words"><strong>Assunto:</strong> {selectedEmail.subject}</div>
+                                        {selectedEmail.messageId && <div className="break-all text-[10px]"><strong>Mensagem-ID:</strong> {selectedEmail.messageId}</div>}
                                     </div>
                                 )}
                             </div>

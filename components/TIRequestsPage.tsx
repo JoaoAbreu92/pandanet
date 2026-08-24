@@ -133,7 +133,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
     const fetchSelectableUsers = async () => {
         if (!currentUser?.company_id) return;
         try {
-            // Primeiro, pegamos o ID do departamento de TI da empresa
             const { data: deptData } = await supabase
                 .from('departments')
                 .select('id')
@@ -143,7 +142,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
             const tiDeptId = deptData?.id;
 
-            // Agora buscamos usuários que são admins OU do departamento de TI
             let query = supabase
                 .from('profiles')
                 .select('id, full_name')
@@ -169,7 +167,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
         if (!currentUser?.company_id) return;
 
-        console.log('[TIRequestsPage] Subscribing to ti_requests realtime changes...');
         const channel = supabase
             .channel(`public:ti_requests:${currentUser.company_id}`)
             .on('postgres_changes', {
@@ -178,7 +175,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 table: 'ti_requests',
                 filter: `company_id=eq.${currentUser.company_id}`
             }, (payload) => {
-                console.log('[TIRequestsPage] Realtime change detected (postgres):', payload);
                 fetchRequests();
                 if (selectedRequest && payload.new && (payload.new as any).id === selectedRequest.id) {
                     const updatedData = payload.new as any;
@@ -190,13 +186,10 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 }
             })
             .on('broadcast', { event: 'comment_update' }, (payload) => {
-                console.log('[TIRequestsPage] Realtime change detected (broadcast):', payload);
                 const { requestId } = payload.payload;
                 fetchRequests();
                 if (selectedRequest && requestId === selectedRequest.id) {
-                    // Force refresh comments if this is the open request
                     fetchRequests().then(() => {
-                        // The fetchRequests updates the submissions list, we need to update selectedRequest too
                         supabase.from('ti_requests').select('*, requester:requester_id(full_name, avatar_url), assigned:assigned_user_id(full_name, avatar_url)').eq('id', requestId).single().then(({ data }) => {
                             if (data) {
                                 setSelectedRequest({
@@ -222,7 +215,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
             .subscribe();
 
         return () => {
-            console.log('[TIRequestsPage] Unsubscribing from ti_requests realtime');
             supabase.removeChannel(channel);
         };
     }, [currentUser?.id, currentUser?.company_id, selectedRequest?.id]);
@@ -244,9 +236,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
             if (error) throw error;
 
-            // Send notification to the assigned user
             if (data.assignedUserId) {
-                const assignedUser = selectableUsers.find(u => u.id === data.assignedUserId);
                 await addNotification({
                     type: 'system',
                     title: 'Nova Solicitação de TI Atribuída',
@@ -290,7 +280,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
             if (error) throw error;
 
-            // Notificar o solicitante sobre a mudança de status
             const currentSub = submissions.find(s => s.id === id);
             if (currentSub && currentSub.requesterId !== currentUser.id) {
                 await addNotification({
@@ -303,7 +292,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 });
             }
 
-            // Broadcast the update
             const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
             channel.send({
                 type: 'broadcast',
@@ -320,14 +308,14 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
     const getStatusColor = (status: TIRequestStatus) => {
         switch (status) {
-            case 'Pendente': return 'bg-yellow-100 text-yellow-800';
-            case 'Em Análise': return 'bg-blue-100 text-blue-800';
-            case 'Aprovado': return 'bg-teal-100 text-teal-800';
-            case 'Pedido Realizado': return 'bg-indigo-100 text-indigo-800';
-            case 'Entregue': return 'bg-green-100 text-green-800';
-            case 'Rejeitado': return 'bg-red-100 text-red-800';
-            case 'Finalizado': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400';
+            case 'Em Análise': return 'bg-blue-100 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400';
+            case 'Aprovado': return 'bg-teal-100 text-teal-800 dark:bg-teal-950/20 dark:text-teal-400';
+            case 'Pedido Realizado': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/20 dark:text-indigo-400';
+            case 'Entregue': return 'bg-green-100 text-green-800 dark:bg-green-950/20 dark:text-green-400';
+            case 'Rejeitado': return 'bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400';
+            case 'Finalizado': return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-gray-400';
+            default: return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-gray-400';
         }
     };
 
@@ -352,8 +340,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
             <div className="space-y-6">
                 <div className="flex justify-between items-start">
                     <div>
-                        <h1 className="text-3xl font-bold text-brand-text">Solicitações de T.I.</h1>
-                        <p className="mt-1 text-brand-subtle-text">Gerencie suas solicitações de hardware e software.</p>
+                        <h1 className="text-3xl font-bold text-brand-text dark:text-white">Solicitações de T.I.</h1>
+                        <p className="mt-1 text-brand-subtle-text dark:text-gray-400">Gerencie suas solicitações de hardware e software.</p>
                     </div>
                     <button onClick={() => setModalOpen(true)} className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">
                         <PlusIcon className="w-4 h-4" />
@@ -362,16 +350,16 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 </div>
 
 
-                <div className="flex bg-gray-100 p-1 rounded-lg w-fit">
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg w-fit">
                     <button
                         onClick={() => setActiveTab('active')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'active' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'active' ? 'bg-white dark:bg-slate-900 text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                     >
                         Solicitações Ativas
                     </button>
                     <button
                         onClick={() => setActiveTab('finalized')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'finalized' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'finalized' ? 'bg-white dark:bg-slate-900 text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                     >
                         Finalizadas
                     </button>
@@ -382,8 +370,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                         {loading ? (
                             <p className="text-center text-brand-subtle-text py-8">Carregando solicitações...</p>
                         ) : (
-                            <table className="w-full text-sm text-left text-gray-500">
-                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                                    <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-slate-900/50">
                                         <tr>
                                             <th scope="col" className="px-6 py-3">Item</th>
                                             <th scope="col" className="px-6 py-3">Solicitante</th>
@@ -396,8 +384,8 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                     </thead>
                                     <tbody>
                                         {filteredSubmissions.map(sub => (
-                                            <tr key={sub.id} className="bg-white border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedRequest(sub)}>
-                                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                                            <tr key={sub.id} className="bg-white dark:bg-slate-800 border-b dark:border-white/5 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer" onClick={() => setSelectedRequest(sub)}>
+                                                <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                                     <div className="flex items-center space-x-2">
                                                         {sub.comments && sub.comments.length > 0 && (
                                                             <span className="w-2 h-2 bg-brand-primary rounded-full" title="Possui mensagens"></span>
@@ -405,7 +393,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                         <span>{sub.itemName}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 font-medium text-gray-900">
+                                                <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                                                     <span>{sub.requesterName}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -413,7 +401,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                         {sub.assignedUserAvatarUrl ? (
                                                             <img src={sub.assignedUserAvatarUrl} alt="" className="w-6 h-6 rounded-full" />
                                                         ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500">?</div>
+                                                            <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-[10px] text-gray-500 dark:text-gray-400">?</div>
                                                         )}
                                                         <span>{sub.assignedUserName}</span>
                                                     </div>
@@ -427,12 +415,12 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                             onChange={(e) => handleUpdateStatus(sub.id, e.target.value as TIRequestStatus)}
                                                             className={`px-2 py-1 rounded-full text-xs font-medium border-none focus:ring-0 ${getStatusColor(sub.status)}`}
                                                         >
-                                                            <option value="Pendente">Pendente</option>
-                                                            <option value="Em Análise">Em Análise</option>
-                                                            <option value="Aprovado">Aprovado</option>
-                                                            <option value="Pedido Realizado">Pedido Realizado</option>
-                                                            <option value="Entregue">Entregue</option>
-                                                            <option value="Rejeitado">Rejeitado</option>
+                                                            <option value="Pendente" className="dark:bg-slate-800 dark:text-white">Pendente</option>
+                                                            <option value="Em Análise" className="dark:bg-slate-800 dark:text-white">Em Análise</option>
+                                                            <option value="Aprovado" className="dark:bg-slate-800 dark:text-white">Aprovado</option>
+                                                            <option value="Pedido Realizado" className="dark:bg-slate-800 dark:text-white">Pedido Realizado</option>
+                                                            <option value="Entregue" className="dark:bg-slate-800 dark:text-white">Entregue</option>
+                                                            <option value="Rejeitado" className="dark:bg-slate-800 dark:text-white">Rejeitado</option>
                                                         </select>
                                                     ) : (
                                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
@@ -473,41 +461,41 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
             {selectedRequest && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl relative animate-fade-in-up max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-brand-text">Detalhes da Solicitação</h3>
-                            <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl relative animate-fade-in-up max-h-[90vh] flex flex-col border border-gray-100 dark:border-white/5">
+                        <div className="p-6 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-brand-text dark:text-white">Detalhes da Solicitação</h3>
+                            <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                                 <XCircleIcon className="w-6 h-6" />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            <div className="grid grid-cols-2 gap-4 text-sm text-brand-text">
+                            <div className="grid grid-cols-2 gap-4 text-sm text-brand-text dark:text-white">
                                 <div>
-                                    <p className="text-gray-500">Solicitante</p>
+                                    <p className="text-gray-500 dark:text-gray-400">Solicitante</p>
                                     <p className="font-medium">{selectedRequest.requesterName}</p>
                                 </div>
                                 <div>
-                                    <p className="text-gray-500">Responsável</p>
+                                    <p className="text-gray-500 dark:text-gray-400">Responsável</p>
                                     <p className="font-medium">{selectedRequest.assignedUserName}</p>
                                 </div>
                                 <div>
-                                    <p className="text-gray-500">Tipo</p>
+                                    <p className="text-gray-500 dark:text-gray-400">Tipo</p>
                                     <p className="font-medium">{selectedRequest.requestType}</p>
                                 </div>
                                 <div>
-                                    <p className="text-gray-500">Status</p>
+                                    <p className="text-gray-500 dark:text-gray-400">Status</p>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedRequest.status)}`}>{selectedRequest.status}</span>
                                 </div>
                             </div>
 
                             <div>
-                                <h4 className="font-semibold text-brand-text mb-2">Item</h4>
-                                <p className="text-brand-subtle-text">{selectedRequest.itemName}</p>
+                                <h4 className="font-semibold text-brand-text dark:text-white mb-2">Item</h4>
+                                <p className="text-brand-subtle-text dark:text-gray-300">{selectedRequest.itemName}</p>
                             </div>
 
                             <div>
-                                <h4 className="font-semibold text-brand-text mb-2">Justificativa</h4>
-                                <p className="text-brand-subtle-text">{selectedRequest.justification}</p>
+                                <h4 className="font-semibold text-brand-text dark:text-white mb-2">Justificativa</h4>
+                                <p className="text-brand-subtle-text dark:text-gray-300">{selectedRequest.justification}</p>
                             </div>
 
                             {(isAdmin || isTIUser || selectedRequest.assignedUserId === currentUser.id) && selectedRequest.status !== 'Finalizado' && (
@@ -528,7 +516,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                             )}
 
                             <div>
-                                <h4 className="font-semibold text-brand-text mb-4">Mensagens ({selectedRequest.comments.length})</h4>
+                                <h4 className="font-semibold text-brand-text dark:text-white mb-4">Mensagens ({selectedRequest.comments.length})</h4>
                                 <div className="space-y-4">
                                     {selectedRequest.comments.length === 0 ? (
                                         <p className="text-sm text-gray-400 italic">Nenhuma mensagem ainda.</p>
@@ -537,7 +525,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             <div key={index} className={`flex items-start space-x-3 ${comment.author === currentUser.name ? 'flex-row-reverse' : ''}`}>
                                                 <img src={comment.authorAvatarUrl || 'https://via.placeholder.com/40'} alt={comment.author} className="w-8 h-8 rounded-full object-cover" />
                                                 <div className={`flex flex-col ${comment.author === currentUser.name ? 'items-end' : ''}`}>
-                                                    <div className={`p-3 rounded-lg ${comment.author === currentUser.name ? 'bg-brand-primary text-white rounded-tr-none' : 'bg-gray-100 text-brand-text rounded-tl-none'}`}>
+                                                    <div className={`p-3 rounded-lg ${comment.author === currentUser.name ? 'bg-brand-primary text-white rounded-tr-none' : 'bg-gray-100 text-brand-text dark:bg-slate-800 dark:text-white rounded-tl-none'}`}>
                                                         <p className="font-semibold text-[10px] mb-1 opacity-70">{comment.author}</p>
                                                         <p className="text-sm">{comment.text}</p>
                                                     </div>
@@ -549,7 +537,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                 </div>
                             </div>
                         </div>
-                        <div className="p-6 border-t border-gray-100">
+                        <div className="p-6 border-t border-gray-100 dark:border-white/5">
                             <form
                                 onSubmit={async (e) => {
                                     e.preventDefault();
@@ -569,7 +557,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             .eq('id', selectedRequest.id);
                                         if (error) throw error;
 
-                                        // Notificar o outro usuário
                                         const targetUserIdForComment = currentUser.id === selectedRequest.requesterId ? selectedRequest.assignedUserId : selectedRequest.requesterId;
                                         if (targetUserIdForComment) {
                                             await addNotification({
@@ -582,7 +569,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             });
                                         }
 
-                                        // Broadcast the update
                                         const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
                                         channel.send({
                                             type: 'broadcast',
@@ -592,7 +578,6 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
                                         setSelectedRequest({ ...selectedRequest, comments: updatedComments });
                                         setNewComment('');
-                                        // Também atualizar na lista principal para que ao fechar o modal a lista esteja certa
                                         fetchRequests();
                                     } catch (err) {
                                         console.error('Error adding comment:', err);
@@ -608,7 +593,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                         value={newComment}
                                         onChange={(e) => setNewComment(e.target.value)}
                                         placeholder="Digite sua mensagem..."
-                                        className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text"
+                                        className="w-full pl-4 pr-12 py-2 bg-gray-100 dark:bg-slate-800 border border-transparent dark:border-white/5 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text dark:text-white"
                                     />
                                     <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:opacity-50">
                                         <PaperAirplaneIcon className="w-4 h-4" />

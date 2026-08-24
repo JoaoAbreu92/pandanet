@@ -115,6 +115,7 @@ const UserFormModal: React.FC<{
             viewCalendar: true,
             useMarketplace: true,
             viewEmail: true,
+            viewScheduling: true,
             viewDirectory: true,
             viewForms: true,
             viewBenefits: true,
@@ -299,6 +300,7 @@ const UserFormModal: React.FC<{
                                 </h5>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Calendário" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agenda (Agendamentos e Eventos)" name="viewScheduling" checked={formData.permissions.viewScheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Formulários" name="viewForms" checked={formData.permissions.viewForms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />

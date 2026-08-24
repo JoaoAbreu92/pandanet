@@ -221,6 +221,9 @@ export interface EmployeePermissions {
 
   // AI Assistant Config
   ai_assistant: boolean;
+
+  // Agenda Permission
+  viewScheduling: boolean;
 }
 
 // WhatsApp Permissions

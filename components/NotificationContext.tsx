@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Notification, NotificationType } from '../types';
@@ -44,6 +44,9 @@ interface NotificationContextType {
     moduleUnreadCounts: Record<string, number>;
     setModuleUnreadCount: (module: string, count: number) => void;
     markNotificationsByLink: (linkSnippet: string) => Promise<void>;
+
+    currentPage?: string;
+    setCurrentPage?: (page: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -55,6 +58,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Module explicit counts
     const [moduleUnreadCounts, setModuleUnreadCountsState] = useState<Record<string, number>>({});
+    
+    // Page tracking state
+    const [currentPage, setCurrentPage] = useState<string>('home');
+    const currentPageRef = useRef(currentPage);
+    useEffect(() => {
+        currentPageRef.current = currentPage;
+    }, [currentPage]);
 
     const setModuleUnreadCount = useCallback((module: string, count: number) => {
         setModuleUnreadCountsState(prev => {
@@ -424,10 +434,45 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const messagesChannel = supabase
                 .channel(`user-messages-${currentUser.id}`)
                 .on('postgres_changes', {
-                    event: '*',
+                    event: 'INSERT',
                     schema: 'public',
                     table: 'messages'
-                }, () => {
+                }, async (payload) => {
+                    const newMsg = payload.new as any;
+                    if (newMsg && newMsg.sender_id !== currentUser.id) {
+                        let isUserParticipant = false;
+                        if (newMsg.receiver_id === currentUser.id) {
+                            isUserParticipant = true;
+                        } else if (!newMsg.receiver_id) {
+                            // Check group participation
+                            const { data: part } = await supabase
+                                .from('conversation_participants')
+                                .select('id')
+                                .eq('conversation_id', newMsg.conversation_id)
+                                .eq('user_id', currentUser.id)
+                                .maybeSingle();
+                            if (part) isUserParticipant = true;
+                        }
+
+                        if (isUserParticipant) {
+                            if (currentPageRef.current !== 'messages') {
+                                playNotificationSound('message');
+                                flashPageTitle('(1) Nova Mensagem!');
+
+                                const { data: sender } = await supabase
+                                    .from('profiles')
+                                    .select('full_name, avatar_url')
+                                    .eq('id', newMsg.sender_id)
+                                    .maybeSingle();
+
+                                showDesktopNotification(
+                                    `Mensagem de ${sender?.full_name || 'Colega'}`,
+                                    newMsg.text || 'Enviou um anexo',
+                                    sender?.avatar_url
+                                );
+                            }
+                        }
+                    }
                     fetchNotifications();
                 })
                 .subscribe();
@@ -648,7 +693,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             // Module Unread Counts
             moduleUnreadCounts,
             setModuleUnreadCount,
-            markNotificationsByLink
+            markNotificationsByLink,
+
+            currentPage,
+            setCurrentPage
         }}>
             {children}
         </NotificationContext.Provider>

@@ -715,7 +715,8 @@ const AppContent: React.FC = () => {
             'viewDirectory': 'org-chart',
             'viewInfoSec': 'infosec',
             'viewKPIDashboard': 'kpis',
-            'viewProjects': 'projects'
+            'viewProjects': 'projects',
+            'viewScheduling': 'scheduling'
         };
 
         const featureId = featureMap[permission];
@@ -777,6 +778,7 @@ const AppContent: React.FC = () => {
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
             case 'scheduling': {
+                if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
                 if (schedulingFeat === false || schedulingFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
@@ -784,6 +786,7 @@ const AppContent: React.FC = () => {
                 return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="appointments" />;
             }
             case 'scheduling-events': {
+                if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
                 if (schedulingFeat === false || schedulingFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;

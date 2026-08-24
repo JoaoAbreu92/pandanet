@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
                             viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                            ai_assistant: true
+                            ai_assistant: true, viewScheduling: true
                         },
                         following: [],
                         phone: '',
@@ -146,7 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true, viewProjects: true,
                     viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                     viewVacationRequests: true, manageVacationRequests: true,
-                    viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true
+                    viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
+                    viewScheduling: true
                 };
 
                 const planEmailLimit = data.company?.plan?.email_limit;

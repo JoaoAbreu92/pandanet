@@ -27,6 +27,7 @@ const basePermissions: EmployeePermissions = {
     viewKnowledgeBase: true,
     viewServiceStatus: true,
     viewInfoSec: true,
+    viewScheduling: true,
 } as unknown as EmployeePermissions;
 
 const proPlanFeatures: Plan['features'] = {

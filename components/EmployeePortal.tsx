@@ -50,10 +50,10 @@ interface HRDocument {
 }
 
 const statusConfig = {
-    pending:   { label: 'Aguardando', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: ClockIcon },
-    approved:  { label: 'Aprovado',   color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: CheckCircleIcon },
-    rejected:  { label: 'Recusado',   color: 'text-red-600 bg-red-50 border-red-200', icon: XCircleIcon },
-    cancelled: { label: 'Cancelado',  color: 'text-gray-600 bg-gray-50 border-gray-200', icon: XCircleIcon },
+    pending:   { label: 'Aguardando', color: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/30', icon: ClockIcon },
+    approved:  { label: 'Aprovado',   color: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/20 dark:border-emerald-900/30', icon: CheckCircleIcon },
+    rejected:  { label: 'Recusado',   color: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950/20 dark:border-red-900/30', icon: XCircleIcon },
+    cancelled: { label: 'Cancelado',  color: 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-slate-800 dark:border-white/5', icon: XCircleIcon },
 };
 
 const EmployeePortal: React.FC = () => {
@@ -255,17 +255,17 @@ const EmployeePortal: React.FC = () => {
 
             <header className="flex flex-wrap justify-between items-end gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Meu RH</h1>
-                    <p className="text-gray-500 mt-1">Gestão de documentos e benefícios de {profile?.name}.</p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Meu RH</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">Gestão de documentos e benefícios de {profile?.name}.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {vacationBalance && vacationBalance.available_days > 0 && (
-                        <span className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
+                        <span className="px-4 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-full text-sm font-bold">
                             🏖️ Saldo Férias: {vacationBalance.available_days} dias
                         </span>
                     )}
                     {pendingDays > 0 && (
-                        <span className="px-4 py-2 bg-amber-100 text-amber-700 rounded-full text-sm font-bold">
+                        <span className="px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 rounded-full text-sm font-bold">
                             ⏳ Em análise: {pendingDays} dias
                         </span>
                     )}
@@ -282,7 +282,7 @@ const EmployeePortal: React.FC = () => {
                             className={`w-full flex items-center p-4 rounded-2xl transition-all ${
                                 activeSection === key
                                     ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20'
-                                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                                    : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 border border-gray-100 dark:border-white/5'
                             }`}
                         >
                             <Icon className="w-5 h-5 mr-3" />
@@ -293,13 +293,13 @@ const EmployeePortal: React.FC = () => {
 
                 {/* Main Content */}
                 <main className="lg:col-span-3">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden">
 
                         {/* HOLERITES */}
                         {activeSection === 'payroll' && (
                             <div className="p-8">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-gray-900">Histórico de Pagamentos</h3>
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Histórico de Pagamentos</h3>
                                     {isAdmin && (
                                         <>
                                             <button
@@ -316,7 +316,7 @@ const EmployeePortal: React.FC = () => {
                                 </div>
 
                                 {payslips.length === 0 ? (
-                                    <div className="text-center py-16 text-gray-400">
+                                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">
                                         <BanknotesIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
                                         <p className="font-medium">Nenhum holerite disponível ainda.</p>
                                         <p className="text-sm">Os holerites aparecerão aqui quando forem disponibilizados pelo RH.</p>
@@ -324,18 +324,18 @@ const EmployeePortal: React.FC = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {payslips.map(pay => (
-                                            <div key={pay.id} className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100 group hover:border-brand-primary transition-colors">
+                                            <div key={pay.id} className="flex items-center justify-between p-5 bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-white/5 group hover:border-brand-primary transition-colors">
                                                 <div className="flex items-center space-x-4">
-                                                    <div className="p-3 bg-white rounded-xl shadow-sm">
+                                                    <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
                                                         <BanknotesIcon className="w-6 h-6 text-brand-primary" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-gray-900">{pay.month}</p>
-                                                        <p className="text-sm text-gray-500">
+                                                        <p className="font-bold text-gray-900 dark:text-white">{pay.month}</p>
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400">
                                                             Disponibilizado em: {new Date(pay.available_at).toLocaleDateString('pt-BR')}
                                                         </p>
                                                         {pay.net_salary && (
-                                                            <p className="text-sm font-semibold text-emerald-600">
+                                                            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                                                                 Líquido: R$ {pay.net_salary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                             </p>
                                                         )}
@@ -344,7 +344,7 @@ const EmployeePortal: React.FC = () => {
                                                 {pay.file_url && (
                                                     <button
                                                         onClick={() => downloadFile(pay.file_url!, pay.file_name || pay.month)}
-                                                        className="p-3 bg-white border border-gray-100 rounded-xl text-brand-primary hover:bg-brand-primary hover:text-white transition-all shadow-sm"
+                                                        className="p-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl text-brand-primary hover:bg-brand-primary hover:text-white transition-all shadow-sm"
                                                         title="Baixar holerite"
                                                     >
                                                         <ArrowDownTrayIcon className="w-5 h-5" />
@@ -361,7 +361,7 @@ const EmployeePortal: React.FC = () => {
                         {activeSection === 'vacation' && (
                             <div className="p-8">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-gray-900">Gestão de Férias</h3>
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Gestão de Férias</h3>
                                     <button
                                         onClick={() => setShowVacationForm(v => !v)}
                                         className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all"
@@ -373,53 +373,53 @@ const EmployeePortal: React.FC = () => {
 
                                 {/* Saldo Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                    <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
-                                        <p className="text-emerald-700 font-medium text-sm">Dias Disponíveis</p>
-                                        <p className="text-4xl font-black text-emerald-800">{vacationBalance?.available_days ?? 0}</p>
+                                    <div className="p-5 bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <p className="text-emerald-700 dark:text-emerald-400 font-medium text-sm">Dias Disponíveis</p>
+                                        <p className="text-4xl font-black text-emerald-800 dark:text-emerald-300">{vacationBalance?.available_days ?? 0}</p>
                                     </div>
-                                    <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
-                                        <p className="text-amber-700 font-medium text-sm">Em Análise</p>
-                                        <p className="text-4xl font-black text-amber-800">{pendingDays}</p>
+                                    <div className="p-5 bg-amber-50 dark:bg-amber-950/20 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                                        <p className="text-amber-700 dark:text-amber-400 font-medium text-sm">Em Análise</p>
+                                        <p className="text-4xl font-black text-amber-800 dark:text-amber-300">{pendingDays}</p>
                                     </div>
-                                    <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
-                                        <p className="text-blue-700 font-medium text-sm">Dias Gozados {new Date().getFullYear()}</p>
-                                        <p className="text-4xl font-black text-blue-800">{vacationBalance?.taken_days ?? 0}</p>
+                                    <div className="p-5 bg-blue-50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                                        <p className="text-blue-700 dark:text-blue-400 font-medium text-sm">Dias Gozados {new Date().getFullYear()}</p>
+                                        <p className="text-4xl font-black text-blue-800 dark:text-blue-300">{vacationBalance?.taken_days ?? 0}</p>
                                     </div>
                                 </div>
 
                                 {/* Formulário de Solicitação */}
                                 {showVacationForm && (
-                                    <div className="mb-6 p-6 bg-gray-50 rounded-2xl border border-gray-200">
-                                        <h4 className="font-bold text-gray-800 mb-4">Nova Solicitação de Férias</h4>
+                                    <div className="mb-6 p-6 bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-200 dark:border-white/5">
+                                        <h4 className="font-bold text-gray-800 dark:text-white mb-4">Nova Solicitação de Férias</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="text-sm font-medium text-gray-600 mb-1 block">Data de Início</label>
+                                                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Data de Início</label>
                                                 <input
                                                     type="date"
                                                     value={vacForm.start_date}
                                                     onChange={e => setVacForm(f => ({ ...f, start_date: e.target.value }))}
                                                     min={new Date().toISOString().split('T')[0]}
-                                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                                    className="w-full border border-gray-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-sm font-medium text-gray-600 mb-1 block">Data de Término</label>
+                                                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Data de Término</label>
                                                 <input
                                                     type="date"
                                                     value={vacForm.end_date}
                                                     onChange={e => setVacForm(f => ({ ...f, end_date: e.target.value }))}
                                                     min={vacForm.start_date || new Date().toISOString().split('T')[0]}
-                                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                                    className="w-full border border-gray-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
                                                 />
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="text-sm font-medium text-gray-600 mb-1 block">Observações (opcional)</label>
+                                                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Observações (opcional)</label>
                                                 <textarea
                                                     value={vacForm.notes}
                                                     onChange={e => setVacForm(f => ({ ...f, notes: e.target.value }))}
                                                     rows={2}
                                                     placeholder="Alguma informação adicional?"
-                                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
+                                                    className="w-full border border-gray-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
                                                 />
                                             </div>
                                         </div>
@@ -438,7 +438,7 @@ const EmployeePortal: React.FC = () => {
                                             </button>
                                             <button
                                                 onClick={() => setShowVacationForm(false)}
-                                                className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all"
+                                                className="px-5 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
                                             >
                                                 Cancelar
                                             </button>
@@ -447,9 +447,9 @@ const EmployeePortal: React.FC = () => {
                                 )}
 
                                 {/* Lista de Solicitações */}
-                                <h4 className="font-semibold text-gray-700 mb-3">Histórico de Solicitações</h4>
+                                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Histórico de Solicitações</h4>
                                 {vacationRequests.length === 0 ? (
-                                    <div className="text-center py-10 text-gray-400">
+                                    <div className="text-center py-10 text-gray-400 dark:text-gray-500">
                                         <CalendarIcon className="w-10 h-10 mx-auto mb-2 opacity-40" />
                                         <p className="text-sm">Nenhuma solicitação de férias encontrada.</p>
                                     </div>
@@ -459,15 +459,15 @@ const EmployeePortal: React.FC = () => {
                                             const cfg = statusConfig[req.status];
                                             const Icon = cfg.icon;
                                             return (
-                                                <div key={req.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                                <div key={req.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-white/5">
                                                     <div className="flex items-center gap-4">
                                                         <div>
-                                                            <p className="font-bold text-gray-900 text-sm">
+                                                            <p className="font-bold text-gray-900 dark:text-white text-sm">
                                                                 {new Date(req.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} → {new Date(req.end_date + 'T12:00:00').toLocaleDateString('pt-BR')}
                                                             </p>
-                                                            <p className="text-xs text-gray-500">{req.days_requested} dias · Solicitado em {new Date(req.created_at).toLocaleDateString('pt-BR')}</p>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">{req.days_requested} dias · Solicitado em {new Date(req.created_at).toLocaleDateString('pt-BR')}</p>
                                                             {req.response_notes && (
-                                                                <p className="text-xs text-gray-500 mt-1 italic">"{req.response_notes}"</p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">"{req.response_notes}"</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -496,10 +496,10 @@ const EmployeePortal: React.FC = () => {
                         {/* DOCUMENTOS */}
                         {activeSection === 'documents' && (
                             <div className="p-8">
-                                <h3 className="text-xl font-bold text-gray-900 mb-6">Documentos de RH</h3>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Documentos de RH</h3>
 
                                 {documents.length === 0 ? (
-                                    <div className="text-center py-16 text-gray-400">
+                                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">
                                         <DocumentIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
                                         <p className="font-medium">Nenhum documento disponível ainda.</p>
                                         <p className="text-sm">Os documentos de RH aparecerão aqui quando forem publicados.</p>
@@ -514,15 +514,15 @@ const EmployeePortal: React.FC = () => {
                                             };
                                             return (
                                                 <div key={cat}>
-                                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">{catLabels[cat]}</p>
+                                                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 mt-4">{catLabels[cat]}</p>
                                                     <div className="space-y-2">
                                                         {catDocs.map(doc => (
-                                                            <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl hover:bg-gray-50 transition-colors group">
+                                                            <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors group">
                                                                 <div className="flex items-center space-x-3">
-                                                                    <DocumentIcon className="w-5 h-5 text-gray-400 group-hover:text-brand-primary transition-colors" />
+                                                                    <DocumentIcon className="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:text-brand-primary transition-colors" />
                                                                     <div>
-                                                                        <p className="font-medium text-gray-700 text-sm">{doc.name}</p>
-                                                                        {doc.description && <p className="text-xs text-gray-400">{doc.description}</p>}
+                                                                        <p className="font-medium text-gray-700 dark:text-gray-200 text-sm">{doc.name}</p>
+                                                                        {doc.description && <p className="text-xs text-gray-400 dark:text-gray-500">{doc.description}</p>}
                                                                     </div>
                                                                 </div>
                                                                 <button

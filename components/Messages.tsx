@@ -1065,9 +1065,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 return;
             }
 
+            const receiverId = (!selectedConversation?.isGroup && selectedConversation?.participantId) ? selectedConversation.participantId : null;
+
             const { error } = await supabase.from('messages').insert({
                 conversation_id: selectedConversationId,
                 sender_id: currentUser.id,
+                receiver_id: receiverId,
                 company_id: compId,
                 text: textToSend.trim() || (stickerUrl ? 'Figurinha' : ''),
                 file_url: uploadedFileUrl || stickerUrl,

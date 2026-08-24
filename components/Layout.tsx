@@ -6,6 +6,7 @@ import NotificationsPanel from './NotificationsPanel';
 import DebugPanel from './DebugPanel';
 import SystemUpdateNotification from './SystemUpdateNotification';
 import EmailNotifier from './EmailNotifier';
+import { useNotifications } from './NotificationContext';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -61,6 +62,14 @@ const Layout: React.FC<LayoutProps> = ({
     const [isDebugOpen, setDebugOpen] = useState(false);
 
     const isMasterAdmin = currentUser.email === 'ti@grupopixel.com.br';
+
+    // Synchronize currentPage with NotificationContext
+    const { setCurrentPage } = useNotifications();
+    React.useEffect(() => {
+        if (setCurrentPage) {
+            setCurrentPage(currentPage);
+        }
+    }, [currentPage, setCurrentPage]);
 
     // Initial check for mobile
     React.useEffect(() => {

@@ -174,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
             >
                 <div className="relative">
-                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary'} transition-colors`} />
+                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${currentPage === page ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
                     {badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
                             {badgeCount > 99 ? '99+' : badgeCount}
@@ -215,6 +215,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'ticket' || (n.link && n.link.includes('ticket')))).length;
         } else if (menuKey === 'rh') {
             menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'event' || (n.link && (n.link.includes('survey') || n.link.includes('training') || n.link.includes('form'))))).length;
+        } else if (menuKey === 'social') {
+            const feedBadgeCount = notifications.filter(n => {
+                if (n.isRead) return false;
+                const keywords = ['feed', 'like', 'mention'];
+                return keywords.some(k =>
+                    (n.link && n.link.toLowerCase().includes(k)) ||
+                    (n.type && n.type.toLowerCase().includes(k))
+                );
+            }).length;
+            menuBadgeCount = (moduleUnreadCounts['messages'] || 0) + (moduleUnreadCounts['whatspanda'] || 0) + feedBadgeCount;
         }
 
         return (
@@ -233,7 +243,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 >
                     <div className="flex items-center">
                         <div className="relative">
-                            <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300 ${isActive ? 'text-brand-primary' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-500 dark:group-hover:text-brand-primary'} transition-colors`} />
+                            <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300 ${isActive ? 'text-brand-primary' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
                             {menuBadgeCount > 0 && !openMenus[menuKey] && (
                                 <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900 animate-pulse">
                                     {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
@@ -245,8 +255,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     {isOpen && <ChevronDownIcon className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
                 {openMenus[menuKey] && isOpen && (
-                    <div className="pl-4 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-500">
-                        <div className="absolute left-6 top-0 bottom-0 w-px bg-gray-100 dark:bg-white/5" />
+                    <div className="pl-4 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-500 relative">
+                        <div className="absolute left-6 top-0 bottom-0 w-px bg-gray-100 dark:bg-slate-800" />
                         {children}
                     </div>
                 )}
@@ -285,9 +295,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavMenu label="Agenda" icon={CalendarDaysIcon} menuKey="agenda" permission={true} featureId="scheduling">
-                    <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission={true} featureId="scheduling" />
-                    <NavItem page="scheduling-events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="scheduling" />
+                <NavMenu label="Agenda" icon={CalendarDaysIcon} menuKey="agenda" permission={!!currentUser.permissions?.viewScheduling} featureId="scheduling">
+                    <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission="viewScheduling" featureId="scheduling" />
+                    <NavItem page="scheduling-events" label="Eventos" icon={CalendarDaysIcon} permission="viewScheduling" featureId="scheduling" />
                 </NavMenu>
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
