@@ -209,11 +209,9 @@ const BannerFormModal: React.FC<{
                 return;
             }
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('chat-media')
-                .getPublicUrl(fileName);
-
-            finalImageUrl = publicUrl;
+            finalImageUrl = await getSignedStorageUrl(
+            `https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${fileName}`
+        );
         }
 
         onSave({ ...formData, imageUrl: finalImageUrl });
