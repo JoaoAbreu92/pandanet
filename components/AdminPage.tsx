@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee } from '../types';
 import Dashboard from './Dashboard';
 import UserManager from './UserManager';
 import GeneralSettings from './GeneralSettings';
@@ -10,6 +10,7 @@ import TeamManager from './TeamManager';
 import EventsManager from './EventsManager';
 import TrainingManager from './TrainingManager';
 import { GenericManager } from './GenericManager';
+import { supabase } from '../supabaseClient';
 
 interface AdminPageProps {
     company: Company;
@@ -20,6 +21,44 @@ interface AdminPageProps {
 
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
+    const [employees, setEmployees] = useState<Employee[]>([]);
+
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            if (!company?.id) return;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('company_id', company.id);
+
+            if (data) {
+                const mappedEmployees: Employee[] = data.map(p => ({
+                    id: p.id,
+                    name: p.full_name,
+                    email: p.email || '',
+                    role: p.role,
+                    team: p.team,
+                    avatarUrl: p.avatar_url || `https://i.pravatar.cc/150?u=${p.email}`,
+                    joinDate: p.join_date,
+                    birthDate: p.birth_date,
+                    isAdmin: p.is_admin,
+                    isOnline: false,
+                    permissions: p.permissions || {},
+                    company_id: p.company_id,
+                    following: p.following || [],
+                    phone: p.phone,
+                    officeLocation: p.office_location,
+                    bio: p.bio,
+                    sectorManager: p.sector_manager,
+                    employeeManager: p.employee_manager,
+                    coverUrl: p.cover_url
+                }));
+                setEmployees(mappedEmployees);
+            }
+        };
+
+        fetchEmployees();
+    }, [company?.id]);
 
     const handleSetData = (key: keyof Company['data'], value: any) => {
         setCompany({
@@ -64,15 +103,15 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     setBanners={(b) => handleSetData('banners', b)}
                 />;
             case 'users':
-                return <UserManager users={company.data?.employees || []} setUsers={(u) => handleSetData('employees', u)} plan={plan} />;
+                return <UserManager users={employees} setUsers={setEmployees} plan={plan} />;
             case 'teams':
-                return <TeamManager users={company.data?.employees || []} setUsers={(u) => handleSetData('employees', u)} />;
+                return <TeamManager users={employees} setUsers={setEmployees} />;
             case 'forms':
                 return <FormSubmissionsManager submissions={company.data?.formSubmissions || []} setSubmissions={(s) => handleSetData('formSubmissions', s)} />;
             case 'marketplace':
                 return <MarketplaceManager items={company.data?.marketplaceItems || []} setItems={(i) => handleSetData('marketplaceItems', i)} />;
             case 'events':
-                return <EventsManager events={company.data?.events || []} setEvents={(e) => handleSetData('events', e)} employees={company.data?.employees || []} />;
+                return <EventsManager events={company.data?.events || []} setEvents={(e) => handleSetData('events', e)} employees={employees} />;
             case 'training':
                 return <TrainingManager trainings={company.data?.trainings || []} setTrainings={(t) => handleSetData('trainings', t)} />;
             case 'kb':

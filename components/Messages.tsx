@@ -120,7 +120,7 @@ const Messages: React.FC<MessagesProps> = () => {
                     email: p.email || '',
                     role: p.role,
                     team: p.team,
-                    avatarUrl: p.avatar_url,
+                    avatarUrl: p.avatar_url || `https://i.pravatar.cc/150?u=${p.email}`,
                     joinDate: p.join_date,
                     birthDate: p.birth_date,
                     isAdmin: p.is_admin,
@@ -130,7 +130,10 @@ const Messages: React.FC<MessagesProps> = () => {
                     phone: p.phone,
                     officeLocation: p.office_location,
                     bio: p.bio,
-                    company_id: p.company_id
+                    company_id: p.company_id,
+                    sectorManager: p.sector_manager,
+                    employeeManager: p.employee_manager,
+                    coverUrl: p.cover_url
                 }));
                 setCompanyEmployees(employees);
             }
@@ -383,50 +386,66 @@ const Messages: React.FC<MessagesProps> = () => {
 
     const handleStartConversation = async (contactId: string) => {
         try {
-            // Verifica se conversa 1:1 já existe
-            // This is tricky without a direct query. We can check our loaded conversations
-            // But better to check DB. 
-            // For now, let's filter the local list. If we fetched all, it should be there.
-            // A better reliable way:
-            // Call an RPC or do a client side filter on *all* user conversations. Since we fetch all, we can check.
+            setLoading(true);
+            // 1. Verificar se já existe uma conversa 1:1 entre esses usuários
+            // Buscamos conversas onde AMBOS participam
+            const { data: participations, error: partError } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id')
+                .eq('user_id', currentUser.id);
 
-            const contactName = companyEmployees.find(e => e.id === contactId)?.name;
-            const existingByName = conversations.find(c => !c.isGroup && c.participantName === contactName);
+            if (partError) throw partError;
 
-            if (existingByName) {
-                setSelectedConversationId(existingByName.id);
-                setActiveTab('conversations');
-                return;
+            const myConvIds = participations.map(p => p.conversation_id);
+
+            if (myConvIds.length > 0) {
+                const { data: commonPart, error: commonError } = await supabase
+                    .from('conversation_participants')
+                    .select('conversation_id')
+                    .in('conversation_id', myConvIds)
+                    .eq('user_id', contactId)
+                    .single();
+
+                // If found, just select it
+                if (commonPart) {
+                    setSelectedConversationId(commonPart.conversation_id);
+                    setActiveTab('conversations');
+                    setLoading(false);
+                    return;
+                }
             }
 
-            // Criar Nova Conversa
-            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
-
+            // 2. Se não existe, criar nova conversa
             const { data: newConv, error: createError } = await supabase
                 .from('conversations')
                 .insert({
-                    company_id: profileData?.company_id,
+                    company_id: currentUser.company_id,
                     is_group: false,
-                    updated_at: new Date().toISOString() // Assuming existing column or creating one? Schema said `created_at`
+                    last_message: 'Conversa iniciada',
+                    last_message_at: new Date().toISOString()
                 })
                 .select()
                 .single();
 
             if (createError) throw createError;
 
-            // Adicionar Participantes
-            await supabase.from('conversation_participants').insert([
-                { conversation_id: newConv.id, user_id: currentUser.id, company_id: profileData?.company_id },
-                { conversation_id: newConv.id, user_id: contactId, company_id: profileData?.company_id }
+            // 3. Adicionar participantes
+            const { error: partInsertError } = await supabase.from('conversation_participants').insert([
+                { conversation_id: newConv.id, user_id: currentUser.id, company_id: currentUser.company_id },
+                { conversation_id: newConv.id, user_id: contactId, company_id: currentUser.company_id }
             ]);
 
-            await fetchConversations(); // Recarrega lista
+            if (partInsertError) throw partInsertError;
+
+            await fetchConversations();
             setSelectedConversationId(newConv.id);
             setActiveTab('conversations');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao iniciar conversa:', error);
-            alert('Erro ao iniciar conversa.');
+            alert('Erro ao iniciar conversa: ' + (error.message || error));
+        } finally {
+            setLoading(false);
         }
     };
 
