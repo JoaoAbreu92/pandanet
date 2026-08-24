@@ -4,7 +4,7 @@ const pino = require('pino');
 const dotenv = require('dotenv');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
-const fs = require('fs');
+
 const path = require('path');
 
 dotenv.config();
