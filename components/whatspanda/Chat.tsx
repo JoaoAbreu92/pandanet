@@ -546,9 +546,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     const messageText = type === 'text' ? newMessage : '';
     const stickerUrl = type === 'sticker' ? content : null;
+    const isSticker = type === 'sticker';
+    const isEmojiOnly = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\s)+$/.test(messageText);
 
     let messageWithSignature = messageText;
-    if (messageText && useSignature && profile?.name) {
+    if (messageText && useSignature && profile?.name && !isEmojiOnly && !isSticker) {
       messageWithSignature = `${messageText}\n\n*Atenciosamente: ${profile.name}*`;
     }
 
@@ -1062,18 +1064,25 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
                 >
                   <div
-                    className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-5 py-3 shadow-xl relative backdrop-blur-md border ${msg.is_from_customer
-                      ? 'bg-white/90 dark:bg-white/5 text-slate-800 dark:text-white rounded-tl-sm border-slate-100 dark:border-white/10'
-                      : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
+                    className={`p-3 md:p-4 rounded-2xl shadow-sm border ${
+                      msg.is_from_customer
+                      ? 'bg-white dark:bg-white/5 text-slate-800 dark:text-slate-100 rounded-tl-sm border-gray-100 dark:border-white/5'
+                      : (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif'))
+                        ? 'bg-transparent shadow-none border-0 p-0 overflow-visible'
+                        : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
                     }`}
                   >
                     <div className="space-y-2">
                       {(msg.media_type?.includes('image') || msg.media_type === 'sticker') ? (
-                        <div className="relative group">
+                        <div className={`relative group ${(msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) ? 'max-w-[160px] md:max-w-[200px]' : ''}`}>
                           <img 
                             src={msg.media_url || ''} 
                             alt="Mídia" 
-                            className="rounded-xl max-w-full h-auto cursor-pointer border border-white/10 shadow-sm" 
+                            className={`rounded-xl h-auto cursor-pointer border border-white/10 shadow-sm ${
+                              (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                              ? 'border-0 shadow-none' 
+                              : 'max-w-full'
+                            }`}
                             onClick={() => window.open(msg.media_url || '_blank')} 
                           />
                           <a 
@@ -1120,10 +1129,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       ) : null}
 
                       {msg.message_text && (
-                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
+                        <p className={`text-sm font-medium leading-relaxed whitespace-pre-wrap ${
+                          (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                          ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
+                          : ''
+                        }`}>
+                          {msg.message_text}
+                        </p>
                       )}
                     </div>
-                    <div className="flex justify-end items-center gap-1.5 mt-2 opacity-60">
+                    <div className={`flex justify-end items-center gap-1.5 mt-2 opacity-60 ${
+                      (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                      ? 'bg-black/20 dark:bg-white/10 px-2 py-0.5 rounded-full w-fit ml-auto' 
+                      : ''
+                    }`}>
                       <span className="text-[10px] font-medium uppercase tracking-tight">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
