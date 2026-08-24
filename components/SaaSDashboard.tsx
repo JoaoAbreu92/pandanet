@@ -914,7 +914,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {localCompanies.map(comp => {
-                                    const isActive = whatsappStatus.activeCompanyIds.includes(comp.id);
+                                    const isActive = (whatsappStatus.activeCompanyIds || []).includes(comp.id);
                                     return (
                                         <div key={comp.id} className={`p-3 rounded border flex items-center justify-between ${isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
                                             <span className="text-sm font-medium truncate">{comp.name}</span>

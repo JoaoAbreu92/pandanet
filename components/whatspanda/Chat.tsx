@@ -192,16 +192,34 @@ const Chat: React.FC = () => {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="p-3 border-b border-slate-100 bg-white">
+        {/* Search and Actions */}
+        <div className="p-3 border-b border-slate-100 bg-white space-y-3">
           <div className="relative group">
             <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                <input 
-                    type="text" 
+            <input
+              type="text" 
               placeholder="Buscar atendimento..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
-                />
-            </div>
+            />
+          </div>
+          {isAdmin && (
+            <button
+              onClick={async () => {
+                if (window.confirm('Tem certeza? Isso irá apagar todo o histórico de conversas do WhatsPanda!')) {
+                  try {
+                    const { error } = await supabase.from('whatsapp_conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                    if (error) throw error;
+                    alert('Atendimentos limpos com sucesso.');
+                  } catch (err: any) {
+                    alert('Erro ao limpar: ' + err.message);
+                  }
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
+            >
+              LIMPAR ATENDIMENTOS
+            </button>
+          )}
         </div>
 
         {/* Conversations List */}
@@ -219,18 +237,29 @@ const Chat: React.FC = () => {
               )}
 
               <div className="flex justify-between items-start mb-1">
-                <h3 className={`font-bold text-sm truncate pr-2 flex items-center gap-1.5 ${selectedConversation?.id === conv.id ? 'text-emerald-700' : 'text-slate-800'}`}>
-                  {conv.channel?.channel_type === 'instagram' ? (
-                    <Instagram className="w-3.5 h-3.5 text-pink-500" />
-                  ) : conv.channel?.channel_type === 'messenger' ? (
-                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                  ) : conv.channel?.channel_type === 'telegram' ? (
-                    <Send className="w-3.5 h-3.5 text-sky-500" />
-                  ) : (
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
-                  )}
-                  {conv.contact_name || conv.contact_phone}
-                </h3>
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(conv.contact_name || conv.contact_phone || 'User')}&background=random`}
+                      className="w-8 h-8 rounded-full border border-slate-200"
+                      alt={conv.contact_name || conv.contact_phone}
+                    />
+                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-px shadow-sm border border-slate-100">
+                      {conv.channel?.channel_type === 'instagram' ? (
+                        <Instagram className="w-3 h-3 text-pink-500" />
+                      ) : conv.channel?.channel_type === 'messenger' ? (
+                          <MessageCircle className="w-3 h-3 text-blue-500" />
+                        ) : conv.channel?.channel_type === 'telegram' ? (
+                            <Send className="w-3 h-3 text-sky-500" />
+                          ) : (
+                        <Smartphone className="w-3 h-3 text-emerald-500" />
+                      )}
+                    </div>
+                  </div>
+                  <h3 className={`font-bold text-sm truncate ${selectedConversation?.id === conv.id ? 'text-emerald-700' : 'text-slate-800'}`}>
+                    {conv.contact_name || conv.contact_phone}
+                  </h3>
+                </div>
                 <span className={`text-[10px] font-semibold whitespace-nowrap mt-0.5 ${selectedConversation?.id === conv.id ? 'text-emerald-600' : 'text-slate-400'}`}>
                     {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>

@@ -33,6 +33,29 @@ const Channels: React.FC = () => {
 
         fetchSettings();
 
+        // Fallback Polling (3 seconds) to ensure QR gets loaded if Realtime fails
+        let pollingInterval: NodeJS.Timeout;
+
+        if (view === 'qr' && currentId && !isConnected) {
+            pollingInterval = setInterval(async () => {
+                const { data, error } = await supabase
+                    .from('whatsapp_settings')
+                    .select('qr_code, is_connected')
+                    .eq('id', currentId)
+                    .single();
+
+                if (!error && data) {
+                    if (data.qr_code && data.qr_code !== qrCode) {
+                        setQrCode(data.qr_code);
+                    }
+                    if (data.is_connected) {
+                        setIsConnected(true);
+                        setTimeout(() => setView('list'), 2000);
+                    }
+                }
+            }, 3000);
+        }
+
         const subscription = supabase
             .channel(`whatsapp_settings_qr_${companyId}`)
             .on('postgres_changes', {
@@ -57,8 +80,9 @@ const Channels: React.FC = () => {
 
         return () => {
             supabase.removeChannel(subscription);
+            if (pollingInterval) clearInterval(pollingInterval);
         };
-    }, [profile?.company_id, user?.user_metadata?.company_id, currentId, view]);
+    }, [profile?.company_id, user?.user_metadata?.company_id, currentId, view, isConnected, qrCode]);
 
     const fetchSettings = async () => {
         setLoading(true);
