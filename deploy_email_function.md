@@ -6,7 +6,16 @@ Como você está usando um Supabase Self-Hosted (VPS), a função `email-handler
 
 Se você tiver o Deno instalado no VPS, pode rodar o serviço diretamente.
 
-1.  **Instale o Deno** (se não tiver):
+1.  **Instale as dependências (unzip):**
+    ```bash
+    # Debian/Ubuntu
+    apt-get update && apt-get install unzip -y
+    
+    # CentOS/RHEL
+    # yum install unzip -y
+    ```
+
+2.  **Instale o Deno:**
     ```bash
     curl -fsSL https://deno.land/x/install/install.sh | sh
     ```
