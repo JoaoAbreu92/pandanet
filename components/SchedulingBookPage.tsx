@@ -73,6 +73,25 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
 
             setEventType(data);
             setHostProfile(data.profiles);
+
+            // Auto-focus and auto-select specific date if configured
+            if (data.availability?.specific_date) {
+                const [year, month, day] = data.availability.specific_date.split('-').map(Number);
+                if (!isNaN(year) && !isNaN(month)) {
+                    setCurrentMonth(new Date(year, month - 1, 1));
+                    const specDate = new Date(year, month - 1, day);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (specDate >= today) {
+                        setSelectedDate(data.availability.specific_date);
+                        if (data.disable_time_slots) {
+                            setSelectedTime('Dia Inteiro');
+                        } else {
+                            setSelectedTime('');
+                        }
+                    }
+                }
+            }
             
             // Buscar todas as reservas ativas para verificar ocupação de horários e limite de capacidade
             const { data: bookingsData } = await supabase
@@ -126,13 +145,21 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         // Date must be today or future
         if (date < today) return false;
 
-        // Day of week check
-        const dayOfWeek = date.getDay(); // 0: Sunday, 1: Monday...
-        const allowedDays = eventType.availability?.days || [1, 2, 3, 4, 5];
-        if (!allowedDays.includes(dayOfWeek)) return false;
+        // If specific date is set, restrict selectable dates to ONLY that day!
+        if (eventType.availability?.specific_date) {
+            const dateStr = formatLocalDate(date);
+            if (dateStr !== eventType.availability.specific_date) {
+                return false;
+            }
+        } else {
+            // Day of week check
+            const dayOfWeek = date.getDay(); // 0: Sunday, 1: Monday...
+            const allowedDays = eventType.availability?.days || [1, 2, 3, 4, 5];
+            if (!allowedDays.includes(dayOfWeek)) return false;
+        }
 
         // If time slots are disabled (full-day rental), check if already booked
-        if (eventType.disable_time_slots) {
+        if (eventType.disable_time_slots && !eventType.requirements?.allow_multiple_bookings) {
             const dateStr = formatLocalDate(date);
             const isBooked = existingBookings.some(
                 b => b.booking_date === dateStr && b.status !== 'rejected' && b.status !== 'cancelled'
@@ -177,8 +204,8 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                 const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                 
                 // Check if slot is already booked on selectedDate
-                const isTaken = existingBookings.some(
-                    b => b.booking_date === selectedDate && b.booking_time === timeStr
+                const isTaken = !eventType.requirements?.allow_multiple_bookings && existingBookings.some(
+                    b => b.booking_date === selectedDate && b.booking_time === timeStr && b.status !== 'rejected' && b.status !== 'cancelled'
                 );
 
                 if (!isTaken) {

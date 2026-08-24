@@ -862,11 +862,13 @@ export interface SchedulingEventType {
     cnpj?: boolean;
     company_name?: boolean;
     cpf?: boolean;
+    allow_multiple_bookings?: boolean;
   };
   availability: {
     days: number[]; // ex: [1, 2, 3, 4, 5]
     startTime: string; // "09:00"
     endTime: string; // "18:00"
+    specific_date?: string | null;
   };
   is_active: boolean;
   has_capacity_limit: boolean;

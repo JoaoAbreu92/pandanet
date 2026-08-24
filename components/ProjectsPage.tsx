@@ -1118,32 +1118,44 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
 
     // --- TRANSITION FILES & CUSTOM CHECKLISTS ---
     const handleTransitionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !transitionData) return;
+        const files = e.target.files;
+        if (!files || files.length === 0 || !transitionData) return;
+
+        const currentCount = transitionData.uploadedFiles.length;
+        if (currentCount + files.length > 5) {
+            showToast('Você pode anexar no máximo 5 arquivos.', 'error');
+            return;
+        }
 
         setUploadingFile(true);
         try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `task_transition_${transitionData.taskId}_${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const newUploadedFiles = [...transitionData.uploadedFiles];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `task_transition_${transitionData.taskId}_${Date.now()}_${i}.${fileExt}`;
+                const filePath = `${fileName}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('feed-media')
-                .upload(filePath, file);
+                const { error: uploadError } = await supabase.storage
+                    .from('feed-media')
+                    .upload(filePath, file);
 
-            if (uploadError) throw uploadError;
+                if (uploadError) throw uploadError;
 
-            const { data } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+                const { data } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+                newUploadedFiles.push({ name: file.name, url: data.publicUrl });
+            }
 
             setTransitionData(prev => prev ? {
                 ...prev,
-                uploadedFiles: [...prev.uploadedFiles, { name: file.name, url: data.publicUrl }]
+                uploadedFiles: newUploadedFiles
             } : null);
-            showToast('Arquivo enviado com sucesso!', 'success');
+            showToast(files.length > 1 ? 'Arquivos enviados com sucesso!' : 'Arquivo enviado com sucesso!', 'success');
         } catch (err: any) {
             showToast('Erro ao enviar arquivo: ' + err.message, 'error');
         } finally {
             setUploadingFile(false);
+            e.target.value = '';
         }
     };
 
@@ -2755,7 +2767,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                             
                                             {timerState ? (
                                                 timerState.taskId === selectedTask?.id ? (
-                                                    <div className="flex flex-col items-center justify-center py-4 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl space-y-3 relative overflow-hidden">
+                                                    <div className="flex flex-col items-center justify-center py-4 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl space-y-3 relative">
                                                         {timerState.isPaused && (
                                                             <div className="absolute top-1.5 left-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">
                                                                 Pausado ({timerState.pauseReason})
@@ -3017,14 +3029,29 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                                                         {(() => {
                                                                             if (item.content.startsWith('[ARQUIVO]')) {
                                                                                 const filePart = item.content.replace('[ARQUIVO]', '').trim();
-                                                                                const [fileName, fileUrl] = filePart.split('|');
+                                                                                const parts = filePart.split('|');
+                                                                                const fileName = parts[0];
+                                                                                const fileUrl = parts[1] || fileName;
+                                                                                
+                                                                                let downloadUrl = fileUrl;
+                                                                                if (downloadUrl && !downloadUrl.startsWith('http')) {
+                                                                                    downloadUrl = supabase.storage.from('feed-media').getPublicUrl(downloadUrl).data.publicUrl;
+                                                                                }
+
                                                                                 return (
                                                                                     <div className="flex flex-col gap-1.5 p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl mt-1 text-[11px]">
                                                                                         <div className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
                                                                                             <PaperClipIcon className="w-3.5 h-3.5" />
                                                                                             <span>Arquivo de Transição Anexado</span>
                                                                                         </div>
-                                                                                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-800 dark:text-slate-200 underline font-medium break-all hover:text-brand-primary">
+                                                                                        <a 
+                                                                                            href={downloadUrl} 
+                                                                                            download={fileName || 'arquivo'}
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                            target="_blank" 
+                                                                                            rel="noopener noreferrer" 
+                                                                                            className="text-slate-800 dark:text-slate-200 underline font-medium break-all hover:text-brand-primary"
+                                                                                        >
                                                                                             {fileName || 'Download do arquivo'}
                                                                                         </a>
                                                                                     </div>
@@ -3184,7 +3211,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                             {/* Files Section */}
                             <div className="space-y-3 pt-4 border-t dark:border-slate-800">
                                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">
-                                    Anexar Arquivos para o Próximo Setor
+                                    Anexar Arquivos para o Próximo Setor (Máx. 5)
                                 </label>
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
                                     Formatos aceitos: PDF, DOC, Planilhas, PNG, JPEG.
@@ -3193,9 +3220,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                 <div className="flex items-center gap-3">
                                     <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-150 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-750 dark:text-slate-200 rounded-xl cursor-pointer text-xs font-bold transition-all border dark:border-slate-700">
                                         <PaperClipIcon className="w-4 h-4" />
-                                        <span>{uploadingFile ? 'Enviando...' : 'Selecionar Arquivo'}</span>
+                                        <span>{uploadingFile ? 'Enviando...' : 'Selecionar Arquivos'}</span>
                                         <input
                                             type="file"
+                                            multiple
                                             className="hidden"
                                             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                                             onChange={handleTransitionFileUpload}

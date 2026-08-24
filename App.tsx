@@ -273,7 +273,9 @@ const AppContent: React.FC = () => {
         const loadInitialData = async () => {
             if (currentUser) {
                 const userEmail = currentUser.email.toLowerCase();
-                setCompanyLoading(true);
+                if (!companyData) {
+                    setCompanyLoading(true);
+                }
                 setInitError(null);
 
                 try {
@@ -414,7 +416,7 @@ const AppContent: React.FC = () => {
             }
         };
         loadInitialData();
-    }, [currentUser]);
+    }, [currentUser?.id, currentUser?.company_id]);
 
     // Sync Online Status
     useEffect(() => {

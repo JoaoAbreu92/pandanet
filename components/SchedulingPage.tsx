@@ -67,12 +67,14 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             phone: true,
             cnpj: false,
             company_name: false,
-            cpf: false
+            cpf: false,
+            allow_multiple_bookings: false
         },
         availability: {
             days: [1, 2, 3, 4, 5],
             startTime: '09:00',
-            endTime: '18:00'
+            endTime: '18:00',
+            specific_date: null as string | null
         },
         is_active: true,
         has_capacity_limit: false,
@@ -602,8 +604,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             fetchEventTypes();
             setEventForm({
                 name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
-                requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
-                availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
+                requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false },
+                availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00', specific_date: null },
                 is_active: true,
                 has_capacity_limit: false,
                 capacity_limit: 0,
@@ -634,12 +636,14 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                 phone: event.requirements?.phone ?? true,
                 cnpj: event.requirements?.cnpj ?? false,
                 company_name: event.requirements?.company_name ?? false,
-                cpf: event.requirements?.cpf ?? false
+                cpf: event.requirements?.cpf ?? false,
+                allow_multiple_bookings: event.requirements?.allow_multiple_bookings ?? false
             },
             availability: {
                 days: event.availability?.days ?? [1, 2, 3, 4, 5],
                 startTime: event.availability?.startTime ?? '09:00',
-                endTime: event.availability?.endTime ?? '18:00'
+                endTime: event.availability?.endTime ?? '18:00',
+                specific_date: event.availability?.specific_date ?? null
             },
             is_active: event.is_active,
             has_capacity_limit: event.has_capacity_limit ?? false,
@@ -926,8 +930,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                     setEditingEvent(null);
                                     setEventForm({
                                         name: '', slug: '', description: '', duration: mode === 'events' ? 1 : 30, duration_unit: mode === 'events' ? 'days' : 'minutes', disable_time_slots: mode === 'events' ? true : false, is_paid: false, price: 0,
-                                        requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
-                                        availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
+                                        requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false },
+                                        availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00', specific_date: null },
                                         is_active: true,
                                         has_capacity_limit: false,
                                         capacity_limit: 0,
@@ -1452,10 +1456,10 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block">Duração *</label>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 max-w-md">
                                         <input 
                                             type="number" 
                                             required 
@@ -1475,45 +1479,16 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                         </select>
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">É pago? *</label>
-                                    {isSchedulingLimited ? (
-                                        <div className="w-full bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-semibold flex flex-col justify-center">
-                                            <span>Não (Gratuito) 🔒</span>
-                                            <span className="text-[9px] text-amber-500 font-black mt-1">Cobranças exigem o plano completo.</span>
-                                        </div>
-                                    ) : (
-                                        <select 
-                                            value={eventForm.is_paid ? 'true' : 'false'}
-                                            onChange={e => setEventForm({ ...eventForm, is_paid: e.target.value === 'true' })}
-                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
-                                        >
-                                            <option value="false">Não (Gratuito)</option>
-                                            <option value="true">Sim (Pago)</option>
-                                        </select>
-                                    )}
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Valor de Reserva (R$)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        disabled={!eventForm.is_paid}
-                                        value={eventForm.price}
-                                        onChange={e => setEventForm({ ...eventForm, price: Number(e.target.value) })}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary disabled:opacity-50"
-                                    />
-                                </div>
                             </div>
 
-                            {/* Option to disable time slots (hourly booking) */}
-                            {mode !== 'events' && (
+                            {/* Option to disable time slots (hourly booking) & Allow multiple bookings */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-0.5 pr-2">
                                         <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Reserva por Dia Inteiro / Múltiplos Dias</label>
                                         <p className="text-[10px] text-slate-500 dark:text-slate-400">Desativa a seleção de horários no calendário. O convidado reserva o dia todo (ou dias inteiros).</p>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                                         <input 
                                             type="checkbox" 
                                             checked={eventForm.disable_time_slots}
@@ -1523,7 +1498,26 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
                                     </label>
                                 </div>
-                            )}
+
+                                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                    <div className="space-y-0.5 pr-2">
+                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Permitir Múltiplos Agendamentos</label>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Permite várias pessoas agendadas no mesmo dia e horário (ex: aluguel coletivo, eventos, etc.).</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.requirements.allow_multiple_bookings || false}
+                                            onChange={e => setEventForm({ 
+                                                ...eventForm, 
+                                                requirements: { ...eventForm.requirements, allow_multiple_bookings: e.target.checked } 
+                                            })}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                                    </label>
+                                </div>
+                            </div>
 
                             {/* Requirements Checklist */}
                             <div className="space-y-2">
@@ -1569,7 +1563,34 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                         />
                                         <span>CNPJ</span>
                                     </label>
+                                    <label className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.requirements.cpf} 
+                                            onChange={e => setEventForm({ 
+                                                ...eventForm, 
+                                                requirements: { ...eventForm.requirements, cpf: e.target.checked } 
+                                            })}
+                                            className="rounded text-brand-primary focus:ring-brand-primary" 
+                                        />
+                                        <span>CPF</span>
+                                    </label>
                                 </div>
+                            </div>
+
+                            {/* Specific Event Date Option */}
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Data Específica do Evento (Opcional)</label>
+                                <input 
+                                    type="date"
+                                    value={eventForm.availability.specific_date || ''}
+                                    onChange={e => setEventForm({ 
+                                        ...eventForm, 
+                                        availability: { ...eventForm.availability, specific_date: e.target.value || null } 
+                                    })}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                />
+                                <p className="text-[10px] text-slate-500">Se preenchido, os clientes só poderão selecionar este dia específico no calendário público.</p>
                             </div>
 
                             {/* Hours and active state */}
