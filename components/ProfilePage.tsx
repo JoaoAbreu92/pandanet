@@ -4,6 +4,7 @@ import { PencilIcon } from './icons';
 import type { Employee, Post } from '../types';
 import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface ProfilePageProps {
     userId?: string;
@@ -23,6 +24,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [loading, setLoading] = useState(false);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     const [isFollowLoading, setIsFollowLoading] = useState(false);
+    const { refreshProfile } = useAuth();
 
     const isOwnProfile = !userId || userId === currentUser.id;
 
@@ -299,6 +301,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             if (error) throw error;
 
             console.log('Database updated successfully');
+            await refreshProfile(); // Sync global state
             onUpdateUser({ ...currentUser, following: newFollowing });
 
             // If it's the target user profile, update it locally too to reflect follower count if we had one

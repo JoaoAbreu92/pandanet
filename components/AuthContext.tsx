@@ -10,6 +10,7 @@ interface AuthContextType {
     currentUser: Employee | null;
     loading: boolean;
     signOut: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
     currentUser: null,
     loading: true,
     signOut: async () => { },
+    refreshProfile: async () => { },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -40,6 +42,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const isMaster = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
                 if (isMaster) {
                     console.log("Profile not found for Master Admin, using fallback.");
+
+                    // Try to find the company ID for groupopixel.com.br
+                    let targetId = undefined;
+                    try {
+                        const { data: comp } = await supabase.from('companies').select('id').eq('domain', 'grupopixel.com.br').single();
+                        if (comp) targetId = comp.id;
+                    } catch (e) { }
+
                     const masterAdmin: Employee = {
                         id: userId,
                         name: 'Master TI',
@@ -51,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         birthDate: new Date().toISOString(),
                         isAdmin: true,
                         isOnline: true,
+                        company_id: targetId,
                         permissions: {
                             viewMessages: true, viewCalendar: true, useMarketplace: true,
                             canPostText: true, canPostImage: true, canPostVideo: true,
@@ -96,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     joinDate: data.join_date || new Date().toISOString(),
                     birthDate: data.birth_date || new Date().toISOString(),
                     isAdmin: isMasterAdmin ? true : (data.is_admin || false),
-                    isOnline: true, // Isso seria em tempo real em um app completo
+                    isOnline: true,
                     permissions: (isMasterAdmin || data.is_company_admin || data.is_admin) ? {
                         ...defaultAdminPermissions,
                         ...(data.permissions || {})
@@ -115,19 +126,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const refreshProfile = async () => {
+        if (user) {
+            await fetchProfile(user.id, user.email);
+        }
+    };
+
     useEffect(() => {
-        // Obter sessão inicial
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
-                fetchProfile(session.user.id, session.user.email);
+                fetchProfile(session.user.id, session.user.email).finally(() => setLoading(false));
             } else {
                 setLoading(false);
             }
         });
 
-        // Ouvir por mudanças na autenticação
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
@@ -150,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, currentUser: profile, loading, signOut }}>
+        <AuthContext.Provider value={{ session, user, profile, currentUser: profile, loading, signOut, refreshProfile }}>
             {!loading && children}
         </AuthContext.Provider>
     );

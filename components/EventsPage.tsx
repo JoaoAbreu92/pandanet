@@ -181,36 +181,71 @@ const EventsPage: React.FC = () => {
 
     const handleCreateEvent = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser?.company_id) return;
+        if (!currentUser?.company_id) {
+            alert("Erro: Empresa não identificada.");
+            return;
+        }
+
+        if (!newEvent.date || !newEvent.start_time) {
+            alert("Por favor, preencha a data e o horário.");
+            return;
+        }
 
         try {
-            const { error } = await supabase
+            // Use local date string to avoid timezone issues when possible, or just build ISO
+            const isoStart = new Date(`${newEvent.date}T${newEvent.start_time}:00`).toISOString();
+
+            const { data: createdEvent, error } = await supabase
                 .from('events')
                 .insert([{
-                    ...newEvent,
+                    title: newEvent.title,
+                    description: newEvent.description,
+                    date: newEvent.date,
+                    start_time: isoStart,
+                    end_time: isoStart,
+                    location: newEvent.location,
+                    category: newEvent.category,
+                    imageUrl: newEvent.imageUrl,
                     company_id: currentUser.company_id,
                     attendees: [],
                     invited_ids: [],
-                    declined: [],
-                    start_time: new Date(`${newEvent.date}T${newEvent.start_time}:00Z`).toISOString(),
-                    end_time: new Date(`${newEvent.date}T${newEvent.start_time}:00Z`).toISOString(), // Default to same as start for now if not provided
-                }]);
+                    declined: []
+                }])
+                .select()
+                .single();
 
             if (error) throw error;
+
+            console.log('Evento criado com sucesso!');
             setIsCreateModalOpen(false);
-            setNewEvent({
-                title: '',
-                description: '',
-                date: '',
-                start_time: '09:00',
-                location: '',
-                category: 'Corporativo',
-                imageUrl: ''
-            });
+
+            // Notify everyone in the company (simple approach for now)
+            // In a large company, this might be slow or should be a background task
+            // We'll only notify if it's a public/social event.
+            if (['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(newEvent.category)) {
+                // Fetch employees to notify
+                const { data: emps } = await supabase.from('profiles').select('id').eq('company_id', currentUser.company_id);
+                if (emps) {
+                    for (const emp of emps) {
+                        if (emp.id !== currentUser.id) {
+                            addNotification({
+                                user_id: emp.id,
+                                company_id: currentUser.company_id,
+                                type: 'event',
+                                title: 'Novo Evento Agendado!',
+                                description: `Participe de: ${newEvent.title}`,
+                                link: '/events'
+                            });
+                        }
+                    }
+                }
+            }
+
+            setNewEvent({ title: '', description: '', date: '', start_time: '09:00', location: '', category: 'Corporativo', imageUrl: '' });
             fetchEvents();
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error creating event:", err);
-            alert("Erro ao criar evento.");
+            alert("Erro ao criar evento: " + (err.message || "Erro desconhecido"));
         }
     };
 

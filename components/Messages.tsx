@@ -237,6 +237,7 @@ const Messages: React.FC<MessagesProps> = () => {
                         id: conv.id,
                         participantName: displayName,
                         participantAvatarUrl: displayAvatar,
+                        participantId: otherPart?.user_id, // Added this line!
                         lastMessage: conv.last_message || 'Inicie a conversa',
                         unreadCount: 0,
                         messages: [],
