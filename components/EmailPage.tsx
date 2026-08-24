@@ -24,7 +24,8 @@ import {
     ArrowUturnLeftIcon,
     ArrowRightOnRectangleIcon,
     ExclamationTriangleIcon, XMarkIcon,
-    PaperClipIcon, ArrowDownTrayIcon
+    PaperClipIcon, ArrowDownTrayIcon,
+    Bars3Icon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
@@ -110,7 +111,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // --- State: Navigation & Layout ---
     const [view, setView] = useState<'inbox' | 'compose' | 'settings' | 'read'>('inbox');
     const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
-    const [sidebarOpen, setSidebarOpen] = useState(true); // For responsive toggle
+    const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768); // Auto-hide on mobile
     const [isFullScreen, setIsFullScreen] = useState(false); // New Full Screen Mode
 
     // --- State: Data ---
@@ -1072,7 +1073,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // --- Render ---
 
     return (
-        <div className="flex bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl h-[calc(100vh-6rem)] rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500">
+        <div className="flex bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl h-[calc(100vh-6rem)] rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500 relative">
+            {/* --- Mobile Sidebar Overlay --- */}
+            {sidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 md:hidden transition-opacity"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
             {/* --- Left Sidebar (Folders) --- */}
             <div className={`w-64 bg-white dark:bg-slate-900 md:bg-gray-50/50 md:dark:bg-transparent border-r border-gray-100 dark:border-white/5 flex flex-col transition-all duration-500 absolute z-30 h-full md:relative ${sidebarOpen && !(view === 'read' && isFullScreen) ? 'translate-x-0 ml-0' : '-translate-x-full md:translate-x-0 -ml-64 md:ml-0'} ${(view === 'read' && isFullScreen) ? 'md:-ml-64' : ''}`}>
                 <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
@@ -1096,7 +1104,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     <nav className="space-y-1">
                         {/* Always show INBOX first */}
                         <button
-                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); setPage(1); }} 
+                            onClick={() => { 
+                                setView('inbox'); 
+                                setCurrentFolder('INBOX'); 
+                                setFilterTag(null); 
+                                setPage(1); 
+                                if (window.innerWidth < 768) setSidebarOpen(false);
+                            }} 
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, 'INBOX')}
                             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
@@ -1128,7 +1142,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 return (
                                     <button
                                         key={folder.path}
-                                        onClick={() => { setView('inbox'); setCurrentFolder(folder.path); setFilterTag(null); setPage(1); }}
+                                        onClick={() => { 
+                                            setView('inbox'); 
+                                            setCurrentFolder(folder.path); 
+                                            setFilterTag(null); 
+                                            setPage(1); 
+                                            if (window.innerWidth < 768) setSidebarOpen(false);
+                                        }}
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDrop(e, folder.path)}
                                         style={{ paddingLeft: `${16 + paddingLeft}px` }}
@@ -1159,7 +1179,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         {availableTags.map(tag => (
                             <button 
                                 key={tag.id}
-                                onClick={() => { setView('inbox'); setFilterTag(tag.label); setPage(1); }}
+                                onClick={() => { 
+                                    setView('inbox'); 
+                                    setFilterTag(tag.label); 
+                                    setPage(1); 
+                                    if (window.innerWidth < 768) setSidebarOpen(false);
+                                }}
                                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${filterTag === tag.label ? 'bg-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                             >
                                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
@@ -1193,6 +1218,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     <div className="p-4 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-white/50 dark:bg-[#020617]/60 backdrop-blur-xl z-20 sticky top-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
+                                {!sidebarOpen && (
+                                    <button 
+                                        onClick={() => setSidebarOpen(true)} 
+                                        className="md:hidden p-1.5 -ml-1 text-gray-400 hover:bg-gray-100 rounded-lg"
+                                        title="Menu"
+                                    >
+                                        <Bars3Icon className="w-5 h-5" />
+                                    </button>
+                                )}
                                 {isSelectionMode ? (
                                     <input
                                         type="checkbox"

@@ -213,7 +213,7 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
         // Verificar conexão no banco garantindo que pertence à empresa (Multi-tenancy check)
         const { data: settings, error } = await supabase
             .from('whatsapp_settings')
-            .select('id, instance_name, company_id')
+            .select('id, company_id')
             .eq('id', connectionId)
             .eq('company_id', companyId) // CRITICAL: Security re-check
             .maybeSingle();
@@ -228,7 +228,7 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
             return res.status(403).json({ error: 'Você não tem permissão para sincronizar esta conexão ou ela não existe.' });
         }
 
-        const instanceName = settings.instance_name || `conn_${connectionId}`;
+        const instanceName = `conn_${connectionId}`;
         
         // Disparar sincronização em background
         syncEvolutionData(instanceName, companyId, connectionId).catch(err => {
