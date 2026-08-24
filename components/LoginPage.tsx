@@ -70,12 +70,14 @@ const LoginPage: React.FC = () => {
                         .ilike('domain', targetDomain)
                         .maybeSingle();
 
+                    let wasJustCreated = false;
+
                     // 2. If not found, create it (matching user's requirement: first user creates company)
-                    if (!companyData && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com'].includes(targetDomain)) {
+                    if (!companyData && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'].includes(targetDomain)) {
                         const { data: newCompany, error: createError } = await supabase
                             .from('companies')
                             .insert({
-                                name: initcap(targetDomain.split('.')[0]),
+                                name: targetDomain.split('.')[0].charAt(0).toUpperCase() + targetDomain.split('.')[0].slice(1),
                                 domain: targetDomain,
                                 status: 'active',
                                 responsible_email: email
@@ -85,18 +87,20 @@ const LoginPage: React.FC = () => {
                         
                         if (!createError) {
                             companyData = newCompany;
+                            wasJustCreated = true;
                         } else {
                             console.error("Error auto-creating company:", createError);
                         }
                     }
 
                     // 3. Update profile with company and status
-                    const isFirstUser = !!companyData && !['gmail.com', 'hotmail.com'].includes(targetDomain);
+                    // ONLY the very first user who triggered the creation of the company becomes the admin
+                    const isFirstUser = wasJustCreated;
                     const { error: updateError } = await supabase
                         .from('profiles')
                         .update({
                             company_id: companyData?.id || null,
-                            status: 'pending',
+                            status: 'pending', // Requer aprovação do admin real
                             role: isFirstUser ? 'admin' : 'employee',
                             is_company_admin: isFirstUser
                         })
