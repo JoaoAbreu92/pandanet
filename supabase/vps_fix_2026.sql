@@ -333,7 +333,52 @@ FOR ALL USING (
 -- Ensure execute permissions
 GRANT EXECUTE ON FUNCTION public.update_user_profile(UUID, TEXT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN, JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, INTEGER, BOOLEAN, JSONB, JSONB, UUID, UUID, BOOLEAN, BOOLEAN, BOOLEAN) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.create_user_admin(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN, JSONB, TEXT, UUID, TEXT, TEXT, BOOLEAN, INTEGER, BOOLEAN, JSONB, JSONB, DATE, UUID, UUID, BOOLEAN) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.delete_user_admin(UUID) TO authenticated, service_role;;
+GRANT EXECUTE ON FUNCTION public.delete_user_admin(UUID) TO authenticated, service_role;
+
+-- 4. VIEW DE AGENDAMENTOS PARA ACESSO PÚBLICO (CAL.COM CLONE)
+-- Permite que usuários não autenticados vejam apenas data, horário e status dos agendamentos para fins de disponibilidade
+CREATE OR REPLACE VIEW public.scheduling_booked_slots AS
+SELECT id, event_type_id, booking_date, booking_time, status
+FROM public.scheduling_bookings;
+
+ALTER VIEW public.scheduling_booked_slots OWNER TO postgres;
+GRANT SELECT ON public.scheduling_booked_slots TO anon, authenticated;
+
+-- 5. TABELA DE NOTAS PESSOAIS (BLOCO DE NOTAS)
+CREATE TABLE IF NOT EXISTS public.personal_notes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL DEFAULT 'Nova Nota',
+    content TEXT NOT NULL DEFAULT '',
+    category VARCHAR(100) NOT NULL DEFAULT 'Geral',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Habilitar RLS (Row Level Security)
+ALTER TABLE public.personal_notes ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS
+DROP POLICY IF EXISTS "Users can manage their own personal notes" ON public.personal_notes;
+CREATE POLICY "Users can manage their own personal notes" 
+ON public.personal_notes 
+FOR ALL 
+USING (
+    auth.uid() = user_id 
+    OR EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE profiles.id = auth.uid() 
+        AND (profiles.role = 'Super Admin' OR profiles.email = 'ti@grupopixel.com.br')
+    )
+)
+WITH CHECK (
+    auth.uid() = user_id 
+    OR EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE profiles.id = auth.uid() 
+        AND (profiles.role = 'Super Admin' OR profiles.email = 'ti@grupopixel.com.br')
+    )
+);
 
 -- Force Schema Cache Reload (Standard trick)
 NOTIFY pgrst, 'reload schema';

@@ -11,6 +11,13 @@ import {
 } from './icons';
 import type { SchedulingEventType, SchedulingBooking } from '../types';
 
+const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 interface SchedulingBookPageProps {
     eventTypeId?: string;
     isPublic?: boolean;
@@ -69,7 +76,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             
             // Buscar todas as reservas ativas para verificar ocupação de horários e limite de capacidade
             const { data: bookingsData } = await supabase
-                .from('scheduling_bookings')
+                .from('scheduling_booked_slots')
                 .select('*')
                 .eq('event_type_id', eventTypeId)
                 .neq('status', 'rejected')
@@ -126,7 +133,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
 
         // If time slots are disabled (full-day rental), check if already booked
         if (eventType.disable_time_slots) {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(date);
             const isBooked = existingBookings.some(
                 b => b.booking_date === dateStr && b.status !== 'rejected' && b.status !== 'cancelled'
             );
@@ -186,7 +193,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
     };
 
     const handleDateSelect = (date: Date) => {
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = formatLocalDate(date);
         setSelectedDate(dateStr);
         if (eventType?.disable_time_slots) {
             setSelectedTime('Dia Inteiro');
@@ -230,7 +237,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             // Verificar limite de capacidade atualizado antes de confirmar
             if (eventType.has_capacity_limit) {
                 const { data: latestBookings, error: countErr } = await supabase
-                    .from('scheduling_bookings')
+                    .from('scheduling_booked_slots')
                     .select('id')
                     .eq('event_type_id', eventType.id)
                     .neq('status', 'rejected')
@@ -427,7 +434,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                                     {days.map((day, idx) => {
                                         if (!day) return <div key={`empty-${idx}`} />;
                                         const isAvailable = isDateAvailable(day);
-                                        const isSelected = selectedDate === day.toISOString().split('T')[0];
+                                        const isSelected = selectedDate === formatLocalDate(day);
                                         return (
                                             <button
                                                 key={`day-${idx}`}
