@@ -18,10 +18,10 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY || '';
 const supabase = createClient(internalSupabaseUrl, supabaseKey.trim());
 
 async function run() {
-  console.log('=== INSPECCIONANDO COLUNAS DE whatsapp_quick_messages ===');
+  console.log('=== INSPECCIONANDO COLUNAS DE whatsapp_messages ===');
   try {
     const { data, error } = await supabase
-      .from('whatsapp_quick_messages')
+      .from('whatsapp_messages')
       .select('*')
       .limit(1);
       
@@ -37,7 +37,7 @@ async function run() {
     // Também consultar via RPC se possível, ou ver information_schema
     const { data: cols, error: colsErr } = await supabase
       .rpc('exec_sql', {
-        sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_quick_messages';"
+        sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_messages';"
       });
       
     if (colsErr) {
