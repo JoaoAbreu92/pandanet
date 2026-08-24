@@ -130,6 +130,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     });
     const [emails, setEmails] = useState<EmailMessage[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     // Tracks the saved imap_user (from DB), NOT the form input — prevents fetchEmails from firing on every keystroke
     const [savedImapUser, setSavedImapUser] = useState('');
@@ -310,10 +311,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     // Calls the Node.js email server (bypasses Deno edge function which cannot do TLS/IMAP)
-    // @ts-ignore
-    const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
-    // @ts-ignore
-        `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
+    const EMAIL_SERVER_URL = "/api/email";
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -880,7 +878,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     to: toTags.join(', '),
                     subject: composeSubject,
                     text: composeBody.replace(/<[^>]*>?/gm, ''),
-                    html: composeBody
+                    html: composeBody,
+                    attachments: attachments
                 }
             });
 
@@ -897,6 +896,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const sendEmail = async () => {
+        if (isSending) return;
+        setIsSending(true);
         setLoading(true);
         try {
             const finalTo = toTags.join(', ');
@@ -907,6 +908,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             const plainBody = composeBody.replace(/<[^>]*>/g, '').trim();
             if (!plainBody && !composeSubject.trim()) {
                 showToast('O assunto ou o corpo do e-mail deve ser preenchido.', 'error');
+                setIsSending(false);
                 setLoading(false);
                 return;
             }
@@ -950,11 +952,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setView('inbox');
         } catch (err: any) {
             console.error("Send Email Error:", err);
-            if (err.message?.includes('413')) {
-                showToast('Erro: O e-mail é muito grande (imagens ou anexos). Tente reduzir o tamanho.', 'error');
-            } else {
-                showToast('Erro ao enviar o e-mail: Verifique se as configurações de SMTP estão corretas.', 'error');
-            }
+            showToast('Erro ao enviar e-mail: ' + (err.message || 'Falha na comunicação com o servidor'), 'error');
             showToast('Sua mensagem está sendo salva em Rascunhos para segurança.', 'info');
 
             // Backup save as draft
@@ -1845,11 +1843,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                         </button>
                                         <button
                                             onClick={sendEmail}
-                                            disabled={loading}
-                                            className="px-8 py-2.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-emerald-600 shadow-lg hover:shadow-emerald-200 active:scale-95 transition-all flex items-center gap-2"
+                                            disabled={loading || isSending}
+                                            className={`px-8 py-2.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-emerald-600 shadow-lg hover:shadow-emerald-200 active:scale-95 transition-all flex items-center gap-2 ${isSending ? 'opacity-70 cursor-not-allowed' : ''}`}
                                         >
-                                            <PaperAirplaneIcon className="w-4 h-4" />
-                                            {loading ? t('email.sending') : t('email.send')}
+                                            {isSending ? (
+                                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <PaperAirplaneIcon className="w-4 h-4" />
+                                            )}
+                                            {isSending ? t('email.sending') : t('email.send')}
                                         </button>
                                     </div>
                                 </div>

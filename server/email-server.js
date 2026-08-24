@@ -393,7 +393,7 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
 // --- ATTACHMENT DOWNLOAD ---
 app.post('/api/email/attachment', authMiddleware, async (req, res) => {
     const { config, uid, path, attachmentId } = req.body;
-    if (!config || !uid || !attachmentId === undefined) return res.status(400).json({ error: 'Missing parameters' });
+    if (!config || !uid || attachmentId === undefined) return res.status(400).json({ error: 'Missing parameters' });
 
     try {
         const client = await getPooledClient(config);
