@@ -302,8 +302,9 @@ const Channels: React.FC = () => {
             if (res.ok && jsonResp?.pairingCode) {
                 addDebugLog(`Código de Pareamento gerado: ${jsonResp.pairingCode}`, 'success');
                 setPairingCode(jsonResp.pairingCode);
-                // Atualizar o número no input
+                // Atualizar o número no input e atualizar lista de conexões
                 setPairingNumberInput(cleanNumber);
+                await fetchSettings();
             } else {
                 addDebugLog(`Erro ao gerar código de pareamento: ${JSON.stringify(jsonResp)}`, 'error');
                 const errMsg = jsonResp?.error || jsonResp?.message || 'Erro desconhecido';

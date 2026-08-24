@@ -42,6 +42,24 @@ function addDebugLog(type, message, details = null) {
 }
 global.addDebugLog = addDebugLog;
 
+// Helper to fetch with timeout (default 15 seconds) to prevent infinite hangs
+async function fetchWithTimeout(url, options = {}, timeout = 15000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        throw error;
+    }
+}
+
+
 app.set('trust proxy', 1);
 
 // --- Security Middlewares ---
@@ -463,21 +481,21 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
   console.log(`[START] Requisitando Evolution para ${instanceName} (pairingNumber: ${pairingNumber || 'none'})...`);
 
   try {
-    // 1. Tenta apagar a instância se já existir para forçar um recomeço limpo
-    await fetch(`${evoUrl}/instance/logout/${instanceName}`, {
+    // 1. Tenta apagar a instância se já existir para forçar um recomeço limpo (com timeout de 15s)
+    await fetchWithTimeout(`${evoUrl}/instance/logout/${instanceName}`, {
        method: 'DELETE',
        headers: { 'apikey': evoKey }
     }).catch(() => {});
 
-    await fetch(`${evoUrl}/instance/delete/${instanceName}`, {
+    await fetchWithTimeout(`${evoUrl}/instance/delete/${instanceName}`, {
        method: 'DELETE',
        headers: { 'apikey': evoKey }
     }).catch(() => {});
 
     const isPairing = !!pairingNumber;
 
-    // 2. Cria a instância com webhooks apontando para nós
-    const createReq = await fetch(`${evoUrl}/instance/create`, {
+    // 2. Cria a instância com webhooks apontando para nós (com timeout de 15s)
+    const createReq = await fetchWithTimeout(`${evoUrl}/instance/create`, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -493,12 +511,19 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
     console.log('[EVOLUTION] Instância criada/buscada:', createRes);
 
     if (createReq.ok || createRes?.instance?.status) {
-        // Reset connection status in Supabase
-        await supabase.from('whatsapp_settings').update({ 
+        // Reset connection status in Supabase and update phone number if pairing is requested
+        const resetData = { 
             is_connected: false, 
             qr_code: null,
             pairing_code: null 
-        }).eq('id', connectionId);
+        };
+        if (isPairing) {
+            const cleanNumber = pairingNumber.replace(/\D/g, '');
+            resetData.phone_number = cleanNumber;
+            console.log(`[START] Atualizando número de telefone no banco para pareamento: ${cleanNumber}`);
+        }
+
+        await supabase.from('whatsapp_settings').update(resetData).eq('id', connectionId);
 
         if (isPairing) {
             const cleanNumber = pairingNumber.replace(/\D/g, '');
@@ -507,7 +532,7 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
             // Aguarda 2 segundos para o Evolution registrar a instância de forma limpa antes de gerar o código
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const connectReq = await fetch(`${evoUrl}/instance/connect/${instanceName}?number=${cleanNumber}`, {
+            const connectReq = await fetchWithTimeout(`${evoUrl}/instance/connect/${instanceName}?number=${cleanNumber}`, {
                 method: 'GET',
                 headers: { 'apikey': evoKey }
             });
@@ -530,7 +555,11 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
     }
   } catch (error) {
     console.error('[START] Erro fatal Evolution:', error.message);
-    res.status(500).json({ error: 'Evolution indisponível', details: error.message });
+    const isTimeout = error.name === 'AbortError' || error.message.includes('aborted');
+    res.status(500).json({ 
+        error: isTimeout ? 'Tempo limite esgotado ao contatar Evolution API' : 'Evolution indisponível', 
+        details: error.message 
+    });
   }
 });
 
@@ -540,19 +569,19 @@ router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (re
   const instanceName = `conn_${connectionId}`;
 
   try {
-    await fetch(`${evoUrl}/instance/logout/${instanceName}`, {
+    await fetchWithTimeout(`${evoUrl}/instance/logout/${instanceName}`, {
        method: 'DELETE',
        headers: { 'apikey': evoKey }
-    });
-    await fetch(`${evoUrl}/instance/delete/${instanceName}`, {
+    }).catch(() => {});
+    await fetchWithTimeout(`${evoUrl}/instance/delete/${instanceName}`, {
        method: 'DELETE',
        headers: { 'apikey': evoKey }
-    });
+    }).catch(() => {});
     
-    await supabase.from('whatsapp_settings').update({ is_connected: false, qr_code: null }).eq('id', connectionId);
+    await supabase.from('whatsapp_settings').update({ is_connected: false, qr_code: null, pairing_code: null }).eq('id', connectionId);
     res.json({ status: 'success' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao deslogar Evolution' });
+    res.status(500).json({ error: 'Erro ao deslogar Evolution', details: error.message });
   }
 });
 
@@ -2278,7 +2307,16 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         console.log(`[WEBHOOK] Status de Conexão: "${state}"`);
 
         if (state === 'open' || state === 'connected') {
-            await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null, pairing_code: null }).eq('id', connectionId);
+            const rawPhone = body?.sender || data?.user?.id || '';
+            const cleanPhone = rawPhone.split('@')[0].replace(/\D/g, '');
+            
+            const updateData = { is_connected: true, qr_code: null, pairing_code: null };
+            if (cleanPhone) {
+                updateData.phone_number = cleanPhone;
+                console.log(`[WEBHOOK-CONNECTION] Atualizando telefone da conexão ${connectionId} para ${cleanPhone}`);
+            }
+            
+            await supabase.from('whatsapp_settings').update(updateData).eq('id', connectionId);
             // Disparar sincronização em background
             const instanceName = `conn_${connectionId}`;
             syncEvolutionData(instanceName, companyId, connectionId);

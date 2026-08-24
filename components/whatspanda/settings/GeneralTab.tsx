@@ -506,8 +506,8 @@ const GeneralTab: React.FC = () => {
                                                     <td className="py-3.5 px-6 font-mono text-emerald-500">{rule.keyword}</td>
                                                     <td className="py-3.5 px-6">
                                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${rule.target_type === 'queue'
-                                                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
-                                                                : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
+                                                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                                                            : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
                                                             }`}>
                                                             {rule.target_type === 'queue' ? 'Setor' : 'Agente'}
                                                         </span>
@@ -679,8 +679,8 @@ const GeneralTab: React.FC = () => {
                                                 }
                                             }}
                                             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isOpen
-                                                    ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
-                                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200'
+                                                ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
+                                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200'
                                                 }`}
                                         >
                                             {isOpen ? 'Marcar Fechado' : 'Marcar Aberto'}
