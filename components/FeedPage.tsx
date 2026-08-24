@@ -681,7 +681,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <hr className="mb-4 dark:border-slate-800" />
                             <div className="grid grid-cols-3 gap-2 border-t border-gray-100 dark:border-slate-800 pt-5 mt-2">
                                 <div className="flex flex-col items-center">
-                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{(currentUser.following || []).length}</span>
+                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.filter(emp => emp.following?.includes(currentUser.id)).length}</span>
                                     <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.followers')}</span>
                                 </div>
                                 <div className="flex flex-col items-center border-x border-gray-100 dark:border-slate-800">
@@ -689,7 +689,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.users')}</span>
                                 </div>
                                 <div className="flex flex-col items-center">
-                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
+                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{posts.filter(p => p.authorId === currentUser.id).reduce((acc, p) => acc + p.reactions.length + p.comments.length, 0)}</span>
                                     <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.interactions')}</span>
                                 </div>
                             </div>
