@@ -2068,7 +2068,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   return (
     <div className="flex h-full bg-[#f8fafc] dark:bg-transparent overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
       {/* Middle Section: Conversations List */}
-      <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
+      <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] shrink-0 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
         <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-white dark:bg-transparent">
           <div className="flex justify-between items-center mb-4">
@@ -3266,7 +3266,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
           {/* Info Sidebar (Right) */}
           {selectedConversation && (
-            <div className={`w-full sm:w-[350px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 fixed right-0 h-full shadow-2xl lg:relative lg:shadow-none ${showContactSidebar ? 'translate-x-0' : 'translate-x-full lg:hidden'} z-30`}>
+            <div className={`w-full sm:w-[350px] shrink-0 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 fixed right-0 h-full shadow-2xl lg:relative lg:shadow-none ${showContactSidebar ? 'translate-x-0' : 'translate-x-full lg:hidden'} z-30`}>
               <div className="p-5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-transparent flex justify-between items-center lg:hidden">
                 <span className="font-bold text-slate-700 dark:text-gray-300 uppercase text-[10px] tracking-widest">Painel do Contato</span>
                 <button onClick={() => setShowContactSidebar(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-500"><X className="w-5 h-5" /></button>
