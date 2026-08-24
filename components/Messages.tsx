@@ -747,6 +747,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                         ? `https://ui-avatars.com/api/?name=${displayName}&background=random`
                         : (otherUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`);
 
+                    // Buscar mensagens não lidas
+                    const { count: unread } = await supabase
+                        .from('messages')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('conversation_id', conv.id)
+                        .eq('receiver_id', currentUser.id)
+                        .eq('is_read', false);
+
                     return {
                         id: conv.id,
                         company_id: conv.company_id,
@@ -754,7 +762,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                         participantAvatarUrl: displayAvatar,
                         participantId: otherPart?.user_id,
                         lastMessage: conv.last_message || 'Inicie a conversa',
-                        unreadCount: 0,
+                        unreadCount: unread || 0,
                         messages: [],
                         isGroup: conv.is_group,
                         groupName: conv.group_name,
@@ -896,6 +904,21 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 .limit(limit + 1);  // +1 para verificar se há mais
 
             if (error) throw error;
+
+            // Marcar mensagens recebidas como lidas no banco de dados
+            if (!isGhostMode) {
+                const { error: readError } = await supabase
+                    .from('messages')
+                    .update({ is_read: true })
+                    .eq('conversation_id', convId)
+                    .eq('receiver_id', currentUser.id)
+                    .eq('is_read', false);
+                if (readError) {
+                    console.error("Erro ao marcar mensagens como lidas:", readError);
+                } else {
+                    fetchConversations();
+                }
+            }
 
             // Verificar se há mais mensagens
             const hasMore = data.length > limit;

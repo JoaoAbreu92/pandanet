@@ -6,7 +6,7 @@ import { useNotifications } from './NotificationContext';
 const EmailNotifier: React.FC = () => {
     const { currentUser } = useAuth();
     const { addNotification, playNotificationSound, showDesktopNotification, setModuleUnreadCount, moduleUnreadCounts } = useNotifications();
-    const [lastUnseenCounts, setLastUnseenCounts] = useState<Record<string, number>>({});
+    const lastUnseenCountsRef = useRef<Record<string, number>>({});
     const [accounts, setAccounts] = useState<any[]>([]);
 
     // Carregar todas as configurações de email acessíveis pelo usuário
@@ -77,7 +77,7 @@ const EmailNotifier: React.FC = () => {
                             const currentUnseen = data.unseen;
                             newCounts[account.id] = currentUnseen;
 
-                            const prevUnseen = lastUnseenCounts[account.id];
+                            const prevUnseen = lastUnseenCountsRef.current[account.id];
 
                             if (prevUnseen !== undefined && currentUnseen > prevUnseen) {
                                 const newEmailsCount = currentUnseen - prevUnseen;
@@ -118,7 +118,7 @@ const EmailNotifier: React.FC = () => {
                 const totalUnseen = Object.values(newCounts).reduce((sum, val) => sum + val, 0);
                 setModuleUnreadCount('email', totalUnseen);
 
-                setLastUnseenCounts(newCounts);
+                lastUnseenCountsRef.current = newCounts;
             } catch (err) {
                 console.error("[EmailNotifier] Falha no polling:", err);
             } finally {
@@ -129,7 +129,7 @@ const EmailNotifier: React.FC = () => {
         checkEmails();
         const interval = setInterval(checkEmails, 90000); // Polling a cada 90s para evitar 429
         return () => clearInterval(interval);
-    }, [accounts, currentUser?.id, lastUnseenCounts, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]);
+    }, [accounts, currentUser?.id, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]);
 
     // Limpa a notificação de banco de dados se a tela de Email reportar zero
     useEffect(() => {
@@ -141,7 +141,7 @@ const EmailNotifier: React.FC = () => {
                 .like('title', 'Novo E-mail%')
                 .eq('is_read', false)
                 .then(() => { });
-            setLastUnseenCounts({});
+            lastUnseenCountsRef.current = {};
         }
     }, [moduleUnreadCounts['email'], currentUser?.id]);
 
