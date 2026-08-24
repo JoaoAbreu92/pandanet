@@ -616,7 +616,7 @@ async function authMiddleware(req, res, next) {
           if (global.addDebugLog) {
               global.addDebugLog('AUTH_SUPABASE_FAIL', `Supabase auth falhou: ${error?.message || 'Nenhum usuário retornado'}`);
           }
-          return res.status(401).json({ error: `Token inválido. Faça login novamente. Erro interno: ${error?.message || 'Nenhum usuário'}` });
+          return res.status(401).json({ error: `Token inválido. JWT Erro: ${jwtErr.message}. Erro interno: ${error?.message || 'Nenhum usuário'}` });
         }
         req.user = user;
         console.log(`[AUTH] Supabase auth OK para user: ${req.user.email}`);
