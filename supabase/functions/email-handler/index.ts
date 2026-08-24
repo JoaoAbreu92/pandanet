@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import nodemailer from "npm:nodemailer@6.9.7";
-import { ImapFlow } from "npm:imapflow@1.0.141";
+import nodemailer from "nodemailer";
+import { ImapFlow } from "imapflow";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,7 +90,7 @@ async function testBrevoAuth(apiKey: string) {
   return { ok: true, data };
 }
 
-console.log("Edge Function 'email-handler' V32 (Brevo API Integration) iniciada.");
+console.log("Edge Function 'email-handler' V35 iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V32). Brevo Supported.'
+      message: 'Edge Function Online (V35). Brevo & Multi-Pass Supported.'
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
