@@ -85,8 +85,12 @@ app.use(express.json({ limit: '50mb' })); // Evolution API webhooks can be large
 // Fix URL for Docker internal network if localhost is provided
 // Base Supabase URL
 let internalSupabaseUrl = process.env.SUPABASE_URL || '';
-if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('127.0.0.1')) {
-  internalSupabaseUrl = internalSupabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
+const isVPSEnv = process.env.IS_VPS || process.platform === 'linux';
+if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('127.0.0.1') || (isVPSEnv && internalSupabaseUrl.includes('77.37.43.60'))) {
+  internalSupabaseUrl = internalSupabaseUrl
+    .replace('localhost', 'supabase-kong')
+    .replace('127.0.0.1', 'supabase-kong')
+    .replace('77.37.43.60', 'supabase-kong');
 }
 
 let publicSupabaseUrl = internalSupabaseUrl;
@@ -1229,7 +1233,7 @@ async function getBase64FromUrl(url) {
         let targetUrl = url;
         
         if (internalSupabaseUrl) {
-            const storageIndex = url.indexOf('/storage/v1/object/public/');
+            const storageIndex = url.indexOf('/storage/v1/object/');
             if (storageIndex !== -1) {
                 const storagePath = url.substring(storageIndex);
                 const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
@@ -1320,14 +1324,19 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
         let fileBuffer = null;
         let contentType = 'application/octet-stream';
 
-        const storageIdx = rawUrl.indexOf('/storage/v1/object/public/');
+        const storageIdx = rawUrl.indexOf('/storage/v1/object/');
 
         if (storageIdx !== -1) {
             // 1. Tentar via SDK do Supabase
-            const relativePath = rawUrl.substring(storageIdx + '/storage/v1/object/public/'.length);
-            const pathParts = relativePath.split('/');
-            const bucket = pathParts[0];
-            const filePath = decodeURIComponent(pathParts.slice(1).join('/'));
+            // Formato esperado: /storage/v1/object/[public|authenticated]/[bucket]/[filePath...]
+            const prefixLen = '/storage/v1/object/'.length;
+            const remainingPath = rawUrl.substring(storageIdx + prefixLen);
+            const pathParts = remainingPath.split('/');
+            
+            // O primeiro elemento após o prefixo é o tipo de acesso (public ou authenticated)
+            // O segundo elemento é o nome do bucket
+            const bucket = pathParts[1];
+            const filePath = decodeURIComponent(pathParts.slice(2).join('/'));
 
             try {
                 const { data, error } = await supabase.storage.from(bucket).download(filePath);
@@ -1352,11 +1361,23 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
                     rawUrl
                 ];
 
+                const authHeader = req.headers['authorization'];
+                const token = (authHeader && authHeader.startsWith('Bearer ')) ? authHeader.split(' ')[1] : req.query.token;
+
                 for (const targetUrl of candidates) {
                     try {
                         const controller = new AbortController();
                         const timer = setTimeout(() => controller.abort(), 10000);
-                        const resp = await fetch(targetUrl, { signal: controller.signal });
+                        
+                        const fetchHeaders = {};
+                        if (token) {
+                            fetchHeaders['Authorization'] = `Bearer ${token}`;
+                        }
+
+                        const resp = await fetch(targetUrl, { 
+                            headers: fetchHeaders,
+                            signal: controller.signal 
+                        });
                         clearTimeout(timer);
 
                         if (resp.ok) {
