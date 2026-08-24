@@ -50,6 +50,7 @@ import AICorrector from './components/AICorrector';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
 import PersonalNotesPage from './components/PersonalNotesPage';
+import PersonalTasksPage from './components/PersonalTasksPage';
 import ProjectsPage from './components/ProjectsPage';
 import FloatingChatHeads from './components/FloatingChatHeads';
 import SchedulingPage from './components/SchedulingPage';
@@ -215,7 +216,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'scheduling', 'scheduling-events', 'scheduling-book'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'personal-tasks', 'scheduling', 'scheduling-events', 'scheduling-book'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -740,7 +741,7 @@ const AppContent: React.FC = () => {
             case 'support-inbox': return <SupportInbox onNavigate={handleNavigate} />;
 
             case 'tickets': return <TicketPage />;
-            case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} />;
+            case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} onNavigate={handleNavigate} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} onImpersonateUser={handleImpersonateUserStart} initialSearch={globalSearchTerm} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
@@ -795,6 +796,7 @@ const AppContent: React.FC = () => {
             }
             case 'scheduling-book': return <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={false} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;
+            case 'personal-tasks': return <PersonalTasksPage currentUser={currentUser} isGhostMode={isGhostMode} pageContext={pageContext} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
         }
     };

@@ -20,7 +20,7 @@ import {
     UserGroupIcon as HeroUserGroupIcon,
     ArrowUturnLeftIcon
 } from './icons';
-import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
+import type { CalendarEvent, Employee, CalendarEventCategory, Page } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -69,9 +69,10 @@ const MONTH_THEMES: Record<number, { name: string, color: string, bg: string, bo
 interface CalendarPageProps {
     events?: CalendarEvent[];
     currentUser?: Employee | null;
+    onNavigate?: (page: Page, context?: any) => void;
 }
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, currentUser: propUser }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, currentUser: propUser, onNavigate }) => {
     const { profile: contextUser } = useAuth();
     const currentUser = propUser || contextUser;
     const { addNotification } = useNotifications();
@@ -80,6 +81,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'year' | 'month' | 'week' | 'day'>('month');
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [personalTasks, setPersonalTasks] = useState<any[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -122,6 +124,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             }
             const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
             if (depts) setDepartments(depts);
+
+            // Fetch personal tasks safely
+            try {
+                const { data: tasksData, error: tasksError } = await supabase
+                    .from('personal_tasks')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+                if (!tasksError && tasksData) {
+                    setPersonalTasks(tasksData);
+                }
+            } catch (err) {
+                console.warn('Could not load personal tasks:', err);
+            }
 
             const { data: evts } = await supabase
                 .from('events')
@@ -304,8 +319,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             isSystem: true
         }));
 
-        return [...events, ...birthdayEvents, ...holidayEvents];
-    }, [events, employees, currentDate]);
+        const taskEvents: CalendarEvent[] = personalTasks
+            .filter(t => t.date)
+            .map(t => ({
+                id: `task-${t.id}`,
+                title: `Tarefa: ${t.title}`,
+                date: t.date,
+                startTime: '00:00',
+                endTime: '23:59',
+                category: 'Tarefa' as any,
+                location: '',
+                attendees: [],
+                notes: '',
+                isPrivate: true,
+                isSystem: false,
+                isTask: true,
+                taskCompleted: t.completed,
+                taskCompletedAt: t.completed_at
+            }));
+
+        return [...events, ...birthdayEvents, ...holidayEvents, ...taskEvents];
+    }, [events, employees, currentDate, personalTasks]);
 
     const handleMonthClick = (monthIndex: number) => {
         setCurrentDate(new Date(currentDate.getFullYear(), monthIndex, 1));
@@ -476,12 +510,42 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                             return null;
                                         })()}
                                         <div className="mt-8 space-y-1 overflow-y-auto max-h-[calc(100%-2rem)]">
-                                            {evs.map(e => (
-                                                <button key={e.id} onClick={(evt) => { evt.stopPropagation(); setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>
-                                                    {e.category === 'Aniversário' && <GiftIcon className="w-3 h-3 inline mr-1" />}
-                                                    {e.title}
-                                                </button>
-                                            ))}
+                                            {evs.map(e => {
+                                                const isTask = (e as any).isTask;
+                                                const taskCompleted = (e as any).taskCompleted;
+                                                return (
+                                                    <button 
+                                                        key={e.id} 
+                                                        onClick={(evt) => { 
+                                                            evt.stopPropagation(); 
+                                                            if (isTask) {
+                                                                onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                                            } else {
+                                                                setSelectedEvent(e); 
+                                                                setDetailModalOpen(true); 
+                                                            }
+                                                        }} 
+                                                        className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${
+                                                            isTask 
+                                                                ? (taskCompleted 
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30' 
+                                                                    : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30')
+                                                                : getCategoryColor(e.category)
+                                                        }`}
+                                                    >
+                                                        {isTask ? (
+                                                            <span className="flex items-center gap-1">
+                                                                {taskCompleted ? '🟢' : '⚪'} <span>{e.title}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <>
+                                                                {e.category === 'Aniversário' && <GiftIcon className="w-3 h-3 inline mr-1" />}
+                                                                {e.title}
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </>
                                 )}
@@ -504,7 +568,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             return d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day;
         });
 
-        const allDayEvents = dayEvents.filter(e => e.category === 'Aniversário' || e.category === 'Feriado');
+        const allDayEvents = dayEvents.filter(e => e.category === 'Aniversário' || e.category === 'Feriado' || (e as any).isTask);
 
         const getEventHour = (e: CalendarEvent) => {
             if (!e.startTime) return 0;
@@ -565,18 +629,43 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
                 {allDayEvents.length > 0 && (
                     <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b dark:border-slate-800">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-2">Dia Inteiro</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-2">Dia Inteiro e Tarefas</span>
                         <div className="flex flex-wrap gap-2">
-                            {allDayEvents.map(e => (
-                                <button
-                                    key={e.id}
-                                    onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border shadow-sm transition-all hover:scale-[1.02] flex items-center gap-1.5 ${getCategoryColor(e.category)}`}
-                                >
-                                    {e.category === 'Aniversário' ? <GiftIcon className="w-4 h-4" /> : <CalendarIcon className="w-4 h-4" />}
-                                    <span>{e.title}</span>
-                                </button>
-                            ))}
+                            {allDayEvents.map(e => {
+                                const isTask = (e as any).isTask;
+                                const taskCompleted = (e as any).taskCompleted;
+                                return (
+                                    <button
+                                        key={e.id}
+                                        onClick={() => {
+                                            if (isTask) {
+                                                onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                            } else {
+                                                setSelectedEvent(e);
+                                                setDetailModalOpen(true);
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border shadow-sm transition-all hover:scale-[1.02] flex items-center gap-1.5 ${
+                                            isTask 
+                                                ? (taskCompleted 
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30' 
+                                                    : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30')
+                                                : getCategoryColor(e.category)
+                                        }`}
+                                    >
+                                        {isTask ? (
+                                            <span className="flex items-center gap-1.5">
+                                                {taskCompleted ? '🟢' : '⚪'} <span>{e.title}</span>
+                                            </span>
+                                        ) : (
+                                            <>
+                                                {e.category === 'Aniversário' ? <GiftIcon className="w-4 h-4" /> : <CalendarIcon className="w-4 h-4" />}
+                                                <span>{e.title}</span>
+                                            </>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -969,56 +1058,114 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 </div>
             )}
 
-            {isDayOptionsOpen && selectedDayOptionsDate && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
-                        <button onClick={() => setDayOptionsOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
-                        <div className="mb-6">
-                            <h3 className="text-2xl font-black text-slate-800 dark:text-gray-100">
-                                {selectedDayOptionsDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </h3>
-                            <p className="text-slate-500 dark:text-gray-400 font-medium text-sm">O que você gostaria de fazer para este dia?</p>
-                        </div>
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => {
-                                    setCurrentDate(selectedDayOptionsDate);
-                                    setView('day');
-                                    setDayOptionsOpen(false);
-                                }}
-                                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
-                            >
-                                <ClockIcon className="w-4 h-4" />
-                                <span>Ver Horários do Dia (Agenda)</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const year = selectedDayOptionsDate.getFullYear();
-                                    const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
-                                    const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
-                                    const formattedDate = `${year}-${month}-${day}`;
+            {isDayOptionsOpen && selectedDayOptionsDate && (() => {
+                const year = selectedDayOptionsDate.getFullYear();
+                const month = selectedDayOptionsDate.getMonth();
+                const day = selectedDayOptionsDate.getDate();
+                const dayEvents = allCalendarEvents.filter(e => {
+                    const d = new Date(e.date);
+                    return d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day;
+                });
 
-                                    setNewEventData(prev => ({
-                                        ...prev,
-                                        date: formattedDate,
-                                        startTime: '09:00',
-                                        endTime: '10:00'
-                                    }));
-                                    setDayOptionsOpen(false);
-                                    setCreateModalOpen(true);
-                                }}
-                                className="w-full bg-brand-primary hover:bg-emerald-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-100 dark:shadow-none flex items-center justify-center gap-2"
-                            >
-                                <PlusIcon className="w-4 h-4" />
-                                <span>Agendar Novo Evento</span>
-                            </button>
-                            <button onClick={() => setDayOptionsOpen(false)} className="w-full py-3 text-sm font-black text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300">
-                                CANCELAR
-                            </button>
+                return (
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
+                            <button onClick={() => setDayOptionsOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
+                            <div className="mb-6">
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-gray-100">
+                                    {selectedDayOptionsDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </h3>
+                                <p className="text-slate-500 dark:text-gray-400 font-medium text-sm">O que você gostaria de fazer para este dia?</p>
+                            </div>
+
+                            {/* Mostrar compromissos e tarefas do dia */}
+                            <div className="mb-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-2">Compromissos e Tarefas:</span>
+                                {dayEvents.length > 0 ? (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {dayEvents.map(e => {
+                                            const isTask = (e as any).isTask;
+                                            const taskCompleted = (e as any).taskCompleted;
+                                            return (
+                                                <button
+                                                    key={e.id}
+                                                    onClick={() => {
+                                                        setDayOptionsOpen(false);
+                                                        if (isTask) {
+                                                            onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                                        } else {
+                                                            setSelectedEvent(e);
+                                                            setDetailModalOpen(true);
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left p-2.5 rounded-xl border text-xs font-bold transition-all hover:scale-[1.01] flex items-center justify-between ${
+                                                        isTask 
+                                                            ? (taskCompleted 
+                                                                ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-300' 
+                                                                : 'bg-amber-50 border-amber-100 text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/30 dark:text-amber-300')
+                                                            : getCategoryColor(e.category)
+                                                    }`}
+                                                >
+                                                    <span className="truncate flex items-center gap-1.5">
+                                                        {isTask ? (taskCompleted ? '🟢' : '⚪') : ''}
+                                                        <span>{e.title}</span>
+                                                    </span>
+                                                    {!isTask && e.startTime !== '00:00' && (
+                                                        <span className="text-[9px] opacity-70">{e.startTime}</span>
+                                                    )}
+                                                    {isTask && taskCompleted && (
+                                                        <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-black uppercase scale-90">Concluída</span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1 pl-1">Nenhum compromisso ou tarefa para este dia.</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => {
+                                        setCurrentDate(selectedDayOptionsDate);
+                                        setView('day');
+                                        setDayOptionsOpen(false);
+                                    }}
+                                    className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <ClockIcon className="w-4 h-4" />
+                                    <span>Ver Horários do Dia (Agenda)</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const year = selectedDayOptionsDate.getFullYear();
+                                        const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
+                                        const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
+                                        const formattedDate = `${year}-${month}-${day}`;
+
+                                        setNewEventData(prev => ({
+                                            ...prev,
+                                            date: formattedDate,
+                                            startTime: '09:00',
+                                            endTime: '10:00'
+                                        }));
+                                        setDayOptionsOpen(false);
+                                        setCreateModalOpen(true);
+                                    }}
+                                    className="w-full bg-brand-primary hover:bg-emerald-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-100 dark:shadow-none flex items-center justify-center gap-2"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>Agendar Novo Evento</span>
+                                </button>
+                                <button onClick={() => setDayOptionsOpen(false)} className="w-full py-3 text-sm font-black text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300">
+                                    CANCELAR
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 };
