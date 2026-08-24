@@ -231,8 +231,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         }
 
         if (!sendReq.ok || (sendRes.error && !sendRes.key)) {
-            console.error('[SEND API] Erro ao enviar na Evolution:', sendRes);
-            return res.status(500).json({ error: 'Failed to send message via WhatsApp' });
+            console.error('[SEND API] Erro ao enviar na Evolution. Status:', sendReq.status, 'Body:', sendRes);
+            return res.status(500).json({ error: 'Failed to send message via WhatsApp', details: sendRes });
         }
 
         // 3. Save message in Supabase
@@ -285,7 +285,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         const contactRes = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
             headers: { 'apikey': evoKey }
         }).catch(err => {
-            console.error(`[SYNC] Erro ao conectar na Evo para contatos:`, err.message);
+            console.error(`[SYNC] [Empresa: ${companyId}] Erro ao conectar na Evo (${evoUrl}/chat/findContacts/${instanceName}):`, err.message);
             return null;
         });
         

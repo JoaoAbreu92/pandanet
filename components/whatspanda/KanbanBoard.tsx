@@ -110,12 +110,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ conversations, onOpenChat, on
   }
 
   return (
-    <div className="flex-1 h-full overflow-hidden bg-slate-50/50 dark:bg-transparent p-6">
+    <div className="flex-1 h-full overflow-hidden bg-slate-50/50 dark:bg-transparent p-4">
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-6 h-full overflow-x-auto pb-4 custom-scrollbar items-start">
+        <div className="flex gap-4 h-full overflow-x-auto pb-6 custom-scrollbar items-start">
           
           {/* Unassigned / Caixa de Entrada Column */}
-          <div className="flex-shrink-0 w-80 max-h-full flex flex-col bg-white/60 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+          <div className="flex-shrink-0 w-72 max-h-full flex flex-col bg-white/60 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+
             <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-black/20 flex justify-between items-center">
               <h3 className="font-semibold text-slate-800 dark:text-white text-sm uppercase tracking-widest">Caixa de Entrada</h3>
               <span className="bg-white dark:bg-white/10 text-slate-600 dark:text-gray-300 text-xs font-medium px-2 py-0.5 rounded-full shadow-sm">
@@ -141,7 +142,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ conversations, onOpenChat, on
 
           {/* Custom Columns */}
           {columns.map(col => (
-            <div key={col.id} className="flex-shrink-0 w-80 max-h-full flex flex-col bg-white/60 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+            <div key={col.id} className="flex-shrink-0 w-72 max-h-full flex flex-col bg-white/60 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+
               <div 
                 className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-black/20 flex justify-between items-center bg-opacity-10" 
                 style={{ borderTop: `4px solid ${col.color}` }}

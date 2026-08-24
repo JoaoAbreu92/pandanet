@@ -92,7 +92,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   };
 
   return (
-    <div className="flex h-screen bg-[#F4F7F6] dark:bg-[#020617] overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
+    <div className="flex h-full bg-[#F4F7F6] dark:bg-[#020617] overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
+
       {/* WhatsPanda Sidebar - Izing Pro Style (Desktop) */}
       <div className="hidden md:flex w-64 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-500">
 
