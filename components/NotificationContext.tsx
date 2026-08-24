@@ -1,7 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
-import type { Notification } from '../types';
+import type { Notification, NotificationType } from '../types';
+
+// Audio assets
+const SOUNDS: Record<string, string> = {
+    message: '/sounds/message.mp3',
+    mention: '/sounds/mention.mp3',
+    event: '/sounds/event.mp3',
+    default: '/sounds/message.mp3'
+};
 
 interface NotificationContextType {
     notifications: Notification[];
@@ -18,6 +26,28 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { currentUser } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Request desktop notification permission
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    const playNotificationSound = useCallback((type: NotificationType) => {
+        const soundPath = SOUNDS[type] || SOUNDS.default;
+        const audio = new Audio(soundPath);
+        audio.play().catch(err => console.error('Audio playback failed:', err));
+    }, []);
+
+    const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, {
+                body,
+                icon: icon || '/logo.png'
+            });
+        }
+    }, []);
 
     const fetchNotifications = useCallback(async () => {
         if (!currentUser?.id) return;
@@ -70,6 +100,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     const newNotif = payload.new as any;
                     if (newNotif && newNotif.user_id === currentUser.id) {
                         console.log('Aviso: Notificação pertence a este usuário. Atualizando...');
+
+                        // Action on new notification
+                        if (payload.eventType === 'INSERT') {
+                            playNotificationSound(newNotif.type as NotificationType);
+                            showDesktopNotification(newNotif.title, newNotif.description, newNotif.avatar_url);
+                        }
+
                         fetchNotifications();
                     } else {
                         console.log('Aviso: Notificação ignorada (pertence a outro usuário).');
