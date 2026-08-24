@@ -787,6 +787,12 @@ ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS has_lunch_bre
 ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_start_time TEXT DEFAULT '12:00';
 ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_end_time TEXT DEFAULT '13:00';
 
+-- 10. WHATSAPP MESSAGES SENDER COLUMNS
+ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS sender_phone TEXT;
+ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS sender_name TEXT;
+GRANT ALL ON TABLE public.whatsapp_messages TO anon, authenticated, service_role;
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
