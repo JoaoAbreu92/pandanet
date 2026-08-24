@@ -2121,10 +2121,24 @@ async function fetchGroupInfo(instanceName, groupJid) {
  * Retorna { inHours: boolean, awayMessage: string | null }
  */
 async function checkBusinessHours(companyId, connectionId, queueId = null) {
-    // Criar a data correspondente ao fuso de São Paulo de forma robusta e independente da VPS
-    const spTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    const currentDayStr = spTime.getDay().toString(); // "0" (domingo) a "6" (sábado)
-    const currentHourStr = `${spTime.getHours().toString().padStart(2, '0')}:${spTime.getMinutes().toString().padStart(2, '0')}`;
+    // Obter partes estruturadas da data no fuso de São Paulo via Intl.DateTimeFormat (imune a parsing de locale)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        weekday: 'short'
+    });
+
+    const parts = {};
+    formatter.formatToParts(now).forEach(p => { parts[p.type] = p.value; });
+    const weekdayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const dayOfWeekNum = weekdayMap[parts.weekday] !== undefined ? weekdayMap[parts.weekday] : now.getDay();
+    const currentDayStr = dayOfWeekNum.toString(); // "0" (domingo) a "6" (sábado)
+    
+    let hour = parts.hour === '24' ? '00' : parts.hour;
+    const currentHourStr = `${hour}:${parts.minute}`;
 
     // 1. Buscar configurações da conexão do WhatsApp
     const { data: settings } = await supabase
@@ -2140,36 +2154,33 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
     const awayMessage = settings.away_message || 'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
 
     // 2. Se houver configuração business_hours JSONB
-    if (settings.business_hours) {
+    if (settings.business_hours && typeof settings.business_hours === 'object') {
         const bh = settings.business_hours;
         let dayConfig = null;
 
         // Se passamos queueId, tentar achar expediente da fila
         if (queueId && bh.queues && bh.queues[queueId]) {
             dayConfig = bh.queues[queueId][currentDayStr];
-            if (dayConfig) {
-                // Se dayConfig existe e é um array de intervalos
+            if (Array.isArray(dayConfig) && dayConfig.length > 0) {
                 const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
                 if (inRange) {
                     return { inHours: true, awayMessage: null };
                 } else {
                     return { inHours: false, awayMessage: 'Estamos fora do horário de expediente deste setor.' };
                 }
-            } else {
-                // Se dayConfig for nulo/vazio, significa que o setor está fechado neste dia (ou não cadastrou)
-                // Se foi configurado a fila no JSONB mas não há expediente para esse dia, assume FECHADO para essa fila
-                return { inHours: false, awayMessage: 'Estamos fora do horário de expediente deste setor.' };
             }
         }
 
         // Se não achou na fila ou não passou queueId, verificar no Geral (general)
-        if (bh.general && bh.general[currentDayStr]) {
-            dayConfig = bh.general[currentDayStr];
-            const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
-            if (inRange) {
-                return { inHours: true, awayMessage: null };
-            } else {
-                return { inHours: false, awayMessage };
+        if (bh.general && (bh.general[currentDayStr] || bh.general[dayOfWeekNum])) {
+            dayConfig = bh.general[currentDayStr] || bh.general[dayOfWeekNum];
+            if (Array.isArray(dayConfig) && dayConfig.length > 0) {
+                const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
+                if (inRange) {
+                    return { inHours: true, awayMessage: null };
+                } else {
+                    return { inHours: false, awayMessage };
+                }
             }
         }
     }
@@ -2182,7 +2193,7 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
         if (currentHourStr < start || currentHourStr > end) {
             return { inHours: false, awayMessage };
         }
-        const isWeekend = spTime.getDay() === 0 || spTime.getDay() === 6;
+        const isWeekend = dayOfWeekNum === 0 || dayOfWeekNum === 6;
         if (isWeekend) {
             return { inHours: false, awayMessage };
         }
@@ -2229,13 +2240,16 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         if (!fromPhone) return;
 
-        // Buscar dados do canal para saber o próprio número e ignorá-lo
+        // Buscar dados do canal para saber o próprio número e ignorá-lo caso envie para si mesmo
         const { data: channelSettings } = await supabase
             .from('whatsapp_settings')
             .select('phone_number')
             .eq('id', connectionId)
             .maybeSingle();
         
+        const channelPhone = channelSettings?.phone_number ? channelSettings.phone_number.replace(/\D/g, '') : null;
+        const cleanFromPhone = fromPhone ? fromPhone.replace(/\D/g, '') : null;
+
         // Ignorar apenas se for uma mensagem enviada para SI MESMO (canal enviando para o próprio número do canal)
         if (isFromMe && channelPhone && cleanFromPhone === channelPhone) {
             console.log(`[MSG] Ignorando mensagem enviada para o próprio número da conexão: ${fromPhone}`);
@@ -3172,26 +3186,29 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
 
     // ----- MENSAGEM RECEBIDA OU ENVIADA -----
     // Cobre event names de v1 e v2: messages.upsert, MESSAGES_UPSERT, messages_upsert, send.message, SEND_MESSAGE
-    const isMessageEvent = ['messages.upsert','messages_upsert','message.upsert','message_upsert','messages.update','send.message','send_message','message'].includes(event);
+    const isMessageEvent = ['messages.upsert','messages_upsert','message.upsert','message_upsert','messages.update','send.message','send_message','message','messages'].includes(event);
     if (isMessageEvent) {
-        // O payload pode vir como { messages: [msg] } ou { message: msg } ou direto
-        let messages = [];
+        let rawList = [];
         if (data?.messages && Array.isArray(data.messages)) {
-            messages = data.messages;
-        } else if (data?.message) {
-            messages = [data];
-        } else if (data?.key) {
-            messages = [data];
+            rawList = data.messages;
         } else if (Array.isArray(data)) {
-            messages = data;
+            rawList = data;
+        } else if (data) {
+            rawList = [data];
         }
 
-        console.log(`[WEBHOOK] ${messages.length} mensagem(ns) para processar.`);
-        for (const message of messages) {
-            if (!message || !message.key) {
-                console.log(`[WEBHOOK] Mensagem sem 'key', ignorando. Dados:`, JSON.stringify(message).substring(0, 200));
-                continue;
+        let messages = [];
+        for (const item of rawList) {
+            if (!item) continue;
+            if (item.key) {
+                messages.push(item);
+            } else if (item.message && item.message.key) {
+                messages.push(item.message);
             }
+        }
+
+        console.log(`[WEBHOOK] ${messages.length} mensagem(ns) extraída(s) para processamento.`);
+        for (const message of messages) {
             await processInboundMessage(message, companyId, connectionId);
         }
     }
