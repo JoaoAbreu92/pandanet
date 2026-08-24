@@ -14,6 +14,7 @@ interface LayoutProps {
     companySettings: Company['settings'];
     isImpersonating: boolean;
     impersonatedCompanyName?: string;
+    impersonatedUser?: Employee | null;
     onNavigate: (page: Page) => void;
     currentPage: Page;
     onLogout: () => void;
@@ -39,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({
     companySettings,
     isImpersonating,
     impersonatedCompanyName,
+    impersonatedUser,
     onNavigate,
     currentPage,
     onLogout,
@@ -63,13 +65,17 @@ const Layout: React.FC<LayoutProps> = ({
     return (
         <div className={`flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-900 ${isShaking ? 'nudge-shake' : ''}`}>
             {isImpersonating && (
-                <div className="bg-red-600 text-white text-xs py-1.5 px-4 text-center z-[60] flex items-center justify-center gap-2 font-medium shadow-sm">
+                <div className={`text-white text-xs py-1.5 px-4 text-center z-[60] flex items-center justify-center gap-2 font-medium shadow-sm ${impersonatedUser ? 'bg-purple-600' : 'bg-red-600'}`}>
                     <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-300 opacity-75"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/30 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
                     </span>
                     <span className="tracking-wide">
-                        <strong className="font-bold">MODO FANTASMA:</strong> Você está visualizando a intranet da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName || 'selecionada'}</span>. Suas leituras e visualizações não deixarão rastros no sistema.
+                        <strong className="font-bold">MODO FANTASMA:</strong> {impersonatedUser ? (
+                            <>Você está auditando o perfil de <span className="underline decoration-purple-300 font-bold">{currentUser.name}</span> na empresa <span className="font-bold">{currentCompany.name}</span>.</>
+                        ) : (
+                            <>Você está visualizando a intranet da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName || 'selecionada'}</span>. Suas leituras e visualizações não deixarão rastros no sistema.</>
+                        )}
                     </span>
                 </div>
             )}

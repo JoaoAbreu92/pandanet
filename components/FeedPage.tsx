@@ -262,6 +262,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
 
 const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition, onNavigate }) => {
     const { addNotification } = useNotifications();
+    const { isGhostMode } = useAuth();
     const [posts, setPosts] = useState<Post[]>([]);
     const [localRecognitions, setLocalRecognitions] = useState<Recognition[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
@@ -453,6 +454,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
     const handleCreatePost = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isGhostMode) {
+            alert("Modo Fantasma: Publicações desativadas durante a auditoria.");
+            return;
+        }
         try {
             if (!newPostContent.trim() && !mediaFile) return;
 
@@ -521,6 +526,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleRecognitionSubmit = async (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
+        if (isGhostMode) return;
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
 
@@ -565,6 +571,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleToggleReaction = async (postId: string, emoji: string) => {
+        if (isGhostMode) return;
         setPosts(currentPosts => currentPosts.map(p => {
             if (p.id !== postId) return p;
             const existingIdx = p.reactions.findIndex(r => r.userId === currentUser.id);
@@ -593,6 +600,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleDeletePost = async (postId: string) => {
+        if (isGhostMode) return;
         if (!window.confirm(t('feed.delete_confirm'))) return;
 
         // Optimistic update
@@ -614,6 +622,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
 
     const handleSubmitComment = async (postId: string, text: string) => {
+        if (isGhostMode) return;
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: currentUser.id, company_id: profile?.company_id, content: text });

@@ -8,9 +8,13 @@ interface AuthContextType {
     user: User | null;
     profile: Employee | null;
     currentUser: Employee | null;
+    /** @deprecated Use profile for real user, currentUser for context user */
+    impersonatedUser: Employee | null;
+    isGhostMode: boolean;
     loading: boolean;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
+    setGhostData: (isGhost: boolean, ghostUser?: Employee | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,18 +22,43 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     profile: null,
     currentUser: null,
+    impersonatedUser: null,
+    isGhostMode: false,
     loading: true,
     signOut: async () => { },
     refreshProfile: async () => { },
+    setGhostData: () => { },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Employee | null>(null);
+    const [impersonatedUser, setImpersonatedUser] = useState<Employee | null>(() => {
+        const saved = localStorage.getItem('pixel_ghost_user_data');
+        return saved ? JSON.parse(saved) : null;
+    });
+    const [isGhostMode, setIsGhostMode] = useState(() => localStorage.getItem('pixel_is_ghost_mode') === 'true');
     const [loading, setLoading] = useState(true);
 
+    const setGhostData = (isGhost: boolean, ghostUser: Employee | null = null) => {
+        setIsGhostMode(isGhost);
+        setImpersonatedUser(ghostUser);
+        if (isGhost) {
+            localStorage.setItem('pixel_is_ghost_mode', 'true');
+            if (ghostUser) {
+                localStorage.setItem('pixel_ghost_user_data', JSON.stringify(ghostUser));
+            } else {
+                localStorage.removeItem('pixel_ghost_user_data');
+            }
+        } else {
+            localStorage.removeItem('pixel_is_ghost_mode');
+            localStorage.removeItem('pixel_ghost_user_data');
+        }
+    };
+
     const fetchProfile = async (userId: string, email?: string) => {
+        // ... (resto da função permanece igual, vou omitir para o replacement mas manter no arquivo)
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -38,12 +67,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             if (error || !data) {
-                // FALLBACK FOR MASTER ADMIN
                 const isMaster = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
                 if (isMaster) {
-                    console.log("Profile not found for Master Admin, using fallback.");
-
-                    // Try to find the company ID for groupopixel.com.br
                     let targetId = undefined;
                     try {
                         const { data: comp } = await supabase.from('companies').select('id').eq('domain', 'grupopixel.com.br').single();
@@ -73,7 +98,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true,
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
-                            viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true
+                            viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
+                            ai_assistant: true
                         },
                         following: [],
                         phone: '',
@@ -92,14 +118,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setProfile(masterAdmin);
                     return;
                 }
-
-                console.error('Erro ao buscar perfil:', error);
                 return;
             }
 
             if (data) {
                 const isMasterAdmin = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
-
                 const defaultAdminPermissions = {
                     viewMessages: true, viewCalendar: true, useMarketplace: true,
                     canPostText: true, canPostImage: true, canPostVideo: true,
@@ -140,15 +163,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 };
                 setProfile(employee);
             }
-        } catch (err) {
-            console.error('Erro inesperado ao buscar perfil:', err);
-        }
+        } catch (err) { }
     };
 
     const refreshProfile = async () => {
-        if (user) {
-            await fetchProfile(user.id, user.email);
-        }
+        if (user) await fetchProfile(user.id, user.email);
     };
 
     useEffect(() => {
@@ -180,11 +199,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setSession(null);
         setUser(null);
+        localStorage.removeItem('pixel_is_ghost_mode');
+        localStorage.removeItem('pixel_ghost_user_data');
         await supabase.auth.signOut();
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, currentUser: profile, loading, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{
+            session,
+            user,
+            profile,
+            currentUser: impersonatedUser || profile,
+            impersonatedUser,
+            isGhostMode,
+            loading,
+            signOut,
+            refreshProfile,
+            setGhostData
+        }}>
             {!loading && children}
         </AuthContext.Provider>
     );

@@ -413,23 +413,32 @@ const AppContent: React.FC = () => {
         }
     };
 
+    const { isGhostMode, setGhostData, impersonatedUser } = useAuth();
+
     const handleImpersonateStart = (company: Company) => {
-        // Simple impersonation for super admins
+        setGhostData(true, null); // Auditoria de empresa
         setImpersonatedCompany(company);
         setCurrentCompany(company);
         setCompanyData(company.data || { employees: [] } as any);
         setCompanySettings(company.settings || { companyName: company.name });
         setIsImpersonating(true);
         localStorage.setItem('pixel_is_impersonating', 'true');
-        setCurrentPage('home'); // Redirect to company home automatically
+        setCurrentPage('home');
         setAuthStage('logged_in');
     };
 
+    const handleImpersonateUserStart = (targetEmployee: Employee) => {
+        setGhostData(true, targetEmployee); // Auditoria profunda de usuário
+        alert(`Entrando em Modo Auditoria: Agora você vê a intranet como ${targetEmployee.name}. Nenhuma ação sua será registrada.`);
+        // Reload page context to ensure everything reflects the new user
+        window.scrollTo(0, 0);
+    };
+
     const handleImpersonateEnd = () => {
+        setGhostData(false, null);
         setIsImpersonating(false);
         setImpersonatedCompany(null);
         localStorage.removeItem('pixel_is_impersonating');
-        // Force refresh to reload real user data
         window.location.reload();
     };
 
@@ -583,7 +592,7 @@ const AppContent: React.FC = () => {
 
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} />;
-            case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
+            case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} onImpersonateUser={handleImpersonateUserStart} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;
@@ -684,6 +693,7 @@ const AppContent: React.FC = () => {
                 currentCompany={currentCompany}
                 companySettings={companySettings}
                 isImpersonating={isImpersonating}
+                impersonatedUser={impersonatedUser}
                 impersonatedCompanyName={impersonatedCompany?.name}
                 onNavigate={handleNavigate}
                 currentPage={currentPage}

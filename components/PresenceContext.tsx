@@ -9,7 +9,7 @@ interface PresenceContextType {
 const PresenceContext = createContext<PresenceContextType>({ onlineUsers: new Set() });
 
 export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGhostMode } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
     useEffect(() => {
@@ -29,14 +29,8 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 const ids = new Set<string>(Object.keys(state));
                 setOnlineUsers(ids);
             })
-            .on('presence' as any, { event: 'join', key: 'user' }, ({ newPresences }) => {
-                // IDs are handled by sync
-            })
-            .on('presence' as any, { event: 'leave', key: 'user' }, ({ leftPresences }) => {
-                // IDs are handled by sync
-            })
             .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
+                if (status === 'SUBSCRIBED' && !isGhostMode) {
                     await channel.track({
                         user_id: currentUser.id,
                         online_at: new Date().toISOString(),

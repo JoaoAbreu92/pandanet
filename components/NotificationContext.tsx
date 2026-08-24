@@ -42,7 +42,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGhostMode } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -265,8 +265,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [currentUser?.id, fetchNotifications, playNotificationSound, showDesktopNotification]);
 
     const markAsRead = async (id: string) => {
-        const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
-        if (isImpersonating) return; // Ghost mode blocks marking as read
+        if (isGhostMode) return; // Ghost mode blocks marking as read
 
         try {
             const { error } = await supabase
@@ -283,9 +282,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const markAllAsRead = async () => {
         if (!currentUser?.id) return;
-
-        const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
-        if (isImpersonating) return; // Ghost mode blocks marking as read
+        if (isGhostMode) return; // Ghost mode blocks marking as read
 
         try {
             const { error } = await supabase
@@ -302,6 +299,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'> & { user_id?: string, company_id?: string }) => {
+        if (isGhostMode) {
+            console.log('[Ghost Mode] Bloqueando inserção de notificação');
+            return;
+        }
         let targetUserId = notif.user_id;
         let targetCompanyId = notif.company_id;
 

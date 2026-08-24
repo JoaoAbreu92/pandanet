@@ -71,7 +71,7 @@ interface MessagesProps {
 }
 
 const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
-    const { profile: currentUser } = useAuth();
+    const { currentUser, isGhostMode } = useAuth();
     const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
@@ -140,6 +140,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     }, [nudgeCooldowns]);
 
     const handleSendNudge = async () => {
+        if (isGhostMode) {
+            alert("Modo Fantasma: Você não pode enviar nudges durante a auditoria.");
+            return;
+        }
         if (!selectedConversationId || !selectedConversation) return;
 
         const now = Date.now();
@@ -725,6 +729,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     }, [conversations, selectedConversationId]);
 
     const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
+        if (isGhostMode) {
+            alert("Modo Fantasma: O envio de mensagens está desabilitado durante a auditoria.");
+            return;
+        }
         if (e) e.preventDefault();
 
         const textToSend = type === 'text' ? newMessageText : '';
@@ -834,6 +842,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     };
 
     const handleReact = async (messageId: string, emoji: string) => { // Alterado messageId para string
+        if (isGhostMode) return;
         const msg = messages.find(m => m.id === messageId);
         if (!msg) return;
 
