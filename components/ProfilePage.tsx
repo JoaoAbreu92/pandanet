@@ -174,9 +174,54 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
     const handleSave = async () => {
         try {
-            console.log("[Profile] Iniciando salvamento...");
+            console.log("[Profile] ========== INICIANDO SALVAMENTO ==========");
             console.log("[Profile] Dados atuais:", tempUserData);
             console.log("[Profile] Current User ID:", currentUser.id);
+            console.log("[Profile] Current User:", currentUser);
+            
+            // Verificar se temos um ID válido
+            if (!currentUser?.id) {
+                throw new Error("ID do usuário não encontrado. Faça login novamente.");
+            }
+
+            // Buscar o ID do usuário autenticado
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error("Usuário não autenticado. Faça login novamente.");
+            }
+
+            console.log("[Profile] Auth User ID:", user.id);
+            
+            // Verificar se o perfil existe
+            console.log("[Profile] Verificando se perfil existe...");
+            const { data: existingProfile, error: checkError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', user.id)
+                .single();
+
+            if (checkError) {
+                console.error("[Profile] Erro ao verificar perfil:", checkError);
+                throw new Error("Erro ao verificar perfil existente.");
+            }
+
+            if (!existingProfile) {
+                console.error("[Profile] Perfil não encontrado para ID:", user.id);
+                throw new Error("Perfil não encontrado. Entre em contato com o suporte.");
+            }
+
+            console.log("[Profile] Perfil existe, prosseguindo com UPDATE");
+            
+            // Converter datas para formato YYYY-MM-DD (sem timestamp)
+            const formatDateForDB = (dateString: string | undefined) => {
+                if (!dateString) return null;
+                try {
+                    const date = new Date(dateString);
+                    return date.toISOString().split('T')[0]; // Retorna apenas YYYY-MM-DD
+                } catch {
+                    return null;
+                }
+            };
             
             const dbUpdates: any = {
                 full_name: tempUserData.name,
@@ -187,46 +232,88 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 office_location: tempUserData.officeLocation,
                 avatar_url: tempUserData.avatarUrl,
                 cover_url: tempUserData.coverUrl,
-                birth_date: tempUserData.birthDate,
-                join_date: tempUserData.joinDate,  // Adicionar campo de data de início
+                birth_date: formatDateForDB(tempUserData.birthDate),
+                join_date: formatDateForDB(tempUserData.joinDate),
                 department_id: (tempUserData as any).department_id,
                 updated_at: new Date().toISOString()
             };
 
             console.log("[Profile] Dados para atualizar:", dbUpdates);
+            console.log("[Profile] Executando UPDATE na tabela profiles...");
 
-            // Usar UPDATE ao invés de UPSERT para melhor controle
-            const { data, error } = await supabase
+            // Fazer UPDATE direto sem .select() para evitar trigger de INSERT
+            const { error: updateError } = await supabase
                 .from('profiles')
                 .update(dbUpdates)
-                .eq('id', currentUser.id)
-                .select();
+                .eq('id', user.id);
 
-            if (error) {
-                console.error("[Profile] Erro do Supabase:", error);
-                throw error;
+            console.log("[Profile] Resposta do UPDATE:");
+            console.log("[Profile] - error:", updateError);
+
+            if (updateError) {
+                console.error("[Profile] ❌ ERRO DO SUPABASE:");
+                console.error("[Profile] - message:", updateError.message);
+                console.error("[Profile] - details:", updateError.details);
+                console.error("[Profile] - hint:", updateError.hint);
+                console.error("[Profile] - code:", updateError.code);
+                throw updateError;
             }
 
-            console.log("[Profile] Resposta do Supabase:", data);
+            console.log("[Profile] ✅ Registro atualizado com sucesso!");
 
-            if (!data || data.length === 0) {
-                throw new Error("Nenhum registro foi atualizado. Verifique as permissões RLS.");
+            // Recarregar perfil do banco para garantir dados atualizados
+            console.log("[Profile] Recarregando perfil do banco...");
+            const { data: freshProfile, error: reloadError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (!reloadError && freshProfile) {
+                console.log("[Profile] Perfil recarregado:", freshProfile);
+                
+                // Atualizar tempUserData com dados frescos do banco
+                const reloadedUser: Employee = {
+                    id: freshProfile.id,
+                    name: freshProfile.full_name,
+                    email: freshProfile.email || '',
+                    role: freshProfile.role,
+                    team: freshProfile.team,
+                    avatarUrl: freshProfile.avatar_url,
+                    joinDate: freshProfile.join_date,
+                    birthDate: freshProfile.birth_date,
+                    isAdmin: freshProfile.is_admin,
+                    isOnline: false,
+                    permissions: freshProfile.permissions || {},
+                    company_id: freshProfile.company_id,
+                    following: freshProfile.following || [],
+                    phone: freshProfile.phone,
+                    officeLocation: freshProfile.office_location,
+                    bio: freshProfile.bio,
+                    coverUrl: freshProfile.cover_url
+                };
+                
+                setTempUserData(reloadedUser);
+                onUpdateUser(reloadedUser);
             }
-
-            // Atualizar estado local
-            onUpdateUser(tempUserData);
             
             // Forçar refresh do perfil no AuthContext
             if (refreshProfile) {
-                console.log("[Profile] Atualizando perfil no AuthContext...");
+                console.log("[Profile] Chamando refreshProfile...");
                 await refreshProfile();
+                console.log("[Profile] refreshProfile concluído");
+            } else {
+                console.warn("[Profile] ⚠️ refreshProfile não disponível");
             }
             
             setIsEditing(false);
             alert('Perfil atualizado com sucesso!');
+            console.log("[Profile] ========== SALVAMENTO CONCLUÍDO ==========");
             
         } catch (error: any) {
+            console.error("[Profile] ========== ERRO NO SALVAMENTO ==========");
             console.error("[Profile] Erro completo:", error);
+            console.error("[Profile] Stack trace:", error.stack);
             alert(`Erro ao atualizar perfil: ${error.message || 'Erro desconhecido'}\n\nVerifique o console (F12) para mais detalhes.`);
         }
     };
@@ -238,7 +325,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setTempUserData(prev => ({ ...prev, [name]: value }));
+        console.log(`[Profile] Input change: ${name} = ${value}`);
+        setTempUserData(prev => ({
+            ...prev,
+            [name]: value === '' ? null : value
+        }));
     };
 
     const uploadImage = async (file: File, bucket: 'avatars' | 'covers') => {
@@ -512,11 +603,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-brand-subtle-text">Data de Nascimento</label>
-                                        <input type="date" name="birthDate" value={tempUserData.birthDate || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                                        <input 
+                                            type="date" 
+                                            name="birthDate" 
+                                            value={tempUserData.birthDate ? tempUserData.birthDate.substring(0, 10) : ''} 
+                                            onChange={handleInputChange} 
+                                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" 
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-brand-subtle-text">Data de Início (Empresa)</label>
-                                        <input type="date" name="joinDate" value={tempUserData.joinDate || ''} onChange={handleInputChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                                        <input 
+                                            type="date" 
+                                            name="joinDate" 
+                                            value={tempUserData.joinDate ? tempUserData.joinDate.substring(0, 10) : ''} 
+                                            onChange={handleInputChange} 
+                                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" 
+                                        />
                                     </div>
                                     <div className="sm:col-span-2">
                                         <label className="text-sm font-medium text-brand-subtle-text">Departamento</label>

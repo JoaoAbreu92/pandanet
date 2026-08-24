@@ -406,6 +406,8 @@ const AppContent: React.FC = () => {
     };
 
     const handleSetCompanyForAdmin = async (updatedCompany: Company) => {
+        console.log("[App] Atualizando empresa:", updatedCompany);
+        
         setCurrentCompany(updatedCompany);
         setCompanyData(updatedCompany.data);
         setCompanySettings(updatedCompany.settings);
@@ -414,6 +416,7 @@ const AppContent: React.FC = () => {
         // Persist to Supabase
         if (updatedCompany.id && updatedCompany.id !== 'root') {
             try {
+                console.log("[App] Salvando no Supabase...");
                 const { error } = await supabase
                     .from('companies')
                     .update({
@@ -424,9 +427,22 @@ const AppContent: React.FC = () => {
                     })
                     .eq('id', updatedCompany.id);
                 if (error) throw error;
-                console.log("Alterações da empresa salvas no Supabase.");
+                console.log("[App] ✅ Alterações da empresa salvas no Supabase.");
+                
+                // Recarregar do banco para garantir sincronização
+                console.log("[App] Recarregando empresa do banco...");
+                const { data: freshCompany, error: reloadError } = await supabase
+                    .from('companies')
+                    .select('*')
+                    .eq('id', updatedCompany.id)
+                    .single();
+                
+                if (!reloadError && freshCompany) {
+                    console.log("[App] ✅ Empresa recarregada:", freshCompany);
+                    setCompanySettings(freshCompany.settings || { companyName: freshCompany.name });
+                }
             } catch (err: any) {
-                console.error("Erro ao persistir dados da empresa:", err.message);
+                console.error("[App] ❌ Erro ao persistir dados da empresa:", err.message);
                 alert("Erro ao salvar no banco de dados: " + err.message);
             }
         }

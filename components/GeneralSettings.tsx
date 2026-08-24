@@ -14,31 +14,45 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
     const [tempSettings, setTempSettings] = useState<CompanySettings>(settings);
 
     const handleSave = async () => {
+        console.log("[GeneralSettings] ========== SALVANDO CONFIGURAÇÕES ==========");
+        console.log("[GeneralSettings] Settings atuais:", tempSettings);
+        
         let finalSettings = { ...tempSettings };
         const newFile = (tempSettings as any)._newLogoFile;
 
         if (newFile) {
+            console.log("[GeneralSettings] Novo arquivo de logo detectado:", newFile.name);
             try {
                 const fileExt = newFile.name.split('.').pop();
                 const fileName = `logo_${Date.now()}.${fileExt}`;
                 const filePath = `branding/${fileName}`;
 
+                console.log("[GeneralSettings] Fazendo upload para:", filePath);
                 const { data, error } = await supabase.storage
                     .from('chat-media')
                     .upload(filePath, newFile);
 
-                if (error) throw error;
+                if (error) {
+                    console.error("[GeneralSettings] Erro no upload:", error);
+                    throw error;
+                }
 
+                console.log("[GeneralSettings] Upload bem-sucedido:", data);
                 const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                console.log("[GeneralSettings] URL pública:", publicUrl);
+                
                 finalSettings.logoUrl = publicUrl;
                 delete (finalSettings as any)._newLogoFile;
             } catch (err: any) {
+                console.error("[GeneralSettings] Erro ao subir logotipo:", err);
                 alert('Erro ao subir logotipo: ' + err.message);
                 return;
             }
         }
 
+        console.log("[GeneralSettings] Chamando setSettings com:", finalSettings);
         setSettings(finalSettings);
+        console.log("[GeneralSettings] ========== CONFIGURAÇÕES SALVAS ==========");
         alert('Configurações salvas!');
     };
 

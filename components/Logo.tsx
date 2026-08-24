@@ -6,12 +6,13 @@ const logoSrc = '/logo.png';
 interface LogoProps {
     showText?: boolean;
     className?: string;
+    companyLogo?: string;
 }
 
-const Logo: React.FC<LogoProps> = ({ showText = true, className = '' }) => {
+const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLogo }) => {
     return (
         <div className={`flex items-center ${className}`}>
-            <img src={logoSrc} alt="Pixel Intranet Logo" className="h-12 w-auto" />
+            <img src={companyLogo || logoSrc} alt="Logo" className="h-12 w-auto object-contain" />
         </div>
     );
 };

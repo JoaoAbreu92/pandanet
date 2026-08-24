@@ -101,16 +101,25 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     };
 
     const handleSetSettings = async (settings: Company['settings']) => {
+        console.log("[AdminPage] ========== SALVANDO SETTINGS DA EMPRESA ==========");
+        console.log("[AdminPage] Company ID:", company.id);
+        console.log("[AdminPage] Novos settings:", settings);
+        
         setCompany({ ...company, settings });
 
-        const { error } = await supabase
+        console.log("[AdminPage] Atualizando no Supabase...");
+        const { data, error } = await supabase
             .from('companies')
             .update({ settings })
-            .eq('id', company.id);
+            .eq('id', company.id)
+            .select();
 
         if (error) {
-            console.error('Error updating company settings:', error);
+            console.error('[AdminPage] ❌ Erro ao atualizar company settings:', error);
+        } else {
+            console.log('[AdminPage] ✅ Settings salvos com sucesso:', data);
         }
+        console.log("[AdminPage] ========== SALVAMENTO CONCLUÍDO ==========");
     };
 
     const tabs = [
