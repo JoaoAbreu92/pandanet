@@ -292,6 +292,7 @@ export interface Message {
   reactions: Reaction[];
   file?: { name: string; url: string; type?: string };
   replyingTo?: Message;
+  replied_message?: Message | any;
   sender_deleted_at?: string;
 }
 

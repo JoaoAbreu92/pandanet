@@ -30,12 +30,12 @@ const TrainingManager: React.FC<TrainingManagerProps> = ({ trainings, setTrainin
         if (editingItem) {
             setTrainings(trainings.map(t => t.id === editingItem.id ? { ...t, ...formData } as TrainingModule : t));
         } else {
-            setTrainings([...trainings, { id: Date.now(), ...formData } as TrainingModule]);
+            setTrainings([...trainings, { id: Date.now().toString(), ...formData } as TrainingModule]);
         }
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = (id: string) => {
         if (confirm(t('generic.delete_confirm'))) setTrainings(trainings.filter(t => t.id !== id));
     };
 

@@ -2,7 +2,7 @@ import { Event } from './types';
 
 export const mockEvents: Event[] = [
     {
-        id: 1,
+        id: '1',
         title: 'Happy Hour Mensal',
         description: 'Venha celebrar os aniversariantes do mês!',
         date: new Date(Date.now() + 86400000 * 2).toISOString(), // +2 days
@@ -13,7 +13,7 @@ export const mockEvents: Event[] = [
         attendees: [],
     },
     {
-        id: 2,
+        id: '2',
         title: 'Workshop de React Avançado',
         description: 'Aprenda sobre Server Components e Hooks.',
         date: new Date(Date.now() + 86400000 * 5).toISOString(), // +5 days
@@ -24,7 +24,7 @@ export const mockEvents: Event[] = [
         attendees: [],
     },
     {
-        id: 3,
+        id: '3',
         title: 'Reunião Geral (All-Hands)',
         description: 'Atualização trimestral de resultados.',
         date: new Date(Date.now() + 86400000 * 10).toISOString(), // +10 days

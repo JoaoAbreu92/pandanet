@@ -99,7 +99,7 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate }) 
   const { onlineUsers } = usePresence();
     const { profile } = useAuth();
 
-    const canViewDetails = profile?.is_admin || profile?.permissions?.viewEmployeeDetails;
+    const canViewDetails = profile?.isAdmin || profile?.permissions?.viewEmployeeDetails;
 
     const handleAction = (page: string, context: any) => {
         if (page === 'profile-details') {

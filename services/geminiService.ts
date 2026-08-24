@@ -62,8 +62,8 @@ export const fetchAnnouncements = async (): Promise<Announcement[]> => {
     console.error("Error fetching announcements from Gemini:", error);
     // Return mock data on failure to ensure the UI is still functional.
     return [
-        { title: 'Erro de API: Não foi possível buscar notícias', summary: 'Houve um problema ao conectar com o serviço de notícias. Verifique a chave da API e tente novamente mais tarde. Exibindo dados de exemplo.', category: 'Notícias da Empresa', date: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }), imageUrl: 'https://picsum.photos/id/103/800/400' },
-        { title: 'Reunião Geral do Terceiro Trimestre', summary: 'Junte-se a nós para nossa reunião trimestral na próxima sexta-feira para discutir nosso progresso e metas futuras.', category: 'Evento', date: '2 de Agosto de 2024', imageUrl: 'https://picsum.photos/id/105/800/400', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+      { id: 'mock-1', title: 'Erro de API: Não foi possível buscar notícias', summary: 'Houve um problema ao conectar com o serviço de notícias. Verifique a chave da API e tente novamente mais tarde. Exibindo dados de exemplo.', category: 'Notícias da Empresa', date: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }), imageUrl: 'https://picsum.photos/id/103/800/400' },
+      { id: 'mock-2', title: 'Reunião Geral do Terceiro Trimestre', summary: 'Junte-se a nós para nossa reunião trimestral na próxima sexta-feira para discutir nosso progresso e metas futuras.', category: 'Evento', date: '2 de Agosto de 2024', imageUrl: 'https://picsum.photos/id/105/800/400', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
     ];
   }
 };

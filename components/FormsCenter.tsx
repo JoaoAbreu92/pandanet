@@ -59,7 +59,7 @@ const FormsCenter: React.FC<FormsCenterProps> = ({ submissions, setSubmissions, 
     const handleNewRequest = (data: Omit<FormSubmission, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt' | 'formType'>) => {
         const newSubmission: FormSubmission = {
             ...data,
-            id: Date.now(),
+            id: Date.now().toString(),
             requesterId: currentUser.id,
             requesterName: currentUser.name,
             requesterAvatarUrl: currentUser.avatarUrl,

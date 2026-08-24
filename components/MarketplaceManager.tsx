@@ -202,7 +202,8 @@ const MarketplaceManager: React.FC = () => {
                 imageUrls: i.image_urls || [],
                 listedBy: i.listed_by,
                 listedAt: i.created_at,
-                reservedBy: i.reserved_by
+                reservedBy: i.reserved_by,
+                seller: i.seller || i.listed_by
             })));
         } catch (err) {
             console.error('Error fetching marketplace items:', err);

@@ -1085,7 +1085,6 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     )}
                     
                     <div className="relative">
-                        {/* Mensagem Respondida (Citada) */}
                         {message.replied_message && (
                             <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${
                                 isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'

@@ -61,10 +61,14 @@ const RecognitionWall: React.FC = () => {
                         name: e.full_name,
                         role: e.role,
                         avatarUrl: e.avatar_url,
-                        email: '', // Not needed for this
-                        department: '',
+                        email: '',
+                        team: '',
                         joinDate: '',
-                    })));
+                        birthDate: '',
+                        isAdmin: false,
+                        permissions: {} as any,
+                        following: []
+                    } as Employee)));
                 }
 
                 // Fetch recognitions
@@ -141,8 +145,8 @@ const RecognitionWall: React.FC = () => {
                 company_id: currentUser.company_id,
                 type: 'mention',
                 title: 'Novo Reconhecimento!',
-                description: `${currentUser.full_name} reconheceu você: "${data.message}"`,
-                avatarUrl: currentUser.avatar_url,
+                description: `${currentUser.name} reconheceu você: "${data.message}"`,
+                avatarUrl: currentUser.avatarUrl,
                 link: '/'
             });
             // Subscription will handle refresh

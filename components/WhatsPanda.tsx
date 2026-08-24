@@ -121,12 +121,12 @@ const WhatsPanda: React.FC = () => {
         {/* Current User Info (Optional footer area) */}
         <div className="mt-auto pt-4 border-t border-gray-100 flex items-center gap-3 px-2">
           <img
-            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name}&background=10b981&color=fff`}
+            src={profile?.avatarUrl || `https://ui-avatars.com/api/?name=${profile?.name}&background=10b981&color=fff`}
             alt="Avatar"
             className="w-9 h-9 rounded-full ring-2 ring-emerald-50"
           />
           <div className="flex flex-col truncate">
-            <span className="text-sm font-bold text-gray-800 truncate">{profile?.full_name || 'Usuário'}</span>
+            <span className="text-sm font-bold text-gray-800 truncate">{profile?.name || 'Usuário'}</span>
             <span className="text-[10px] text-gray-400 truncate uppercase font-semibold">{profile?.role || 'Atendente'}</span>
           </div>
         </div>

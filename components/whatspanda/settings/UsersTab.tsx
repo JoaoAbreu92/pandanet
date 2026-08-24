@@ -14,7 +14,10 @@ const DEFAULT_PERMISSIONS: WhatsAppPermissions = {
     can_view_chats: true,
     can_send_messages: true,
     can_send_media: true,
-    can_manage_settings: false
+    can_manage_settings: false,
+    can_transfer: false,
+    can_see_all_departments: false,
+    can_manage_tags: false
 };
 
 const UsersTab: React.FC = () => {

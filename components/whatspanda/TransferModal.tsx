@@ -73,7 +73,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
 
     try {
       // Validate permissions
-      const canTransfer = profile?.is_admin || profile?.is_company_admin || 
+      const canTransfer = profile?.isAdmin || profile?.isCompanyAdmin || 
                          profile?.whatspanda_permissions?.can_transfer;
       
       if (!canTransfer) {
@@ -114,7 +114,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
           company_id: profile?.company_id,
           type: 'whatsapp_transfer',
           title: 'Novo Atendimento Atribuído',
-          description: `${profile?.full_name} transferiu um atendimento para você`,
+          description: `${profile?.name} transferiu um atendimento para você`,
           link: `/whatspanda?view=chat&id=${conversationId}`
         });
       }

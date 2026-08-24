@@ -27,7 +27,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
         if (!newComment.trim()) return;
 
         const comment = {
-            id: Date.now(),
+            id: Date.now().toString(),
             author: currentUser.name,
             authorAvatarUrl: currentUser.avatarUrl,
             text: newComment,
@@ -73,7 +73,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
         const status: Ticket['status'] = pendingResolve ? 'Pendente' : 'Resolvido';
 
         const comment = {
-            id: Date.now(),
+            id: Date.now().toString(),
             author: currentUser.name,
             authorAvatarUrl: currentUser.avatarUrl,
             text: `[SISTEMA - ${status.toUpperCase()}]: ${resolutionText}`,

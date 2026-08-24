@@ -29,7 +29,7 @@ const RequestModal: React.FC<{
             return;
         }
         setLoading(true);
-        await onSubmit({ requestType, itemName, justification, assignedUserId });
+        await onSubmit({ requestType, itemName, justification, assignedUserId, comments: [] });
         setLoading(false);
     };
 

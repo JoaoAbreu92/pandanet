@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewTiDashboard: true, openTickets: true, openTiRequests: true,
                             viewTraining: true, viewSurveys: true, viewPolicies: true,
                             viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                            createEvents: true, manageMarketplace: true,
+                            createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true,
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
                             viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true
@@ -78,7 +78,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         following: [],
                         phone: '',
                         officeLocation: '',
-                        bio: ''
+                        bio: '',
+                        rg: '',
+                        cpf: '',
+                        emergency_contact_name: '',
+                        emergency_contact_phone: '',
+                        health_insurance: '',
+                        blood_type: '',
+                        marital_status: '',
+                        education_level: '',
+                        status: 'active'
                     };
                     setProfile(masterAdmin);
                     return;
@@ -99,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     viewTiDashboard: true, openTickets: true, openTiRequests: true,
                     viewTraining: true, viewSurveys: true, viewPolicies: true,
                     viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                    createEvents: true, manageMarketplace: true,
+                    createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true,
                     viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                     viewVacationRequests: true, manageVacationRequests: true,
                     viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true

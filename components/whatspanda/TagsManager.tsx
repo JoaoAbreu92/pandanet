@@ -19,7 +19,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ conversationId }) => {
   const [selectedScope, setSelectedScope] = useState<TagScope>('personal');
   const [loading, setLoading] = useState(false);
 
-  const isAdmin = profile?.is_admin || profile?.is_company_admin;
+  const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin;
   const canManageTags = isAdmin || profile?.whatspanda_permissions?.can_manage_tags;
 
   useEffect(() => {

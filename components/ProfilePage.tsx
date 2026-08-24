@@ -455,7 +455,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     };
 
     // Feed manipulation handlers (copied logic, ideally should be shared context or hook)
-    const handleToggleReaction = (postId: number, emoji: string) => {
+    const handleToggleReaction = (postId: string, emoji: string) => {
         if (!setFeedPosts) return;
         setFeedPosts(feedPosts.map(post => {
             if (post.id === postId) {
@@ -477,7 +477,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
         }));
     };
 
-    const handleSubmitComment = (postId: number, text: string) => { // Removed postId type annotation as it's inferred or matches signature
+    const handleSubmitComment = (postId: string, text: string) => { // Removed postId type annotation as it's inferred or matches signature
         if (!setFeedPosts) return;
         setFeedPosts(feedPosts.map(post => {
             if (post.id === postId) {
@@ -791,6 +791,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     onToggleReaction={handleToggleReaction}
                                     onSubmitComment={handleSubmitComment}
                                     onShare={handleShare}
+                                    onDelete={(postId) => console.log('Delete post', postId)}
                                 />
                             ))
                         ) : (

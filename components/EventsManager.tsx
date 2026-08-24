@@ -25,7 +25,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
         location: '',
         imageUrl: '',
         attendees: [],
-        invitees: [],
+        invited_ids: [],
         imageType: 'url'
     });
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -78,7 +78,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
             setEditingEvent(null);
             setFormData({
                 title: '', description: '', date: '', time: '', location: '', category: 'Social',
-                imageUrl: '', attendees: [], invitees: [], imageType: 'url'
+                imageUrl: '', attendees: [], invited_ids: [], imageType: 'url'
             });
             setImageFile(null);
         }
@@ -98,11 +98,11 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
     };
 
     const toggleInvitee = (userId: string) => {
-        const currentInvitees = formData.invitees || [];
+        const currentInvitees = formData.invited_ids || [];
         if (currentInvitees.includes(userId)) {
-            setFormData({ ...formData, invitees: currentInvitees.filter(id => id !== userId) });
+            setFormData({ ...formData, invited_ids: currentInvitees.filter(id => id !== userId) });
         } else {
-            setFormData({ ...formData, invitees: [...currentInvitees, userId] });
+            setFormData({ ...formData, invited_ids: [...currentInvitees, userId] });
         }
     };
 
@@ -144,8 +144,8 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                 end_time: endTimeIso,
                 location: formData.location,
                 category: formData.category,
-                imageUrl: uploadedImageUrl,
-                invited_ids: formData.invitees || [],
+                image_url: uploadedImageUrl,
+                invited_ids: formData.invited_ids || [],
                 attendees: formData.attendees || []
             };
 
@@ -340,7 +340,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                                             <input
                                                 type="checkbox"
                                                 className="rounded text-brand-primary focus:ring-brand-primary"
-                                                checked={(formData.invitees || []).includes(emp.id)}
+                                                checked={(formData.invited_ids || []).includes(emp.id)}
                                                 onChange={() => toggleInvitee(emp.id)}
                                             />
                                             <div className="flex items-center space-x-2">

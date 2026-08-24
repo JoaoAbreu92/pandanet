@@ -9,8 +9,8 @@ const FormSubmissionsManager: React.FC = () => {
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const canView = currentUser?.is_admin || currentUser?.permissions?.viewVacationRequests;
-    const canManage = currentUser?.is_admin || currentUser?.permissions?.manageVacationRequests;
+    const canView = currentUser?.isAdmin || currentUser?.permissions?.viewVacationRequests;
+    const canManage = currentUser?.isAdmin || currentUser?.permissions?.manageVacationRequests;
 
     const fetchSubmissions = async () => {
         if (!currentUser?.company_id || !canView) return;

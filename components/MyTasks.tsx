@@ -5,22 +5,22 @@ import type { Task } from '../types';
 import { PlusIcon, TrashIcon } from './icons';
 
 const initialTasks: Task[] = [
-    { id: 1, text: 'Finalizar apresentação do roadmap Q3', completed: false },
-    { id: 2, text: 'Revisar pull request do João', completed: true },
-    { id: 3, text: 'Agendar 1-on-1 com a Jane', completed: false },
+    { id: '1', text: 'Finalizar apresentação do roadmap Q3', completed: false },
+    { id: '2', text: 'Revisar pull request do João', completed: true },
+    { id: '3', text: 'Agendar 1-on-1 com a Jane', completed: false },
 ];
 
 const MyTasks: React.FC = () => {
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [newTask, setNewTask] = useState('');
 
-    const toggleTask = (id: number) => {
+    const toggleTask = (id: string) => {
         setTasks(tasks.map(task => 
             task.id === id ? { ...task, completed: !task.completed } : task
         ));
     };
     
-    const deleteTask = (id: number) => {
+    const deleteTask = (id: string) => {
         setTasks(tasks.filter(task => task.id !== id));
     };
 
@@ -28,7 +28,7 @@ const MyTasks: React.FC = () => {
         e.preventDefault();
         if (newTask.trim() === '') return;
         const newTaskObject: Task = {
-            id: Date.now(),
+            id: Date.now().toString(),
             text: newTask.trim(),
             completed: false,
         };
