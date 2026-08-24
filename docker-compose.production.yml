@@ -21,9 +21,6 @@ services:
     networks:
       - pandanet_network
       - supabase_default
-    networks:
-      - pandanet_network
-      - supabase_default
     logging:
       driver: "json-file"
       options:
@@ -46,9 +43,6 @@ services:
       - PUBLIC_SUPABASE_URL=http://77.37.43.60:8000
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - SERVICE_ROLE_KEY=${SUPABASE_SERVICE_KEY}
-    networks:
-      - pandanet_network
-      - supabase_default
     networks:
       - pandanet_network
       - supabase_default
