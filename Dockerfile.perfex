@@ -25,5 +25,13 @@ RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
 # Habilitar mod_rewrite do Apache (necessário para o Perfex)
 RUN a2enmod rewrite
 
-# Ajustar permissões para o Apache
+# Configuração para permitir .htaccess (AllowOverride All)
+RUN echo '<Directory /var/www/html>\n\
+    Options FollowSymLinks\n\
+    AllowOverride All\n\
+    Require all granted\n\
+</Directory>' > /etc/apache2/conf-available/perfex.conf \
+    && a2enconf perfex
+
+# Ajustar permissões iniciais
 RUN chown -R www-data:www-data /var/www/html
