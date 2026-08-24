@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { Company } from '../types';
+import type { Company, Plan, Employee } from '../types';
+import { supabase } from '../supabaseClient';
 import {
     BuildingOfficeIcon,
     UsersIcon,
@@ -26,11 +27,12 @@ import {
     XMarkIcon,
     CheckCircleIcon,
     LockClosedIcon,
-    MagnifyingGlassIcon
+    MagnifyingGlassIcon,
+    ShieldCheckIcon
 } from './icons';
 
 interface SaaSDashboardProps {
-    companies?: Company[];
+    companies?: Company[]; // Keep for compatibility but we will fetch internal state
 }
 
 type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
@@ -38,12 +40,42 @@ type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
-    // --- Local State for Data & Filters ---
-    const [localCompanies, setLocalCompanies] = useState<Company[]>(Array.isArray(companies) ? companies : []);
-    const [localPlans, setLocalPlans] = useState<any[]>([]);
+    // --- State for Data & Filters ---
+    const [localCompanies, setLocalCompanies] = useState<Company[]>([]);
+    const [localPlans, setLocalPlans] = useState<Plan[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // State for users in modal
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
+
+    // --- Fetch Data ---
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Fetch Plans
+            const { data: plansData, error: plansError } = await supabase.from('plans').select('*');
+            if (plansError) console.error('Error fetching plans', plansError);
+            else setLocalPlans(plansData || []);
+
+            // Fetch Companies
+            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)'); // Join plan
+            if (companiesError) console.error('Error fetching companies', companiesError);
+            else {
+                // Fetch user counts for each company if possible, or just raw companies
+                // Ideally we join profiles count, but for now just getting companies
+                setLocalCompanies(companiesData as unknown as Company[] || []);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     // --- Computed Data ---
     const filteredCompanies = localCompanies.filter(c => {
@@ -60,8 +92,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const activeCompaniesCount = localCompanies.filter(c => c.status !== 'inactive').length;
     const expiredCompaniesCount = localCompanies.filter(c => c.status === 'expired').length;
     const inactiveCompaniesCount = localCompanies.filter(c => c.status === 'inactive').length;
-    const totalUsers = localCompanies.reduce((acc, c) => acc + (c.employees?.length || 0), 0);
-    const onlineUsers = localCompanies.reduce((acc, c) => acc + (c.employees?.filter(e => e.status === 'online')?.length || 0), 0);
+    const totalUsers = 0; // TODO: Count from profiles
+    const onlineUsers = 0; // TODO
 
     // --- Modal State Management ---
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -95,6 +127,33 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         } else if (type === 'config' && company) {
             // Load company features if they exist, otherwise default
             setFeaturesState({}); // In a real app, this would come from company.settings
+        } else if (type === 'users' && company) {
+            // Fetch users for this company
+            fetchCompanyUsers(company.id!);
+        }
+    };
+
+    const fetchCompanyUsers = async (companyId: string) => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('company_id', companyId);
+
+        if (error) console.error("Error fetching users", error);
+        else setCompanyUsers(data as unknown as Employee[] || []);
+    };
+
+    const toggleCompanyAdmin = async (userId: string, currentStatus: boolean) => {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ is_company_admin: !currentStatus })
+            .eq('id', userId);
+
+        if (error) {
+            alert("Erro ao atualizar permissão: " + error.message);
+        } else {
+            // Update local state
+            setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, is_company_admin: !currentStatus } : u));
         }
     };
 
@@ -123,22 +182,38 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     };
 
     // 2. CREATE / UPDATE COMPANY
-    const submitCompanyForm = () => {
+    const submitCompanyForm = async () => {
         if (modalOpen.createCompany) {
-            const newCompany: Company = {
-                id: Date.now().toString(),
-                name: formData.name || 'Nova Empresa',
-                domain: formData.domain || 'nova.com',
+            const selectedPlan = localPlans.find(p => p.name === formData.plan);
+
+            const newCompany = {
+                name: formData.name,
+                domain: formData.domain,
                 status: 'active',
-                subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                settings: { companyName: formData.name },
-                data: {} as any,
-                employees: [],
-                plan: { name: formData.plan } as any
+                cnpj: formData.cnpj, // Assuming added field
+                plan_id: selectedPlan?.id,
+                subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                settings: { companyName: formData.name }
             };
-            setLocalCompanies([...localCompanies, newCompany]);
+
+            const { data, error } = await supabase.from('companies').insert([newCompany]).select();
+
+            if (error) {
+                alert('Erro ao criar empresa: ' + error.message);
+                return;
+            }
+            if (data) {
+                // If created successfully, we could try to assign the responsible user
+                // But normally we'd create the user profile next.
+                // Re-fetch logic or optimistically update
+                fetchData();
+            }
         } else if (modalOpen.edit && selectedCompany) {
-            setLocalCompanies(prev => prev.map(c => c === selectedCompany ? { ...c, name: formData.name, domain: formData.domain } : c));
+            const { error } = await supabase.from('companies')
+                .update({ name: formData.name, domain: formData.domain })
+                .eq('id', selectedCompany.id);
+
+            if (!error) fetchData();
         }
         closeModal();
     };
@@ -174,26 +249,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     };
 
     // 6. PLANS (Create/Edit)
-    const submitPlanForm = () => {
+    // 6. PLANS (Create/Edit)
+    const submitPlanForm = async () => {
+        const planData = {
+            name: formData.name,
+            user_limit: parseInt(formData.users) || 0,
+            price: parseFloat(formData.val) || 0,
+            features: featuresState
+        };
+
         if (modalOpen.createPlan) {
-            const newPlan = {
-                id: Date.now(),
-                name: formData.name,
-                users: parseInt(formData.users) || 0,
-                conn: parseInt(formData.conn) || 0,
-                val: parseFloat(formData.val) || 0,
-                features: featuresState
-            };
-            setLocalPlans([...localPlans, newPlan]);
+            const { error } = await supabase.from('plans').insert([planData]);
+            if (error) alert('Erro ao criar plano: ' + error.message);
+            else fetchData();
         } else if (modalOpen.editPlan && selectedPlanId) {
-            setLocalPlans(prev => prev.map(p => p.id === selectedPlanId ? {
-                ...p,
-                name: formData.name,
-                users: parseInt(formData.users),
-                conn: parseInt(formData.conn),
-                val: parseFloat(formData.val),
-                features: featuresState
-            } : p));
+            const { error } = await supabase.from('plans').update(planData).eq('id', selectedPlanId);
+            if (error) alert('Erro ao atualizar plano: ' + error.message);
+            else fetchData();
         }
         closeModal();
     };
@@ -527,6 +599,54 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                     <div className="p-6 border-t flex justify-end gap-2">
                         <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
                         <button onClick={modalOpen.config ? handleSaveConfig : submitPlanForm} className="px-6 py-2 bg-blue-600 text-white rounded font-bold text-xs uppercase">Salvar</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Users List Modal */}
+            {modalOpen.users && selectedCompany && (
+                <Modal onClose={closeModal} title={`Usuários de ${selectedCompany.name}`} width="max-w-3xl">
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <p className="text-sm text-gray-500">Gerencie os usuários e administradores desta empresa.</p>
+                            {/* Future: Add User Invite Button */}
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase font-bold text-gray-500">
+                                    <tr>
+                                        <th className="px-4 py-3">Nome</th>
+                                        <th className="px-4 py-3">Email</th>
+                                        <th className="px-4 py-3">Papel</th>
+                                        <th className="px-4 py-3 text-center">Admin da Empresa</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                    {companyUsers.length === 0 ? (
+                                        <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">Nenhum usuário encontrado nesta empresa.</td></tr>
+                                    ) : (
+                                        companyUsers.map(user => (
+                                            <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                                <td className="px-4 py-3 font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                                                    {user.avatarUrl && <img src={user.avatarUrl} className="w-6 h-6 rounded-full" />}
+                                                    {user.name || 'Sem Nome'}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                                                <td className="px-4 py-3 text-gray-500">{user.role || '-'}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => toggleCompanyAdmin(user.id, !!user.is_company_admin)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.is_company_admin ? 'bg-purple-600' : 'bg-gray-200'}`}
+                                                    >
+                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user.is_company_admin ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </Modal>
             )}

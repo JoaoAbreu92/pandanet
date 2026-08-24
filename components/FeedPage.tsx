@@ -333,16 +333,16 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
                     <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase">Atalhos</h3>
                     <ul className="space-y-2">
                         <li>
-                            <a href="#" className="flex items-center space-x-2 text-sm text-gray-600 hover:text-brand-primary">
+                            <button className="flex items-center space-x-2 text-sm text-gray-600 hover:text-brand-primary w-full text-left">
                                 <UserGroupIcon className="w-5 h-5 text-purple-500" />
                                 <span>Grupos</span>
-                            </a>
+                            </button>
                         </li>
                         <li>
-                            <a href="#" className="flex items-center space-x-2 text-sm text-gray-600 hover:text-brand-primary">
+                            <button className="flex items-center space-x-2 text-sm text-gray-600 hover:text-brand-primary w-full text-left">
                                 <HashtagIcon className="w-5 h-5 text-blue-500" />
                                 <span>Tópicos</span>
-                            </a>
+                            </button>
                         </li>
                     </ul>
                 </div>

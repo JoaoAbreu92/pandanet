@@ -179,6 +179,7 @@ export interface Employee {
   joinDate: string; // YYYY-MM-DD
   birthDate: string; // YYYY-MM-DD
   isAdmin: boolean;
+  is_company_admin?: boolean; // Added for SaaS Dashboard
   isOnline?: boolean;
   permissions: EmployeePermissions;
   phone?: string;
@@ -435,12 +436,15 @@ export interface Plan {
   name: string;
   userLimit: number;
   features: PlanFeatures;
+  price?: number; // Added to match migration
 }
 
 export interface Company {
   id?: string;
   domain: string;
   name: string;
+  cnpj?: string; // Added
+  plan_id?: string; // FK
   plan?: Plan;
   subscriptionEndDate?: string; // YYYY-MM-DD
   status?: 'active' | 'inactive' | 'expired';
