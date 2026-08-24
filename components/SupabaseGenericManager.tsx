@@ -151,9 +151,9 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
             fetchItems();
             setIsModalOpen(false);
-        } catch (err) {
+        } catch (err: any) {
             console.error(`Error saving ${tableName}:`, err);
-            alert('Erro ao salvar item.');
+            alert('Erro ao salvar item: ' + (err?.message || err?.details || JSON.stringify(err)));
         } finally {
             setIsProcessing(false);
         }
@@ -168,9 +168,9 @@ export function SupabaseGenericManager<T extends { id: string }>({
                     .eq('id', id);
                 if (error) throw error;
                 fetchItems();
-            } catch (err) {
+            } catch (err: any) {
                 console.error(`Error deleting ${tableName}:`, err);
-                alert('Erro ao excluir item.');
+                alert('Erro ao excluir item: ' + (err?.message || err?.details || JSON.stringify(err)));
             }
         }
     };
