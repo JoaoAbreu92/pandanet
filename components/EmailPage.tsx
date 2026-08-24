@@ -65,6 +65,10 @@ interface Contact {
     email: string;
 }
 
+// --- Module-level cache (persists while tab is open, zero Supabase cost) ---
+const emailCache: Record<string, { emails: any[]; total: number; unseen: number; timestamp: number }> = {};
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 // --- Components ---
 
 const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
@@ -274,6 +278,17 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setSelectedEmail(prev => prev ? { ...prev, flags: newFlags } : null);
         }
 
+        // Update unseen count badge immediately when marking as read/unread
+        if (flag === '\\Seen' && currentFolder === 'INBOX') {
+            const wasUnread = !(email.flags || []).includes('\\Seen');
+            if (add && wasUnread) setUnseenCount(prev => Math.max(0, prev - 1));
+            else if (!add && !wasUnread) setUnseenCount(prev => prev + 1);
+        }
+
+        // Invalidate cache for current folder so next switch-away reloads fresh
+        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        delete emailCache[cacheKey];
+
         // Call Server
         await callEmailServer('flags', {
             config: settings,
@@ -377,8 +392,20 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
 
-    const fetchEmails = async (isBackground = false) => {
+    const fetchEmails = async (isBackground = false, forceRefresh = false) => {
         if (!settings.imap_user) return;
+
+        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        const cached = emailCache[cacheKey];
+
+        // Use cache on initial load (not background polling, not forced refresh)
+        if (!isBackground && !forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+            setEmails(cached.emails);
+            setTotalEmails(cached.total);
+            if (currentFolder === 'INBOX') setUnseenCount(cached.unseen);
+            return;
+        }
+
         if (!isBackground) setLoading(true);
         else setRefreshing(true);
 
@@ -394,7 +421,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             // Handle Response (Array or Object with total)
             const emailList = Array.isArray(data) ? data : data.emails;
-            const total = Array.isArray(data) ? data.length : data.total; // Default to length if API old
+            const total = Array.isArray(data) ? data.length : data.total;
             const unseen = data.unseen || 0;
 
             setTotalEmails(total);
@@ -408,7 +435,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             // Merge metadata
             const mergedEmails = emailList.map((email: any) => {
-                const meta = metadataList?.find((m: any) => m.message_id === email.messageId); // Assuming function returns messageId
+                const meta = metadataList?.find((m: any) => m.message_id === email.messageId);
                 return {
                     ...email,
                     metadata: meta ? { id: meta.id, tags: meta.tags, notes: meta.notes } : { tags: [] }
@@ -416,6 +443,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             });
 
             setEmails(mergedEmails);
+
+            // Save to cache
+            emailCache[cacheKey] = { emails: mergedEmails, total, unseen, timestamp: Date.now() };
         } catch (err: any) {
             console.error("Fetch Error:", err);
             if (!isBackground) alert(`Erro ao buscar e-mails: ${err.message || "Verifique as configurações."}`);
