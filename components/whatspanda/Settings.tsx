@@ -7,7 +7,7 @@ import { useAuth } from '../AuthContext';
 
 const Settings: React.FC = () => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags' | 'chatbot'>('users');
+    const [activeTab, setActiveTab] = useState<'tags' | 'chatbot'>('tags');
 
     const canAccess = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin' || profile?.whatspanda_permissions?.can_manage_settings;
 
@@ -27,13 +27,11 @@ const Settings: React.FC = () => {
         <div className="p-10 h-full flex flex-col overflow-hidden dark:bg-transparent transition-colors duration-500">
             <div className="mb-10 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Configurações</h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie usuários, filas e etiquetas do seu atendimento.</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie etiquetas e chatbot do seu atendimento.</p>
             </div>
             
             <div className="flex space-x-10 mb-10 px-4">
                 {[
-                    { id: 'users', label: 'Usuários' },
-                    { id: 'queues', label: 'Filas' },
                     { id: 'tags', label: 'Etiquetas' },
                     { id: 'chatbot', label: 'Chatbot' },
                 ].map((tab) => (
@@ -56,8 +54,6 @@ const Settings: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {activeTab === 'users' && <UsersTab />}
-                    {activeTab === 'queues' && <QueuesTab />}
                     {activeTab === 'tags' && <TagsTab />}
                     {activeTab === 'chatbot' && <ChatbotSettings />}
                 </div>
