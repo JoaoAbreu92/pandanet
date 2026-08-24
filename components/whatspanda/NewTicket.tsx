@@ -127,6 +127,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
             .maybeSingle();
 
         let conversationId = existingConv?.id;
+        const userId = profile?.id || user?.id || currentUser?.id;
 
         // 2. If not, create new one
         if (!conversationId) {
@@ -141,6 +142,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
                     queue_id: selectedQueue || null,
+                    assigned_to: userId,
                     is_group: false
                 })
                 .select()
@@ -153,7 +155,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
             }
             conversationId = newConv.id;
         } else {
-            // Re-open and update queue/channel if needed
+            // Re-open and update queue/channel/assignment if needed
             await supabase
                 .from('whatsapp_conversations')
                 .update({ 
@@ -161,6 +163,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
                     queue_id: selectedQueue || null,
+                    assigned_to: userId,
                     is_group: false
                 })
                 .eq('id', conversationId);

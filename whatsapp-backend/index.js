@@ -808,7 +808,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             .update({ 
                 last_message_at: new Date().toISOString(),
                 status: (conv.status === 'fechado' || conv.status === 'pendente') ? 'aberto' : conv.status,
-                assigned_to: (conv.status === 'pendente' && !conv.assigned_to) ? userId : conv.assigned_to
+                assigned_to: (!conv.assigned_to || conv.status === 'fechado') ? userId : conv.assigned_to
             })
             .eq('id', conversationId);
 

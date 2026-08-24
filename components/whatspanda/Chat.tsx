@@ -97,7 +97,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const recordingIntervalRef = useRef<any>(null);
 
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'fechados'>('meus');
+  const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'todos' | 'fechados'>('meus');
   const [useSignature, setUseSignature] = useState(false);
   const [signatureText, setSignatureText] = useState('');
   
@@ -598,8 +598,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         const userId = activeProfile?.id || profile?.id;
         if (data.assigned_to === userId) {
           setActiveTab('meus');
-        } else {
+        } else if (data.assigned_to === null) {
           setActiveTab('aguardando');
+        } else {
+          if (isAdmin || permissions?.can_view_others_chats) {
+            setActiveTab('todos');
+          } else {
+            setActiveTab('meus'); // fallback
+          }
         }
       }
       // If it's a group, ensure the filter allows it
