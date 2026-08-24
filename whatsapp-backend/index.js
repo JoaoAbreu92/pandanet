@@ -66,6 +66,12 @@ if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
   supabaseUrl = supabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
 }
 
+// Em produção, a conexão direta via contêiner ou IP pode falhar no WebSocket (Realtime) devido a cabeçalhos de Host do Kong.
+// Forçar o uso da URL pública com SSL garante que o WebSocket suba com sucesso através do Nginx.
+if (process.env.NODE_ENV === 'production' || supabaseUrl.includes('supabase-kong') || supabaseUrl.includes('77.37.43.60')) {
+    supabaseUrl = 'https://pandanet.grupopixel.com.br';
+}
+
 if (evoUrl.includes('localhost') || evoUrl.includes('127.0.0.1')) {
     evoUrl = evoUrl.replace('localhost', 'evolution-api').replace('127.0.0.1', 'evolution-api');
 }
