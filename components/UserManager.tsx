@@ -77,30 +77,122 @@ const UserFormModal: React.FC<{
                         <div><label className="flex items-center space-x-2 mt-6 text-brand-text"><input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary" /><span>{t('users.admin')}</span></label></div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text mb-2">{t('users.permissions_feed')}</label>
-                        <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-gray-50 rounded-md">
-                            <label className="flex items-center space-x-2 text-brand-text">
-                                <input type="checkbox" name="canPostText" checked={formData.permissions.canPostText} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                <span>Postar Pensamentos</span>
-                            </label>
-                            <label className="flex items-center space-x-2 text-brand-text">
-                                <input type="checkbox" name="canPostImage" checked={formData.permissions.canPostImage} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                <span>Postar Imagens</span>
-                            </label>
-                            <label className="flex items-center space-x-2 text-brand-text">
-                                <input type="checkbox" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                <span>Postar Vídeos</span>
-                            </label>
-                        </div>
+                        <div className="space-y-4">
+                            {/* Feed Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Feed Social</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="canPostText" checked={formData.permissions.canPostText} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Postar Texto</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="canPostImage" checked={formData.permissions.canPostImage} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Postar Imagem</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Postar Vídeo</span>
+                                    </label>
+                                </div>
+                            </div>
 
-                        <label className="block text-sm font-medium text-brand-subtle-text mb-2">{t('users.permissions_other')}</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {Object.keys(formData.permissions).filter(k => !k.startsWith('canPost')).map(key => (
-                                <label key={key} className="flex items-center space-x-2 text-brand-text">
-                                    <input type="checkbox" name={key} checked={formData.permissions[key as keyof typeof formData.permissions]} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                    <span>{key.replace('view', 'Ver ').replace('open', 'Abrir ').replace('use', 'Usar ')}</span>
-                                </label>
-                            ))}
+                            {/* General Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Geral</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewMessages" checked={formData.permissions.viewMessages} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Chat & Mensagens</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Calendário</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="useMarketplace" checked={formData.permissions.useMarketplace} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Marketplace</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Bem Estar</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* RH Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Recursos Humanos (RH)</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Diretório</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewForms" checked={formData.permissions.viewForms} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Formulários</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Benefícios</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Onboarding</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Reconhecimentos</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Documentos</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewTraining" checked={formData.permissions.viewTraining} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Treinamentos</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewSurveys" checked={formData.permissions.viewSurveys} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Pesquisas</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewPolicies" checked={formData.permissions.viewPolicies} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Políticas</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* TI Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Tecnologia da Informação (TI)</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Dashboard TI</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="openTickets" checked={formData.permissions.openTickets} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Meus Chamados</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Solicitar Equipamento</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewKnowledgeBase" checked={formData.permissions.viewKnowledgeBase} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Base de Conhecimento</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewServiceStatus" checked={formData.permissions.viewServiceStatus} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Status de Serviços</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewInfoSec" checked={formData.permissions.viewInfoSec} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Segurança da Info.</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div className="flex justify-end space-x-3 pt-4">
