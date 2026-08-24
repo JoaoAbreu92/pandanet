@@ -704,6 +704,7 @@ export interface WhatsAppContact {
   ignore_contact?: boolean;
   disable_transcription?: boolean;
   disable_kanban?: boolean;
+  assigned_to?: string;
 }
 
 export interface WhatsAppSettings {

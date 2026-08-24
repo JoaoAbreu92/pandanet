@@ -15,6 +15,8 @@ const CRMTaskForm: React.FC<CRMTaskFormProps> = ({ onClose, onSave, initialData 
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [employees, setEmployees] = useState<any[]>([]);
+    const [relatedItems, setRelatedItems] = useState<any[]>([]);
+    const [loadingRelated, setLoadingRelated] = useState(false);
 
     const [formData, setFormData] = useState<Partial<CRMTask>>({
         company_id: currentUser?.company_id || '',
@@ -49,6 +51,52 @@ const CRMTaskForm: React.FC<CRMTaskFormProps> = ({ onClose, onSave, initialData 
         };
         fetchEmployees();
     }, [currentUser?.company_id]);
+
+    useEffect(() => {
+        const fetchRelatedItems = async () => {
+            if (!formData.rel_type || !currentUser?.company_id) {
+                setRelatedItems([]);
+                return;
+            }
+
+            setLoadingRelated(true);
+            try {
+                const tableMap: any = {
+                    project: { table: 'crm_projects', label: 'name' },
+                    invoice: { table: 'crm_invoices', label: 'subject' },
+                    customer: { table: 'crm_customers', label: 'name' },
+                    proposal: { table: 'crm_proposals', label: 'subject' },
+                    lead: { table: 'crm_leads', label: 'name' },
+                    estimate: { table: 'crm_estimates', label: 'subject' },
+                    subscription: { table: 'crm_subscriptions', label: 'subject' },
+                    contract: { table: 'crm_contracts', label: 'subject' }
+                };
+
+                const config = tableMap[formData.rel_type];
+                if (!config) {
+                    setRelatedItems([]);
+                    return;
+                }
+
+                const { data, error } = await supabase
+                    .from(config.table)
+                    .select(`id, ${config.label}`)
+                    .eq('company_id', currentUser.company_id);
+
+                if (error) throw error;
+                setRelatedItems((data as any[]).map(item => ({
+                    id: item.id,
+                    label: item[config.label] || 'Sem título'
+                })));
+            } catch (error) {
+                console.error('Error fetching related items:', error);
+            } finally {
+                setLoadingRelated(false);
+            }
+        };
+
+        fetchRelatedItems();
+    }, [formData.rel_type, currentUser?.company_id]);
 
     const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && currentTag.trim()) {
@@ -228,8 +276,41 @@ const CRMTaskForm: React.FC<CRMTaskFormProps> = ({ onClose, onSave, initialData 
                                     <option value="customer">Cliente</option>
                                     <option value="proposal">Proposta</option>
                                     <option value="lead">Lead</option>
+                                    <option value="estimate">Estimativa</option>
+                                    <option value="subscription">Assinatura</option>
+                                    <option value="contract">Contrato</option>
                                 </select>
                             </div>
+
+                            {formData.rel_type && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                        Selecionar {
+                                            {
+                                                project: 'Projeto',
+                                                invoice: 'Fatura',
+                                                customer: 'Cliente',
+                                                proposal: 'Proposta',
+                                                lead: 'Lead',
+                                                estimate: 'Estimativa',
+                                                subscription: 'Assinatura',
+                                                contract: 'Contrato'
+                                            }[formData.rel_type] || 'Item'
+                                        }
+                                    </label>
+                                    <select
+                                        value={formData.rel_id}
+                                        onChange={(e) => setFormData({ ...formData, rel_id: e.target.value })}
+                                        disabled={loadingRelated}
+                                        className="w-full bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:border-blue-500 focus:ring-0 transition-colors disabled:opacity-50"
+                                    >
+                                        <option value="">{loadingRelated ? 'Carregando...' : 'Nenhum selecionado'}</option>
+                                        {relatedItems.map(item => (
+                                            <option key={item.id} value={item.id}>{item.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Cessionários</label>

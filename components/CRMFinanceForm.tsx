@@ -10,7 +10,8 @@ import {
     CurrencyDollarIcon,
     TagIcon,
     CheckIcon,
-    QueueListIcon
+    QueueListIcon,
+    ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '../supabaseClient';
 import type { CRMCustomer, Employee } from '../types';
@@ -31,29 +32,31 @@ interface CRMItemLine {
 
 interface CRMFinanceFormProps {
     type: 'invoice' | 'proposal' | 'estimate';
+    initialData?: any;
+    readOnly?: boolean;
     onClose: () => void;
     onSuccess: (data: any) => void;
     customers: CRMCustomer[];
     currentUser: Employee;
 }
 
-const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSuccess, customers, currentUser }) => {
+const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, initialData, readOnly = false, onClose, onSuccess, customers, currentUser }) => {
     const [formData, setFormData] = useState({
-        subject: '',
-        customer_id: '',
-        date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        currency: 'BRL',
-        status: 'draft',
-        assigned_to: currentUser.id,
-        items: [] as CRMItemLine[],
-        discount: 0,
-        discount_type: 'percent',
-        adjustment: 0,
-        billing_address: '',
-        shipping_address: '',
-        notes: '',
-        terms: ''
+        subject: initialData?.subject || '',
+        customer_id: initialData?.customer_id || '',
+        date: initialData?.date || new Date().toISOString().split('T')[0],
+        due_date: (initialData?.duedate || initialData?.open_till || initialData?.expiry_date) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        currency: initialData?.currency || 'BRL',
+        status: initialData?.status || 'draft',
+        assigned_to: initialData?.assigned_to || currentUser.id,
+        items: (initialData?.items as CRMItemLine[]) || [] as CRMItemLine[],
+        discount: initialData?.discount || 0,
+        discount_type: initialData?.discount_type || 'percent',
+        adjustment: initialData?.adjustment || 0,
+        billing_address: initialData?.billing_address || '',
+        shipping_address: initialData?.shipping_address || '',
+        notes: initialData?.notes || '',
+        terms: initialData?.terms || ''
     });
 
     const [subTotal, setSubTotal] = useState(0);
@@ -147,8 +150,6 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
         }));
     };
 
-
-
     const handleSave = async () => {
         if (!currentUser?.company_id || !formData.customer_id) {
             toast.error('Selecione um cliente e preencha os campos obrigatórios.');
@@ -190,10 +191,21 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                 dbData.expiry_date = formData.due_date;
             }
 
-            const { data: savedData, error } = await supabase
-                .from(tableName)
-                .insert([dbData])
-                .select();
+            let query;
+            if (initialData?.id) {
+                query = supabase
+                    .from(tableName)
+                    .update(dbData)
+                    .eq('id', initialData.id)
+                    .select();
+            } else {
+                query = supabase
+                    .from(tableName)
+                    .insert([dbData])
+                    .select();
+            }
+
+            const { data: savedData, error } = await query;
 
             if (error) {
                 console.error(`Error saving ${type}:`, error);
@@ -213,9 +225,9 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
     };
 
     const title = {
-        invoice: 'Criar Nova Fatura',
-        proposal: 'Criar Nova Proposta',
-        estimate: 'Criar Nova Estimativa'
+        invoice: initialData ? (readOnly ? 'Visualizar Fatura' : 'Editar Fatura') : 'Criar Nova Fatura',
+        proposal: initialData ? (readOnly ? 'Visualizar Proposta' : 'Editar Proposta') : 'Criar Nova Proposta',
+        estimate: initialData ? (readOnly ? 'Visualizar Estimativa' : 'Editar Estimativa') : 'Criar Nova Estimativa'
     }[type];
 
     return (
@@ -247,7 +259,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     <DocumentTextIcon className="w-4 h-4" /> Assunto
                                 </label>
                                 <input 
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                    disabled={readOnly}
+                                    className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                     placeholder="Ex: Consultoria Mensal"
                                     value={formData.subject}
                                     onChange={e => setFormData(prev => ({ ...prev, subject: e.target.value }))}
@@ -258,7 +271,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     <UserIcon className="w-4 h-4" /> Cliente
                                 </label>
                                 <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                    disabled={readOnly}
+                                    className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                     value={formData.customer_id}
                                     onChange={e => setFormData(prev => ({ ...prev, customer_id: e.target.value }))}
                                 >
@@ -278,7 +292,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     </label>
                                     <input 
                                         type="date"
-                                        className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                        disabled={readOnly}
+                                        className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                         value={formData.date}
                                         onChange={e => setFormData(prev => ({ ...prev, date: e.target.value }))}
                                     />
@@ -289,7 +304,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     </label>
                                     <input 
                                         type="date"
-                                        className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                        disabled={readOnly}
+                                        className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                         value={formData.due_date}
                                         onChange={e => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
                                     />
@@ -300,7 +316,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     <CurrencyDollarIcon className="w-4 h-4" /> Moeda
                                 </label>
                                 <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                    disabled={readOnly}
+                                    className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                     value={formData.currency}
                                     onChange={e => setFormData(prev => ({ ...prev, currency: e.target.value }))}
                                 >
@@ -317,7 +334,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     <TagIcon className="w-4 h-4" /> Status
                                 </label>
                                 <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                    disabled={readOnly}
+                                    className={`w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                     value={formData.status}
                                     onChange={e => setFormData(prev => ({ ...prev, status: e.target.value }))}
                                 >
@@ -346,12 +364,14 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                 <QueueListIcon className="w-5 h-5 text-brand-primary" />
                                 Itens do Documento
                             </h3>
-                            <button 
-                                onClick={addItem}
-                                className="flex items-center gap-2 bg-brand-primary/10 text-brand-primary px-4 py-2 rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all text-xs border border-brand-primary/20 shadow-sm"
-                            >
-                                <PlusIcon className="w-4 h-4" /> Adicionar Item
-                            </button>
+                            {!readOnly && (
+                                <button 
+                                    onClick={addItem}
+                                    className="flex items-center gap-2 bg-brand-primary/10 text-brand-primary px-4 py-2 rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all text-xs border border-brand-primary/20 shadow-sm"
+                                >
+                                    <PlusIcon className="w-4 h-4" /> Adicionar Item
+                                </button>
+                            )}
                         </div>
                         <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold mb-4">Gerencie os serviços e produtos desta transação</p>
                         
@@ -372,7 +392,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-2">
                                                     <select
-                                                        className="w-full bg-slate-50 dark:bg-slate-800/80 outline-none text-slate-900 dark:text-gray-300 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 appearance-none max-w-[200px]"
+                                                        disabled={readOnly}
+                                                        className={`w-full bg-slate-50 dark:bg-slate-800/80 outline-none text-slate-900 dark:text-gray-300 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 appearance-none max-w-[200px] ${readOnly ? 'cursor-not-allowed opacity-50' : ''}`}
                                                         onChange={(e) => handleSelectItem(item.id, e.target.value)}
                                                         value={item.item_id || ''}
                                                     >
@@ -382,6 +403,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                                         ))}
                                                     </select>
                                                     <input 
+                                                        disabled={readOnly}
                                                         className="w-full bg-transparent outline-none text-slate-900 dark:text-white font-bold text-sm"
                                                         placeholder="Nome do Item (ou selecione acima)"
                                                         value={item.description}
@@ -389,6 +411,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                                     />
                                                     <textarea
                                                         rows={2}
+                                                        disabled={readOnly}
                                                         className="w-full bg-transparent outline-none text-gray-500 dark:text-gray-400 text-[11px] font-medium resize-none border-l-2 border-brand-primary/20 pl-2 focus:border-brand-primary"
                                                         placeholder="Adicione detalhes extras longo aqui..."
                                                         value={item.long_description}
@@ -399,6 +422,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                             <td className="px-6 py-4 text-center">
                                                 <input 
                                                     type="number"
+                                                    disabled={readOnly}
                                                     className="w-full bg-transparent outline-none dark:text-white text-center font-bold"
                                                     value={item.qty}
                                                     onChange={e => updateItem(item.id, 'qty', Number(e.target.value))}
@@ -407,6 +431,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                             <td className="px-6 py-4">
                                                 <input 
                                                     type="number"
+                                                    disabled={readOnly}
                                                     className="w-full bg-transparent outline-none dark:text-white font-bold"
                                                     value={item.rate}
                                                     onChange={e => updateItem(item.id, 'rate', Number(e.target.value))}
@@ -418,9 +443,11 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-600 p-1">
-                                                    <TrashIcon className="w-5 h-5" />
-                                                </button>
+                                                {!readOnly && (
+                                                    <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-600 p-1">
+                                                        <TrashIcon className="w-5 h-5" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -442,7 +469,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 italic">Observações</label>
                                 <textarea 
-                                    className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 min-h-[100px] outline-none transition-all dark:text-white text-sm"
+                                    disabled={readOnly}
+                                    className={`w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 min-h-[100px] outline-none transition-all dark:text-white text-sm ${readOnly ? 'cursor-not-allowed opacity-75' : ''}`}
                                     placeholder="Mensagem para o cliente..."
                                     value={formData.notes}
                                     onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
@@ -461,11 +489,13 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     <div className="flex items-center gap-2">
                                         <input 
                                             type="number"
+                                            disabled={readOnly}
                                             className="w-20 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1 text-right text-xs outline-none dark:text-white font-bold"
                                             value={formData.discount}
                                             onChange={e => setFormData(prev => ({ ...prev, discount: Number(e.target.value) }))}
                                         />
                                         <select 
+                                            disabled={readOnly}
                                             className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs outline-none dark:text-white font-bold"
                                             value={formData.discount_type}
                                             onChange={e => setFormData(prev => ({ ...prev, discount_type: e.target.value as any }))}
@@ -481,6 +511,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                 <span className="text-gray-500 font-bold uppercase tracking-wider">Ajuste:</span>
                                 <input 
                                     type="number"
+                                    disabled={readOnly}
                                     className="w-24 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1 text-right text-xs outline-none dark:text-white font-bold"
                                     value={formData.adjustment}
                                     onChange={e => setFormData(prev => ({ ...prev, adjustment: Number(e.target.value) }))}
@@ -503,14 +534,27 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                         onClick={onClose}
                         className="px-6 py-3 rounded-2xl font-bold text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
                     >
-                        Cancelar
+                        {readOnly ? 'Fechar' : 'Cancelar'}
                     </button>
-                    <button 
-                        onClick={handleSave}
-                        className="px-10 py-3 bg-brand-primary text-white rounded-2xl font-black hover:shadow-xl hover:shadow-brand-primary/40 transition-all flex items-center gap-2 uppercase tracking-widest text-xs"
-                    >
-                        <CheckIcon className="w-5 h-5" /> Salvar {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </button>
+                    {!readOnly && (
+                        <button 
+                            onClick={handleSave}
+                            disabled={loading || !formData.customer_id}
+                            className="px-10 py-3 bg-brand-primary text-white rounded-2xl font-black hover:shadow-xl hover:shadow-brand-primary/40 transition-all flex items-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <>
+                                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                    Salvando...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckIcon className="w-5 h-5" /> 
+                                    {initialData ? 'Salvar Alterações' : `Salvar ${type === 'invoice' ? 'Fatura' : type === 'proposal' ? 'Proposta' : 'Estimativa'}`}
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

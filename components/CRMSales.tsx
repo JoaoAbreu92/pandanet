@@ -375,8 +375,14 @@ const CRMSales: React.FC<{
                                         <div className="flex items-center justify-end gap-1">
                                             <button
                                                 onClick={() => {
-                                                    if (item.customer_id) onViewCustomer?.(item.customer_id);
-                                                    else alert(`Visualização de ${activeTab} (${item.id}) em desenvolvimento.`);
+                                                    const type = activeTab.endsWith('s') ? activeTab.slice(0, -1) : activeTab;
+                                                    if (['invoice', 'proposal', 'estimate'].includes(type)) {
+                                                        onNewRequest?.(type, { ...item, _readOnly: true });
+                                                    } else if (item.customer_id) {
+                                                        onViewCustomer?.(item.customer_id);
+                                                    } else {
+                                                        alert(`Visualização de ${activeTab} (${item.id}) em desenvolvimento.`);
+                                                    }
                                                 }}
                                                 className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
                                                 title="Ver Detalhes"
@@ -385,7 +391,6 @@ const CRMSales: React.FC<{
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    // Trigger existing modal but in Edit mode
                                                     const type = activeTab.endsWith('s') ? activeTab.slice(0, -1) : activeTab;
                                                     onNewRequest?.(type, item);
                                                 }}

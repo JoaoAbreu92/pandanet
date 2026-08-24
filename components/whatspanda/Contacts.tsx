@@ -33,6 +33,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     const [ignoreContact, setIgnoreContact] = useState(false);
     const [disableTranscription, setDisableTranscription] = useState(false);
     const [disableKanban, setDisableKanban] = useState(false);
+    const [assignedTo, setAssignedTo] = useState<string>('');
 
     // Auxiliary Data
     const [availableTags, setAvailableTags] = useState<WhatsAppTag[]>([]);
@@ -116,10 +117,10 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             setSelectedTags(contact.tags || []);
             setSelectedQueue(contact.queue_id || '');
             setIsBlocked(contact.is_blocked || false);
-            // Simulação de outros campos do print 3
             setIgnoreContact(contact.ignore_contact || false);
             setDisableTranscription(contact.disable_transcription || false);
             setDisableKanban(contact.disable_kanban || false);
+            setAssignedTo(contact.assigned_to || '');
         } else {
             setEditingContact(null);
             setName('');
@@ -132,6 +133,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             setIgnoreContact(false);
             setDisableTranscription(false);
             setDisableKanban(false);
+            setAssignedTo('');
         }
         setActiveTab('dados');
         setIsModalOpen(true);
@@ -141,7 +143,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
         if (!name.trim() || !phone.trim()) return;
         const companyId = currentUser?.company_id;
         
-        const contactData = {
+        const contactData: any = {
             name,
             phone,
             email,
@@ -149,10 +151,10 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             tags: selectedTags,
             queue_id: selectedQueue || null,
             is_blocked: isBlocked,
-            // Mock de suporte para campos do print 3 no futuro
             ignore_contact: ignoreContact,
             disable_transcription: disableTranscription,
             disable_kanban: disableKanban,
+            assigned_to: assignedTo || null,
             updated_at: new Date().toISOString()
         };
 
@@ -191,7 +193,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
 
     return (
         <div className="flex h-full flex-col bg-white dark:bg-[#0f111a] text-gray-700 dark:text-gray-300 overflow-hidden font-sans transition-colors duration-300">
-            {/* Toolbar - Estilo Print 2 */}
+            {/* Toolbar */}
             <div className="p-4 flex flex-wrap gap-2 items-center bg-gray-50 dark:bg-[#11141d] border-b border-gray-200 dark:border-gray-800">
                 <button 
                     onClick={handleSyncContacts}
@@ -199,15 +201,6 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 >
                     <RefreshCw className={`w-4 h-4 text-emerald-500 ${syncing ? 'animate-spin' : ''}`} />
                     Sincronizar Contatos
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
-                    <RefreshCw className="w-4 h-4" /> Sincronizar Grupos
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
-                    <RefreshCw className="w-4 h-4 transform rotate-90" /> Importar
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
-                    <RefreshCw className="w-4 h-4 transform -rotate-90" /> Exportar
                 </button>
                 <button 
                     onClick={() => handleOpenModal()}
@@ -229,18 +222,6 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                         className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-emerald-500 outline-none transition-all dark:text-white"
                     />
                 </div>
-                <div className="relative">
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none dark:text-white">
-                        <option>Etiquetas</option>
-                    </select>
-                </div>
-                <div className="relative">
-                    <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none dark:text-white">
-                        <option>Carteira</option>
-                    </select>
-                </div>
             </div>
 
             {/* Tabela de Contatos */}
@@ -251,7 +232,6 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                             <th className="p-4 w-12"><input type="checkbox" className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700" /></th>
                             <th className="p-4">Nome</th>
                             <th className="p-4">WhatsApp</th>
-                            <th className="p-4">Carteira</th>
                             <th className="p-4">Etiquetas</th>
                             <th className="p-4">Email</th>
                             <th className="p-4 text-center">Bloquear</th>
@@ -266,10 +246,27 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                     <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
                                         {contact.name?.charAt(0) || <User className="w-4 h-4" />}
                                     </div>
-                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-200">{contact.name}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-200">{contact.name}</span>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            {contact.queue_id && (
+                                                <span 
+                                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase"
+                                                    style={{ backgroundColor: availableQueues.find(q => q.id === contact.queue_id)?.color || '#6366f1' }}
+                                                >
+                                                    {availableQueues.find(q => q.id === contact.queue_id)?.name || 'Setor'}
+                                                </span>
+                                            )}
+                                            {contact.assigned_to && (
+                                                <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-[9px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-1 uppercase">
+                                                    <User className="w-2.5 h-2.5" />
+                                                    {availableUsers.find(u => u.id === contact.assigned_to)?.full_name?.split(' ')[0] || 'Atendente'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </td>
                                 <td className="p-4 text-xs font-mono text-emerald-600 dark:text-emerald-500 font-semibold">{contact.phone}</td>
-                                <td className="p-4"><span className="text-xs text-gray-400 dark:text-gray-500 italic">Nenhuma</span></td>
                                 <td className="p-4">
                                     <div className="flex gap-1">
                                         {contact.tags?.map(t => (
@@ -289,12 +286,6 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                 </td>
                                 <td className="p-4 text-right">
                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                            onClick={() => alert('Iniciando conversa...')}
-                                            className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg transition-all"
-                                        >
-                                            <MessageSquare className="w-4 h-4" />
-                                        </button>
                                         <button onClick={() => handleOpenModal(contact)} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-blue-600 dark:text-blue-500 rounded-lg transition-all">
                                             <Edit2 className="w-4 h-4" />
                                         </button>
@@ -309,146 +300,94 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 </table>
             </div>
 
-            {/* Modal de Edição Reformulado - Estilo Print 3 */}
+            {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-                    <div className="bg-white dark:bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300 overflow-hidden">
-                        {/* Header do Modal */}
+                    <div className="bg-white dark:bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
                             <UserPlus className="w-5 h-5 text-emerald-500" />
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white flex-1">
                                 {editingContact ? 'Editar Contato' : 'Adicionar Contato'}
                             </h3>
-                            <div className="flex items-center gap-2">
-                                <button className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg transition-all">
-                                    <MessageSquare className="w-5 h-5" />
-                                </button>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 dark:text-gray-500 hover:text-red-500 rounded-lg transition-all">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 dark:text-gray-500 hover:text-red-500 rounded-lg transition-all">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
 
-                        {/* Tabs */}
                         <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#11141d]">
-                            {[
-                                { id: 'dados', label: 'DADOS CONTATO', icon: User },
-                                { id: 'kanban', label: 'KANBAN', icon: LayoutGrid },
-                                { id: 'etiqueta', label: 'ETIQUETA', icon: Tag },
-                                { id: 'anotacoes', label: 'ANOTAÇÕES', icon: Edit2 },
-                            ].map(tab => (
+                            {['dados', 'kanban', 'etiqueta', 'anotacoes'].map(id => (
                                 <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id as any)}
-                                    className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 border-b-2 transition-all ${
-                                        activeTab === tab.id 
-                                        ? 'border-emerald-500 text-emerald-600 dark:text-white' 
-                                        : 'border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                    key={id}
+                                    onClick={() => setActiveTab(id as any)}
+                                    className={`flex-1 py-3 text-[10px] font-bold tracking-wider border-b-2 transition-all ${
+                                        activeTab === id ? 'border-emerald-500 text-emerald-600 dark:text-white' : 'border-transparent text-gray-400'
                                     }`}
                                 >
-                                    <tab.icon className="w-4 h-4" />
-                                    <span className="text-[9px] font-extrabold tracking-wider">{tab.label}</span>
+                                    {id.toUpperCase()}
                                 </button>
                             ))}
                         </div>
 
-                        {/* Conteúdo do Modal */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-white dark:bg-transparent">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                             {activeTab === 'dados' && (
-                                <div className="space-y-6">
-                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                                            <User className="w-4 h-4 text-emerald-500" />
-                                        </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Nome</label>
                                         <input 
                                             type="text" 
-                                            placeholder="Nome 👶"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none text-gray-900 dark:text-white"
+                                            className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 text-sm outline-none"
                                         />
                                     </div>
-
-                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">WhatsApp</label>
                                         <input 
                                             type="text" 
-                                            placeholder="WhatsApp"
                                             value={phone}
                                             onChange={(e) => setPhone(e.target.value)}
-                                            className="w-full bg-transparent pl-4 pr-10 py-1 text-sm outline-none text-gray-900 dark:text-white font-mono"
+                                            className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 text-sm outline-none font-mono"
                                         />
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                            <MessageSquare className="w-4 h-4 text-emerald-500" />
-                                        </div>
                                     </div>
-
-                                    <div className="flex items-center gap-3 text-[11px] font-bold text-emerald-600 dark:text-emerald-500/80 px-2 cursor-pointer select-none" onClick={() => { /* Op op op */ }}>
-                                        <div className={`w-10 h-5 rounded-full relative transition-all duration-300 ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${ignoreContact ? 'left-6' : 'left-1'}`} />
-                                        </div>
-                                        <span className="flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Validar se o número possui WhatsApp</span>
-                                    </div>
-
-                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                                            <Mail className="w-4 h-4 text-emerald-500" />
-                                        </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">E-mail</label>
                                         <input 
                                             type="email" 
-                                            placeholder="E-mail"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none text-gray-900 dark:text-white"
+                                            className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 text-sm outline-none"
                                         />
                                     </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
-                                        <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
-                                                <Ban className="w-3.5 h-3.5 text-red-400" /> Ignorar contato
-                                            </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setIgnoreContact(!ignoreContact)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ignoreContact ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
-                                            </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase">Setor (Fila)</label>
+                                            <select 
+                                                value={selectedQueue}
+                                                onChange={(e) => setSelectedQueue(e.target.value)}
+                                                className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 text-sm outline-none"
+                                            >
+                                                <option value="">Nenhum</option>
+                                                {availableQueues.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
+                                            </select>
                                         </div>
-                                        <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
-                                                <RefreshCw className="w-3.5 h-3.5 text-blue-400" /> Desativar Transcrição
-                                            </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${disableTranscription ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setDisableTranscription(!disableTranscription)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableTranscription ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
-                                                <LayoutGrid className="w-3.5 h-3.5 text-purple-400" /> Desativar KANBAN
-                                            </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${disableKanban ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setDisableKanban(!disableKanban)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableKanban ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
-                                            </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase">Atendente (Usuário)</label>
+                                            <select 
+                                                value={assignedTo}
+                                                onChange={(e) => setAssignedTo(e.target.value)}
+                                                className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 text-sm outline-none"
+                                            >
+                                                <option value="">Nenhum</option>
+                                                {availableUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                                            </select>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'kanban' && (
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Mover para Estágio Kanban</label>
-                                    <select 
-                                        value={selectedQueue}
-                                        onChange={(e) => setSelectedQueue(e.target.value)}
-                                        className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm outline-none text-gray-900 dark:text-white appearance-none"
-                                    >
-                                        <option value="">Selecione um Estágio...</option>
-                                        {availableQueues.map(q => (
-                                            <option key={q.id} value={q.id}>{q.name}</option>
-                                        ))}
-                                    </select>
                                 </div>
                             )}
 
                             {activeTab === 'etiqueta' && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     {availableTags.map(tag => (
                                         <button
                                             key={tag.id}
@@ -457,62 +396,40 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                                 else setSelectedTags([...selectedTags, tag.id]);
                                             }}
                                             className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                                                selectedTags.includes(tag.id) 
-                                                ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20' 
-                                                : 'bg-gray-50 dark:bg-[#11141d] border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+                                                selectedTags.includes(tag.id) ? 'bg-emerald-500/10 border-emerald-500' : 'bg-gray-50 dark:bg-[#11141d] border-gray-800'
                                             }`}
                                         >
-                                            <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: tag.color }} />
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{tag.name}</span>
-                                            {selectedTags.includes(tag.id) && <Check className="w-3.5 h-3.5 ml-auto text-emerald-500" />}
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                            <span className="text-[10px] font-bold uppercase">{tag.name}</span>
                                         </button>
                                     ))}
-                                    {availableTags.length === 0 && (
-                                        <div className="col-span-2 py-8 text-center text-gray-400 italic text-xs">Nenhuma etiqueta cadastrada.</div>
-                                    )}
                                 </div>
                             )}
 
                             {activeTab === 'anotacoes' && (
                                 <textarea 
-                                    placeholder="Escreva anotações internas sobre este contato..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-xl p-4 text-sm outline-none resize-none h-48 focus:border-emerald-500 transition-all text-gray-900 dark:text-white"
+                                    className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-lg p-4 text-sm outline-none resize-none h-48"
+                                    placeholder="Notas internas..."
                                 />
                             )}
                         </div>
 
-                        {/* Footer do Modal */}
-                        <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-transparent">
-                            <button 
-                                onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all shadow-sm"
-                            >
-                                <X className="w-4 h-4" /> Cancelar
-                            </button>
-                            <button 
-                                onClick={handleSave}
-                                className="px-8 py-2.5 bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all shadow-lg"
-                            >
-                                <Check className="w-4 h-4" /> {editingContact ? 'Salvar Alterações' : 'Criar Contato'}
-                            </button>
+                        <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+                            <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-xs font-bold uppercase transition-all">Cancelar</button>
+                            <button onClick={handleSave} className="px-8 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase transition-all">Salvar</button>
                         </div>
                     </div>
                 </div>
             )}
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
             `}</style>
         </div>
     );
 };
 
 export default Contacts;
-

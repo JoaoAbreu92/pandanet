@@ -18,28 +18,29 @@ import { CRMCustomer } from '../types';
 import toast from 'react-hot-toast';
 
 interface CRMSubscriptionFormProps {
+    initialData?: any;
     onClose: () => void;
     onSave: () => void;
 }
 
-const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSave }) => {
+const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ initialData, onClose, onSave }) => {
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState<CRMCustomer[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState(false);
 
     const [formData, setFormData] = useState({
-        customer_id: '',
-        name: '', // Nome da Assinatura
-        stripe_plan_id: '', // Plano para Inscrição (Stripe)
-        tax_1: 0,
-        tax_2: 0,
-        description: '', // Descrição na Fatura
-        include_description_in_item: false,
-        first_billing_date: '', // Data da 1ª Fatura
-        currency: 'BRL',
-        quantity: 1,
-        terms: ''
+        customer_id: initialData?.customer_id || '',
+        name: initialData?.name || '', // Nome da Assinatura
+        stripe_plan_id: initialData?.stripe_plan_id || '', // Plano para Inscrição (Stripe)
+        tax_1: initialData?.tax_1 || 0,
+        tax_2: initialData?.tax_2 || 0,
+        description: initialData?.description || '', // Descrição na Fatura
+        include_description_in_item: initialData?.include_description_in_item || false,
+        first_billing_date: initialData?.next_billing_cycle ? new Date(initialData.next_billing_cycle).toISOString().split('T')[0] : '', // Data da 1ª Fatura
+        currency: initialData?.currency || 'BRL',
+        quantity: initialData?.quantity || 1,
+        terms: initialData?.terms || ''
     });
 
     useEffect(() => {
@@ -71,23 +72,35 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
 
         try {
             setLoading(true);
-            const { error } = await supabase
-                .from('crm_subscriptions')
-                .insert([{
-                    company_id: currentUser.company_id,
-                    customer_id: formData.customer_id,
-                    name: formData.name,
-                    description: formData.description,
-                    quantity: formData.quantity,
-                    currency: formData.currency,
-                    stripe_plan_id: formData.stripe_plan_id,
-                    terms: formData.terms,
-                    next_billing_cycle: formData.first_billing_date || null,
-                    status: 'active'
-                }]);
+            const dbData = {
+                company_id: currentUser.company_id,
+                customer_id: formData.customer_id,
+                name: formData.name,
+                description: formData.description,
+                quantity: formData.quantity,
+                currency: formData.currency,
+                stripe_plan_id: formData.stripe_plan_id,
+                terms: formData.terms,
+                next_billing_cycle: formData.first_billing_date || null,
+                status: 'active'
+            };
+
+            let query;
+            if (initialData?.id) {
+                query = supabase
+                    .from('crm_subscriptions')
+                    .update(dbData)
+                    .eq('id', initialData.id);
+            } else {
+                query = supabase
+                    .from('crm_subscriptions')
+                    .insert([dbData]);
+            }
+
+            const { error } = await query;
 
             if (error) throw error;
-            toast.success('Assinatura criada com sucesso!');
+            toast.success(initialData ? 'Assinatura atualizada com sucesso!' : 'Assinatura criada com sucesso!');
             onSave();
             onClose();
         } catch (error: any) {

@@ -14,23 +14,24 @@ import { CRMCustomer } from '../types';
 import toast from 'react-hot-toast';
 
 interface CRMContractFormProps {
+    initialData?: any;
     onClose: () => void;
     onSave: () => void;
 }
 
-const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) => {
+const CRMContractForm: React.FC<CRMContractFormProps> = ({ initialData, onClose, onSave }) => {
     const { currentUser } = useAuth();
     const [customers, setCustomers] = useState<CRMCustomer[]>([]);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        customer_id: '',
-        subject: '',
-        contract_value: 0,
-        contract_type: 'Service',
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: '',
-        description: '',
-        status: 'active'
+        customer_id: initialData?.customer_id || '',
+        subject: initialData?.subject || '',
+        contract_value: initialData?.contract_value || 0,
+        contract_type: initialData?.contract_type || 'Service',
+        start_date: initialData?.start_date || new Date().toISOString().split('T')[0],
+        end_date: initialData?.end_date || '',
+        description: initialData?.description || '',
+        status: initialData?.status || 'active'
     });
 
     useEffect(() => {
@@ -56,26 +57,38 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
 
         try {
             setLoading(true);
-            const { error } = await supabase
-                .from('crm_contracts')
-                .insert([{
-                    customer_id: formData.customer_id,
-                    subject: formData.subject,
-                    contract_value: formData.contract_value,
-                    contract_type: formData.contract_type,
-                    start_date: formData.start_date,
-                    end_date: formData.end_date || null,
-                    description: formData.description,
-                    status: formData.status,
-                    company_id: currentUser.company_id
-                }]);
+            const dbData = {
+                customer_id: formData.customer_id,
+                subject: formData.subject,
+                contract_value: formData.contract_value,
+                contract_type: formData.contract_type,
+                start_date: formData.start_date,
+                end_date: formData.end_date || null,
+                description: formData.description,
+                status: formData.status,
+                company_id: currentUser.company_id
+            };
+
+            let query;
+            if (initialData?.id) {
+                query = supabase
+                    .from('crm_contracts')
+                    .update(dbData)
+                    .eq('id', initialData.id);
+            } else {
+                query = supabase
+                    .from('crm_contracts')
+                    .insert([dbData]);
+            }
+
+            const { error } = await query;
 
             if (error) {
-                console.error('Error inserting contract:', error);
+                console.error('Error saving contract:', error);
                 toast.error(`Erro ao salvar contrato: ${error.message || 'Erro desconhecido'}`);
                 throw error;
             }
-            toast.success('Contrato criado com sucesso!');
+            toast.success(initialData ? 'Contrato atualizado com sucesso!' : 'Contrato criado com sucesso!');
             onSave();
             onClose();
         } catch (error) {
@@ -93,7 +106,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <DocumentTextIcon className="w-6 h-6 text-brand-primary" />
-                            Novo Contrato
+                            {initialData?.id ? 'Editar Contrato' : 'Novo Contrato'}
                         </h2>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors">
@@ -222,7 +235,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                             disabled={loading}
                             className="bg-brand-primary text-white px-10 py-3 rounded-xl font-black hover:shadow-lg transition-all flex items-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50"
                         >
-                            {loading ? 'Salvando...' : <><CheckIcon className="w-4 h-4" /> Criar Contrato</>}
+                            {loading ? 'Salvando...' : <><CheckIcon className="w-4 h-4" /> {initialData?.id ? 'Atualizar Contrato' : 'Criar Contrato'}</>}
                         </button>
                     </div>
                 </form>

@@ -593,6 +593,8 @@ const AppContent: React.FC = () => {
     const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
     const [showContractForm, setShowContractForm] = useState(false);
     const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>([]);
+    const [editingItem, setEditingItem] = useState<any>(null);
+    const [isReadOnly, setIsReadOnly] = useState(false);
 
     const fetchCRMCustomers = useCallback(async () => {
         if (!currentUser?.company_id) return;
@@ -715,10 +717,11 @@ const AppContent: React.FC = () => {
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
                         onNewRequest={(type, item) => {
+                            setEditingItem(item || null);
+                            setIsReadOnly(false); // Default to edit mode
                             if (type === 'item') setShowItemForm(true);
                             else if (type === 'subscription') setShowSubscriptionForm(true);
                             else setFinanceFormType(type as any);
-                            // TODO: Pass item to forms for editing
                         }}
                     />
                 );
@@ -728,7 +731,10 @@ const AppContent: React.FC = () => {
                         initialTab="subscriptions"
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type, item) => setShowSubscriptionForm(true)}
+                        onNewRequest={(type, item) => {
+                            setEditingItem(item || null);
+                            setShowSubscriptionForm(true);
+                        }}
                     />
                 );
             case 'crm-contracts':
@@ -737,7 +743,10 @@ const AppContent: React.FC = () => {
                         initialTab="contracts"
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type, item) => setShowContractForm(true)}
+                        onNewRequest={(type, item) => {
+                            setEditingItem(item || null);
+                            setShowContractForm(true);
+                        }}
                     />
                 );
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
@@ -901,11 +910,18 @@ const AppContent: React.FC = () => {
                 {financeFormType && (
                     <CRMFinanceForm
                         type={financeFormType}
+                        initialData={editingItem}
+                        readOnly={isReadOnly}
                         customers={crmCustomers}
                         currentUser={currentUser}
-                        onClose={() => setFinanceFormType(null)}
+                        onClose={() => {
+                            setFinanceFormType(null);
+                            setEditingItem(null);
+                            setIsReadOnly(false);
+                        }}
                         onSuccess={() => {
                             setFinanceFormType(null);
+                            setEditingItem(null);
                             setCrmRefreshTrigger(prev => prev + 1);
                         }}
                     />
@@ -923,9 +939,14 @@ const AppContent: React.FC = () => {
 
                 {showSubscriptionForm && (
                     <CRMSubscriptionForm
-                        onClose={() => setShowSubscriptionForm(false)}
+                        initialData={editingItem}
+                        onClose={() => {
+                            setShowSubscriptionForm(false);
+                            setEditingItem(null);
+                        }}
                         onSave={() => {
                             setShowSubscriptionForm(false);
+                            setEditingItem(null);
                             setCrmRefreshTrigger(prev => prev + 1);
                         }}
                     />
@@ -933,9 +954,14 @@ const AppContent: React.FC = () => {
 
                 {showContractForm && (
                     <CRMContractForm
-                        onClose={() => setShowContractForm(false)}
+                        initialData={editingItem}
+                        onClose={() => {
+                            setShowContractForm(false);
+                            setEditingItem(null);
+                        }}
                         onSave={() => {
                             setShowContractForm(false);
+                            setEditingItem(null);
                             setCrmRefreshTrigger(prev => prev + 1);
                         }}
                     />

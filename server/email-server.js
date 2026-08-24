@@ -127,6 +127,78 @@ setInterval(async () => {
     }
 }, 60000);
 
+// --- SEARCH EMAILS (GLOBAL) ---
+app.post('/api/email/search', authMiddleware, async (req, res) => {
+    const { config, query } = req.body;
+    if (!config || !query) return res.status(400).json({ error: 'Missing config or query' });
+
+    console.log(`[email-server] GLOBAL SEARCH: "${query}" for ${config.imap_user}`);
+
+    try {
+        const client = await getPooledClient(config);
+        const folders = await client.list();
+        const allResults = [];
+
+        for (const folder of folders) {
+            // Skip Trash and Spam for global search unless specified? 
+            // The user said "all emails, inbox and folders". 
+            // I'll skip common trash/spam folders to keep results relevant, but include most.
+            const lcPath = folder.path.toLowerCase();
+            if (lcPath.includes('trash') || lcPath.includes('lixeira') || lcPath.includes('spam') || lcPath.includes('junk')) {
+                continue;
+            }
+
+            const lock = await client.getMailboxLock(folder.path);
+            try {
+                // Search for current query in Subject, From, To or Body
+                const searchCriteria = {
+                    or: [
+                        { subject: query },
+                        { from: query },
+                        { to: query },
+                        { body: query }
+                    ]
+                };
+
+                const uids = await client.search(searchCriteria);
+                if (uids.length > 0) {
+                    // Fetch details for found UIDs
+                    // Limit to newest 20 per folder to avoid timeout/bloat
+                    const sortedUids = uids.sort((a, b) => b - a).slice(0, 20);
+                    
+                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true, source: true })) {
+                        const parsed = await simpleParser(message.source);
+                        const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
+                        
+                        allResults.push({
+                            uid: message.uid,
+                            messageId: message.envelope.messageId,
+                            subject: message.envelope.subject || '(Sem Assunto)',
+                            from: message.envelope.from?.[0]?.address || 'Desconhecido',
+                            date: message.envelope.date,
+                            flags: message.flags,
+                            snippet: snippet + (snippet.length === 100 ? '...' : ''),
+                            folder: folder.path
+                        });
+                    }
+                }
+            } catch (folderErr) {
+                console.warn(`[email-server] Search failed in folder ${folder.path}:`, folderErr.message);
+            } finally {
+                lock.release();
+            }
+        }
+
+        // Sort results by date desc across all folders
+        allResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return res.json({ emails: allResults, total: allResults.length });
+    } catch (err) {
+        console.error('[email-server] Global Search Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // --- FETCH EMAILS (IMAP) ---
 app.post('/api/email/fetch', authMiddleware, async (req, res) => {
     const { config, path } = req.body;

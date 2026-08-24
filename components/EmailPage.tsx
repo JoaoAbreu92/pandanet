@@ -192,14 +192,50 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     const closeContextMenu = () => setContextMenu(null);
 
-    // Click outside to close
+    // --- Persistence (localStorage) ---
     useEffect(() => {
-        const handleClick = () => closeContextMenu();
-        window.addEventListener('click', handleClick);
-        return () => window.removeEventListener('click', handleClick);
-    }, []);
+        const savedView = localStorage.getItem(`panda_email_view_${currentUser.id}`);
+        const savedFolder = localStorage.getItem(`panda_email_folder_${currentUser.id}`);
+        const savedSelected = localStorage.getItem(`panda_email_selected_${currentUser.id}`);
+        const savedLocallySeen = localStorage.getItem(`panda_email_seen_${currentUser.id}`);
 
-    // Sincroniza o contador local de nÃ£o lidos com o badge global do Sidebar
+        if (savedView) setView(savedView as any);
+        if (savedFolder) setCurrentFolder(savedFolder);
+        if (savedLocallySeen) {
+            try {
+                const seenArray = JSON.parse(savedLocallySeen);
+                setLocallySeenUids(new Set(seenArray));
+            } catch (e) { console.error("Error parsing saved seen UIDs", e); }
+        }
+        if (savedSelected) {
+            try {
+                const email = JSON.parse(savedSelected);
+                setSelectedEmail(email);
+                // If it was open, fetch body again to be sure
+                if (savedView === 'read') {
+                    fetchEmailBody(email.uid, email.folder || savedFolder || 'INBOX');
+                }
+            } catch (e) { console.error("Error parsing saved selected email", e); }
+        }
+    }, [currentUser.id]);
+
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        localStorage.setItem(`panda_email_view_${currentUser.id}`, view);
+        localStorage.setItem(`panda_email_folder_${currentUser.id}`, currentFolder);
+        if (selectedEmail) {
+            localStorage.setItem(`panda_email_selected_${currentUser.id}`, JSON.stringify(selectedEmail));
+        } else {
+            localStorage.removeItem(`panda_email_selected_${currentUser.id}`);
+        }
+    }, [view, currentFolder, selectedEmail, currentUser.id]);
+
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        localStorage.setItem(`panda_email_seen_${currentUser.id}`, JSON.stringify(Array.from(locallySeenUids)));
+    }, [locallySeenUids, currentUser.id]);
+
+    // Sincroniza o contador local de não lidos com o badge global do Sidebar
     useEffect(() => {
         setModuleUnreadCount('email', unseenCount);
     }, [unseenCount, setModuleUnreadCount]);
@@ -694,17 +730,25 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
 
 
+    const handleSearch = (e: React.FormEvent | React.KeyboardEvent) => {
+        if ('key' in e && e.key !== 'Enter') return;
+        e.preventDefault();
+        setPage(1);
+        fetchEmails(false, true);
+    };
+
     const fetchEmails = async (isBackground = false, forceRefresh = false) => {
         if (!settings.imap_user) return;
 
-        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        const isSearchingGlobal = searchQuery.trim().length > 0;
+        const cacheKey = `${currentUser.id}_${isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder}_${page}`;
         const cached = emailCache[cacheKey];
 
         // Use cache on initial load (not background polling, not forced refresh)
         if (!isBackground && !forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
             setEmails(cached.emails);
             setTotalEmails(cached.total);
-            if (currentFolder === 'INBOX') setUnseenCount(cached.unseen);
+            if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(cached.unseen);
             return;
         }
 
@@ -712,12 +756,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         else setRefreshing(true);
 
         try {
-            const { data, error } = await callEmailServer('fetch', {
-                config: settings,
-                path: currentFolder,
-                page,
-                pageSize
-            });
+            const action = isSearchingGlobal ? 'search' : 'fetch';
+            const payload = isSearchingGlobal 
+                ? { config: settings, query: searchQuery.trim() }
+                : { config: settings, path: currentFolder, page, pageSize };
+
+            const { data, error } = await callEmailServer(action, payload);
             if (error) throw error;
             if (data.error) throw new Error(data.error);
 
@@ -727,7 +771,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             const unseen = data.unseen || 0;
 
             setTotalEmails(total);
-            if (currentFolder === 'INBOX') setUnseenCount(unseen);
+            if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(unseen);
 
             // Fetch Local Metadata (Tags/Notes)
             const { data: metadataList } = await supabase
@@ -1187,7 +1231,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Pesquisar e-mails..."
+                                onKeyDown={handleSearch}
+                                placeholder="Pesquisar em tudo..."
                                 className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white"
                             />
                         </div>
@@ -1229,8 +1274,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             <div className={`text-sm truncate pr-2 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
                                                 {email.from}
                                             </div>
-                                            <div className="text-[10px] text-gray-400 font-medium whitespace-nowrap opacity-60">
-                                                {new Date(email.date).toLocaleDateString()}
+                                            <div className="text-[10px] text-gray-400 font-medium whitespace-nowrap opacity-60 flex flex-col items-end">
+                                                <span>{new Date(email.date).toLocaleDateString()}</span>
+                                                {(email as any).folder && (
+                                                    <span className="text-[8px] font-bold text-brand-primary uppercase mt-1">{(email as any).folder}</span>
+                                                )}
                                             </div>
                                         </div>
                                         <div className={`text-sm line-clamp-1 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
