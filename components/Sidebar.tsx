@@ -148,7 +148,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         return (
             <div>
                 <button
-                    onClick={() => toggleMenu(menuKey)}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleMenu(menuKey);
+                    }}
                     className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 relative group
                         ${isActive
                             ? 'bg-brand-primary/10 text-brand-primary dark:text-brand-primary border border-brand-primary/20'
@@ -240,14 +244,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavMenu label="CRM & Vendas" icon={BuildingOfficeIcon} menuKey="crm" permission={!!customFeatures?.crm}>
                     <NavItem page="crm-dashboard" label="Dashboard CRM" icon={ChartBarIcon} permission={true} />
                     <NavItem page="crm-customers" label="Clientes" icon={UserGroupIcon} permission={true} />
-                    <NavMenu label="Vendas" icon={BuildingStorefrontIcon} menuKey="portal" permission={true}>
-                        <NavItem page="crm-proposals" label="Propostas" icon={DocumentTextIcon} permission={true} />
-                        <NavItem page="crm-estimates" label="Estimativas" icon={DocumentTextIcon} permission={true} />
-                        <NavItem page="crm-invoices" label="Faturas" icon={BanknotesIcon} permission={true} />
-                        <NavItem page="crm-payments" label="Pagamentos" icon={CurrencyDollarIcon} permission={true} />
-                        <NavItem page="crm-credit-notes" label="Notas de Crédito" icon={DocumentTextIcon} permission={true} />
-                        <NavItem page="crm-items" label="Itens" icon={PlusIcon} permission={true} />
-                    </NavMenu>
+                    <NavItem page="crm-proposals" label="Propostas" icon={DocumentTextIcon} permission={true} />
+                    <NavItem page="crm-estimates" label="Estimativas" icon={DocumentTextIcon} permission={true} />
+                    <NavItem page="crm-invoices" label="Faturas" icon={BanknotesIcon} permission={true} />
+                    <NavItem page="crm-payments" label="Pagamentos" icon={CurrencyDollarIcon} permission={true} />
+                    <NavItem page="crm-credit-notes" label="Notas de Crédito" icon={DocumentTextIcon} permission={true} />
                     <NavItem page="crm-subscriptions" label="Assinaturas" icon={CalendarDaysIcon} permission={true} />
                     <NavItem page="crm-contracts" label="Contratos" icon={DocumentTextIcon} permission={true} />
                     <NavItem page="crm-tasks" label="Minhas Tarefas" icon={FolderIcon} permission={true} />

@@ -121,8 +121,8 @@ const CRMCustomerDetail: React.FC<CRMCustomerDetailProps> = ({ customer, onClose
     ];
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-end bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500 border-l border-white/10">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl max-h-[90dvh] rounded-3xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/10 overflow-hidden">
                 {/* Header */}
                 <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center gap-3">

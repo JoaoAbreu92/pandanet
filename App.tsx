@@ -47,6 +47,7 @@ import CRMDashboard from './components/CRMDashboard';
 import CRMCustomers from './components/CRMCustomers';
 import CRMCustomerDetail from './components/CRMCustomerDetail';
 import CRMNewCustomerForm from './components/CRMNewCustomerForm';
+import CRMFinanceForm from './components/CRMFinanceForm';
 import CRMCalendar from './components/CRMCalendar';
 import CRMSales from './components/CRMSales';
 import WhatsPanda from './components/WhatsPanda.tsx';
@@ -561,6 +562,7 @@ const AppContent: React.FC = () => {
 
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<CRMCustomer | null>(null);
+    const [financeFormType, setFinanceFormType] = useState<'invoice' | 'proposal' | 'estimate' | null>(null);
 
     const handleViewCustomer = async (customerOrId: CRMCustomer | string) => {
         if (typeof customerOrId === 'string') {
@@ -645,7 +647,13 @@ const AppContent: React.FC = () => {
             case 'crm-payments':
             case 'crm-credit-notes':
             case 'crm-items':
-                return <CRMSales initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any} />;
+                return (
+                    <CRMSales
+                        initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any}
+                        onViewCustomer={handleViewCustomer}
+                        onNewRequest={(type) => setFinanceFormType(type as any)}
+                    />
+                );
             case 'crm-subscriptions':
                 return <CRMSales initialTab="subscriptions" />;
             case 'crm-contracts':
@@ -773,6 +781,15 @@ const AppContent: React.FC = () => {
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
                 {isNewCustomerModalOpen && <CRMNewCustomerForm onClose={() => setIsNewCustomerModalOpen(false)} />}
+                {financeFormType && (
+                    <CRMFinanceForm
+                        type={financeFormType}
+                        customers={(companyData?.employees as any[] || [])} // Simplification for now, should be real customers
+                        currentUser={currentUser}
+                        onClose={() => setFinanceFormType(null)}
+                        onSave={(data) => console.log('Saving finance data:', data)}
+                    />
+                )}
             </Layout>
         );
     }

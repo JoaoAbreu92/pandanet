@@ -15,7 +15,11 @@ import { useAuth } from './AuthContext';
 
 type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscriptions' | 'contracts';
 
-const CRMSales: React.FC<{ initialTab?: SalesTab, onViewCustomer?: (id: string) => void }> = ({ initialTab = 'invoices', onViewCustomer }) => {
+const CRMSales: React.FC<{
+    initialTab?: SalesTab,
+    onViewCustomer?: (id: string) => void,
+    onNewRequest?: (type: string) => void
+}> = ({ initialTab = 'invoices', onViewCustomer, onNewRequest }) => {
     const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<SalesTab>(initialTab);
     const [searchQuery, setSearchQuery] = useState('');
@@ -115,7 +119,14 @@ const CRMSales: React.FC<{ initialTab?: SalesTab, onViewCustomer?: (id: string) 
             {/* List Control actions */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800">
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg">
+                    <button
+                        onClick={() => {
+                            if (['proposals', 'estimates', 'invoices'].includes(activeTab)) {
+                                onNewRequest?.(activeTab.slice(0, -1));
+                            }
+                        }}
+                        className="flex items-center gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg"
+                    >
                         <PlusIcon className="w-4 h-4" />
                         Nova {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}
                     </button>
