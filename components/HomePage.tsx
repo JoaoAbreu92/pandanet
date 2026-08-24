@@ -192,7 +192,7 @@ const MasterBanner: React.FC = () => {
                             src={bannerData!.videoUrl}
                             autoPlay muted loop playsInline
                             className="w-full object-cover"
-                            style={{ minHeight: '400px', maxHeight: '500px' }}
+                            style={{ minHeight: '415px', maxHeight: '515px' }}
                         />
                     ) : bannerData!.link ? (
                         <a href={bannerData!.link} target="_blank" rel="noopener noreferrer" className="block">
@@ -200,7 +200,7 @@ const MasterBanner: React.FC = () => {
                                 src={bannerData!.imageUrl}
                                 alt="Banner Master"
                                 className="w-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
-                                style={{ minHeight: '400px', maxHeight: '500px' }}
+                                style={{ minHeight: '415px', maxHeight: '515px' }}
                             />
                             {bannerData!.buttonText && (
                                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
@@ -215,7 +215,7 @@ const MasterBanner: React.FC = () => {
                             src={bannerData!.imageUrl}
                             alt="Banner Master"
                             className="w-full object-cover"
-                            style={{ minHeight: '400px', maxHeight: '500px' }}
+                            style={{ minHeight: '415px', maxHeight: '515px' }}
                         />
                     )}
 
@@ -342,11 +342,11 @@ const MasterBanner: React.FC = () => {
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser }) => {
     return (
         <div className="space-y-8">
-            {/* Carrossel principal da empresa */}
-            <Carousel />
-
             {/* Banner Master - visível para todos, editável só pelo Masteradmin/GrupoPixel */}
             <MasterBanner />
+
+            {/* Carrossel principal da empresa */}
+            <Carousel />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Column */}

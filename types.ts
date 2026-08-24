@@ -735,10 +735,16 @@ export interface WhatsAppQueue {
 }
 
 export interface WhatsAppTag {
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface WhatsAppKanbanColumn {
   id: string;
   company_id: string;
   name: string;
   color: string;
+  order_index: number;
   is_active: boolean;
   created_at: string;
 }
@@ -780,6 +786,7 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
     connection_name?: string;
   };
   tags?: WhatsAppConversationTag[];
+  kanban_column?: WhatsAppKanbanColumn;
   notes_count?: number;
 }
 

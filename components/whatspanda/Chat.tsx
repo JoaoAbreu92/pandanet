@@ -368,7 +368,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
         queue:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
-        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
+        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
+        kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
       `)
       .eq('id', id)
       .single();
@@ -401,7 +402,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
         queue:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
-        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
+        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
+        kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
       `)
       .eq('company_id', companyId)
       .eq('status', activeTab);
@@ -418,9 +420,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
+      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%,contact_name.ilike.%Grupo%');
     } else if (chatTypeFilter === 'private') {
-      query = query.or('is_group.eq.false,is_group.is.null').not('contact_phone', 'ilike', '%@g.us%');
+      query = query.neq('is_group', true).not('contact_phone', 'ilike', '%@g.us%');
     }
 
     // Logica de visibilidade:
@@ -1042,6 +1044,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-500/30 font-bold flex items-center gap-1 shadow-sm">
                         <LayoutGrid className="w-2.5 h-2.5" />
                         {conv.department.name}
+                      </span>
+                    )}
+                    {conv.kanban_column && (
+                      <span 
+                        className="text-[9px] px-2 py-0.5 rounded-md border font-bold flex items-center gap-1 shadow-sm"
+                        style={{ 
+                          backgroundColor: `${conv.kanban_column.color}20`, 
+                          color: conv.kanban_column.color,
+                          borderColor: `${conv.kanban_column.color}40`
+                        }}
+                      >
+                        <Clock className="w-2.5 h-2.5" />
+                        {conv.kanban_column.name}
                       </span>
                     )}
                   </div>
