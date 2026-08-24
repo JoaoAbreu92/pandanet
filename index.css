@@ -251,4 +251,24 @@
 
 .animate-wiggle-shake {
   animation: wiggle-shake-anim 0.4s ease-in-out;
-}
+}
+
+/* Gamification Badges Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 15s linear infinite;
+}
+

@@ -168,7 +168,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                         </div>
                     )}
 
-                    <div 
+                    <div
                         onContextMenu={(e) => onContextMenu(e, message)}
                         className={`p-3 rounded-lg max-w-xs sm:max-w-md cursor-context-menu select-none ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'} hover:brightness-95 transition-all`}
                         title="Clique com o botão direito para reagir ou responder"
@@ -1440,7 +1440,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             )}
                             {conversations.filter(c => {
                                 if (c.isGroup) return false;
-                                
+
                                 // Determine if this is a cross-company support conversation
                                 const isMasterAdminUser = currentUser?.email === 'ti@grupopixel.com.br' || currentUser?.id === masterAdminId;
                                 const isSupportConv = (isMasterAdminUser || c.participantId === masterAdminId) && c.company_id !== currentUser?.company_id;

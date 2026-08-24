@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Card from './Card';
 import { PencilIcon, SparklesIcon } from './icons';
-import type { Employee, Post } from '../types';
+import type { Employee, Post, CompanyBadge, UserBadge } from '../types';
 import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -21,7 +21,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [isUploading, setIsUploading] = useState(false);
     const [targetUser, setTargetUser] = useState<Employee | null>(null);
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
-    const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'security' | 'ai'>(userId && userId !== currentUser.id ? 'activity' : 'info');
+    const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'security' | 'ai' | 'conquistas'>(userId && userId !== currentUser.id ? 'activity' : 'info');
     const [loading, setLoading] = useState(false);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -186,6 +186,38 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
         if (effectiveUser.id) {
             fetchUserPosts(effectiveUser.id);
         }
+    }, [effectiveUser.id]);
+
+    const [profileBadges, setProfileBadges] = useState<UserBadge[]>([]);
+
+    useEffect(() => {
+        const fetchProfileBadges = async () => {
+            if (!effectiveUser.id) return;
+            const { data } = await supabase
+                .from('user_badges')
+                .select(`
+                    id,
+                    company_id,
+                    user_id,
+                    badge_id,
+                    awarded_by,
+                    reason,
+                    is_equipped,
+                    created_at,
+                    company_badges (
+                        id,
+                        name,
+                        description,
+                        icon,
+                        color
+                    )
+                `)
+                .eq('user_id', effectiveUser.id);
+            if (data) {
+                setProfileBadges(data as any[]);
+            }
+        };
+        fetchProfileBadges();
     }, [effectiveUser.id]);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -584,7 +616,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 </div>
             </div>
 
-            <div className="pt-16">
+            {/* PERFIL HEADER: NOME, CARGO E SELOS EM DESTAQUE */}
+            <div className="bg-white dark:bg-slate-900 border border-gray-150 dark:border-slate-800 rounded-b-xl px-6 pb-6 pt-16 -mt-2 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-slate-800 dark:text-white">
+                <div>
+                    <h3 className="text-2xl font-black leading-tight">{userData.name}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{userData.role} • {userData.team}</p>
+                </div>
+                {/* Equipped Badges Row */}
+                <div className="flex gap-2 flex-wrap select-none mt-2 md:mt-0">
+                    {profileBadges.filter(ub => ub.is_equipped).slice(0, 6).map(ub => {
+                        const badge = ub.company_badges;
+                        if (!badge) return null;
+                        return (
+                            <div 
+                                key={ub.id} 
+                                className={`w-11 h-11 rounded-xl ${badge.color} border flex items-center justify-center text-2xl shadow-md select-none transform hover:scale-110 transition-transform duration-300 cursor-pointer animate-float`}
+                                title={`${badge.name}: ${badge.description || ''}`}
+                            >
+                                {badge.icon}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="pt-4">
                 {/* Tabs */}
                 <div className="border-b border-gray-200 mb-6">
                     <nav className="-mb-px flex space-x-8">
@@ -619,6 +675,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 Assistente IA
                             </button>
                         )}
+                        <button
+                            onClick={() => setActiveTab('conquistas')}
+                            className={`${activeTab === 'conquistas' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                        >
+                            Conquistas
+                        </button>
                     </nav>
                 </div>
 
@@ -897,6 +959,43 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 )}
                             </div>
                         </Card>
+                ) : activeTab === 'conquistas' ? (
+                    <Card title="🏆 Selos & Conquistas" className="bg-white dark:bg-slate-800">
+                        {profileBadges.length === 0 ? (
+                            <p className="text-sm text-slate-500 text-center py-8">
+                                Nenhuma conquista registrada para este perfil ainda.
+                            </p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                                {profileBadges.map(ub => {
+                                    const badge = ub.company_badges;
+                                    if (!badge) return null;
+                                    return (
+                                        <div 
+                                            key={ub.id}
+                                            className="flex items-start space-x-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30 shadow-sm hover:shadow transition-shadow"
+                                        >
+                                            <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-sm shrink-0 select-none transform hover:scale-105 transition-transform animate-float`}>
+                                                {badge.icon}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-slate-850 dark:text-white text-base truncate">{badge.name}</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{badge.description}</p>
+                                                {ub.reason && (
+                                                    <p className="text-xs text-slate-600 dark:text-slate-350 mt-2 bg-white dark:bg-slate-700/50 p-2.5 rounded-xl italic border border-slate-100 dark:border-slate-750 font-medium">
+                                                        "{ub.reason}"
+                                                    </p>
+                                                )}
+                                                <p className="text-[10px] text-slate-400 mt-2">
+                                                    Conquistado em: {new Date(ub.created_at).toLocaleDateString('pt-BR')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </Card>
                 ) : (
                     <div className="space-y-6">
                         {filteredPosts.length > 0 ? (

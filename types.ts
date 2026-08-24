@@ -818,4 +818,27 @@ export interface ActiveChatHead {
   participantName: string;
   participantAvatarUrl: string;
   participantId?: string;
-}
+}
+
+export interface CompanyBadge {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  created_at?: string;
+}
+
+export interface UserBadge {
+  id: string;
+  company_id: string;
+  user_id: string;
+  badge_id: string;
+  awarded_by?: string;
+  reason?: string;
+  is_equipped: boolean;
+  created_at?: string;
+  company_badges?: CompanyBadge; // Quando carregado via join
+}
+

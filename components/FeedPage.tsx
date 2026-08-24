@@ -8,7 +8,7 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon, ShieldCheckIcon as ShieldCheck } from './icons';
-import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page } from '../types';
+import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page, CompanyBadge, UserBadge } from '../types';
 
 export const PostCard: React.FC<{
     post: Post;
@@ -84,45 +84,114 @@ export const PostCard: React.FC<{
 
     const isAuthor = currentUser.id === post.authorId;
 
+    const isBadgeAward = post.content.startsWith('[BADGE_AWARD]');
+    let badgeData: any = null;
+    if (isBadgeAward) {
+        try {
+            badgeData = JSON.parse(post.content.replace('[BADGE_AWARD]', ''));
+        } catch (e) {
+            console.error('Failed to parse badge award json', e);
+        }
+    }
+
     return (
-        <Card title="" className="pb-2 overflow-visible">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                    <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
-                    <div>
-                        <h4 className="font-bold text-brand-text dark:text-gray-100">{post.authorName}</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(post.timestamp).toLocaleString()}</p>
+        <Card 
+            title="" 
+            className={`pb-2 overflow-visible transition-all duration-500 ${
+                badgeData 
+                    ? 'border-2 border-amber-400 bg-slate-950 shadow-xl shadow-amber-500/5 relative overflow-hidden dark:bg-slate-950 dark:border-amber-400/60' 
+                    : ''
+            }`}
+        >
+            {badgeData ? (
+                <div className="py-6 px-4 flex flex-col items-center relative select-none">
+                    {/* Glowing background rays */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
+                    
+                    {/* Delete button for badge award post */}
+                    {isAuthor && (
+                        <button 
+                            onClick={() => onDelete(post.id)} 
+                            className="absolute right-0 top-0 p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                            title={t('feed.delete_post')}
+                        >
+                            <TrashIcon className="w-5 h-5" />
+                        </button>
+                    )}
+
+                    {/* Badge Icon 3D Floating */}
+                    <div className={`w-24 h-24 rounded-3xl ${badgeData.badge_color} border-2 border-white/20 flex items-center justify-center text-5xl shadow-xl shadow-slate-900/50 transform hover:scale-115 hover:rotate-6 transition-all duration-305 cursor-pointer animate-float select-none`}>
+                        {badgeData.badge_icon}
+                    </div>
+
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-5 flex items-center gap-1">
+                        🏆 Nova Conquista Registrada
+                    </span>
+
+                    <h3 className="text-xl font-black text-white mt-2 leading-tight">
+                        Parabéns, {badgeData.recipient_name}! 🎉
+                    </h3>
+
+                    <p className="text-xs text-slate-300 mt-1.5 font-medium">
+                        Conquistou o selo <span className="font-bold text-white">{badgeData.badge_name}</span>
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-4 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                        <img src={badgeData.recipient_avatar} className="w-6 h-6 rounded-full object-cover border border-white/20" alt="" />
+                        <span className="text-[10px] text-slate-300 font-bold">
+                            Premiação concedida por {badgeData.awarded_by_name}
+                        </span>
+                    </div>
+
+                    <div className="relative w-full max-w-md mt-6 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                        <span className="absolute -top-3.5 left-4 text-4xl text-brand-primary font-serif select-none">“</span>
+                        <p className="text-sm text-slate-200 italic leading-relaxed px-2 text-center font-medium">
+                            {badgeData.reason}
+                        </p>
+                        <span className="absolute -bottom-7 right-4 text-4xl text-brand-primary font-serif select-none">”</span>
                     </div>
                 </div>
-                {isAuthor && (
-                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 transition-colors" title={t('feed.delete_post')}>
-                        <TrashIcon className="w-5 h-5" />
-                    </button>
-                )}
-            </div>
+            ) : (
+                <>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                            <div>
+                                <h4 className="font-bold text-brand-text dark:text-gray-100">{post.authorName}</h4>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(post.timestamp).toLocaleString()}</p>
+                            </div>
+                        </div>
+                        {isAuthor && (
+                            <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 transition-colors" title={t('feed.delete_post')}>
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
 
-            <div className="text-brand-text dark:text-gray-200 whitespace-pre-wrap mb-4">
-                {renderContent(post.content)}
-            </div>
+                    <div className="text-brand-text dark:text-gray-200 whitespace-pre-wrap mb-4">
+                        {renderContent(post.content)}
+                    </div>
 
-            {post.mediaUrl && (
-                <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 dark:bg-slate-700 dark:border-slate-600 text-center">
-                    <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-contain max-h-[500px]" />
-                </div>
-            )}
+                    {post.mediaUrl && (
+                        <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 dark:bg-slate-700 dark:border-slate-600 text-center">
+                            <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-contain max-h-[500px]" />
+                        </div>
+                    )}
 
-            {!post.mediaUrl && getEmbedUrl(post.content) && (
-                <div className={`mb-4 rounded-lg overflow-hidden bg-black shadow-inner flex justify-center items-center ${getEmbedUrl(post.content)?.type === 'youtube' || getEmbedUrl(post.content)?.type === 'vimeo' ? 'aspect-video w-full' : 'max-h-[600px] w-full max-w-[400px] mx-auto'}`}>
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        src={getEmbedUrl(post.content)?.url}
-                        title="Video player"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                    ></iframe>
-                </div>
+                    {!post.mediaUrl && getEmbedUrl(post.content) && (
+                        <div className={`mb-4 rounded-lg overflow-hidden bg-black shadow-inner flex justify-center items-center ${getEmbedUrl(post.content)?.type === 'youtube' || getEmbedUrl(post.content)?.type === 'vimeo' ? 'aspect-video w-full' : 'max-h-[600px] w-full max-w-[400px] mx-auto'}`}>
+                            <iframe
+                                width="100%"
+                                height="105%"
+                                src={getEmbedUrl(post.content)?.url}
+                                title="Video player"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            ></iframe>
+                        </div>
+                    )}
+                </>
             )}
 
             <div className="flex justify-between text-sm text-gray-500 pb-2 border-b">
@@ -312,6 +381,55 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [mentions, setMentions] = useState<{ id: string, name: string }[]>([]);
     const { t } = useLanguage();
 
+    // Gamification states
+    const [showGalleryModal, setShowGalleryModal] = useState(false);
+    const [allCompanyBadges, setAllCompanyBadges] = useState<CompanyBadge[]>([]);
+    const [earnedBadges, setEarnedBadges] = useState<UserBadge[]>([]);
+    const [equippedBadges, setEquippedBadges] = useState<UserBadge[]>([]);
+
+    const fetchUserBadgesData = async () => {
+        try {
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            if (!profileData?.company_id) return;
+
+            const { data: companyBadgesData } = await supabase
+                .from('company_badges')
+                .select('*')
+                .eq('company_id', profileData.company_id)
+                .order('created_at', { ascending: false });
+
+            if (companyBadgesData) setAllCompanyBadges(companyBadgesData);
+
+            const { data: userBadgesData } = await supabase
+                .from('user_badges')
+                .select(`
+                    id,
+                    company_id,
+                    user_id,
+                    badge_id,
+                    awarded_by,
+                    reason,
+                    is_equipped,
+                    created_at,
+                    company_badges (
+                        id,
+                        name,
+                        description,
+                        icon,
+                        color
+                    )
+                `)
+                .eq('user_id', currentUser.id);
+
+            if (userBadgesData) {
+                setEarnedBadges(userBadgesData as any[]);
+                setEquippedBadges((userBadgesData as any[]).filter(ub => ub.is_equipped));
+            }
+        } catch (err) {
+            console.error('Erro ao buscar selos:', err);
+        }
+    };
+
     const imageInputRef = useRef<HTMLInputElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -404,7 +522,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
     useEffect(() => {
         setLoading(true);
-        Promise.all([fetchPosts(), fetchRecognitions()]).finally(() => setLoading(false));
+        Promise.all([fetchPosts(), fetchRecognitions(), fetchUserBadgesData()]).finally(() => setLoading(false));
 
         const channel = supabase
             .channel('public:posts_and_recognitions')
@@ -412,6 +530,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchPosts())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => fetchPosts())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'recognitions' }, () => fetchRecognitions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges' }, () => fetchUserBadgesData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'company_badges' }, () => fetchUserBadgesData())
             .subscribe();
 
         return () => {
@@ -770,6 +890,46 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.interactions')}</span>
                                 </div>
                             </div>
+
+                            {/* ESPAÇO RETANGULAR VERMELHO DO PRINT: GALERIA DE 6 ÚLTIMOS SELOS */}
+                            <div className="mt-5 pt-4 border-t border-gray-100 dark:border-slate-800">
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-[10px] font-bold text-brand-subtle-text dark:text-gray-500 uppercase tracking-wider">Selos em Destaque</span>
+                                    <button 
+                                        onClick={() => setShowGalleryModal(true)}
+                                        className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg"
+                                    >
+                                        🏆 Galeria
+                                    </button>
+                                </div>
+                                
+                                <div className="flex justify-between items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/80 min-h-[52px]">
+                                    {Array.from({ length: 6 }).map((_, idx) => {
+                                        const userBadge = equippedBadges[idx];
+                                        if (userBadge && userBadge.company_badges) {
+                                            const badge = userBadge.company_badges;
+                                            return (
+                                                <div 
+                                                    key={userBadge.id} 
+                                                    className={`w-9 h-9 rounded-lg ${badge.color} border flex items-center justify-center text-xl shadow-sm select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float`}
+                                                    title={`${badge.name}: ${badge.description || ''}`}
+                                                >
+                                                    {badge.icon}
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <div 
+                                                key={idx} 
+                                                className="w-9 h-9 rounded-lg border-2 border-dashed border-gray-200 dark:border-slate-800/60 flex items-center justify-center text-xs text-gray-300 dark:text-slate-700 select-none font-bold"
+                                                title="Slot de Selo Vazio"
+                                            >
+                                                +
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     </Card>
                     <RecognitionWidget recognitions={localRecognitions} onRecognize={() => setShowRecognitionModal(true)} currentUser={currentUser} onDelete={fetchRecognitions} />
@@ -901,6 +1061,113 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     />
                 )
             }
+
+            {/* MODAL DA GALERIA DE SELOS (DUOLINGO STYLE) */}
+            {showGalleryModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-slate-850 shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 text-slate-800 dark:text-white">
+                        <div className="flex justify-between items-center p-6 border-b dark:border-slate-800">
+                            <div>
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    🏆 Minha Galeria de Selos
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    Equipe até 6 selos conquistados para exibir em seu perfil
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowGalleryModal(false)}
+                                className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center font-bold text-slate-500 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
+                                <span className="text-xs text-emerald-800 dark:text-emerald-400 font-bold">
+                                    Painel de Destaques
+                                </span>
+                                <span className="text-xs bg-brand-primary text-white font-bold px-2.5 py-1 rounded-full">
+                                    {equippedBadges.length} / 6 Equipados
+                                </span>
+                            </div>
+                            
+                            {allCompanyBadges.length === 0 ? (
+                                <p className="text-sm text-slate-500 text-center py-6">
+                                    Nenhum selo cadastrado pela empresa até o momento.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-4">
+                                    {allCompanyBadges.map(badge => {
+                                        const earned = earnedBadges.find(ub => ub.badge_id === badge.id);
+                                        const isEquipped = earned?.is_equipped || false;
+                                        
+                                        return (
+                                            <button
+                                                key={badge.id}
+                                                onClick={async () => {
+                                                    if (!earned) return; // Locked badge
+                                                    
+                                                    const newEquippedState = !isEquipped;
+                                                    if (newEquippedState && equippedBadges.length >= 6) {
+                                                        alert("Você só pode equipar no máximo 6 selos em destaque!");
+                                                        return;
+                                                    }
+                                                    
+                                                    const { error } = await supabase
+                                                        .from('user_badges')
+                                                        .update({ is_equipped: newEquippedState })
+                                                        .eq('id', earned.id);
+                                                        
+                                                    if (!error) {
+                                                        fetchUserBadgesData();
+                                                    }
+                                                }}
+                                                className={`relative flex flex-col items-center p-3.5 rounded-2xl border transition-all duration-300 outline-none ${
+                                                    earned 
+                                                        ? isEquipped 
+                                                            ? 'border-brand-primary bg-emerald-50/10 dark:bg-emerald-500/5 shadow-md scale-105' 
+                                                            : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-900 hover:scale-[1.02] hover:border-slate-300 dark:hover:border-slate-700'
+                                                        : 'border-slate-50 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/30 opacity-60 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-3 select-none ${
+                                                    earned 
+                                                        ? badge.color 
+                                                        : 'bg-slate-200 dark:bg-slate-800 text-slate-455 dark:text-slate-650 grayscale'
+                                                }`}>
+                                                    {badge.icon}
+                                                </div>
+                                                
+                                                <span className="text-[10px] font-bold text-center truncate w-full">
+                                                    {badge.name}
+                                                </span>
+                                                
+                                                {earned ? (
+                                                    isEquipped ? (
+                                                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white dark:border-slate-950">
+                                                            ✓
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase mt-1 tracking-wider">
+                                                            Conquistado
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase mt-1 tracking-wider flex items-center gap-0.5">
+                                                        🔒 Bloqueado
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

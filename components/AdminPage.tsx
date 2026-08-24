@@ -15,6 +15,7 @@ import { OrgFlowEditor } from './OrgFlowEditor';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Department } from '../types';
+import BadgesManager from './BadgesManager';
 
 interface AdminPageProps {
     company: Company;
@@ -137,6 +138,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'events', label: 'Eventos', category: 'Conteúdo', featureId: 'events' },
 
         { id: 'users', label: 'Usuários', category: 'Pessoas' },
+        { id: 'badges', label: 'Selos / Gamificação', category: 'Pessoas' },
         { id: 'departments', label: 'Departamentos', category: 'Pessoas' },
         { id: 'teams', label: 'Equipes', category: 'Pessoas' },
         { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Pessoas' },
@@ -181,6 +183,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <Dashboard />;
             case 'users':
                 return <UserManager users={employees} setUsers={setEmployees} plan={plan} departments={departments} />;
+            case 'badges':
+                return <BadgesManager company={company} employees={employees} />;
             case 'departments':
                 return <DepartmentManager companyId={company.id!} />;
             case 'teams':
