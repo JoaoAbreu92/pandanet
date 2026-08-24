@@ -205,7 +205,7 @@ const TrainingPage: React.FC = () => {
                     employee_id: currentUser.id,
                     answers: quizAnswers,
                     score,
-                    status: 'pending',
+                    status: 'corrected',
                     completed_at: new Date().toISOString()
                 }]);
 

@@ -726,25 +726,38 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {q.options.map((opt, oIndex) => (
-                                                    <div key={oIndex} className="flex items-center space-x-2">
-                                                        <input
-                                                            type="radio"
-                                                            name={`correct_${qIndex}`}
-                                                            checked={q.correctOptionIndex === oIndex}
-                                                            onChange={() => handleQuizQuestionChange(qIndex, 'correctOptionIndex', oIndex)}
-                                                            className="text-brand-primary focus:ring-brand-primary"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            required
-                                                            value={opt}
-                                                            onChange={e => handleQuizOptionChange(qIndex, oIndex, e.target.value)}
-                                                            className="w-full border border-gray-305 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm"
-                                                            placeholder={`Opção ${oIndex + 1}`}
-                                                        />
-                                                    </div>
-                                                ))}
+                                                {q.options.map((opt, oIndex) => {
+                                                    const isCorrect = q.correctOptionIndex === oIndex;
+                                                    return (
+                                                        <div
+                                                            key={oIndex}
+                                                            className={`flex items-center space-x-2 p-1.5 px-3 rounded-xl border transition-all ${
+                                                                isCorrect
+                                                                    ? 'border-green-500 bg-green-50/30 dark:bg-emerald-950/10'
+                                                                    : 'border-gray-250 dark:border-gray-700'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name={`correct_${qIndex}`}
+                                                                checked={isCorrect}
+                                                                onChange={() => handleQuizQuestionChange(qIndex, 'correctOptionIndex', oIndex)}
+                                                                className="text-brand-primary focus:ring-brand-primary"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                required
+                                                                value={opt}
+                                                                onChange={e => handleQuizOptionChange(qIndex, oIndex, e.target.value)}
+                                                                className="w-full border-0 bg-transparent text-gray-900 dark:text-white text-sm focus:ring-0 focus:outline-none p-1"
+                                                                placeholder={`Opção ${oIndex + 1}`}
+                                                            />
+                                                            {isCorrect && (
+                                                                <span className="text-[10px] font-bold text-green-600 dark:text-emerald-400 shrink-0">Gabarito</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                             <p className="text-[11px] text-gray-400">Selecione o botão radial correspondente à alternativa correta.</p>
                                         </div>
