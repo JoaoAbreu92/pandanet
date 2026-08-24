@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({ origin: '*' })); // Permitir qualquer origem para evitar problemas de CORS em dev/test
 app.use(express.json());
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -23,12 +23,14 @@ app.get('/', (req, res) => {
 // Endpoint para iniciar sessão manualmente (ex: nova empresa cadastrada)
 app.post('/sessions/:companyId/start', async (req, res) => {
   const { companyId } = req.params;
+  console.log(`[POST] /sessions/${companyId}/start - Recebido`); // Log de entrada
   if (sessions.has(companyId)) {
     return res.status(400).json({ status: 'error', message: 'Sessão já existe para esta empresa.' });
   }
   try {
     await connectToWhatsApp(companyId);
     res.json({ status: 'success', message: `Iniciando sessão para empresa ${companyId}` });
+    console.log(`[SUCCESS] Sessão iniciada para ${companyId}`);
   } catch (error) {
     console.error('Erro ao iniciar sessão:', error);
     res.status(500).json({ status: 'error', message: 'Falha ao iniciar sessão' });
