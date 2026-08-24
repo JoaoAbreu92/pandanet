@@ -128,10 +128,13 @@ function parseMessageTimestamp(ts) {
 }
 
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 // Client for queries (uses internal fast URL to avoid SSL/DNS/Proxy issues)
 const supabase = createClient(internalSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 // Client for public Realtime websockets
 const realtimeSupabase = createClient(publicSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
+// Client for authenticating user tokens safely using the public anon key (bypasses service key issues)
+const supabaseAnon = createClient(internalSupabaseUrl, supabaseAnonKey ? supabaseAnonKey.trim() : '');
 
 // --- AUTO-MIGRAÇÃO DE SCHEMA ---
 async function runAutoMigration() {
@@ -604,7 +607,7 @@ async function authMiddleware(req, res, next) {
         if (global.addDebugLog) {
             global.addDebugLog('AUTH_JWT_FAIL', `JWT local falhou: ${jwtErr.message}. Tentando Supabase getUser...`);
         }
-        const { data: { user }, error } = await supabase.auth.getUser(token);
+        const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
         if (error || !user) {
           console.error('[AUTH] Supabase também falhou:', error?.message);
           if (global.addDebugLog) {
@@ -621,7 +624,7 @@ async function authMiddleware(req, res, next) {
       if (global.addDebugLog) {
           global.addDebugLog('AUTH_NO_SECRET', 'JWT_SECRET não configurado! Usando apenas Supabase auth...');
       }
-      const { data: { user }, error } = await supabase.auth.getUser(token);
+      const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
       if (error || !user) {
         console.error('[AUTH] Supabase error (sem JWT_SECRET):', error?.message);
         if (global.addDebugLog) {
