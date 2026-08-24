@@ -1,20 +1,20 @@
 #!/bin/bash
-# Script para rodar o serviço de e-mail em background (Modo Produção)
+# Script para rodar o serviço de e-mail em background (Versão Node.js)
 
-echo "--- Iniciando Serviço de E-mail PandaNet ---"
+echo "--- Iniciando Serviço de E-mail PandaNet (Node.js) ---"
 
-# 1. Tenta parar uma instância anterior (se houver)
-pkill -f "email-handler/index.ts"
+# 1. Para processo anterior
+pkill -f "email-server.js"
 echo "Processos anteriores encerrados."
 
-# 2. Roda o Deno em background (nohup)
-# - Usa caminho absoluto do Deno (/root/.deno/bin/deno)
-# - Flags de permissão necessárias
-# - Salva logs em email-service.log
-# - Executa em background (&)
+# 2. Atualiza dependências
+cd server
+npm install 
+cd ..
 
-nohup /root/.deno/bin/deno run --allow-net --allow-env --allow-sys --watch supabase/functions/email-handler/index.ts > email-service.log 2>&1 &
+# 3. Roda Node em background
+# - Logs em email-server.log
+nohup node server/email-server.js > email-service.log 2>&1 &
 
-echo "✅ Serviço iniciado com SUCESSO na porta 9999!"
-echo "📝 Logs estão sendo salvos em: email-service.log"
-echo "OBS: Você pode fechar este terminal que o serviço continuará rodando."
+echo "✅ Serviço Node.js iniciado na porta 3001!"
+echo "📝 Logs em: email-service.log"
