@@ -270,23 +270,40 @@ async function updateCompanySettings(companyId, updates) {
         .single();
     
     if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching settings:', error);
+        console.error('[updateCompanySettings] Error fetching settings:', error);
         return;
     }
 
     if (!data) {
         // Insert
-        await supabase.from('whatsapp_settings').insert({
-            company_id: companyId,
-            ...updates
-        });
+        console.log(`[updateCompanySettings] Inserting new settings for company ${companyId}:`, updates);
+        const { data: insertData, error: insertError } = await supabase
+            .from('whatsapp_settings')
+            .insert({
+                company_id: companyId,
+                ...updates
+            })
+            .select();
+
+        if (insertError) {
+            console.error('[updateCompanySettings] INSERT ERROR:', insertError);
+        } else {
+            console.log('[updateCompanySettings] INSERT SUCCESS:', insertData);
+        }
     } else {
         // Update
-        await supabase
+        console.log(`[updateCompanySettings] Updating settings for company ${companyId}:`, updates);
+        const { data: updateData, error: updateError } = await supabase
             .from('whatsapp_settings')
             .update(updates)
-            .eq('company_id', companyId);
-        console.log(`[updateCompanySettings] Updated settings for company ${companyId}:`, updates);
+            .eq('company_id', companyId)
+            .select();
+
+        if (updateError) {
+            console.error('[updateCompanySettings] UPDATE ERROR:', updateError);
+        } else {
+            console.log('[updateCompanySettings] UPDATE SUCCESS:', updateData);
+        }
     }
 }
 
