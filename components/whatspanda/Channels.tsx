@@ -643,6 +643,12 @@ const Channels: React.FC = () => {
                                 <p className="text-white truncate">{currentId || 'NENHUMA'}</p>
                             </div>
                         </div>
+                        {currentId && channels.find(c => c.id === currentId)?.last_sync_error && (
+                            <div className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 mb-4 animate-in slide-in-from-top-2 duration-500">
+                                <p className="text-red-400 font-bold mb-1 uppercase tracking-widest text-[9px]">Erro Detalhado de Sincronização:</p>
+                                <p className="text-red-300 break-words font-medium">{channels.find(c => c.id === currentId)?.last_sync_error}</p>
+                            </div>
+                        )}
                         <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
                             {debugLogs.length === 0 ? (
                                 <p className="opacity-30 italic">Aguardando eventos...</p>
