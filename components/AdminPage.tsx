@@ -530,9 +530,9 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
                 />;
             case 'scheduling':
-                return <SchedulingPage customFeatures={company.custom_features} mode="appointments" />;
+                return <SchedulingPage customFeatures={customFeatures} mode="appointments" />;
             case 'scheduling-events':
-                return <SchedulingPage customFeatures={company.custom_features} mode="events" />;
+                return <SchedulingPage customFeatures={customFeatures} mode="events" />;
             default:
                 return null;
         }

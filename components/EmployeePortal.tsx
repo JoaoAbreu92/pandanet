@@ -308,15 +308,27 @@ const EmployeePortal: React.FC = () => {
         }
     };
 
+    const company = profile?.company;
+    const mergedFeatures = {
+        ...(company?.plan?.features || {}),
+        ...(company?.custom_features || {})
+    };
+
     const navItems = [
         { key: 'payroll', label: 'Holerites', icon: BanknotesIcon, perm: 'action_view_holerite' },
         { key: 'vacation', label: 'Férias', icon: CalendarIcon, perm: null },
         { key: 'documents', label: 'Documentos', icon: DocumentIcon, perm: null },
-        { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon, perm: 'action_register_hours' },
-        { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon, perm: null },
-        { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon, perm: null },
+        { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon, perm: 'action_register_hours', featureId: 'timebank' },
+        { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon, perm: null, featureId: 'employee_benefits' },
+        { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon, perm: null, featureId: 'performance' },
         { key: 'requests', label: 'Solicitações', icon: DocumentTextIcon, perm: null },
     ].filter(item => {
+        if (item.featureId) {
+            const feat = mergedFeatures[item.featureId] as any;
+            if (feat === false || feat === 'disabled') {
+                return false;
+            }
+        }
         if (item.perm) {
             return (profile?.permissions as any)?.[item.perm] !== false;
         }

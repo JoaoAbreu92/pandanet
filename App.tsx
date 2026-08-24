@@ -67,6 +67,10 @@ const AppContent: React.FC = () => {
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
+    const mergedFeatures = {
+        ...(currentCompany?.plan?.features || {}),
+        ...(currentCompany?.custom_features || {})
+    };
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     // Loading & Error States
@@ -885,8 +889,8 @@ const AppContent: React.FC = () => {
         };
 
         const featureId = featureMap[permission];
-        if (featureId && currentCompany?.custom_features) {
-            const feat = currentCompany.custom_features[featureId] as any;
+        if (featureId) {
+            const feat = mergedFeatures[featureId] as any;
             if (feat === false || feat === 'disabled') {
                 return false;
             }
@@ -918,9 +922,9 @@ const AppContent: React.FC = () => {
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={handleUpdateTIRequests} currentUser={currentUser} /> : null;
             case 'profile-page':
                 const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
-                return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />;
+                return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} isAIEnabled={mergedFeatures.ai_assistant !== false} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} onImpersonate={handleImpersonateStart} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
-            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={currentCompany.custom_features} onNavigate={handleNavigate} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
+            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;
@@ -934,33 +938,33 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
-            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
-            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
-            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
-            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
+            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : null;
+            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : null;
+            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : null;
+            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : null;
+            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
             case 'scheduling': {
                 if (!canAccess('viewScheduling')) return null;
-                const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
+                const schedulingFeat = mergedFeatures.scheduling as any;
                 if (schedulingFeat === false || schedulingFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
-                return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="appointments" />;
+                return <SchedulingPage customFeatures={mergedFeatures} mode="appointments" />;
             }
             case 'scheduling-events': {
                 if (!canAccess('viewScheduling')) return null;
-                const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
+                const schedulingFeat = mergedFeatures.scheduling as any;
                 if (schedulingFeat === false || schedulingFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
-                return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="events" />;
+                return <SchedulingPage customFeatures={mergedFeatures} mode="events" />;
             }
             case 'agenda': {
                 if (!canAccess('viewAgenda')) return null;
-                const agendaFeat = currentCompany?.custom_features?.new_agenda as any;
+                const agendaFeat = mergedFeatures.new_agenda as any;
                 if (agendaFeat === false || agendaFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agenda está desativado para a sua empresa.</div>;
                 }
@@ -968,7 +972,7 @@ const AppContent: React.FC = () => {
             }
             case 'reservas': {
                 if (!canAccess('viewReservations')) return null;
-                const reservationsFeat = currentCompany?.custom_features?.reservations as any;
+                const reservationsFeat = mergedFeatures.reservations as any;
                 if (reservationsFeat === false || reservationsFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de reservas está desativado para a sua empresa.</div>;
                 }
@@ -1098,8 +1102,8 @@ const AppContent: React.FC = () => {
                     {canAccess('viewWhatsPanda') && <WhatsPanda initialSearch={globalSearchTerm} />}
                 </div>
                 {renderPage()}
-                <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
-                <AICorrector currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
+                <AIAssistant currentUser={currentUser} isAIEnabled={mergedFeatures.ai_assistant !== false} />
+                <AICorrector currentUser={currentUser} isAIEnabled={mergedFeatures.ai_assistant !== false} />
                 <FloatingChatHeads
                     chatHeads={chatHeads}
                     expandedChatHeadIds={expandedChatHeadIds}

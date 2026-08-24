@@ -491,14 +491,27 @@ const HRManager: React.FC = () => {
 
       <div className="flex gap-2 flex-wrap">
         {[
-          ['vacation','🏖️ Férias'],
-          ['balance','📊 Saldo'],
-          ['documents','📄 Documentos'],
-          ['payslips','💰 Holerites'],
-          ['timebank','⏰ Banco de Horas'],
-          ['benefits','🎁 Benefícios'],
-          ['performance','📈 Avaliações/Metas']
-        ].map(([k, l]) => (
+          ['vacation','🏖️ Férias', null],
+          ['balance','📊 Saldo', null],
+          ['documents','📄 Documentos', null],
+          ['payslips','💰 Holerites', null],
+          ['timebank','⏰ Banco de Horas', 'timebank'],
+          ['benefits','🎁 Benefícios', 'employee_benefits'],
+          ['performance','📈 Avaliações/Metas', 'performance']
+        ].filter(([,, featId]) => {
+          if (featId) {
+            const comp = profile?.company;
+            const merged = {
+              ...(comp?.plan?.features || {}),
+              ...(comp?.custom_features || {})
+            };
+            const feat = merged[featId] as any;
+            if (feat === false || feat === 'disabled') {
+              return false;
+            }
+          }
+          return true;
+        }).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k as any)}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${tab === k ? 'bg-brand-primary text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'}`}>
             {l}

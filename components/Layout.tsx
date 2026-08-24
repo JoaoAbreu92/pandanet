@@ -152,7 +152,10 @@ const Layout: React.FC<LayoutProps> = ({
                         companyLogo={companySettings.logoUrl}
                         isImpersonating={isImpersonating}
                         isMasterAdmin={isMasterAdmin}
-                        customFeatures={currentCompany.custom_features}
+                        customFeatures={{
+                            ...(currentCompany?.plan?.features || {}),
+                            ...(currentCompany?.custom_features || {})
+                        }}
                     />
                 </div>
 

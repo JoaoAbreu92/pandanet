@@ -42,7 +42,11 @@ const Carousel: React.FC = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
 
-    if (currentUser?.company?.custom_features?.banners === false) {
+    const hasBanners = currentUser?.company?.custom_features?.banners !== undefined
+        ? currentUser.company.custom_features.banners
+        : currentUser?.company?.plan?.features?.banners;
+
+    if (hasBanners === false) {
         return null;
     }
 
