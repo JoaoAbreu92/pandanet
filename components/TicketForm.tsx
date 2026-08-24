@@ -18,9 +18,11 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
 
     // Pre-select TI department if exists
     React.useEffect(() => {
-        const tiDept = departments.find(d => d.name.toUpperCase() === 'TI');
-        if (tiDept) setDepartmentId(tiDept.id);
-    }, [departments]);
+        if (departments.length > 0 && !departmentId) {
+            const tiDept = departments.find(d => d.name.trim().toUpperCase() === 'TI');
+            if (tiDept) setDepartmentId(tiDept.id);
+        }
+    }, [departments, departmentId]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

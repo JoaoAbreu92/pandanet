@@ -79,6 +79,7 @@ const TicketPage: React.FC = () => {
                 setTickets(formattedTickets);
             }
             // Fetch Departments
+            console.log('Fetching departments for company_id:', currentUser.company_id);
             const { data: deptsData, error: deptsErr } = await supabase
                 .from('departments')
                 .select('*')
@@ -87,14 +88,7 @@ const TicketPage: React.FC = () => {
             if (deptsErr) {
                 console.error('Error fetching departments:', deptsErr);
             } else if (deptsData) {
-                console.log('Departments fetched:', deptsData.length);
                 setDepartments(deptsData);
-
-                // If no departments exist and it's an admin, we might want to suggest creating one, 
-                // but for now let's just log it.
-                if (deptsData.length === 0) {
-                    console.log('No departments found for this company.');
-                }
             }
 
         } catch (error) {
