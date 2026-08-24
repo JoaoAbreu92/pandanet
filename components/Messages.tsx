@@ -799,6 +799,28 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: companyFilter }, async (payload) => {
                 const newMsg = payload.new as any;
                 console.log("[Realtime] Nova mensagem recebida:", newMsg);
+
+                // --- PROTEÇÃO DE VAZAMENTO ---
+                // Caso o RLS vaze via socket (ex: regras abertas), garantimos no front-end que a notificação e atualização não cruzem para usuários que não são participantes.
+                let shouldProcess = isGhostMode;
+                if (!shouldProcess) {
+                    const { data: isParticipant } = await supabase
+                        .from('conversation_participants')
+                        .select('id')
+                        .eq('conversation_id', newMsg.conversation_id)
+                        .eq('user_id', currentUser.id)
+                        .maybeSingle();
+
+                    if (isParticipant) {
+                        shouldProcess = true;
+                    }
+                }
+
+                if (!shouldProcess) {
+                    console.log("[Realtime] Ignorando mensagem de conversa onde eu não sou participante.");
+                    return; // ABORTA completamente
+                }
+
                 console.log("[Realtime] Conversa ativa:", selectedConvRef.current);
                 console.log("[Realtime] Conversa da mensagem:", newMsg.conversation_id);
 

@@ -385,16 +385,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const fetchSettings = async () => {
-    const userId = activeProfile?.id || profile?.id;
-    if (!userId) return;
+    const companyId = activeProfile?.company_id || profile?.company_id;
+    if (!companyId) return;
 
+    // Busca todos os canais da empresa
     const { data } = await supabase
       .from('whatsapp_settings')
       .select('*')
-      .eq('user_id', userId)
-      .limit(1);
+      .eq('company_id', companyId);
 
-    if (data && data.length > 0) setSettings(data[0]);
+    if (data && data.length > 0) {
+      setSettings(data[0]); // Mantém um padrão para a abertura de ticket
+      setConnections(data); // Preenche os canais disponíveis para o filtro avançado
+    }
   };
   
   const loadFiltersData = async () => {
@@ -479,8 +482,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
         kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
       `)
-      .eq('company_id', companyId)
-      .eq('connection_id', settings.id); // Força filtro pela conexão do usuário
+      .eq('company_id', companyId);
+
+    // Se tiver filtrado conexões, aplica. Caso contrário mostra de todos os canais visíveis
+    if (filterConnection.length > 0) {
+      query = query.in('connection_id', filterConnection);
+    }
 
     // Na aba de grupos, mostramos todos independente do status (aberto/pendente/fechado)
     if (chatTypeFilter !== 'group') {
