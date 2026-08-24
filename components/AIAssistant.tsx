@@ -46,8 +46,13 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     }, [hasAIEnabled, currentUser.id]);
 
     const fetchSystemSettings = async () => {
-        const { data } = await supabase.from('system_settings').select('key, value').eq('key', 'panda_ia_icon').single();
-        if (data?.value) setPandaIaIcon(data.value);
+        try {
+            const { data, error } = await supabase.from('system_settings').select('key, value').eq('key', 'panda_ia_icon').maybeSingle();
+            if (error) throw error;
+            if (data?.value) setPandaIaIcon(data.value);
+        } catch (err: any) {
+            console.warn("[SYSTEM] Could not fetch panda_ia_icon:", err.message);
+        }
     };
 
     useEffect(() => {

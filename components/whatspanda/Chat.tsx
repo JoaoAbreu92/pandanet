@@ -69,6 +69,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [showContactSidebar, setShowContactSidebar] = useState(false);
   const canTransfer = isAdmin || activeProfile?.whatspanda_permissions?.can_transfer;
   const { markNotificationsByLink } = useNotifications();
+  
+  // State para filtros avancados
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterConnection, setFilterConnection] = useState<string[]>([]);
+  const [filterQueue, setFilterQueue] = useState<string[]>([]);
+  const [filterAssignee, setFilterAssignee] = useState<string[]>([]);
+  const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'private' | 'group'>('private');
+  const [connections, setConnections] = useState<any[]>([]);
+  const [queues, setQueues] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+  const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (onConversationSelect) {
@@ -79,23 +90,23 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   useEffect(() => {
     fetchSettings();
     fetchConversations();
+    loadFiltersData();
     
-    // Conversation list subscription - independent of selectedConversation
+    // Conversation list subscription com debounce para evitar spam de refetch
     const convSubscription = supabase
       .channel('whatsapp_conversations_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
-        fetchConversations(); 
+        // Debounce: aguardar 800ms antes de refazer o fetch
+        if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+        realtimeDebounceRef.current = setTimeout(() => {
+          fetchConversations();
+        }, 800);
       })
-      .subscribe((status) => {
-        console.log(`[WP-DEBUG] Realtime Status (Conversas): ${status}`);
-        if (status === 'TIMED_OUT' || status === 'CLOSED') {
-           console.log('[WP-DEBUG] Tentando reconectar subscrição de conversas...');
-           // A lib do Supabase tenta reconectar sozinha, mas o log ajuda a monitorar
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(convSubscription);
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     };
   }, []); // Run once on mount
 
@@ -154,6 +165,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
 
     if (data && data.length > 0) setSettings(data[0]);
   };
+  
+  const loadFiltersData = async () => {
+    const companyId = currentUser?.company_id;
+    if (!companyId) return;
+    const [{ data: conns }, { data: deps }, { data: profs }] = await Promise.all([
+      supabase.from('whatsapp_settings').select('id, connection_name').eq('company_id', companyId),
+      supabase.from('departments').select('id, name').eq('company_id', companyId),
+      supabase.from('profiles').select('id, full_name').eq('company_id', companyId),
+    ]);
+    if (conns) setConnections(conns);
+    if (deps) setQueues(deps);
+    if (profs) setAgents(profs);
+  };
 
   // Update searchTerm if initialSearch changes
   useEffect(() => {
@@ -167,13 +191,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       fetchConversations();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, activeTab]);
+  }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter]);
+
 
   const fetchConversations = async () => {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
 
-    console.log(`[CHAT] Buscando conversas para empresa: ${companyId}, Tab: ${activeTab}, Search: ${searchTerm}`);
+    const userId = activeProfile?.id || profile?.id;
+    const canViewAll = isAdmin || permissions.can_view_others_chats;
+    const canSeeAllDeps = isAdmin || permissions.can_see_all_departments;
+
     let query = supabase
       .from('whatsapp_conversations')
       .select(`
@@ -186,19 +214,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       .eq('company_id', companyId)
       .eq('status', activeTab);
 
+    // Pesquisa por nome ou telefone
     if (searchTerm) {
       query = query.or(`contact_name.ilike.%${searchTerm}%,contact_phone.ilike.%${searchTerm}%`);
     }
+    
+    // Filtros avancados
+    if (filterConnection.length > 0) query = query.in('connection_id', filterConnection);
+    if (filterQueue.length > 0) query = query.in('queue_id', filterQueue);
+    if (filterAssignee.length > 0) query = query.in('assigned_to', filterAssignee);
 
-    // O fluxo estilo Whaticket: 
-    // Pendente = Sem dono.
-    // Aberto = Meus atendimentos (ou de todos, se eu for admin).
-    // Fechado = Meus fechados (ou de todos, se eu for admin).
-    const canViewAll = isAdmin || permissions.can_view_others_chats;
-    const canSeeAllDeps = isAdmin || permissions.can_see_all_departments;
+    // Filtro de Tipo (Privado / Grupo)
+    if (chatTypeFilter === 'private') {
+      query = query.eq('is_group', false);
+    } else if (chatTypeFilter === 'group') {
+      query = query.eq('is_group', true);
+    }
 
+    // Logica de visibilidade:
+    // Pendente = assigned_to IS NULL (aguardando atendente)
+    // Aberto   = assigned_to = userId (SE nao admin), ou todos (SE admin)
+    // Fechado  = mesmo que Aberto
     if (activeTab === 'pendente') {
-      // Pendentes independentemente de cargo: precisam estar aguardando
       query = query.is('assigned_to', null);
       if (!canSeeAllDeps) {
         const assignedQueues = permissions.assigned_queues || [];
@@ -207,15 +244,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
         }
       }
     } else {
-      // Aberto ou Fechado
-      if (!canViewAll && profile?.id) {
-        // Se não sou admin, vejo SÓ os MEUS
-        query = query.eq('assigned_to', profile.id);
+      // Aberto ou Fechado: nao-admin so ve os SEUS
+      if (!canViewAll && userId) {
+        query = query.eq('assigned_to', userId);
       }
     }
 
-    const { data } = await query
-      .order('last_message_at', { ascending: false });
+    const { data } = await query.order('last_message_at', { ascending: false });
     
     if (data) {
       setConversations(data as WhatsAppConversationWithDetails[]);
@@ -349,9 +384,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
 
     let messageToSend = newMessage;
     
-    // Add signature if enabled
-    if (useSignature && activeProfile?.whatsapp_signature) {
-      messageToSend = `*${activeProfile.whatsapp_signature}*:\n${messageToSend}`;
+    // Add signature if enabled - Using either configured signature or user name as fallback
+    if (useSignature) {
+        const signatureText = activeProfile?.whatsapp_signature || activeProfile?.name || '';
+        if (signatureText) {
+            messageToSend = `*${signatureText}*:\n${messageToSend}`;
+        }
     }
 
     setNewMessage(''); // Clear input optimistically
@@ -456,20 +494,137 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               </button>
             ))}
           </div>
+          {/* Tipo de conversa: Privado / Grupo */}
+          <div className="flex gap-1 mt-2">
+            {([{ v: 'private', label: '💬 Privados' }, { v: 'group', label: '👥 Grupos' }] as const).map(({ v, label }) => (
+              <button
+                key={v}
+                onClick={() => setChatTypeFilter(chatTypeFilter === v ? 'all' : v as any)}
+                className={`flex-1 text-[10px] py-1 rounded-lg font-semibold border transition-all ${
+                  chatTypeFilter === v
+                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                    : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-emerald-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search and Actions */}
-        <div className="p-3 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-transparent space-y-3">
-          <div className="relative group">
-            <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-            <input
-              type="text" 
-              placeholder="Buscar atendimento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 dark:text-white"
-            />
+        <div className="p-3 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-transparent space-y-2">
+          <div className="flex gap-1.5">
+            <div className="relative group flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+              <input
+                type="text" 
+                placeholder="Buscar atendimento..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 dark:text-white"
+              />
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all ${
+                showFilters || filterConnection.length > 0 || filterQueue.length > 0 || filterAssignee.length > 0
+                  ? 'bg-emerald-500 text-white border-emerald-500'
+                  : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-emerald-300'
+              }`}
+              title="Filtros Avançados"
+            >
+              ⚙
+            </button>
           </div>
+          
+          {/* Painel de filtros avancados */}
+          {showFilters && (
+            <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-3 space-y-2 text-xs">
+              <p className="font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-[10px]">Filtros Avançados</p>
+              
+              {/* Conexão */}
+              {connections.length > 0 && (
+                <div>
+                  <p className="text-slate-500 mb-1">Conexão</p>
+                  <div className="flex flex-wrap gap-1">
+                    {connections.map((c: any) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setFilterConnection(prev =>
+                          prev.includes(c.id) ? prev.filter(x => x !== c.id) : [...prev, c.id]
+                        )}
+                        className={`px-2 py-0.5 rounded-full border text-[10px] transition-all ${
+                          filterConnection.includes(c.id)
+                            ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            : 'bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-200'
+                        }`}
+                      >
+                        {c.connection_name || 'Canal'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Fila/Setor */}
+              {queues.length > 0 && (
+                <div>
+                  <p className="text-slate-500 mb-1">Fila / Setor</p>
+                  <div className="flex flex-wrap gap-1">
+                    {queues.map((q: any) => (
+                      <button
+                        key={q.id}
+                        onClick={() => setFilterQueue(prev =>
+                          prev.includes(q.id) ? prev.filter(x => x !== q.id) : [...prev, q.id]
+                        )}
+                        className={`px-2 py-0.5 rounded-full border text-[10px] transition-all ${
+                          filterQueue.includes(q.id)
+                            ? 'bg-blue-100 text-blue-700 border-blue-300'
+                            : 'bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-200'
+                        }`}
+                      >
+                        {q.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Atendente (admin only) */}
+              {isAdmin && agents.length > 0 && (
+                <div>
+                  <p className="text-slate-500 mb-1">Atendente</p>
+                  <div className="flex flex-wrap gap-1">
+                    {agents.map((a: any) => (
+                      <button
+                        key={a.id}
+                        onClick={() => setFilterAssignee(prev =>
+                          prev.includes(a.id) ? prev.filter(x => x !== a.id) : [...prev, a.id]
+                        )}
+                        className={`px-2 py-0.5 rounded-full border text-[10px] transition-all ${
+                          filterAssignee.includes(a.id)
+                            ? 'bg-purple-100 text-purple-700 border-purple-300'
+                            : 'bg-white dark:bg-white/10 text-slate-600 dark:text-slate-300 border-slate-200'
+                        }`}
+                      >
+                        {a.full_name || 'Agente'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {(filterConnection.length > 0 || filterQueue.length > 0 || filterAssignee.length > 0) && (
+                <button
+                  onClick={() => { setFilterConnection([]); setFilterQueue([]); setFilterAssignee([]); }}
+                  className="text-red-500 hover:text-red-700 text-[10px] font-bold"
+                >
+                  ✕ Limpar filtros
+                </button>
+              )}
+            </div>
+          )}
           {isAdmin && activeTab === 'fechado' && (
             <button
               onClick={async () => {

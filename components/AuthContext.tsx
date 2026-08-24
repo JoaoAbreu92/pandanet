@@ -166,6 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     ai_api_key: data.ai_api_key || null,
                     ai_provider: data.ai_provider || null,
                     ai_behavior: data.ai_behavior || null,
+                    whatsapp_signature: data.whatsapp_signature || '',
+                    use_whatsapp_signature: data.use_whatsapp_signature || false,
                 };
                 setProfile(employee);
             }

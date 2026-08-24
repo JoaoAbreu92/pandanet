@@ -665,31 +665,29 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         const isFromMe = message.key?.fromMe;
         let remoteJid = message.key?.remoteJid || '';
         
-        // Ignorar grupos e broadcasts
-        if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) return;
+        // Ignorar broadcasts mas permitir grupos e @lid
+        if (!remoteJid || remoteJid.includes('@broadcast')) return;
+        const isGroup = remoteJid.includes('@g.us');
         
-        // IMPORTANTE: @lid é um ID interno do WhatsApp Business/Linked Devices, não um número real.
-        // O número real do remetente fica em senderPn quando o JID é @lid.
+        // extrair telefone real
         let fromPhone;
         if (remoteJid.includes('@lid')) {
-            // Extrair o número real do senderPn
             const senderPn = message.key?.senderPn || message.senderPn || '';
             if (senderPn) {
-                fromPhone = senderPn.split('@')[0]; // ex: '554184727828@s.whatsapp.net' -> '554184727828'
-                console.log(`[MSG] JID @lid detectado. Usando senderPn: ${fromPhone}`);
+                fromPhone = senderPn.split('@')[0];
             } else {
-                console.log(`[MSG] JID @lid sem senderPn disponível. Ignorando mensagem.`);
+                console.log(`[MSG] JID @lid sem senderPn. Ignorando.`);
                 return;
             }
         } else {
             fromPhone = remoteJid.split('@')[0];
         }
+
         const msgId = message.key?.id;
         const pushName = message.pushName || message.contact?.name || message.verifiedName || null;
 
-        // Auto-criar/atualizar contato com nome e telefone real
-        // Isso resolve @lid: contatos são criados automaticamente quando mensagens chegam
-        if (!isFromMe && fromPhone) {
+        // Auto-criar contato para indivíduos (não grupos)
+        if (!isFromMe && fromPhone && !isGroup) {
             const contactName = pushName || formatPhoneDisplay(fromPhone);
             await supabase
                 .from('whatsapp_contacts')
@@ -697,117 +695,100 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     { company_id: companyId, phone: fromPhone, name: contactName, updated_at: new Date().toISOString() },
                     { onConflict: 'company_id,phone', ignoreDuplicates: false }
                 );
-            console.log(`[MSG] Contato upserted: ${fromPhone} | Nome: ${contactName}`);
         }
 
         // 0. Verificar se o contato está bloqueado
-        const { data: contact } = await supabase
-            .from('whatsapp_contacts')
-            .select('is_blocked')
-            .eq('company_id', companyId)
-            .eq('phone', fromPhone)
-            .maybeSingle();
+        if (!isGroup) {
+            const { data: contact } = await supabase
+                .from('whatsapp_contacts')
+                .select('is_blocked')
+                .eq('company_id', companyId)
+                .eq('phone', fromPhone)
+                .maybeSingle();
 
-        if (contact?.is_blocked) {
-            console.log(`[BOT] Mensagem ignorada: Contato ${fromPhone} está bloqueado.`);
-            return;
+            if (contact?.is_blocked) {
+                console.log(`[BOT] Contato ${fromPhone} bloqueado.`);
+                return;
+            }
         }
 
-        // Verificar se mensagem já existe
-        const { data: exists, error: existErr } = await supabase
+        // Verificar duplicata
+        const { data: exists } = await supabase
             .from('whatsapp_messages')
             .select('id')
             .eq('whatsapp_message_id', msgId)
-            .limit(1)
             .maybeSingle();
         
-        if (existErr) {
-            console.error(`[MSG] Erro ao verificar existência:`, existErr.message);
-        }
-        if (exists) {
-            console.log(`[MSG] Mensagem ${msgId} já processada. Ignorando.`);
-            return;
-        }
+        if (exists) return;
 
-        // Extrair texto e mídia
+        // Extrair texto
         let text = message.message?.conversation ||
             message.message?.extendedTextMessage?.text || 
             message.text || "";
 
         let mediaUrl = null;
         let mediaType = null;
-
         const m = message.message || {};
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
 
         if (mediaMsg) {
             mediaType = m.imageMessage ? 'image' : m.audioMessage ? 'audio' : m.videoMessage ? 'video' : 'file';
-            // Evolution API usually returns the internal URL/path. If they don't provide a public one, we might need to fetch it.
-            // For now, we'll try to use the message text or a placeholder if evolution doesn't provide URL directly in upsert.
             if (!text) text = `[Mídia: ${mediaType}]`;
         }
 
         if (!text && !mediaMsg) return;
 
-        // 1. Localizar conversa (Usar limit(1) por segurança contra duplicatas históricas)
-        let { data: conv, error: convErr } = await supabase
+        // 1. Localizar ou Criar Conversa
+        let { data: conv } = await supabase
             .from('whatsapp_conversations')
-            .select('id, unread_count, queue_id, assigned_to')
+            .select('*')
             .eq('company_id', companyId)
             .eq('contact_phone', fromPhone)
-            .order('created_at', { ascending: false })
-            .limit(1)
             .maybeSingle();
 
-        if (convErr) {
-            console.error(`[MSG] Erro ao buscar conversa para ${fromPhone}:`, convErr.message);
-        }
-
-        let conversationId = conv?.id;
-
+        let conversationId;
         if (!conv) {
-            console.log(`[MSG] Criando nova conversa para ${fromPhone}...`);
-            const rawName = message.pushName || message.contact?.name || message.verifiedName;
-            const contactName = rawName ? rawName : formatPhoneDisplay(fromPhone);
+            // Se for grupo, abre direto como "aberto" (sem pendente individual)
+            const initialStatus = isGroup ? 'aberto' : 'pendente';
             const { data: newConv, error: createErr } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
                     company_id: companyId,
                     contact_phone: fromPhone,
-                    contact_name: contactName,
-                    status: 'pendente',
+                    contact_name: pushName || (isGroup ? 'Grupo' : formatPhoneDisplay(fromPhone)),
+                    status: initialStatus,
                     unread_count: isHistorical ? 0 : 1,
                     connection_id: connectionId,
+                    is_group: isGroup,
                     last_message_at: new Date().toISOString()
                 }).select().single();
             
-            if (createErr) {
-                console.error(`[MSG] Erro CRÍTICO ao criar conversa:`, createErr.message);
-                // Se falhou, tenta buscar novamente por via das dúvidas
-                const { data: retryConv } = await supabase.from('whatsapp_conversations')
-                    .select('id').eq('company_id', companyId).eq('contact_phone', fromPhone).maybeSingle();
-                conversationId = retryConv?.id;
-            } else {
-                conversationId = newConv?.id;
+            if (createErr) throw createErr;
+            conv = newConv;
+            conversationId = newConv.id;
+        } else {
+            conversationId = conv.id;
+            if (!isHistorical) {
+                // Reabrir se estiver fechada
+                let nextStatus = conv.status;
+                if (conv.status === 'fechado' && !isFromMe) {
+                    nextStatus = conv.assigned_to ? 'aberto' : 'pendente';
+                }
+                
+                await supabase
+                    .from('whatsapp_conversations')
+                    .update({
+                        unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), 
+                        last_message_at: new Date().toISOString(),
+                        status: nextStatus,
+                        contact_name: isGroup ? conv.contact_name : (pushName || conv.contact_name)
+                    }).eq('id', conversationId);
             }
-        } else if (!isHistorical) {
-            // Se a conversa estava fechada, ela deve reabrir como pendente. Mas se eu mesmo respondi (isFromMe), não deve reabrir pra pendente se eu apenas esqueci de fechar.
-            // Para mantermos simples: qualquer msg nova abre.
-            const newStatus = (!isFromMe && conv.status === 'fechado') ? 'pendente' : conv.status;
-            
-            await supabase
-                .from('whatsapp_conversations')
-                .update({
-                    unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), // Não soma unread se eu enviei!
-                    last_message_at: new Date().toISOString(),
-                    status: newStatus
-                }).eq('id', conversationId);
         }
 
         // 2. Inserir a mensagem
         if (conversationId) {
-            console.log(`[MSG] Inserindo mensagem. FromCustomer: ${!isFromMe} | De: ${fromPhone}`);
-            const { error: insErr } = await supabase.from('whatsapp_messages').insert({
+            await supabase.from('whatsapp_messages').insert({
                 company_id: companyId,
                 conversation_id: conversationId,
                 message_text: text,
@@ -817,61 +798,10 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 media_type: mediaType,
                 created_at: message.messageTimestamp ? new Date(message.messageTimestamp * 1000).toISOString() : new Date().toISOString()
             });
-            if (insErr) {
-                console.error(`[MSG] Erro ao inserir msg ${msgId}:`, insErr.message);
-            } else {
-                if (!isHistorical) {
-                    console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
-                    
-                    // Garantir que a conversa seja atualizada mesmo se for de saída (fromMe)
-                    // Isso ajuda o usuário a ver o que enviou por outro dispositivo
-                    if (isFromMe) {
-                         await supabase.from('whatsapp_conversations').update({
-                            last_message_at: new Date().toISOString()
-                        }).eq('id', conversationId);
-                    }
 
-                    // Disparar Chatbot se for do cliente e não for histórico
-                    if (!isFromMe) {
-                        // 5. Executar Roteamento Inteligente Gemini (se habilitado)
-                        if (!conv || (!conv.queue_id && !conv.user_id)) { 
-                            try {
-                                const { data: settings } = await supabase
-                                    .from('whatsapp_settings')
-                                    .select('gemini_api_key')
-                                    .eq('company_id', companyId)
-                                    .limit(1)
-                                    .single();
-
-                                if (settings?.gemini_api_key) {
-                                    const { data: queues } = await supabase.from('whatsapp_queues').select('id, name').eq('company_id', companyId);
-                                    const suggestedQueueId = await analyzeMessageForTransfer(text, queues || [], settings.gemini_api_key);
-
-                                    if (suggestedQueueId) {
-                                        console.log(`[GEMINI] Sugestão de transferência para fila ${suggestedQueueId}`);
-                                        await supabase.from('whatsapp_conversations').update({ 
-                                            queue_id: suggestedQueueId,
-                                            status: 'pending'
-                                        }).eq('id', conversationId);
-                                        
-                                        await supabase.from('whatsapp_messages').insert({
-                                            conversation_id: conversationId,
-                                            company_id: companyId,
-                                            message_text: `[🤖 IA] Atendimento movido para a fila: ${queues.find(q => q.id === suggestedQueueId)?.name}`,
-                                            is_from_me: true,
-                                            is_system: true
-                                        });
-                                    }
-                                }
-                            } catch (geminiErr) {
-                                console.error('[GEMINI] Erro no roteamento:', geminiErr.message);
-                            }
-                        }
-
-                        // 6. Rodar Chatbot Legado
-                        runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
-                    }
-                }
+            if (!isHistorical && !isFromMe) {
+                // Chatbot se necessário
+                runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
             }
         }
     } catch (err) {
