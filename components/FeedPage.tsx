@@ -71,7 +71,7 @@ export const PostCard: React.FC<{
         const parts = content.split(/(@[\w\s]+)/g);
         return parts.map((part, i) => {
             if (part.startsWith('@')) {
-                return <span key={i} className="text-brand-primary font-bold bg-emerald-50 px-1 rounded">{part}</span>;
+                return <span key={i} className="text-brand-primary font-bold bg-emerald-50 dark:bg-emerald-900/30 px-1 rounded">{part}</span>;
             }
             // Detectar links e transformá-los em links clicáveis (opcional, mas bom para UX)
             return part;
@@ -86,8 +86,8 @@ export const PostCard: React.FC<{
                 <div className="flex items-center">
                     <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
                     <div>
-                        <h4 className="font-bold text-brand-text">{post.authorName}</h4>
-                        <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
+                        <h4 className="font-bold text-brand-text dark:text-gray-100">{post.authorName}</h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(post.timestamp).toLocaleString()}</p>
                     </div>
                 </div>
                 {isAuthor && (
@@ -97,12 +97,12 @@ export const PostCard: React.FC<{
                 )}
             </div>
 
-            <div className="text-brand-text whitespace-pre-wrap mb-4">
+            <div className="text-brand-text dark:text-gray-200 whitespace-pre-wrap mb-4">
                 {renderContent(post.content)}
             </div>
 
             {post.mediaUrl && (
-                <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border text-center">
+                <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 dark:bg-slate-700 dark:border-slate-600 text-center">
                     <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-cover max-h-[500px]" />
                 </div>
             )}
@@ -137,23 +137,23 @@ export const PostCard: React.FC<{
 
             <div className="flex justify-around py-1 relative">
                 <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="flex-1">
-                    <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-gray-50 transition-colors ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500'}`}>
+                    <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>Reagir</span>
                     </button>
                     {showReactionMenu && (
-                        <div className="absolute bottom-full mb-2 left-0 bg-white shadow-xl border rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
+                        <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
                             {reactions.map(emoji => (
-                                <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 rounded-full">
+                                <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
                                     {emoji}
                                 </button>
                             ))}
                         </div>
                     )}
                 </div>
-                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors">
+                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     <ChatBubbleLeftIcon className="w-5 h-5" /><span>Comentar</span>
                 </button>
-                <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors">
+                <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     <ShareIcon className="w-5 h-5" /><span>Compartilhar</span>
                 </button>
             </div>
@@ -163,10 +163,10 @@ export const PostCard: React.FC<{
                     {post.comments.map(comment => (
                         <div key={comment.id} className="flex space-x-3">
                             <img src={comment.authorAvatar} alt={comment.authorName} className="w-8 h-8 rounded-full object-cover shrink-0" />
-                            <div className="bg-gray-50 rounded-2xl px-4 py-2 flex-1">
-                                <h5 className="font-bold text-xs text-brand-text">{comment.authorName}</h5>
-                                <p className="text-sm text-brand-text">{comment.text}</p>
-                                <p className="text-[10px] text-gray-400 mt-1">{new Date(comment.timestamp).toLocaleDateString()}</p>
+                            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-2xl px-4 py-2 flex-1">
+                                <h5 className="font-bold text-xs text-brand-text dark:text-gray-100">{comment.authorName}</h5>
+                                <p className="text-sm text-brand-text dark:text-gray-200">{comment.text}</p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{new Date(comment.timestamp).toLocaleDateString()}</p>
                             </div>
                         </div>
                     ))}
@@ -180,7 +180,7 @@ export const PostCard: React.FC<{
                         ref={commentInputRef}
                         type="text"
                         placeholder="Escreva um comentário..."
-                        className="w-full bg-gray-50 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                        className="w-full bg-gray-50 dark:bg-slate-700/50 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-brand-primary outline-none dark:text-gray-100"
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
                     />
@@ -221,14 +221,14 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                     <div className="space-y-3">
                         <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Online Agora</p>
                         {onlineUsers.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <div className="relative">
-                                    <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
-                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                                    <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
+                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
-                                    <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
+                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-xs text-brand-subtle-text dark:text-gray-400 truncate">{user.role}</p>
                                 </div>
                             </div>
                         ))}
@@ -236,16 +236,16 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                 )}
 
                 <div className="space-y-3 pt-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sugestões de Colaboradores</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Sugestões de Colaboradores</p>
                     {displaySuggestions.length === 0 ? (
                         <p className="text-xs text-gray-400 italic">Nenhum outro usuário encontrado.</p>
                     ) : (
                         displaySuggestions.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
-                                    <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
+                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-xs text-brand-subtle-text dark:text-gray-400 truncate">{user.role}</p>
                                 </div>
                             </div>
                         ))
@@ -641,21 +641,21 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             </div>
                         </div>
                         <div className="px-6 pt-2">
-                            <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
-                            <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
-                            <hr className="mb-4" />
-                            <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-5 mt-2">
+                            <h3 className="text-lg font-bold text-brand-text dark:text-gray-100 mb-1">{currentUser.name}</h3>
+                            <p className="text-sm text-brand-subtle-text dark:text-gray-400 mb-4">{currentUser.role} • {currentUser.team}</p>
+                            <hr className="mb-4 dark:border-slate-800" />
+                            <div className="grid grid-cols-3 gap-2 border-t border-gray-100 dark:border-slate-800 pt-5 mt-2">
                                 <div className="flex flex-col items-center">
-                                    <span className="font-bold text-brand-text text-xl">{(currentUser.following || []).length}</span>
-                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Seguidores</span>
+                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{(currentUser.following || []).length}</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Seguidores</span>
                                 </div>
-                                <div className="flex flex-col items-center border-x border-gray-100">
-                                    <span className="font-bold text-brand-text text-xl">{allEmployees.length}</span>
-                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Usuários</span>
+                                <div className="flex flex-col items-center border-x border-gray-100 dark:border-slate-800">
+                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.length}</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Usuários</span>
                                 </div>
                                 <div className="flex flex-col items-center">
-                                    <span className="font-bold text-brand-text text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
-                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Interações</span>
+                                    <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Interações</span>
                                 </div>
                             </div>
                         </div>
@@ -672,18 +672,18 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     <textarea
                                         ref={postTextareaRef}
                                         placeholder="O que está acontecendo na empresa?"
-                                        className="w-full p-4 border border-gray-100 rounded-xl bg-gray-50/50 text-brand-text focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/20 outline-none transition-all resize-none min-h-[120px]"
+                                        className="w-full p-4 border border-gray-100 dark:border-slate-700 rounded-xl bg-gray-50/50 dark:bg-slate-700/30 text-brand-text dark:text-gray-100 focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/20 outline-none transition-all resize-none min-h-[120px]"
                                         value={newPostContent}
                                         onChange={handlePostContentChange}
                                     ></textarea>
                                     {mentionSearch !== '' && (
-                                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
                                             {allEmployees
                                                 .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
                                                 .map(user => (
-                                                    <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-0 transition-colors">
+                                                    <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
                                                         <img src={user.avatarUrl || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full object-cover" alt="" />
-                                                        <div><p className="text-sm font-bold text-brand-text">{user.name}</p><p className="text-xs text-brand-subtle-text">{user.role}</p></div>
+                                                        <div><p className="text-sm font-bold text-brand-text dark:text-gray-100">{user.name}</p><p className="text-xs text-brand-subtle-text dark:text-gray-400">{user.role}</p></div>
                                                     </div>
                                                 ))}
                                         </div>
@@ -692,20 +692,20 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             </div>
 
                             {mediaFile && (
-                                <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50">
+                                <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800">
                                     <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
                                     <button onClick={() => setMediaFile(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-all shadow-lg scale-90 group-hover:scale-100 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-5 h-5" /></button>
                                 </div>
                             )}
 
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 gap-4">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
                                 <div className="flex justify-around sm:justify-start space-x-2">
-                                    <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">Foto</span></button>
-                                    <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">Reconhecer</span></button>
+                                    <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">Foto</span></button>
+                                    <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">Reconhecer</span></button>
                                 </div>
                                 <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
                             </div>
-                            <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3 gap-2">
+                            <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 dark:border-slate-800 pt-3 gap-2">
                                 <div className="flex items-start space-x-2">
                                     <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
                                     <span className="text-orange-600 font-bold leading-tight">Importante: Postagens expiram automaticamente em 90 dias para otimização de espaço.</span>
@@ -722,7 +722,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     {loading ? (
                         <div className="space-y-6">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-white rounded-xl h-64 animate-pulse"></div>
+                                <div key={i} className="bg-white dark:bg-slate-800 rounded-xl h-64 animate-pulse"></div>
                             ))}
                         </div>
                     ) : (

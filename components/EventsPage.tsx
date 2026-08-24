@@ -48,7 +48,7 @@ const EventsPage: React.FC = () => {
                     imageUrl: e.imageUrl,
                     category: (e.category as any) || 'Outro',
                     imageType: 'url',
-                    invitees: e.invited_ids || [], // Map to the correct column
+                    invited_ids: e.invited_ids || [], // Map to the correct column
                     attendees: e.attendees || [],
                     declined: e.declined || []
                 }));
@@ -106,7 +106,7 @@ const EventsPage: React.FC = () => {
                         company_id: currentUser.company_id,
                         type: 'event',
                         title: 'Nova Confirmação!',
-                        description: `${currentUser.name || currentUser.full_name} confirmou presença em: ${event.title}`,
+                        description: `${currentUser.name} confirmou presença em: ${event.title}`,
                         link: '/events'
                     });
                 }
@@ -261,14 +261,14 @@ const EventsPage: React.FC = () => {
         return (isSocialOrPublic || isInvited || isAttending) && !isDeclined;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Carregando eventos...</div>;
+    if (loading) return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Carregando eventos...</div>;
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Eventos e Acontecimentos</h1>
-                    <p className="text-gray-500 mt-1">Fique por dentro de tudo o que acontece na empresa.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Eventos e Acontecimentos</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">Fique por dentro de tudo o que acontece na empresa.</p>
                 </div>
                 {currentUser?.permissions?.createEvents && (
                     <button
@@ -282,24 +282,24 @@ const EventsPage: React.FC = () => {
             </div>
 
             {sortedEvents.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-lg shadow-sm border border-gray-100">
-                    <CalendarDaysIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900">Nenhum evento agendado</h3>
-                    <p className="text-gray-500">Fique atento para novidades em breve!</p>
+                <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700">
+                    <CalendarDaysIcon className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Nenhum evento agendado</h3>
+                    <p className="text-gray-500 dark:text-gray-400">Fique atento para novidades em breve!</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {sortedEvents.map(event => {
                         const isAttending = (event.attendees || []).includes(currentUser?.id || '');
                         return (
-                            <div key={event.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
+                            <div key={event.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md transition-shadow group">
                                 <div className="h-48 overflow-hidden relative">
                                     <img
                                         src={event.imageUrl || `https://source.unsplash.com/random/800x600/?event,corporate,${event.id}`}
                                         alt={event.title}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
-                                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-brand-primary shadow-sm">
+                                    <div className="absolute top-4 right-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-brand-primary shadow-sm">
                                         {event.category}
                                     </div>
                                     <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg text-center shadow-sm">
@@ -308,20 +308,20 @@ const EventsPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="p-5">
-                                    <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">{event.title}</h3>
-                                    <p className="text-gray-500 text-sm mb-4 line-clamp-2">{event.description}</p>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 line-clamp-1">{event.title}</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4 line-clamp-2">{event.description}</p>
 
                                     <div className="space-y-2 mb-6">
-                                        <div className="flex items-center text-sm text-gray-600">
-                                            <ClockIcon className="w-4 h-4 mr-2 text-gray-400" />
+                                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                            <ClockIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
                                             {event.time}
                                         </div>
-                                        <div className="flex items-center text-sm text-gray-600">
-                                            <MapPinIcon className="w-4 h-4 mr-2 text-gray-400" />
+                                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                            <MapPinIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
                                             {event.location}
                                         </div>
-                                        <div className="flex items-center text-sm text-gray-600">
-                                            <UserGroupIcon className="w-4 h-4 mr-2 text-gray-400" />
+                                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                            <UserGroupIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
                                             {(event.attendees || []).length} confirmados
                                         </div>
                                     </div>
@@ -329,7 +329,7 @@ const EventsPage: React.FC = () => {
                                     <div className="flex space-x-2">
                                         <button
                                             onClick={() => setSelectedEvent(event)}
-                                            className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-all bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                                            className="flex-1 py-2.5 px-4 rounded-lg font-medium transition-all bg-gray-50 dark:bg-slate-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600"
                                         >
                                             Ver Detalhes
                                         </button>
@@ -349,7 +349,7 @@ const EventsPage: React.FC = () => {
             {/* Event Detail Modal */}
             {selectedEvent && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="h-48 relative">
                             <img
                                 src={selectedEvent.imageUrl || `https://source.unsplash.com/random/800x600/?event,corporate,${selectedEvent.id}`}
@@ -362,29 +362,29 @@ const EventsPage: React.FC = () => {
                             >
                                 <XMarkIcon className="w-6 h-6" />
                             </button>
-                            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-brand-primary shadow-sm">
+                            <div className="absolute top-4 left-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-brand-primary shadow-sm">
                                 {selectedEvent.category}
                             </div>
                         </div>
 
                         <div className="p-6">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedEvent.title}</h3>
-                            <p className="text-gray-600 mb-6">{selectedEvent.description}</p>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{selectedEvent.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-300 mb-6">{selectedEvent.description}</p>
 
                             <div className="grid grid-cols-2 gap-4 mb-8">
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                                     <CalendarDaysIcon className="w-5 h-5 mr-3 text-brand-primary" />
                                     {new Date(selectedEvent.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                                     <ClockIcon className="w-5 h-5 mr-3 text-brand-primary" />
                                     {selectedEvent.time}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                                     <MapPinIcon className="w-5 h-5 mr-3 text-brand-primary" />
                                     {selectedEvent.location}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                                     <UserGroupIcon className="w-5 h-5 mr-3 text-brand-primary" />
                                     {(selectedEvent.attendees || []).length} confirmados
                                 </div>
@@ -427,17 +427,17 @@ const EventsPage: React.FC = () => {
             {
                 declineModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold text-gray-900">Justificar Ausência</h3>
-                                <button onClick={() => setDeclineModalOpen(null)}><XMarkIcon className="w-6 h-6 text-gray-400" /></button>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Justificar Ausência</h3>
+                                <button onClick={() => setDeclineModalOpen(null)}><XMarkIcon className="w-6 h-6 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" /></button>
                             </div>
                             <form onSubmit={handleDeclineSubmit}>
-                                <p className="text-sm text-gray-600 mb-4">Por favor, explique o motivo da sua ausência neste evento.</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Por favor, explique o motivo da sua ausência neste evento.</p>
                                 <textarea
                                     required
                                     rows={4}
-                                    className="w-full border rounded-lg p-3 mb-4 focus:ring-brand-primary focus:border-brand-primary"
+                                    className="w-full border dark:border-slate-700 rounded-lg p-3 mb-4 focus:ring-brand-primary focus:border-brand-primary bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                     placeholder="Motivo..."
                                     value={declineReason}
                                     onChange={e => setDeclineReason(e.target.value)}
@@ -455,29 +455,29 @@ const EventsPage: React.FC = () => {
             {
                 isCreateModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+                        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-gray-900">Cadastrar Novo Evento</h3>
-                                <button onClick={() => setIsCreateModalOpen(false)}><XMarkIcon className="w-6 h-6 text-gray-400" /></button>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Cadastrar Novo Evento</h3>
+                                <button onClick={() => setIsCreateModalOpen(false)}><XMarkIcon className="w-6 h-6 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" /></button>
                             </div>
                             <form onSubmit={handleCreateEvent} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Título do Evento</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título do Evento</label>
                                     <input
                                         required
                                         type="text"
-                                        className="w-full border rounded-lg p-2.5"
+                                        className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                         value={newEvent.title}
                                         onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
                                         placeholder="Ex: Treinamento de Integração"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição</label>
                                     <textarea
                                         required
                                         rows={3}
-                                        className="w-full border rounded-lg p-2.5"
+                                        className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                         value={newEvent.description}
                                         onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
                                         placeholder="Breve descrição do evento..."
@@ -485,41 +485,41 @@ const EventsPage: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
                                         <input
                                             required
                                             type="date"
-                                            className="w-full border rounded-lg p-2.5"
+                                            className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                             value={newEvent.date}
                                             onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Horário</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Horário</label>
                                         <input
                                             required
                                             type="time"
-                                            className="w-full border rounded-lg p-2.5"
+                                            className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                             value={newEvent.start_time}
                                             onChange={e => setNewEvent({ ...newEvent, start_time: e.target.value })}
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">localização</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">localização</label>
                                     <input
                                         required
                                         type="text"
-                                        className="w-full border rounded-lg p-2.5"
+                                        className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                         value={newEvent.location}
                                         onChange={e => setNewEvent({ ...newEvent, location: e.target.value })}
                                         placeholder="Ex: Sala de Reuniões A ou Zoom"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
                                     <select
-                                        className="w-full border rounded-lg p-2.5"
+                                        className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                         value={newEvent.category}
                                         onChange={e => setNewEvent({ ...newEvent, category: e.target.value })}
                                     >
@@ -531,10 +531,10 @@ const EventsPage: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">URL da Imagem (Opcional)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (Opcional)</label>
                                     <input
                                         type="text"
-                                        className="w-full border rounded-lg p-2.5"
+                                        className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
                                         value={newEvent.imageUrl}
                                         onChange={e => setNewEvent({ ...newEvent, imageUrl: e.target.value })}
                                         placeholder="https://..."

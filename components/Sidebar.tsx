@@ -60,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             return null;
         }
         return (
-            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={label}>
+            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={label}>
                 <Icon className="w-6 h-6 flex-shrink-0" />
                 {isOpen && <span className="ml-4 truncate">{label}</span>}
             </button>
@@ -77,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         return (
             <div>
-                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white'}`}>
+                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700/50 dark:hover:text-white'}`}>
                     <div className="flex items-center">
                         <Icon className="w-6 h-6 flex-shrink-0" />
                         {isOpen && <span className="ml-4 truncate font-semibold">{label}</span>}
@@ -101,12 +101,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800 premium-card
+        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-slate-900 dark:border-slate-800 premium-card
             fixed md:relative z-50 h-full
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>
-            <div className={`flex items-center justify-center h-28 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'md:flex-col md:space-y-0'}`}>
-                <Logo showText={isOpen} />
+            <div className="p-6 flex items-center justify-center bg-white border-b border-gray-100">
+                {isOpen ? (
+                    <img src="/logo-full.png" alt="Logo" className="h-10 object-contain" />
+                ) : (
+                    <img src="/logo-icon.png" alt="Logo" className="w-10 h-10 object-contain" />
+                )}
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
@@ -118,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
 
-                <hr className="my-2 border-gray-100 dark:border-gray-800" />
+                <hr className="my-2 border-gray-100 dark:border-slate-800" />
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
                 <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
@@ -175,11 +179,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     </button>
                 )}
             </nav>
-            <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
+            {/* Company Logo Footer */}
+            <div className={`mt-auto p-4 border-t border-gray-100 text-center bg-white ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
                     <img src={companyLogo} alt={companyName} className="h-10 mx-auto object-contain" />
                 )}
-                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate mt-2">{companyName}</p>
+                <p className="text-sm font-bold text-gray-800 truncate mt-2">{companyName}</p>
             </div>
         </aside>
     );

@@ -292,7 +292,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     };
 
     const YearView = () => (
-        <div className="p-6 bg-white rounded-b-xl animate-fade-in-down">
+        <div className="p-6 bg-white dark:bg-slate-900 rounded-b-xl animate-fade-in-down">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {Object.entries(MONTH_THEMES).map(([idx, theme]) => {
                     const monthIdx = parseInt(idx);
@@ -305,7 +305,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <button
                             key={idx}
                             onClick={() => handleMonthClick(monthIdx)}
-                            className={`group relative flex flex-col p-4 rounded-2xl border ${theme.border} ${theme.bg} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden`}
+                            className={`group relative flex flex-col p-4 rounded-2xl border ${theme.border} ${theme.bg} dark:bg-slate-800/50 dark:border-slate-700 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden`}
                         >
                             {/* Theme Ribbon */}
                             <div className={`absolute top-0 right-0 w-16 h-16 opacity-10 pointer-events-none`}>
@@ -316,17 +316,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <h4 className={`text-lg font-bold ${theme.text}`}>{theme.name}</h4>
-                                    <p className="text-[10px] uppercase tracking-wider font-semibold opacity-60">{theme.campaign}</p>
+                                    <h4 className={`text-lg font-bold ${theme.text} dark:text-gray-100`}>{theme.name}</h4>
+                                    <p className="text-[10px] uppercase tracking-wider font-semibold opacity-60 dark:text-gray-400">{theme.campaign}</p>
                                 </div>
-                                <span className="bg-white/50 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-bold text-gray-500 border border-gray-100 italic">
+                                <span className="bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-bold text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-slate-700 italic">
                                     {monthEvents.length} {monthEvents.length === 1 ? 'evento' : 'eventos'}
                                 </span>
                             </div>
 
                             <div className="space-y-2 mb-4">
                                 {monthEvents.slice(0, 3).map(e => (
-                                    <div key={e.id} className="text-[10px] truncate bg-white/40 px-2 py-1 rounded border border-white/50 text-gray-600">
+                                    <div key={e.id} className="text-[10px] truncate bg-white/40 dark:bg-slate-700/30 px-2 py-1 rounded border border-white/50 dark:border-slate-700 text-gray-600 dark:text-gray-300">
                                         • {e.title}
                                     </div>
                                 ))}
@@ -340,8 +340,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 )}
                             </div>
 
-                            <div className="mt-auto pt-3 border-t border-black/5">
-                                <p className="text-[9px] leading-tight text-gray-500 italic">"{theme.phrase}"</p>
+                            <div className="mt-auto pt-3 border-t border-black/5 dark:border-white/5">
+                                <p className="text-[9px] leading-tight text-gray-500 dark:text-gray-400 italic">"{theme.phrase}"</p>
                             </div>
                         </button>
                     );
@@ -360,11 +360,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
         return (
             <div className={`animate-scale-in transition-all duration-500`}>
-                <div className={`p-4 ${theme.bg} border-b ${theme.border} flex items-center justify-between`}>
+                <div className={`p-4 ${theme.bg} dark:bg-slate-900 border-b ${theme.border} dark:border-slate-800 flex items-center justify-between`}>
                     <div className="flex items-center space-x-6">
                         <button
                             onClick={() => setView('year')}
-                            className="p-2 hover:bg-white/50 rounded-xl text-gray-400 hover:text-gray-600 transition-all border border-transparent hover:border-white/50"
+                            className="p-2 hover:bg-white/50 dark:hover:bg-slate-800/50 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all border border-transparent hover:border-white/50 dark:hover:border-slate-700"
                             title="Voltar para Visão Anual"
                         >
                             <ArrowUturnLeftIcon className="w-5 h-5" />
@@ -373,35 +373,35 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <div className="flex items-center space-x-4">
                             <button
                                 onClick={handlePrevMonth}
-                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 hover:bg-white shadow-sm text-gray-500`}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
                             >
                                 <ChevronLeftIcon className="w-5 h-5" />
                             </button>
 
                             <div className="text-center min-w-[200px]">
-                                <h3 className={`text-2xl font-black ${theme.text}`}>{theme.name} <span className="opacity-40">{year}</span></h3>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 italic mt-0.5">{theme.phrase}</p>
+                                <h3 className={`text-2xl font-black ${theme.text} dark:text-gray-100`}>{theme.name} <span className="opacity-40">{year}</span></h3>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 italic mt-0.5">{theme.phrase}</p>
                             </div>
 
                             <button
                                 onClick={handleNextMonth}
-                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 hover:bg-white shadow-sm text-gray-500`}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
                             >
                                 <ChevronRightIcon className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                        <div className={`px-4 py-2 rounded-xl bg-white/80 border ${theme.border} shadow-sm backdrop-blur-md`}>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 leading-none mb-1">Campanha do Mês</p>
-                            <p className={`text-xs font-black uppercase ${theme.text}`}>Mês {theme.campaign}</p>
+                        <div className={`px-4 py-2 rounded-xl bg-white/80 dark:bg-slate-800/80 border ${theme.border} dark:border-slate-700 shadow-sm backdrop-blur-md`}>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 leading-none mb-1">Campanha do Mês</p>
+                            <p className={`text-xs font-black uppercase ${theme.text} dark:text-gray-200`}>Mês {theme.campaign}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-7 border-b">
+                <div className="grid grid-cols-7 border-b dark:border-slate-800">
                     {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map(d => (
-                        <div key={d} className="py-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 border-r last:border-0">{d}</div>
+                        <div key={d} className="py-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 border-r dark:border-slate-800 last:border-0">{d}</div>
                     ))}
                 </div>
 
@@ -414,10 +414,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         }) : [];
 
                         return (
-                            <div key={idx} className={`h-32 border-b border-r p-2 relative transition-colors ${day ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/50'} last:border-r-0`}>
+                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}>
                                 {day && (
                                     <>
-                                        <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 group-hover:text-slate-600'}`}>{day.getDate()}</span>
+                                         <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
                                         <div className="mt-8 space-y-1 overflow-y-auto max-h-[calc(100%-2rem)]">
                                             {evs.map(e => (
                                                 <button key={e.id} onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>
@@ -438,11 +438,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
     const getCategoryColor = (category: CalendarEventCategory) => {
         switch (category) {
-            case 'Reunião': return 'bg-blue-50 text-blue-700 border-blue-200';
-            case 'Evento da Empresa': return 'bg-purple-50 text-purple-700 border-purple-200';
-            case 'Feriado': return 'bg-rose-50 text-rose-700 border-rose-200';
-            case 'Aniversário': return 'bg-amber-50 text-amber-700 border-amber-200';
-            default: return 'bg-gray-50 text-gray-700 border-gray-200';
+            case 'Reunião': return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+            case 'Evento da Empresa': return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
+            case 'Feriado': return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800';
+            case 'Aniversário': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800';
+            default: return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-slate-700/30 dark:text-gray-300 dark:border-slate-800';
         }
     };
 
@@ -450,8 +450,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         <div className="max-w-screen-2xl mx-auto space-y-6">
             <div className="flex items-center justify-between mb-2">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">Calendário <span className="text-brand-primary italic">Panda</span></h1>
-                    <p className="text-slate-500 font-medium">Gestão de eventos e compromissos</p>
+                    <h1 className="text-3xl font-black text-slate-800 dark:text-gray-100 tracking-tight">Calendário <span className="text-brand-primary italic">Panda</span></h1>
+                    <p className="text-slate-500 dark:text-gray-400 font-medium">Gestão de eventos e compromissos</p>
                 </div>
                 <div className="flex items-center space-x-3">
                     <button onClick={() => setCreateModalOpen(true)} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
@@ -460,7 +460,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 </div>
             </div>
 
-            <Card className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 rounded-3xl">
+            <Card className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
                 <header className="bg-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 gap-4">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
@@ -487,32 +487,32 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 relative animate-scale-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-8 relative animate-scale-in">
                         <button onClick={() => setCreateModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
                         <div className="mb-6">
-                            <h3 className="text-3xl font-black text-slate-800">Agendar Evento</h3>
-                            <p className="text-slate-500 font-medium">Preencha os detalhes do compromisso</p>
+                            <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100">Agendar Evento</h3>
+                            <p className="text-slate-500 dark:text-gray-400 font-medium">Preencha os detalhes do compromisso</p>
                         </div>
                         <form onSubmit={handleCreateEvent} className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Assunto</label>
-                                <input type="text" name="title" value={newEventData.title} onChange={handleInputChange} required className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" placeholder="Ex: Planejamento Trimestral" />
+                                <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Assunto</label>
+                                <input type="text" name="title" value={newEventData.title} onChange={handleInputChange} required className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" placeholder="Ex: Planejamento Trimestral" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Data</label>
-                                    <input type="date" name="date" value={newEventData.date} onChange={handleInputChange} required className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" />
+                                    <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Data</label>
+                                    <input type="date" name="date" value={newEventData.date} onChange={handleInputChange} required className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Categoria</label>
-                                    <select name="category" value={newEventData.category} onChange={handleInputChange} className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none">
+                                    <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Categoria</label>
+                                    <select name="category" value={newEventData.category} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none">
                                         <option>Reunião</option>
                                         <option>Evento da Empresa</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-brand-primary/20 transition-all cursor-pointer group">
+                            <div className="flex items-center space-x-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-2xl border border-transparent hover:border-brand-primary/20 transition-all cursor-pointer group">
                                 <input
                                     type="checkbox"
                                     id="isPrivate"
@@ -522,20 +522,20 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     className="w-5 h-5 text-brand-primary border-slate-300 rounded focus:ring-brand-primary"
                                 />
                                 <label htmlFor="isPrivate" className="flex-1 cursor-pointer">
-                                    <div className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">Evento Privado</div>
-                                    <p className="text-[10px] text-slate-500 font-medium">Este evento aparecerá somente para você no calendário.</p>
+                                    <div className="text-sm font-bold text-slate-800 dark:text-gray-100 group-hover:text-brand-primary transition-colors">Evento Privado</div>
+                                    <p className="text-[10px] text-slate-500 dark:text-gray-400 font-medium">Este evento aparecerá somente para você no calendário.</p>
                                 </label>
                             </div>
 
                             {!newEventData.isPrivate && (
                                 <>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Equipe/Departamento</label>
+                                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Convidar Equipe/Departamento</label>
                                         <select
                                             name="departmentId"
                                             value={newEventData.departmentId}
                                             onChange={handleInputChange}
-                                            className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none"
+                                            className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none"
                                         >
                                             <option value="">Nenhum departamento específico</option>
                                             {departments.map(d => (
@@ -545,10 +545,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Usuários</label>
-                                        <div className="bg-slate-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-transparent focus-within:ring-2 focus-within:ring-brand-primary transition-all">
+                                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Convidar Usuários</label>
+                                        <div className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-4 max-h-40 overflow-y-auto border border-transparent focus-within:ring-2 focus-within:ring-brand-primary transition-all">
                                             {employees.filter(emp => emp.id !== currentUser?.id).map(emp => (
-                                                <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded-xl cursor-pointer transition-colors group">
+                                                <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors group">
                                                     <input
                                                         type="checkbox"
                                                         checked={newEventData.attendees.includes(emp.id)}
@@ -571,7 +571,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                                 {emp.name?.charAt(0)}
                                                             </div>
                                                         )}
-                                                        <span className="text-sm font-semibold text-slate-700 group-hover:text-brand-primary transition-colors">{emp.name}</span>
+                                                        <span className="text-sm font-semibold text-slate-700 dark:text-gray-200 group-hover:text-brand-primary transition-colors">{emp.name}</span>
                                                     </div>
                                                 </label>
                                             ))}
@@ -591,21 +591,21 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
             {isDetailModalOpen && selectedEvent && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 relative animate-scale-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-8 relative animate-scale-in">
                         <button onClick={() => setDetailModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
                         <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 ${getCategoryColor(selectedEvent.category)}`}>
                             {selectedEvent.category === 'Aniversário' ? <GiftIcon className="w-10 h-10" /> : <CalendarIcon className="w-10 h-10" />}
                         </div>
                         <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${getCategoryColor(selectedEvent.category)}`}>{selectedEvent.category}</span>
-                        <h3 className="text-3xl font-black text-slate-800 mt-3 mb-2">{selectedEvent.title}</h3>
-                        <p className="text-slate-500 font-bold flex items-center mb-6">
+                        <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100 mt-3 mb-2">{selectedEvent.title}</h3>
+                        <p className="text-slate-500 dark:text-gray-400 font-bold flex items-center mb-6">
                             <ClockIcon className="w-5 h-5 mr-2" />
                             {new Date(selectedEvent.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}
                         </p>
-                        <div className="space-y-4 pt-6 border-t border-slate-100">
+                        <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-700">
                             {selectedEvent.location && (
-                                <div className="flex items-start space-x-3 text-slate-600 font-medium">
-                                    <MapPinIcon className="w-5 h-5 text-slate-400 mt-1" />
+                                <div className="flex items-start space-x-3 text-slate-600 dark:text-gray-300 font-medium">
+                                    <MapPinIcon className="w-5 h-5 text-slate-400 dark:text-gray-500 mt-1" />
                                     <div>
                                         <span className="block">{selectedEvent.location}</span>
                                         {selectedEvent.isSystem && (
@@ -617,12 +617,12 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 </div>
                             )}
                             {selectedEvent.notes && (
-                                <div className="flex flex-col space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <div className="flex items-center space-x-2 text-slate-400">
+                                <div className="flex flex-col space-y-2 p-4 bg-slate-50 dark:bg-slate-700 rounded-2xl border border-slate-100 dark:border-slate-600">
+                                    <div className="flex items-center space-x-2 text-slate-400 dark:text-gray-500">
                                         <DocumentTextIcon className="w-4 h-4" />
                                         <span className="text-[10px] font-black uppercase tracking-widest">{selectedEvent.isSystem ? 'Histórico/Descrição' : 'Observações'}</span>
                                     </div>
-                                    <p className="text-sm text-slate-600 font-medium leading-relaxed italic opacity-80">
+                                    <p className="text-sm text-slate-600 dark:text-gray-300 font-medium leading-relaxed italic opacity-80">
                                         {selectedEvent.notes}
                                     </p>
                                 </div>
@@ -631,7 +631,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             {/* Status dos Convidados */}
                             {!selectedEvent.isSystem && (
                                 <div className="space-y-3 pt-4">
-                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                    <p className="text-[10px] font-black uppercase text-slate-400 dark:text-gray-500 tracking-widest flex items-center gap-2">
                                         <UsersIcon className="w-3 h-3" /> Convidados
                                     </p>
                                     <div className="space-y-2">
@@ -647,7 +647,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                             </div>
                                         ) : selectedEvent.invites && selectedEvent.invites.length > 0 ? (
                                             selectedEvent.invites.map(inv => (
-                                                <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                                                <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600">
                                                     <div className="flex items-center gap-2">
                                                         {inv.invitee_avatar ? (
                                                             <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover" />
@@ -657,7 +657,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                             </div>
                                                         )}
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-700">{inv.invitee_name}</span>
+                                                            <span className="text-xs font-bold text-slate-700 dark:text-gray-200">{inv.invitee_name}</span>
                                                             {inv.status === 'declined' && inv.decline_reason && (
                                                                 <span className="text-[9px] text-red-500 italic">" {inv.decline_reason} "</span>
                                                             )}
@@ -683,18 +683,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             const myInvite = selectedEvent.invites?.find(inv => inv.user_id === currentUser?.id);
                             if (myInvite && myInvite.status === 'pending') {
                                 return (
-                                    <div className="mt-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-pulse-slow">
-                                        <p className="text-xs font-bold text-emerald-800 mb-3 text-center uppercase tracking-wide">Você foi convidado!</p>
+                                    <div className="mt-8 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800 animate-pulse-slow">
+                                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 mb-3 text-center uppercase tracking-wide">Você foi convidado!</p>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleRSVP('accepted')}
-                                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl font-bold text-xs uppercase transition-all shadow-md shadow-emerald-100"
+                                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl font-bold text-xs uppercase transition-all shadow-md shadow-emerald-100 dark:shadow-none"
                                             >
                                                 Confirmar
                                             </button>
                                             <button
                                                 onClick={() => setRSVPModalOpen(true)}
-                                                className="flex-1 bg-white hover:bg-red-50 text-red-500 p-3 rounded-xl font-bold text-xs uppercase border border-red-100 transition-all"
+                                                className="flex-1 bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 p-3 rounded-xl font-bold text-xs uppercase border border-red-100 dark:border-red-900/50 transition-all"
                                             >
                                                 Recusar
                                             </button>
@@ -712,17 +712,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
             {isRSVPModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
                         <button onClick={() => setRSVPModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
                         <div className="mb-6">
-                            <h3 className="text-2xl font-black text-slate-800">Recusar Convite</h3>
-                            <p className="text-slate-500 font-medium text-sm">Por favor, informe o motivo da recusa:</p>
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-gray-100">Recusar Convite</h3>
+                            <p className="text-slate-500 dark:text-gray-400 font-medium text-sm">Por favor, informe o motivo da recusa:</p>
                         </div>
                         <div className="space-y-4">
                             <textarea
                                 value={declineReason}
                                 onChange={(e) => setDeclineReason(e.target.value)}
-                                className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold h-32 resize-none"
+                                className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold h-32 resize-none"
                                 placeholder="Ex: Estarei em outra reunião externa..."
                             ></textarea>
                             <div className="flex gap-3">

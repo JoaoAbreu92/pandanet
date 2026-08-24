@@ -61,6 +61,8 @@ export interface Notification {
   linkTo?: Page; // Link opcional para uma página interna
   actionLabel?: string;
   avatarUrl?: string;
+  user_id?: string; // Target user for database notifications
+  company_id?: string;
 }
 
 export interface QuickLink {
@@ -107,7 +109,7 @@ export interface Event {
   imageUrl?: string;
   category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro';
   imageType?: 'url' | 'upload';
-  invitees?: string[]; // IDs de usuários especificamente convidados/convocados
+  invited_ids?: string[]; // IDs de usuários especificamente convidados/convocados
   attendees: string[]; // IDs de usuários que CONFIRMARAM
   declined?: { userId: string; reason: string }[]; // Usuários que recusaram e o motivo
 }
@@ -398,6 +400,7 @@ export interface MarketplaceItem {
   listedAt: string; // YYYY-MM-DD
   status: MarketplaceItemStatus;
   reservedBy?: string;
+  seller: string;
 }
 
 export type FormStatus = 'Pendente' | 'Aprovado' | 'Rejeitado';

@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
     };
 
     return (
-        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-gray-900 dark:border-gray-800 premium-card">
+        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-slate-900 dark:border-slate-800 premium-card">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">

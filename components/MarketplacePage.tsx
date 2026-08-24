@@ -69,7 +69,7 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                     <XCircleIcon className="w-6 h-6" />
                 </button>
@@ -77,14 +77,14 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-brand-text">Título do Anúncio</label>
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Título do Anúncio</label>
+                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-brand-text">Preço (R$)</label>
-                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                            <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Preço (R$)</label>
+                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-brand-text">Condição</label>
@@ -98,8 +98,8 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-brand-text">Categoria</label>
-                        <select value={category} onChange={e => setCategory(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Categoria</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
                             <option>Eletrônicos</option>
                             <option>Móveis</option>
                             <option>Livros</option>
@@ -109,17 +109,17 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-brand-text">Descrição</label>
-                        <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required></textarea>
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Descrição</label>
+                        <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required></textarea>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-brand-text">Foto do Item</label>
-                        <input type="file" accept="image/*" onChange={e => setImage(e.target.files ? e.target.files[0] : null)} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
+                        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Foto do Item</label>
+                        <input type="file" accept="image/*" onChange={e => setImage(e.target.files ? e.target.files[0] : null)} className="mt-1 block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                        <button type="button" onClick={onClose} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancelar</button>
+                        <button type="button" onClick={onClose} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 dark:bg-slate-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-slate-600">Cancelar</button>
                         <button type="submit" disabled={uploading} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
                             {uploading ? 'Publicando...' : 'Publicar Anúncio'}
                         </button>
@@ -143,9 +143,9 @@ const ItemDetailModal: React.FC<{
 
     const getStatusChip = (status: MarketplaceItem['status']) => {
         switch (status) {
-            case 'Disponível': return <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Disponível</span>;
-            case 'Reservado': return <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Reservado</span>;
-            case 'Vendido': return <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full">Vendido</span>;
+            case 'Disponível': return <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs font-medium px-2.5 py-0.5 rounded-full">Disponível</span>;
+            case 'Reservado': return <span className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 text-xs font-medium px-2.5 py-0.5 rounded-full">Reservado</span>;
+            case 'Vendido': return <span className="bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-gray-300 text-xs font-medium px-2.5 py-0.5 rounded-full">Vendido</span>;
         }
     };
 
@@ -156,7 +156,7 @@ const ItemDetailModal: React.FC<{
                     {item.imageUrls.length > 0 ? (
                         <img src={item.imageUrls[currentImageIndex]} alt={item.title} className="w-full h-64 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none" />
                     ) : (
-                        <div className="text-gray-400">Sem imagem</div>
+                            <div className="text-gray-400 dark:text-gray-600">Sem imagem</div>
                     )}
 
                     {item.imageUrls.length > 1 && (
@@ -167,10 +167,10 @@ const ItemDetailModal: React.FC<{
                     )}
                 </div>
                 <div className="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 hidden md:block"><XCircleIcon className="w-6 h-6" /></button>
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hidden md:block"><XCircleIcon className="w-6 h-6" /></button>
                     <div className="flex justify-between items-start mb-2">
-                        <h2 className="text-2xl font-bold text-brand-text">{item.title}</h2>
-                        <button onClick={onClose} className="p-2 -mr-2 text-gray-500 md:hidden"><XCircleIcon className="w-6 h-6" /></button>
+                        <h2 className="text-2xl font-bold text-brand-text dark:text-gray-100">{item.title}</h2>
+                        <button onClick={onClose} className="p-2 -mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 md:hidden"><XCircleIcon className="w-6 h-6" /></button>
                     </div>
                     <div className="flex items-center space-x-2 mb-4">
                         {getStatusChip(item.status)}
@@ -178,11 +178,11 @@ const ItemDetailModal: React.FC<{
                         <span className="text-sm text-brand-subtle-text">· {item.condition}</span>
                     </div>
                     <p className="text-3xl font-bold text-brand-primary mb-4">R$ {item.price.toFixed(2)}</p>
-                    <div className="text-brand-subtle-text space-y-2 text-sm mb-6 flex-grow">
+                    <div className="text-brand-subtle-text dark:text-gray-300 space-y-2 text-sm mb-6 flex-grow">
                         <p className="whitespace-pre-wrap">{item.description}</p>
-                        <p className="text-xs text-gray-400 mt-4">Anunciado por: {item.seller} em {item.listedAt}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">Anunciado por: {item.seller} em {item.listedAt}</p>
                     </div>
-                    <div className="mt-auto pt-4 border-t">
+                    <div className="mt-auto pt-4 border-t dark:border-slate-700">
                         {item.status === 'Disponível' ? (
                             <button onClick={() => onReserve(item.id)} className="w-full py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Tenho Interesse!</button>
                         ) : (
@@ -292,8 +292,8 @@ const MarketplacePage: React.FC = () => {
     };
 
     const getStatusBorder = (status: MarketplaceItem['status']) => {
-        if (status === 'Vendido') return 'border-gray-300';
-        if (status === 'Reservado') return 'border-yellow-400';
+        if (status === 'Vendido') return 'border-gray-300 dark:border-slate-700';
+        if (status === 'Reservado') return 'border-yellow-400 dark:border-yellow-600';
         return 'border-transparent';
     };
 
@@ -303,8 +303,8 @@ const MarketplacePage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
                 <div>
-                    <h1 className="text-3xl font-bold text-brand-text">Marketplace da Empresa</h1>
-                    <p className="text-brand-subtle-text mt-1">Encontre equipamentos usados com um ótimo custo-benefício!</p>
+                    <h1 className="text-3xl font-bold text-brand-text dark:text-gray-100">Marketplace da Empresa</h1>
+                    <p className="text-brand-subtle-text dark:text-gray-400 mt-1">Encontre equipamentos usados com um ótimo custo-benefício!</p>
                 </div>
                 {currentUser?.permissions?.manageMarketplace && (
                     <button
@@ -319,22 +319,22 @@ const MarketplacePage: React.FC = () => {
 
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="relative flex-grow">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="text" placeholder="Buscar por item..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-full bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                    <input type="text" placeholder="Buscar por item..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border dark:border-slate-700 rounded-full bg-white dark:bg-slate-800 text-brand-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary" />
                 </div>
-                <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full md:w-48 px-4 py-2 border rounded-full bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full md:w-48 px-4 py-2 border dark:border-slate-700 rounded-full bg-white dark:bg-slate-800 text-brand-text dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary">
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredItems.map(item => (
-                    <div key={item.id} onClick={() => setSelectedItem(item)} className={`rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 cursor-pointer bg-white flex flex-col overflow-hidden border-2 ${getStatusBorder(item.status)}`}>
+                    <div key={item.id} onClick={() => setSelectedItem(item)} className={`rounded-lg shadow-md hover:shadow-xl dark:shadow-none transition-shadow duration-300 cursor-pointer bg-white dark:bg-slate-800 flex flex-col overflow-hidden border-2 ${getStatusBorder(item.status)}`}>
                         <div className="relative">
                             {item.imageUrls.length > 0 ? (
                                 <img src={item.imageUrls[0]} alt={item.title} className="h-48 w-full object-cover" />
                             ) : (
-                                <div className="h-48 w-full bg-gray-200 flex items-center justify-center text-gray-400">Sem Imagem</div>
+                                    <div className="h-48 w-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-gray-400 dark:text-gray-500">Sem Imagem</div>
                             )}
 
                             {item.status !== 'Disponível' && (
@@ -344,17 +344,17 @@ const MarketplacePage: React.FC = () => {
                             )}
                         </div>
                         <div className="p-4 flex flex-col flex-grow">
-                            <h3 className="font-bold text-brand-text truncate">{item.title}</h3>
-                            <p className="text-sm text-brand-subtle-text">{item.condition}</p>
+                            <h3 className="font-bold text-brand-text dark:text-gray-100 truncate">{item.title}</h3>
+                            <p className="text-sm text-brand-subtle-text dark:text-gray-400">{item.condition}</p>
                             <p className="mt-2 text-xl font-bold text-brand-primary flex-grow">R$ {item.price.toFixed(2)}</p>
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }} className="mt-4 w-full text-center px-4 py-2 text-sm font-medium text-brand-primary bg-emerald-50 rounded-md hover:bg-emerald-100 transition-colors">
+                            <button onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }} className="mt-4 w-full text-center px-4 py-2 text-sm font-medium text-brand-primary bg-emerald-50 dark:bg-emerald-900/20 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
                                 Ver Detalhes
                             </button>
                         </div>
                     </div>
                 ))}
             </div>
-            {filteredItems.length === 0 && <p className="text-center text-gray-500 py-12">Nenhum item encontrado. Tente ajustar sua busca.</p>}
+            {filteredItems.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 py-12">Nenhum item encontrado. Tente ajustar sua busca.</p>}
 
             {selectedItem && currentUser && <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onReserve={handleReserveItem} currentUserId={currentUser.id} />}
 
