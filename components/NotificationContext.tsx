@@ -303,18 +303,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const registerPushNotifications = useCallback(async (userId: string) => {
         if (!Capacitor.isNativePlatform()) {
             console.log('[PandaNet] Not running on a native platform, skipping Push Notifications setup.');
+            const isMobileBrowser = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobileBrowser) {
+                alert('[PandaNet] Aviso: Você está acessando pelo navegador web do celular. Para receber notificações com o app fechado, utilize o aplicativo nativo (APK).');
+            }
             return;
         }
 
         try {
+            console.log('[PandaNet] Iniciando registro do Push FCM...');
             let permStatus = await PushNotifications.checkPermissions();
 
-            if (permStatus.receive === 'prompt') {
+            if (permStatus.receive !== 'granted') {
                 permStatus = await PushNotifications.requestPermissions();
             }
 
             if (permStatus.receive !== 'granted') {
-                console.warn('[PandaNet] Push notification permission not granted.');
+                alert('[PandaNet] Permissão de notificação push negada pelo usuário.');
                 return;
             }
 
@@ -331,8 +336,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         vibration: true
                     });
                     console.log('[PandaNet] Canal FCM para Android criado.');
-                } catch (chErr) {
+                } catch (chErr: any) {
                     console.error('[PandaNet] Erro ao criar canal FCM:', chErr);
+                    alert('[PandaNet] Erro ao criar canal FCM: ' + chErr?.message);
                 }
             }
 
@@ -342,6 +348,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             // On success, save token to profile in Supabase
             await PushNotifications.addListener('registration', async (token) => {
                 console.log('[PandaNet] Push registration success, token: ' + token.value);
+                alert('[PandaNet] Dispositivo registrado com sucesso no Firebase!');
                 try {
                     const { error } = await supabase
                         .from('profiles')
@@ -349,14 +356,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         .eq('id', userId);
                     if (error) throw error;
                     console.log('[PandaNet] Push token successfully saved to profile.');
-                } catch (dbErr) {
+                    alert('[PandaNet] Token push salvo com sucesso no seu perfil do banco.');
+                } catch (dbErr: any) {
                     console.error('[PandaNet] Error saving push token to profile:', dbErr);
+                    alert('[PandaNet] Erro ao registrar token push no banco: ' + dbErr?.message);
                 }
             });
 
             // Handle registration errors
             await PushNotifications.addListener('registrationError', (error) => {
                 console.error('[PandaNet] Push registration error:', JSON.stringify(error));
+                alert('[PandaNet] Falha ao registrar notificações push no Firebase: ' + JSON.stringify(error));
             });
 
             // Handle push notifications received when app is open (foreground)
@@ -369,8 +379,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 console.log('[PandaNet] Push action performed:', JSON.stringify(action));
             });
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('[PandaNet] Fatal error in registerPushNotifications:', err);
+            alert('[PandaNet] Erro fatal no Push Notifications: ' + err?.message);
         }
     }, []);
 
