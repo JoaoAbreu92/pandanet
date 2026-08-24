@@ -334,6 +334,10 @@ DROP POLICY IF EXISTS "Insert Own Profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_select_policy" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_insert_policy" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_policy" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_delete_policy" ON public.profiles;
 
 -- Create clean, recursion-free policies
 CREATE POLICY "profiles_select_policy" ON public.profiles
