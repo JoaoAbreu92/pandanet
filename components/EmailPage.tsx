@@ -1224,8 +1224,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             <p>{t('email.select_to_read')}</p>
                     </div>
                 ) : view === 'compose' ? (
-                    <div className="flex-1 flex flex-col h-full bg-white">
-                        <div className="p-6 flex-1 flex flex-col space-y-4">
+                            <div className="flex-1 flex flex-col h-full bg-white overflow-hidden">
+                                <div className="p-6 flex-1 flex flex-col space-y-4 overflow-y-auto">
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-2">
                                             {toTags.map(tag => (
@@ -1419,22 +1419,22 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                             ))}
                                         </div>
                                     </div>
+                                </div>
 
-                                    <div className="flex justify-between items-center pt-2">
-                                        <span className="text-xs text-gray-400 ml-1">
-                                            {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">{t('generic.cancel')}</button>
-                                            <button
-                                                onClick={sendEmail}
-                                                disabled={loading}
-                                                className="px-6 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 shadow-lg flex items-center gap-2"
-                                            >
-                                                <PaperAirplaneIcon className="w-4 h-4" />
-                                                {loading ? t('email.sending') : t('email.send')}
-                                            </button>
-                                        </div>
+                                <div className="p-4 border-t bg-gray-50 flex justify-between items-center shrink-0">
+                                    <span className="text-xs text-gray-400 ml-1">
+                                        {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">{t('generic.cancel')}</button>
+                                        <button
+                                            onClick={sendEmail}
+                                            disabled={loading}
+                                            className="px-6 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 shadow-lg flex items-center gap-2"
+                                        >
+                                            <PaperAirplaneIcon className="w-4 h-4" />
+                                            {loading ? t('email.sending') : t('email.send')}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
