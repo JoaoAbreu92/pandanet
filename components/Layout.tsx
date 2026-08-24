@@ -108,8 +108,8 @@ const Layout: React.FC<LayoutProps> = ({
                     onClearAll={onClearAllNotifications}
                     onNavigate={onNavigate}
                 />
-                <main className="flex-1 overflow-hidden p-0 relative">
-                        <div className={`h-full w-full overflow-x-hidden ${['messages', 'email'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
+                    <main className="flex-1 overflow-hidden p-0 relative bg-[#F8FAFC]">
+                        <div className={`h-full w-full overflow-x-hidden ${['messages', 'email'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-6 md:p-10'}`}>
                         {children}
                     </div>
                 </main>
