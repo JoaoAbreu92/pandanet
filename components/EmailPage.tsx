@@ -311,7 +311,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             config: settings,
             uids: [email.uid],
             operation: add ? 'add' : 'remove',
-            flags: [flag]
+            flags: [flag],
+            path: currentFolder
         });
     };
 
@@ -493,10 +494,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             // Merge metadata
             const mergedEmails = emailList.map((email: any) => {
-                const meta = metadataList?.find((m: any) => m.message_id === email.messageId);
+                const meta = metadataList?.find((m: any) => m.message_id === (email.messageId || email.uid));
                 return {
                     ...email,
-                    metadata: meta ? { id: meta.id, tags: meta.tags, notes: meta.notes } : { tags: [] }
+                    metadata: meta ? { id: meta.id, tags: meta.tags || [], notes: meta.notes } : { tags: [] }
                 };
             });
 
@@ -643,10 +644,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const filteredEmails = emails.filter(email => {
+        const subject = email.subject || '';
+        const from = email.from || '';
         const matchesSearch =
-            email.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            email.from?.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesTag = filterTag ? email.metadata?.tags.some(t => t.label === filterTag) : true;
+            subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            from.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesTag = filterTag ? (email.metadata?.tags || []).some(t => t.label === filterTag) : true;
         return matchesSearch && matchesTag;
     });
 
@@ -810,7 +813,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             </div>
 
                             <button
-                                onClick={() => { toggleFlag(contextMenu.email, '\\Seen', (contextMenu.email.flags || []).includes('\\Seen')); closeContextMenu(); }}
+                                onClick={() => {
+                                    const isSeen = (contextMenu.email.flags || []).includes('\\Seen');
+                                    toggleFlag(contextMenu.email, '\\Seen', !isSeen);
+                                    closeContextMenu();
+                                }}
                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
                             >
                                 <EnvelopeIcon className="w-4 h-4 text-gray-400" />

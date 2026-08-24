@@ -181,11 +181,10 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 const simpleParser = require('mailparser').simpleParser;
 
 app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
-    const { config, uid, path } = req.body;
-    const mailboxPath = path || 'INBOX';
+    const uidNum = Number(uid);
     if (!config || !uid) return res.status(400).json({ error: 'Missing config or uid' });
 
-    console.log(`[email-server] FETCH BODY: UID ${uid}`);
+    console.log(`[email-server] FETCH BODY: UID ${uid} in ${mailboxPath}`);
 
     try {
         const client = await getPooledClient(config);
@@ -200,7 +199,7 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
         const lock = await client.getMailboxLock(finalPath);
         try {
-            const message = await client.fetchOne(uid, { source: true }, { uid: true });
+            const message = await client.fetchOne(uidNum, { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });
 
             const parsed = await simpleParser(message.source);
@@ -220,19 +219,22 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
 // --- MANAGE FLAGS (SEEN, FLAGGED, ETC) ---
 app.post('/api/email/flags', authMiddleware, async (req, res) => {
-    const { config, uids, operation, flags } = req.body; // operation: 'add' or 'remove'
+    const { config, uids, operation, flags, path } = req.body; // operation: 'add' or 'remove'
+    const mailboxPath = path || 'INBOX';
     if (!config || !uids || !operation || !flags) return res.status(400).json({ error: 'Missing parameters' });
+
+    const uidsNum = Array.isArray(uids) ? uids.map(Number) : [Number(uids)];
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock('INBOX');
+        const lock = await client.getMailboxLock(mailboxPath);
         try {
             if (operation === 'add') {
-                await client.messageFlagsAdd(uids, flags, { uid: true });
+                await client.messageFlagsAdd(uidsNum, flags, { uid: true });
             } else if (operation === 'remove') {
-                await client.messageFlagsRemove(uids, flags, { uid: true });
+                await client.messageFlagsRemove(uidsNum, flags, { uid: true });
             } else if (operation === 'set') {
-                await client.messageFlagsSet(uids, flags, { uid: true });
+                await client.messageFlagsSet(uidsNum, flags, { uid: true });
             }
             return res.json({ success: true });
         } finally {
