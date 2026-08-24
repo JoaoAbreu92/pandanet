@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, CalendarDaysIcon, XMarkIcon, PhotoIcon } from './icons';
 import type { Event, Employee } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface EventsManagerProps {
-    events: Event[];
-    setEvents: (events: Event[]) => void;
     employees: Employee[];
 }
 
-const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employees }) => {
+const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
+    const { profile: currentUser } = useAuth();
+    const [events, setEvents] = useState<Event[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
     const [formData, setFormData] = useState<Partial<Event>>({
         category: 'Social',
         title: '',
@@ -24,6 +29,45 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
         imageType: 'url'
     });
     const [imageFile, setImageFile] = useState<File | null>(null);
+
+    const fetchEvents = async () => {
+        if (!currentUser?.company_id) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('events')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('date', { ascending: true });
+
+            if (error) throw error;
+
+            if (data) {
+                const formatted: Event[] = data.map((e: any) => ({
+                    id: e.id,
+                    title: e.title,
+                    description: e.description,
+                    date: e.date?.split('T')[0] || e.start_time?.split('T')[0],
+                    time: e.start_time?.split('T')[1]?.substring(0, 5) || e.time || '09:00',
+                    location: e.location || '',
+                    imageUrl: e.imageUrl,
+                    category: e.category || 'Social',
+                    attendees: e.attendees || [],
+                    invitees: e.invitees || [],
+                    declined: e.declined || []
+                }));
+                setEvents(formatted);
+            }
+        } catch (err) {
+            console.error('Error fetching events:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchEvents();
+    }, [currentUser?.company_id]);
 
     const handleOpenModal = (event?: Event) => {
         if (event) {
@@ -53,7 +97,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
         }
     };
 
-    const toggleInvitee = (userId: number) => {
+    const toggleInvitee = (userId: string) => {
         const currentInvitees = formData.invitees || [];
         if (currentInvitees.includes(userId)) {
             setFormData({ ...formData, invitees: currentInvitees.filter(id => id !== userId) });
@@ -62,26 +106,89 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (editingEvent) {
-            setEvents(events.map(ev => ev.id === editingEvent.id ? { ...ev, ...formData } as Event : ev));
-        } else {
-            const newEvent: Event = {
-                id: Date.now(),
-                attendees: [],
-                ...formData as Event
+        if (!currentUser?.company_id) return;
+        setIsProcessing(true);
+
+        try {
+            let uploadedImageUrl = formData.imageUrl;
+
+            if (imageFile) {
+                const fileName = `event_${Date.now()}_${imageFile.name}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('announcements-media') // Reusing for now or created separate bucket? SQL didn't create new bucket for events.
+                    .upload(fileName, imageFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('announcements-media')
+                    .getPublicUrl(fileName);
+
+                uploadedImageUrl = publicUrl;
+            }
+
+            // Map frontend fields (time/date) to DB start_time and end_time
+            // Start Time = date + time
+            const startTimeIso = new Date(`${formData.date}T${formData.time}:00`).toISOString();
+            // Default End Time is +1 hour if not specified
+            const endTimeIso = new Date(new Date(startTimeIso).getTime() + 3600000).toISOString();
+
+            const payload = {
+                company_id: currentUser.company_id,
+                title: formData.title,
+                description: formData.description,
+                date: formData.date,
+                start_time: startTimeIso,
+                end_time: endTimeIso,
+                location: formData.location,
+                category: formData.category,
+                imageUrl: uploadedImageUrl,
+                invitees: formData.invitees,
+                attendees: formData.attendees || []
             };
-            setEvents([...events, newEvent]);
+
+            if (editingEvent) {
+                const { error } = await supabase
+                    .from('events')
+                    .update(payload)
+                    .eq('id', editingEvent.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('events')
+                    .insert([payload]);
+                if (error) throw error;
+            }
+
+            fetchEvents();
+            setIsModalOpen(false);
+        } catch (err) {
+            console.error('Error saving event:', err);
+            alert('Erro ao salvar evento.');
+        } finally {
+            setIsProcessing(false);
         }
-        setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este evento?')) {
-            setEvents(events.filter(ev => ev.id !== id));
+            try {
+                const { error } = await supabase
+                    .from('events')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                fetchEvents();
+            } catch (err) {
+                console.error('Error deleting event:', err);
+                alert('Erro ao excluir evento.');
+            }
         }
     };
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando gerenciador de eventos...</div>;
 
     return (
         <div className="space-y-6">
@@ -138,7 +245,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {event.attendees.length}
+                                        {event.attendees?.length || 0}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button onClick={() => handleOpenModal(event)} className="text-indigo-600 hover:text-indigo-900 mr-4">
@@ -162,7 +269,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
                             <h3 className="text-lg font-bold text-gray-900">{editingEvent ? 'Editar Evento' : 'Novo Evento'}</h3>
                             <button onClick={() => setIsModalOpen(false)}><XMarkIcon className="w-6 h-6 text-gray-400" /></button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Título</label>
                                 <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
@@ -189,10 +296,11 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Categoria</label>
                                     <select value={formData.category || 'Social'} onChange={e => setFormData({ ...formData, category: e.target.value as any })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border">
-                                        <option>Social</option>
-                                        <option>Corporativo</option>
-                                        <option>Treinamento</option>
-                                        <option>Outro</option>
+                                        <option value="Social">Social</option>
+                                        <option value="Corporativo">Corporativo</option>
+                                        <option value="Treinamento">Treinamento</option>
+                                        <option value="Evento da Empresa">Evento da Empresa</option>
+                                        <option value="Outro">Outro</option>
                                     </select>
                                 </div>
                             </div>
@@ -200,11 +308,11 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
                             <div className="space-y-2">
                                 <label className="block text-sm font-medium text-gray-700">Imagem</label>
                                 <div className="flex space-x-4 mb-2">
-                                    <label className="flex items-center space-x-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
                                         <input type="radio" checked={formData.imageType !== 'upload'} onChange={() => setFormData({ ...formData, imageType: 'url' })} />
                                         <span>URL</span>
                                     </label>
-                                    <label className="flex items-center space-x-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
                                         <input type="radio" checked={formData.imageType === 'upload'} onChange={() => setFormData({ ...formData, imageType: 'upload' })} />
                                         <span>Upload</span>
                                     </label>
@@ -217,7 +325,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
                                             <PhotoIcon className="w-8 h-8 text-gray-400 mb-2" />
                                             <span className="text-sm text-gray-500">Clique para enviar imagem</span>
                                         </label>
-                                        {formData.imageUrl && <p className="text-xs text-green-600 mt-2">Imagem carregada!</p>}
+                                        {imageFile && <p className="text-xs text-green-600 mt-2">Arquivo selecionado: {imageFile.name}</p>}
                                     </div>
                                 ) : (
                                     <input className="w-full border p-2 rounded" placeholder="URL da Imagem" value={formData.imageUrl || ''} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} />
@@ -226,23 +334,29 @@ const EventsManager: React.FC<EventsManagerProps> = ({ events, setEvents, employ
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Convocados / Participantes</label>
-                                <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
+                                <div className="max-h-40 overflow-y-auto border rounded p-3 space-y-2 bg-gray-50">
                                     {(employees || []).map(emp => (
-                                        <label key={emp.id} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                        <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all cursor-pointer">
                                             <input
                                                 type="checkbox"
+                                                className="rounded text-brand-primary focus:ring-brand-primary"
                                                 checked={(formData.invitees || []).includes(emp.id)}
                                                 onChange={() => toggleInvitee(emp.id)}
                                             />
-                                            <span className="text-sm">{emp.name}</span>
+                                            <div className="flex items-center space-x-2">
+                                                <img src={emp.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                                                <span className="text-sm text-gray-700 font-medium">{emp.name}</span>
+                                            </div>
                                         </label>
                                     ))}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Selecione os usuários que devem comparecer.</p>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">Selecione os usuários que devem comparecer.</p>
                             </div>
-                            <div className="pt-4 flex justify-end space-x-3">
+                            <div className="pt-4 flex justify-end space-x-3 sticky bottom-0 bg-white pb-2">
                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
-                                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">Salvar</button>
+                                <button type="submit" disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
+                                    {isProcessing ? 'Salvando...' : 'Salvar'}
+                                </button>
                             </div>
                         </form>
                     </div>

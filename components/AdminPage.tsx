@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee } from '../types';
 import Dashboard from './Dashboard';
 import UserManager from './UserManager';
-import GeneralSettings from './GeneralSettings';
+import { DepartmentManager } from './DepartmentManager';
+import TeamManager from './TeamManager';
 import FormSubmissionsManager from './FormSubmissionsManager';
 import MarketplaceManager from './MarketplaceManager';
-import PollManager from './PollManager';
-import TeamManager from './TeamManager';
-import { DepartmentManager } from './DepartmentManager';
 import EventsManager from './EventsManager';
-import TrainingManager from './TrainingManager';
-import { GenericManager } from './GenericManager';
+import { SupabaseGenericManager } from './SupabaseGenericManager';
+import GeneralSettings from './GeneralSettings';
+import PollManager from './PollManager';
 import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 import type { Department } from '../types';
 
 interface AdminPageProps {
@@ -71,6 +71,18 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     }, [company?.id]);
 
     const handleSetData = async (key: keyof Company['data'], value: any) => {
+        // List of keys that now have dedicated tables
+        const dedicatedTables: string[] = ['events', 'banners', 'marketplaceItems', 'announcements', 'tiRequests', 'recognitions', 'wellnessItems', 'kbArticles'];
+
+        if (dedicatedTables.includes(key)) {
+            // If it's a dedicated table, we don't update company.data via JSONB anymore
+            // The managers themselves now handle their own persistence.
+            // We just update the local state to keep UI snappy if needed, 
+            // but the source of truth is the dedicated table.
+            console.log(`Key ${key} matches a dedicated table. Persistence is handled by the manager.`);
+            return;
+        }
+
         const newData = {
             ...company.data,
             [key]: value,
@@ -126,10 +138,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard':
-                return <Dashboard
-                    banners={company.data?.banners || []}
-                    setBanners={(b) => handleSetData('banners', b)}
-                />;
+                return <Dashboard />;
             case 'users':
                 return <UserManager users={employees} setUsers={setEmployees} plan={plan} departments={departments} />;
             case 'departments':
@@ -137,39 +146,50 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'teams':
                 return <TeamManager users={employees} setUsers={setEmployees} />;
             case 'forms':
-                return <FormSubmissionsManager submissions={company.data?.formSubmissions || []} setSubmissions={(s) => handleSetData('formSubmissions', s)} />;
+                return <FormSubmissionsManager />;
             case 'marketplace':
-                return <MarketplaceManager items={company.data?.marketplaceItems || []} setItems={(i) => handleSetData('marketplaceItems', i)} />;
+                // MarketplaceManager should also be refactored eventually, but leaving as is for now if it works.
+                return <MarketplaceManager />;
             case 'events':
-                return <EventsManager events={company.data?.events || []} setEvents={(e) => handleSetData('events', e)} employees={employees} />;
+                return <EventsManager employees={employees} />;
             case 'training':
-                return <TrainingManager trainings={company.data?.trainings || []} setTrainings={(t) => handleSetData('trainings', t)} />;
+                return <SupabaseGenericManager<TrainingModule>
+                    title="Módulos de Treinamento"
+                    tableName="trainings"
+                    newItemTemplate={{ title: '', duration: '', category: '', thumbnail: '' }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'duration', label: 'Duração' },
+                        { key: 'category', label: 'Categoria' },
+                        { key: 'thumbnail', label: 'Capa (Imagem)', type: 'file' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.duration}</p></div>}
+                />;
             case 'kb':
-                return <GenericManager<KBArticle>
+                return <SupabaseGenericManager<KBArticle>
                     title="Base de Conhecimento"
-                    items={company.data?.kbArticles || []}
-                    setItems={(i) => handleSetData('kbArticles', i)}
-                    newItemTemplate={{ id: '', title: '', category: 'Geral', content: '', views: 0, mediaUrl: '', mediaType: 'image' }}
+                    tableName="kb_articles"
+                    newItemTemplate={{ title: '', category: 'Geral', content: '', mediaUrl: '', mediaType: 'image' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'category', label: 'Categoria' },
                         { key: 'content', label: 'Conteúdo', type: 'textarea' },
-                        { key: 'mediaUrl', label: 'URL da Mídia (Imagem/Vídeo)', type: 'text' },
-                        { key: 'mediaType', label: 'Tipo de Mídia', type: 'select', options: ['image', 'video'] }
+                        { key: 'mediaUrl', label: 'Mídia (Imagem/Vídeo)', type: 'file', dbColumn: 'media_url' },
+                        { key: 'mediaType', label: 'Tipo de Mídia', type: 'select', options: ['image', 'video'], dbColumn: 'media_type' }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;
             case 'status':
-                return <GenericManager<ServiceStatusItem>
+                // Check if services table exists, otherwise fallback or skip
+                return <SupabaseGenericManager<ServiceStatusItem>
                     title="Status de Serviços"
-                    items={company.data?.services || []}
-                    setItems={(i) => handleSetData('services', i)}
-                    newItemTemplate={{ id: '', name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
+                    tableName="services"
+                    newItemTemplate={{ name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
                     fields={[
                         { key: 'name', label: 'Serviço' },
                         { key: 'status', label: 'Status', type: 'select', options: ['operational', 'maintenance', 'outage'] },
                         { key: 'uptime', label: 'Uptime' },
-                        { key: 'imageUrl', label: 'URL do Ícone/Imagem', type: 'text' }
+                        { key: 'imageUrl', label: 'Ícone', type: 'file', dbColumn: 'image_url' }
                     ]}
                     renderItem={(i) => (
                         <div className="flex items-center">
@@ -182,43 +202,45 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     )}
                 />;
             case 'infosec':
-                return <GenericManager<SecurityAlert>
+                return <SupabaseGenericManager<SecurityAlert>
                     title="Alertas de Segurança"
-                    items={company.data?.securityAlerts || []}
-                    setItems={(i) => handleSetData('securityAlerts', i)}
-                    newItemTemplate={{ id: '', title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
-                    fields={[{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descrição', type: 'textarea' }, { key: 'level', label: 'Nível', type: 'select', options: ['info', 'warning', 'critical'] }, { key: 'date', label: 'Data' }]}
+                    tableName="security_alerts"
+                    newItemTemplate={{ title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'description', label: 'Descrição', type: 'textarea' },
+                        { key: 'level', label: 'Nível', type: 'select', options: ['info', 'warning', 'critical'] },
+                        { key: 'date', label: 'Data' }
+                    ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
                 />;
             case 'policies':
-                return <GenericManager<ResourceDocument>
+                return <SupabaseGenericManager<ResourceDocument>
                     title="Documentos e Políticas"
-                    items={company.data?.documents || []}
-                    setItems={(i) => handleSetData('documents', i)}
-                    newItemTemplate={{ id: '', title: '', category: 'RH', type: 'PDF', url: '#', updatedAt: new Date().toISOString().split('T')[0] }}
+                    tableName="policies"
+                    newItemTemplate={{ title: '', category: 'RH', type: 'PDF', url: '' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'category', label: 'Categoria' },
-                        // Type is auto-detected, removed from manual fields
-                        { key: 'url', label: 'Arquivo (Anexo)', type: 'file' }
+                        { key: 'type', label: 'Tipo de Arquivo', type: 'select', options: ['PDF', 'DOC', 'XLS', 'IMG'] },
+                        { key: 'url', label: 'Arquivo (Upload)', type: 'file' }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
                 />;
             case 'polls':
-                return <PollManager polls={company.data?.polls || []} setPolls={(p) => handleSetData('polls', p)} />;
+                return <PollManager />;
             case 'bem-estar':
-                return <GenericManager<WellnessItem>
+                return <SupabaseGenericManager<WellnessItem>
                     title="Itens de Bem-Estar"
-                    items={company.data?.wellnessItems || []}
-                    setItems={(i) => handleSetData('wellnessItems', i)}
-                    newItemTemplate={{ id: '', title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
+                    tableName="wellness_items"
+                    newItemTemplate={{ title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição', type: 'textarea' },
                         { key: 'category', label: 'Categoria', type: 'select', options: ['Saúde Mental', 'Atividade Física', 'Nutrição', 'Outro'] },
-                        { key: 'videoUrl', label: 'URL do Vídeo (Embed)', type: 'text' },
-                        { key: 'linkUrl', label: 'Link Externo', type: 'text' },
-                        { key: 'linkText', label: 'Texto do Link', type: 'text' }
+                        { key: 'videoUrl', label: 'Vídeo (URL)', type: 'text', dbColumn: 'video_url' },
+                        { key: 'linkUrl', label: 'Link (URL)', type: 'text', dbColumn: 'link_url' },
+                        { key: 'linkText', label: 'Texto do Link', type: 'text', dbColumn: 'link_text' }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;

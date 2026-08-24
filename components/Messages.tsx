@@ -136,7 +136,6 @@ const Messages: React.FC<MessagesProps> = () => {
     useEffect(() => {
         const fetchEmployees = async () => {
             if (!currentUser?.company_id) return;
-
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
@@ -347,12 +346,17 @@ const Messages: React.FC<MessagesProps> = () => {
                 }
             }
 
-            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            const compId = currentUser.company_id;
+            if (!compId) {
+                console.error("Missing company_id for current user", currentUser);
+                alert("Erro: Empresa não identificada no seu perfil.");
+                return;
+            }
 
             const { error } = await supabase.from('messages').insert({
                 conversation_id: selectedConversationId,
                 sender_id: currentUser.id,
-                company_id: profileData?.company_id,
+                company_id: compId,
                 text: stickerUrl || textToSend,
                 file_url: uploadedFileUrl || stickerUrl,
                 file_type: stickerUrl ? 'sticker' : fileType,

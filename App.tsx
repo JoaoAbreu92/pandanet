@@ -360,7 +360,7 @@ const AppContent: React.FC = () => {
         };
 
         switch (currentPage) {
-            case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
+            case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages />;
             case 'tickets': return <TicketPage />;
@@ -369,12 +369,12 @@ const AppContent: React.FC = () => {
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;
-            case 'forms': return canAccess('viewForms') ? <FormsPage submissions={companyData.formSubmissions} setSubmissions={(s) => setCompanyData({ ...companyData, formSubmissions: s })} currentUser={currentUser} /> : null;
+            case 'forms': return canAccess('viewForms') ? <FormsPage /> : null;
             case 'benefits': return canAccess('viewBenefits') ? <BeneficiosPage /> : null;
-            case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage items={companyData.wellnessItems} /> : null;
+            case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage /> : null;
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
-            case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
+            case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage /> : null;
             case 'profile':
                 const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
                 return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} />;
@@ -388,7 +388,7 @@ const AppContent: React.FC = () => {
             case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage /> : null;
             case 'events': return <EventsPage />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
-            default: return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
+            default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };
 

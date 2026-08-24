@@ -207,7 +207,11 @@ const MarketplacePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchItems = async () => {
-        if (!currentUser?.company_id) return;
+        if (!currentUser?.company_id) {
+            console.warn('Marketplace: currentUser.company_id is missing', currentUser);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             const { data, error } = await supabase

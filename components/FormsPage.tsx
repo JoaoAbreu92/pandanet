@@ -1,20 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, XCircleIcon } from './icons';
-import type { FormSubmission, FormStatus, Employee } from '../types';
-
-interface FormsPageProps {
-    submissions: FormSubmission[];
-    setSubmissions: (submissions: FormSubmission[]) => void;
-    currentUser: Employee;
-}
-
+import type { FormSubmission, FormStatus } from '../types';
 import { useLanguage } from './LanguageContext';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 const VacationRequestModal: React.FC<{
     onClose: () => void;
-    onSubmit: (data: Omit<FormSubmission, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt' | 'formType'>) => void;
-}> = ({ onClose, onSubmit }) => {
+    onSubmit: (data: { startDate: string, endDate: string, reason: string, sectorManager: string, employeeManager: string }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
     const { t } = useLanguage();
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -30,36 +26,38 @@ const VacationRequestModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text mb-4">{t('forms.vacation')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.manager_sector')}</label>
-                            <input type="text" value={sectorManager} onChange={e => setSectorManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                            <input type="text" value={sectorManager} onChange={e => setSectorManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.manager_employee')}</label>
-                            <input type="text" value={employeeManager} onChange={e => setEmployeeManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                            <input type="text" value={employeeManager} onChange={e => setEmployeeManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.start_date')}</label>
-                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.end_date')}</label>
-                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.reason')}</label>
-                        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text border p-2"></textarea>
                     </div>
                     <div className="flex justify-end space-x-3 pt-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">{t('generic.cancel')}</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">{t('forms.submit')}</button>
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">{t('generic.cancel')}</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : t('forms.submit')}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -67,23 +65,80 @@ const VacationRequestModal: React.FC<{
     );
 };
 
-const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, currentUser }) => {
+const FormsPage: React.FC = () => {
     const { t } = useLanguage();
+    const { profile: currentUser } = useAuth();
+    const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
-    const handleNewRequest = (data: Omit<FormSubmission, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt' | 'formType'>) => {
-        const newSubmission: FormSubmission = {
-            ...data,
-            id: Date.now(),
-            requesterId: currentUser.id,
-            requesterName: currentUser.name,
-            requesterAvatarUrl: currentUser.avatarUrl,
-            formType: 'Solicitação de Férias', // Could also be localized or kept as internal ID
-            status: 'Pendente',
-            submittedAt: new Date().toISOString().split('T')[0],
-        };
-        setSubmissions([newSubmission, ...submissions]);
-        setModalOpen(false);
+    const fetchSubmissions = async () => {
+        if (!currentUser?.id) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('form_submissions')
+                .select('*')
+                .eq('requester_id', currentUser.id)
+                .order('submitted_at', { ascending: false });
+
+            if (error) throw error;
+
+            setSubmissions((data || []).map(s => ({
+                id: s.id,
+                requesterId: s.requester_id,
+                requesterName: currentUser.name || '',
+                requesterAvatarUrl: currentUser.avatarUrl || '',
+                formType: s.form_type,
+                status: s.status as FormStatus,
+                submittedAt: s.submitted_at,
+                startDate: s.start_date,
+                endDate: s.end_date,
+                reason: s.reason,
+                sectorManager: s.sector_manager,
+                employeeManager: s.employee_manager
+            })));
+        } catch (err) {
+            console.error('Error fetching submissions:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchSubmissions();
+    }, [currentUser?.id]);
+
+    const handleNewRequest = async (data: { startDate: string, endDate: string, reason: string, sectorManager: string, employeeManager: string }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Solicitação de Férias',
+                    status: 'Pendente',
+                    start_date: data.startDate,
+                    end_date: data.endDate,
+                    reason: data.reason,
+                    sector_manager: data.sectorManager,
+                    employee_manager: data.employeeManager
+                }]);
+
+            if (error) throw error;
+
+            setModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting form:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const getStatusColor = (status: FormStatus) => {
@@ -95,7 +150,7 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
         }
     };
 
-    const userSubmissions = submissions.filter(sub => sub.requesterId === currentUser.id);
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando formulários...</div>;
 
     return (
         <>
@@ -103,26 +158,26 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
                 <h1 className="text-3xl font-bold text-brand-text">{t('forms.title')}</h1>
                 <Card title={t('forms.available')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div onClick={() => setModalOpen(true)} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
-                            <h3 className="font-bold text-lg text-brand-text">{t('forms.vacation')}</h3>
+                        <div onClick={() => setModalOpen(true)} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center group">
+                            <h3 className="font-bold text-lg text-brand-text group-hover:text-brand-primary transition-colors">{t('forms.vacation')}</h3>
                             <p className="text-sm text-brand-subtle-text mt-1">{t('forms.vacation_desc')}</p>
-                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600 transition-colors shadow-md">
                                 <PlusIcon className="w-4 h-4" />
                                 <span>{t('forms.start_request')}</span>
                             </button>
                         </div>
-                        <div onClick={() => alert('Em breve/Coming Soon')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
+                        <div onClick={() => alert('Em breve')} className="p-6 bg-gray-50 rounded-lg opacity-60 border cursor-not-allowed text-center">
                             <h3 className="font-bold text-lg text-brand-text">{t('forms.reimbursement')}</h3>
                             <p className="text-sm text-brand-subtle-text mt-1">{t('forms.reimbursement_desc')}</p>
-                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
+                            <button disabled className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-gray-300 text-white rounded-md cursor-not-allowed">
                                 <PlusIcon className="w-4 h-4" />
                                 <span>{t('forms.start_request')}</span>
                             </button>
                         </div>
-                        <div onClick={() => alert('Em breve/Coming Soon')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
+                        <div onClick={() => alert('Em breve')} className="p-6 bg-gray-50 rounded-lg opacity-60 border cursor-not-allowed text-center">
                             <h3 className="font-bold text-lg text-brand-text">{t('forms.data_change')}</h3>
                             <p className="text-sm text-brand-subtle-text mt-1">{t('forms.data_change_desc')}</p>
-                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
+                            <button disabled className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-gray-300 text-white rounded-md cursor-not-allowed">
                                 <PlusIcon className="w-4 h-4" />
                                 <span>{t('forms.start_request')}</span>
                             </button>
@@ -142,23 +197,31 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
                                 </tr>
                             </thead>
                             <tbody>
-                                {userSubmissions.map(sub => (
-                                    <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
-                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.formType}</td>
-                                        <td className="px-6 py-4">{new Date(sub.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - {new Date(sub.endDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
-                                        <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
-                                        </td>
+                                {submissions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center text-gray-400 italic">Nenhuma solicitação encontrada.</td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    submissions.map(sub => (
+                                        <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.formType}</td>
+                                            <td className="px-6 py-4">
+                                                {sub.startDate ? new Date(sub.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}
+                                                {sub.endDate ? ` - ${new Date(sub.endDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : ''}
+                                            </td>
+                                            <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${getStatusColor(sub.status)}`}>{sub.status}</span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
-                        {userSubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">...</p>}
                     </div>
                 </Card>
             </div>
-            {isModalOpen && <VacationRequestModal onClose={() => setModalOpen(false)} onSubmit={handleNewRequest} />}
+            {isModalOpen && <VacationRequestModal onClose={() => setModalOpen(false)} onSubmit={handleNewRequest} submitting={submitting} />}
         </>
     );
 };

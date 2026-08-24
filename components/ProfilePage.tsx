@@ -21,6 +21,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
     const [activeTab, setActiveTab] = useState<'info' | 'activity'>(userId && userId !== currentUser.id ? 'activity' : 'info');
     const [loading, setLoading] = useState(false);
+    const [userPosts, setUserPosts] = useState<Post[]>([]);
+    const [isFollowLoading, setIsFollowLoading] = useState(false);
 
     const isOwnProfile = !userId || userId === currentUser.id;
 
@@ -69,6 +71,59 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             setActiveTab('activity');
         }
     }, [userId, currentUser]);
+
+    const fetchUserPosts = async (targetId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('posts')
+                .select(`
+                    id, content, created_at, media_url, media_type, mentions, author_id,
+                    profiles: author_id(full_name, avatar_url),
+                    post_reactions(id, emoji, user_id),
+                    comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
+                `)
+                .or(`author_id.eq.${targetId},mentions.cs.{${targetId}}`)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const formattedPosts: Post[] = data.map((item: any) => ({
+                id: item.id,
+                authorId: item.author_id,
+                authorName: item.profiles?.full_name || 'Desconhecido',
+                authorAvatar: item.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                content: item.content,
+                mediaUrl: item.media_url,
+                mediaType: item.media_type as 'image' | 'video',
+                timestamp: item.created_at,
+                mentions: item.mentions || [],
+                reactions: item.post_reactions.map((r: any) => ({
+                    emoji: r.emoji,
+                    userId: r.user_id
+                })),
+                comments: item.comments.map((c: any) => ({
+                    id: c.id,
+                    authorId: c.author_id,
+                    authorName: c.profiles?.full_name || 'Desconhecido',
+                    authorAvatar: c.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                    text: c.content,
+                    timestamp: c.created_at
+                })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            }));
+
+            setUserPosts(formattedPosts);
+        } catch (error) {
+            console.error('Error fetching user posts:', error);
+        }
+    };
+
+    const effectiveUser = targetUser || currentUser;
+
+    useEffect(() => {
+        if (effectiveUser.id) {
+            fetchUserPosts(effectiveUser.id);
+        }
+    }, [effectiveUser.id]);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
@@ -177,15 +232,37 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
         }
     };
 
-    const effectiveUser = targetUser || currentUser;
+    const filteredPosts = userPosts;
 
-    const filteredPosts = useMemo(() => {
-        const userIdToFilter = effectiveUser.id;
-        return feedPosts.filter(post =>
-            post.authorId === userIdToFilter || // Posts do usuário do perfil
-            post.mentions.includes(userIdToFilter) // Menções ao usuário do perfil
-        ).sort((a, b) => b.id - a.id);
-    }, [feedPosts, effectiveUser]);
+    const handleFollowToggle = async () => {
+        if (!currentUser || !effectiveUser || isFollowLoading) return;
+        setIsFollowLoading(true);
+
+        try {
+            const isFollowing = currentUser.following?.includes(effectiveUser.id);
+            let newFollowing = [...(currentUser.following || [])];
+
+            if (isFollowing) {
+                newFollowing = newFollowing.filter(id => id !== effectiveUser.id);
+            } else {
+                newFollowing.push(effectiveUser.id);
+            }
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ following: newFollowing })
+                .eq('id', currentUser.id);
+
+            if (error) throw error;
+
+            onUpdateUser({ ...currentUser, following: newFollowing });
+        } catch (err) {
+            console.error("Error toggling follow:", err);
+            alert("Erro ao processar solicitação de seguir.");
+        } finally {
+            setIsFollowLoading(false);
+        }
+    };
 
     // Feed manipulation handlers (copied logic, ideally should be shared context or hook)
     const handleToggleReaction = (postId: number, emoji: string) => {
@@ -243,7 +320,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-brand-text">{isOwnProfile ? 'Meu Perfil' : `Perfil de ${userData.name}`}</h2>
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-brand-text">{isOwnProfile ? 'Meu Perfil' : `Perfil de ${userData.name}`}</h2>
+                {!isOwnProfile && (
+                    <button
+                        onClick={handleFollowToggle}
+                        disabled={isFollowLoading}
+                        className={`px-6 py-2 rounded-full font-bold transition-all shadow-md ${currentUser.following?.includes(effectiveUser.id)
+                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-brand-primary text-white hover:bg-emerald-600'
+                            }`}
+                    >
+                        {isFollowLoading ? '...' : currentUser.following?.includes(effectiveUser.id) ? 'Seguindo' : 'Seguir'}
+                    </button>
+                )}
+            </div>
 
             <div className="relative">
                 <div className="h-48 bg-gray-200 rounded-t-lg relative group">

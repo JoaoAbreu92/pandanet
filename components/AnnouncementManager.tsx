@@ -40,20 +40,25 @@ const AnnouncementFormModal: React.FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const companyId = currentUser?.company_id;
+        if (!companyId) {
+            alert('Erro: Empresa não identificada.');
+            return;
+        }
         setIsProcessing(true);
 
         try {
-            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
-            const companyId = profile?.company_id;
-
             let uploadedImageUrl = formData.imageUrl;
-            let uploadedVideoUrl = formData.videoUrl; // Actually stores URL of uploaded file if videoFile is present
+            let uploadedVideoUrl = formData.videoUrl;
 
             // Upload Image
             if (imageFile) {
                 const fileName = `img_${Date.now()}_${imageFile.name}`;
-                const { data: imgData, error: imgError } = await supabase.storage.from('announcements-media').upload(fileName, imageFile);
-                if (imgError) throw imgError;
+                const { error: imgError } = await supabase.storage.from('announcements-media').upload(fileName, imageFile);
+                if (imgError) {
+                    console.error('Image upload error:', imgError);
+                    throw new Error('Erro ao enviar imagem.');
+                }
                 const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(fileName);
                 uploadedImageUrl = publicUrl;
             }
@@ -61,10 +66,13 @@ const AnnouncementFormModal: React.FC<{
             // Upload Video
             if (videoFile) {
                 const fileName = `vid_${Date.now()}_${videoFile.name}`;
-                const { data: vidData, error: vidError } = await supabase.storage.from('announcements-media').upload(fileName, videoFile);
-                if (vidError) throw vidError;
+                const { error: vidError } = await supabase.storage.from('announcements-media').upload(fileName, videoFile);
+                if (vidError) {
+                    console.error('Video upload error:', vidError);
+                    throw new Error('Erro ao enviar vídeo.');
+                }
                 const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(fileName);
-                uploadedVideoUrl = publicUrl; // Use video_url column for both external and internal hosted videos
+                uploadedVideoUrl = publicUrl;
             }
 
             const payload = {
@@ -74,23 +82,23 @@ const AnnouncementFormModal: React.FC<{
                 image_url: uploadedImageUrl,
                 video_url: uploadedVideoUrl,
                 company_id: companyId,
-                date: new Date().toISOString(), // Update date on edit? Or keep original? Usually update.
+                date: announcement?.id ? announcement.date : new Date().toISOString(),
             };
 
             if (announcement?.id) {
                 const { error } = await supabase.from('announcements').update(payload).eq('id', announcement.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('announcements').insert(payload);
+                const { error } = await supabase.from('announcements').insert([payload]);
                 if (error) throw error;
             }
 
             onSave();
             onClose();
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving announcement:', error);
-            alert('Erro ao salvar anúncio.');
+            alert(`Erro ao salvar anúncio: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setIsProcessing(false);
         }
@@ -147,13 +155,17 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
     const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
     const fetchAnnouncements = async () => {
-        if (!currentUser) return;
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+        if (!currentUser?.company_id) return;
         const { data, error } = await supabase
             .from('announcements')
             .select('*')
-            .eq('company_id', profile?.company_id)
+            .eq('company_id', currentUser.company_id)
             .order('date', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching announcements:', error);
+            return;
+        }
 
         if (data) {
             const formatted: Announcement[] = data.map(a => ({
@@ -161,7 +173,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
                 title: a.title,
                 summary: a.summary,
                 category: a.category,
-                date: new Date(a.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+                date: a.date, // Keep ISO for internal use
                 imageUrl: a.image_url,
                 videoUrl: a.video_url,
                 reactions: a.reactions || []
@@ -195,7 +207,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
                             <div key={ann.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
                                 <div>
                                     <p className="font-semibold text-brand-text">{ann.title}</p>
-                                    <p className="text-sm text-brand-subtle-text">{ann.category} - {ann.date}</p>
+                                    <p className="text-sm text-brand-subtle-text">{ann.category} - {new Date(ann.date).toLocaleDateString('pt-BR')}</p>
                                 </div>
                                 <div className="flex space-x-2">
                                     <button onClick={() => { setEditingAnnouncement(ann); setModalOpen(true); }} className="p-2 text-brand-subtle-text hover:text-brand-primary">
