@@ -5,9 +5,10 @@ import { XMarkIcon, PaperAirplaneIcon, SparklesIcon } from './icons';
 
 interface AIAssistantProps {
     currentUser: Employee;
+    isAIEnabled?: boolean;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<AIMessage[]>([]);
     const [input, setInput] = useState('');
@@ -15,7 +16,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Only render if User has an API key AND the Company has AI allowed.
-    const hasAIEnabled = currentUser.permissions?.ai_assistant && currentUser.ai_api_key;
+    const hasAIEnabled = isAIEnabled && currentUser.ai_api_key;
     const behavior = currentUser.ai_behavior || 'popup';
     const provider = currentUser.ai_provider || 'gemini';
 

@@ -13,9 +13,10 @@ interface ProfilePageProps {
     feedPosts?: Post[];
     setFeedPosts?: (posts: Post[]) => void;
     allEmployees?: Employee[];
+    isAIEnabled?: boolean;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdateUser, feedPosts = [], setFeedPosts, allEmployees = [] }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdateUser, feedPosts = [], setFeedPosts, allEmployees = [], isAIEnabled }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [targetUser, setTargetUser] = useState<Employee | null>(null);
@@ -604,7 +605,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 Segurança
                             </button>
                         )}
-                        {isOwnProfile && currentUser.permissions?.ai_assistant && (
+                        {isOwnProfile && isAIEnabled && (
                             <button
                                 onClick={() => setActiveTab('ai')}
                                 className={`${activeTab === 'ai' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
@@ -795,7 +796,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             </button>
                         </div>
                     </Card>
-                    ) : activeTab === 'ai' && currentUser.permissions?.ai_assistant ? (
+                    ) : activeTab === 'ai' && isAIEnabled ? (
                         <Card title="Assistente Panda IA">
                             <div className="space-y-6 max-w-2xl bg-white dark:bg-slate-800">
                                 <div className="bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/40 p-4 rounded-xl text-sm text-emerald-800 dark:text-emerald-300">

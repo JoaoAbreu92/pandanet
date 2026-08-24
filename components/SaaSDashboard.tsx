@@ -788,7 +788,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />
-                <Toggle label="WhatsPanda (CRM)" id="viewWhatsPanda" icon={ChatBubbleLeftRightIcon} />
+                <Toggle label="WhatsPanda (CRM)" id="whatspanda" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Assistente IA (Panda)" id="ai_assistant" icon={SparklesIcon} />
 
                 <SectionTitle title="Recursos de RH" />

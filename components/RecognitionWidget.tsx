@@ -36,9 +36,9 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
     };
 
     return (
-        <div className="premium-card p-4">
+        <div className="premium-card bg-white dark:bg-slate-800 border dark:border-slate-700 p-4 rounded-xl shadow-sm">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-gray-700 text-sm uppercase flex items-center">
+                <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm uppercase flex items-center">
                     <SparklesIcon className="w-5 h-5 mr-2 text-amber-500" />
                     Mural
                 </h3>
@@ -49,12 +49,12 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
 
             <div className="space-y-4">
                 {recentRecognitions.map(rec => (
-                    <div key={rec.id} className="bg-gray-50 rounded-lg p-3 relative group transition-all">
+                    <div key={rec.id} className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 relative group transition-all">
                         <div className="flex items-start space-x-2 mb-2">
-                            <img src={rec.toAvatar} alt={rec.to} className="w-8 h-8 rounded-full border-2 border-white object-cover" />
+                            <img src={rec.toAvatar} alt={rec.to} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 object-cover" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-800 truncate">{rec.to}</p>
-                                <p className="text-[10px] text-gray-500 truncate">De: {rec.from}</p>
+                                <p className="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">{rec.to}</p>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">De: {rec.from}</p>
                             </div>
                             {isAuthorized(rec) && (
                                 <button
@@ -65,8 +65,8 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
                                 </button>
                             )}
                         </div>
-                        <p className="text-xs text-gray-600 italic line-clamp-3 mb-2">"{rec.message}"</p>
-                        <span className="inline-block px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-semibold text-gray-500">
+                        <p className="text-xs text-gray-600 dark:text-gray-300 italic line-clamp-3 mb-2">"{rec.message}"</p>
+                        <span className="inline-block px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded text-[10px] font-semibold text-gray-500 dark:text-gray-400">
                             #{rec.value}
                         </span>
                     </div>

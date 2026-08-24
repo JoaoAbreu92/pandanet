@@ -24,8 +24,8 @@ const EventsCarouselMini: React.FC<EventsCarouselMiniProps> = ({ events }) => {
 
     if (upcomingEvents.length === 0) {
         return (
-            <div className="bg-white rounded-lg p-4 text-center border border-gray-100 shadow-sm">
-                <p className="text-sm text-gray-500">Sem eventos próximos.</p>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center border border-gray-100 dark:border-slate-700 shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Sem eventos próximos.</p>
             </div>
         );
     }
@@ -33,14 +33,14 @@ const EventsCarouselMini: React.FC<EventsCarouselMiniProps> = ({ events }) => {
     const event = upcomingEvents[currentIndex];
 
     return (
-        <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 group hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-slate-800 rounded-lg overflow-hidden shadow-sm border border-gray-100 dark:border-slate-700 group hover:shadow-md transition-all">
             <div className="h-32 overflow-hidden relative">
                 <img
                     src={event.imageUrl || `https://source.unsplash.com/random/400x300/?event,${event.id}`}
                     alt={event.title}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-brand-primary uppercase">
+                <div className="absolute top-2 right-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-brand-primary uppercase">
                     {event.category}
                 </div>
             </div>
@@ -48,8 +48,8 @@ const EventsCarouselMini: React.FC<EventsCarouselMiniProps> = ({ events }) => {
                 <p className="text-xs text-brand-primary font-bold mb-1 uppercase tracking-wide">
                     {new Date(event.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
                 </p>
-                <h4 className="font-bold text-gray-800 text-sm mb-1 leading-tight line-clamp-2">{event.title}</h4>
-                <div className="flex items-center text-xs text-gray-500 mt-2">
+                <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm mb-1 leading-tight line-clamp-2">{event.title}</h4>
+                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
                     <MapPinIcon className="w-3 h-3 mr-1" /> {event.location}
                 </div>
 
