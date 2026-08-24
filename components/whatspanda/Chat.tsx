@@ -827,9 +827,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.assigned_to = userId;
       }
       
-      // Finalizar: limpa o assigned_to para voltar ao pool se reaberto
+      // Finalizar: desvincula o setor (queue_id), atendente (assigned_to) e reseta o chatbot_node_id para recomeçar o fluxo do bot
       if (newStatus === 'fechado') {
-        // mantém assigned_to para histórico
+        updateData.assigned_to = null;
+        updateData.queue_id = null;
+        updateData.chatbot_node_id = null;
       }
 
       const { error } = await supabase
@@ -1764,7 +1766,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     const chunk = ids.slice(i, i + chunkSize);
                     const { error } = await supabase
                       .from('whatsapp_conversations')
-                      .update({ status: 'fechado' })
+                      .update({ 
+                        status: 'fechado',
+                        assigned_to: null,
+                        queue_id: null,
+                        chatbot_node_id: null
+                      })
                       .in('id', chunk);
                     if (error) throw error;
                   }
