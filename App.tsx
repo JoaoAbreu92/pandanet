@@ -69,8 +69,7 @@ const AppContent: React.FC = () => {
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'messages',
-                filter: `company_id=eq.${currentUser.company_id}`
+                table: 'messages'
             }, async (payload) => {
                 const newMsg = payload.new;
                 // Verificamos se é um "nudge" (chamar atenção)

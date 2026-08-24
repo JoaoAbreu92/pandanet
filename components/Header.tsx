@@ -23,7 +23,7 @@ import { useLanguage } from './LanguageContext';
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const { language, setLanguage, t } = useLanguage();
-    const { testNotifications } = useNotifications();
+    const { testNotifications, availableSounds, selectedSound, changeSound } = useNotifications();
 
     return (
         <header className="bg-white border-b flex-shrink-0 relative z-20 dark:bg-gray-800 dark:border-gray-700 premium-card">
@@ -88,15 +88,38 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         </>
                     )}
 
-                    {/* Botão de Ativar Sons/Notificações */}
-                    <button
-                        onClick={testNotifications}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition-all text-xs font-bold border border-emerald-200"
-                        title="Testar Sons e Notificações"
-                    >
-                        <PlayCircleIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">Ativar Toques</span>
-                    </button>
+                    {/* Botão de Ativar Sons + Selector */}
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={testNotifications}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border border-emerald-200"
+                            title="Testar Sons e Notificações"
+                        >
+                            <PlayCircleIcon className="w-4 h-4" />
+                            <span className="hidden sm:inline">Ativar Toques</span>
+                        </button>
+                        <div className="relative group">
+                            <button className="px-2 py-1.5 bg-emerald-50 text-emerald-600 rounded-r-full hover:bg-emerald-100 border-t border-b border-r border-emerald-200">
+                                <span className="text-xs">▼</span>
+                            </button>
+                            {/* Dropdown de Sons */}
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 hidden group-hover:block">
+                                <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
+                                    Escolher Toque
+                                </div>
+                                {availableSounds?.map((sound) => (
+                                    <button
+                                        key={sound.id}
+                                        onClick={() => changeSound(sound.id)}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-bold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
+                                    >
+                                        <span>{sound.name}</span>
+                                        {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />

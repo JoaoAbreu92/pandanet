@@ -31,8 +31,12 @@ interface NotificationContextType {
     addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => Promise<void>;
     testNotifications: () => Promise<void>;
     showDesktopNotification: (title: string, body: string, icon?: string) => void;
-    playNotificationSound: (type: NotificationType | 'nudge') => void;
+    playNotificationSound: (type: NotificationType | 'nudge', overrideSoundId?: string) => void;
     loading: boolean;
+    // New Sound Selection
+    selectedSound: string;
+    availableSounds: { id: string; name: string; path: string | null }[];
+    changeSound: (soundId: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -42,6 +46,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Sound Customization
+    const [selectedSound, setSelectedSound] = useState<string>(() => localStorage.getItem('pixel_notification_sound') || 'synth');
+
+    const AVAILABLE_SOUNDS = [
+        { id: 'synth', name: 'Original (Bip)', path: null }, // Uses synthesizer
+        { id: 'custom1', name: 'Toque 1', path: '/sounds/custom1.mp3' },
+        { id: 'custom2', name: 'Toque 2', path: '/sounds/custom2.mp3' },
+        { id: 'custom3', name: 'Toque 3', path: '/sounds/custom3.mp3' },
+        { id: 'custom4', name: 'Toque 4', path: '/sounds/custom4.mp3' },
+        { id: 'custom5', name: 'Toque 5', path: '/sounds/custom5.mp3' },
+        { id: 'custom6', name: 'Toque 6', path: '/sounds/custom6.mp3' },
+    ];
+
     // Request desktop notification permission
     useEffect(() => {
         if ('Notification' in window && Notification.permission === 'default') {
@@ -49,53 +66,71 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, []);
 
-    const playNotificationSound = useCallback((type: NotificationType | 'nudge') => {
+    const playNotificationSound = useCallback((type: NotificationType | 'nudge', overrideSoundId?: string) => {
+        const soundId = overrideSoundId || selectedSound;
+        const soundDef = AVAILABLE_SOUNDS.find(s => s.id === soundId);
+
         try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioContext) return;
+            // Se for synth ou não encontrar o arquivo, usa o sintetizador
+            if (!soundDef || !soundDef.path) {
+                const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioContext) return;
 
-            const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
 
-            osc.connect(gain);
-            gain.connect(ctx.destination);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
 
-            const now = ctx.currentTime;
+                const now = ctx.currentTime;
 
-            // Configuration based on type
-            if (type === 'nudge') {
-                // Rattle / Alert sound
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, now);
-                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
-                osc.frequency.linearRampToValueAtTime(150, now + 0.2);
-                osc.frequency.linearRampToValueAtTime(600, now + 0.3);
+                // Configuration based on type
+                if (type === 'nudge') {
+                    // Rattle / Alert sound
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                    osc.frequency.linearRampToValueAtTime(150, now + 0.2);
+                    osc.frequency.linearRampToValueAtTime(600, now + 0.3);
 
-                gain.gain.setValueAtTime(0.5, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    gain.gain.setValueAtTime(0.5, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
 
-                osc.start(now);
-                osc.stop(now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else {
+                    // Pleasant ding
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+                console.log(`[PandaNet] Playing synthesized sound for: ${type}`);
             } else {
-                // Pleasant ding
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, now);
-                osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
-
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-
-                osc.start(now);
-                osc.stop(now + 0.3);
+                // Toca o arquivo MP3 customizado
+                const audio = new Audio(soundDef.path);
+                audio.volume = 0.9;
+                audio.play().catch(e => console.error("Erro ao tocar MP3 customizado:", e, soundDef.path));
+                console.log(`[PandaNet] Playing custom sound: ${soundDef.name}`);
             }
-
-            console.log(`[PandaNet] Playing synthesized sound for: ${type}`);
 
         } catch (e) {
             console.error('[PandaNet] Fatal error in playNotificationSound:', e);
         }
-    }, []);
+    }, [selectedSound]);
+
+    const changeSound = (soundId: string) => {
+        setSelectedSound(soundId);
+        localStorage.setItem('pixel_notification_sound', soundId);
+        // Toca o som para testar imediatamente
+        setTimeout(() => playNotificationSound('message', soundId), 100);
+    };
 
     const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
         if (!('Notification' in window)) {
@@ -195,7 +230,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 supabase.removeChannel(channel);
             };
         }
-    }, [currentUser?.id, fetchNotifications]);
+    }, [currentUser?.id, fetchNotifications, playNotificationSound, showDesktopNotification]);
 
     const markAsRead = async (id: string) => {
         try {
@@ -300,10 +335,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         showDesktopNotification('Teste de Notificação', 'Se você está vendo isso, as notificações estão funcionando!', currentUser?.avatarUrl);
     };
 
-    const unreadCount = notifications.filter(n => !n.isRead).length;
-
     return (
-        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, testNotifications, showDesktopNotification, playNotificationSound, loading }}>
+        <NotificationContext.Provider value={{
+            notifications,
+            unreadCount: notifications.filter(n => !n.isRead).length,
+            markAsRead,
+            markAllAsRead,
+            addNotification,
+            testNotifications,
+            showDesktopNotification,
+            playNotificationSound,
+            loading,
+            // Exposed Sound Selection
+            selectedSound,
+            availableSounds: AVAILABLE_SOUNDS,
+            changeSound
+        }}>
             {children}
         </NotificationContext.Provider>
     );
