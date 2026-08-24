@@ -2727,41 +2727,49 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             </div>
 
             {/* Input Area */}
-            <div className="px-3 py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-3 md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
+            <div className="px-1.5 py-1.5 sm:px-3 sm:py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-2 sm:pb-3 md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] w-full overflow-hidden">
               
               {/* Sticker Picker UI */}
               {showStickerPicker && (
-                <div className="absolute bottom-[100%] left-4 right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="absolute bottom-[100%] left-2 right-2 sm:left-4 sm:right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
                   <div className="flex border-b border-slate-100 dark:border-white/5">
-                    <button onClick={() => setStickerTab('emojis')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'emojis' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Emojis</button>
-                    <button onClick={() => setStickerTab('gallery')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'gallery' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Figus</button>
-                    <button onClick={() => setStickerTab('saved')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Gifs</button>
-                    <button onClick={() => setShowStickerPicker(false)} className="px-4 text-slate-400 hover:text-red-500"><X className="w-5 h-5" /></button>
+                    <button
+                      onClick={() => setStickerTab('emoji')}
+                      className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'emoji' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
+                    >
+                      Emojis & Gifs
+                    </button>
+                    <button
+                      onClick={() => setStickerTab('saved')}
+                      className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
+                    >
+                      Minhas Figurinhas ({customStickers.length})
+                    </button>
                   </div>
-                  <div className="p-4 max-h-64 overflow-y-auto custom-scrollbar">
-                    {stickerTab === 'emojis' ? (
-                      <div className="grid grid-cols-7 sm:grid-cols-9 md:grid-cols-12 gap-1 px-1">
-                        {EMOJI_LIST.map((emoji, i) => (
+
+                  <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar">
+                    {stickerTab === 'emoji' ? (
+                      <div className="grid grid-cols-6 gap-2">
+                        {['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉', '👏', '🤝', '✅', '❌', '💯', '⭐', '💡', '🚀', '👀', '📌'].map((emoji, i) => (
                           <button
                             key={i}
-                            onClick={() => handleSendEmoji(emoji)}
-                            className="p-2 text-2xl hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90"
+                            onClick={() => {
+                              setNewMessage(prev => prev + emoji);
+                              setShowStickerPicker(false);
+                            }}
+                            className="text-2xl p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all hover:scale-125"
                           >
                             {emoji}
                           </button>
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-3">
-                        {(stickerTab === 'gallery' ? [
-                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
-                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+                      <div className="grid grid-cols-4 gap-3">
+                        {(customStickers.length === 0 ? [
                           'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
-                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
                           'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif',
                           'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif',
-                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
-                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e6/512.gif'
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif'
                         ] : customStickers).map((url, i) => (
                           <div key={i} className="relative group aspect-square max-w-[60px] mx-auto">
                             <img 
@@ -2775,17 +2783,6 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             )}
                           </div>
                         ))}
-                        {stickerTab === 'saved' && (
-                          <div className="relative aspect-square max-w-[60px] mx-auto">
-                            <button 
-                              onClick={() => stickerUploadRef.current?.click()}
-                              className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all"
-                            >
-                              <Plus className="w-5 h-5" />
-                              <span className="text-[8px] font-bold mt-1">NOVO</span>
-                            </button>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -2794,24 +2791,24 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
               {/* Attachment Preview */}
               {attachedFile && (
-                <div className="mb-3 p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-between border border-emerald-100 dark:border-emerald-500/20 animate-in slide-in-from-bottom-2">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400">
-                      <Paperclip className="w-5 h-5" />
+                <div className="mb-2 sm:mb-3 p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-between border border-emerald-100 dark:border-emerald-500/20 animate-in slide-in-from-bottom-2">
+                  <div className="flex items-center gap-2 sm:gap-3 overflow-hidden min-w-0">
+                    <div className="p-1.5 sm:p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
-                    <div className="truncate">
-                      <p className="text-sm font-bold text-slate-700 dark:text-emerald-50 truncate">{attachedFile.name}</p>
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{(attachedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <div className="truncate min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-emerald-50 truncate">{attachedFile.name}</p>
+                      <p className="text-[9px] sm:text-[10px] text-slate-500 uppercase font-bold tracking-tight">{(attachedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                     </div>
                   </div>
-                  <button onClick={() => setAttachedFile(null)} className="p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-400 hover:text-red-500 rounded-xl transition-all">
-                    <X className="w-5 h-5" />
+                  <button onClick={() => setAttachedFile(null)} className="p-1.5 sm:p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-400 hover:text-red-500 rounded-xl transition-all shrink-0">
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               )}
 
               {isGhostMode ? (
-                <div className="bg-purple-50 p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
+                <div className="bg-purple-50 p-2 sm:p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
                   <p className="text-xs md:text-sm font-bold text-purple-600 flex items-center justify-center gap-2">
                     MODO AUDITORIA ATIVO
                   </p>
@@ -2820,7 +2817,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   </p>
                 </div>
               ) : (
-              <div className="flex-1 bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
+              <div className="flex-1 min-w-0 w-full bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -2836,57 +2833,57 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 />
 
                 {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between px-3 py-1.5 md:py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-sm font-bold text-red-500 dark:text-red-400">
+                  <div className="flex-1 min-w-0 flex items-center justify-between px-2 sm:px-3 py-1.5 md:py-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                      <span className="text-xs sm:text-sm font-bold text-red-500 dark:text-red-400 truncate">
                         Gravando ({formatTime(recordingTime)})
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => stopRecording(false)}
-                        className="p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl transition-all"
+                        className="p-1.5 sm:p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl transition-all"
                         title="Cancelar Gravação"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => stopRecording(true)}
-                        className="p-2.5 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center"
+                        className="p-2 sm:p-2.5 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center"
                         title="Enviar Áudio"
                       >
-                        <Send className="w-5 h-5" />
+                        <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <>
+                  <div className="flex items-center w-full min-w-0 gap-0.5 sm:gap-1.5">
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                      className={`p-1.5 sm:p-2.5 md:p-3 rounded-2xl transition-all duration-300 shrink-0 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
                       disabled={!canSendMedia}
                       title={!canSendMedia ? "Anexar Arquivo" : "Anexar Arquivo"}
                     >
-                      <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
+                      <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
 
                     <button
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
-                      className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
+                      className={`p-1.5 sm:p-2.5 md:p-3 rounded-2xl transition-all duration-300 shrink-0 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
                       disabled={!canSendMedia}
                       title={!canSendMedia ? "Figurinhas / Gifs" : "Figurinhas / Gifs"}
                     >
-                      <Smile className="w-5 h-5 md:w-5 md:h-5" />
+                      <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
 
-                    <div className="flex flex-col items-center justify-center px-1 mb-2">
-                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
+                    <div className="flex flex-col items-center justify-center px-0.5 sm:px-1 shrink-0">
+                      <span className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
                       <button
                         onClick={handleToggleSignature}
-                        className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
+                        className={`p-1 sm:p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
                         title={useSignature ? "Assinatura Ativa" : "Sem Assinatura"}
                       >
                         <CheckCheck className={`w-3.5 h-3.5 ${useSignature ? 'opacity-100' : 'opacity-40'}`} />
@@ -2895,21 +2892,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
                     {/* Botão Chamar Atenção (Nudge) */}
                     {activeProfile?.can_nudge !== false && (
-                      <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
+                      <div className="shrink-0 flex items-center justify-center">
                         <button
                           type="button"
                           onClick={handleSendNudge}
                           disabled={!!cooldownTimeouts[selectedConversation?.id || '']}
-                          className={`p-2.5 rounded-2xl transition-all relative flex items-center justify-center ${
+                          className={`p-1.5 sm:p-2.5 rounded-2xl transition-all relative flex items-center justify-center ${
                             cooldownTimeouts[selectedConversation?.id || '']
                               ? 'text-slate-300 cursor-not-allowed opacity-50'
                               : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
                           }`}
                           title="Chamar Atenção (Nudge)"
                         >
-                          <Bell className={`w-5 h-5 ${cooldownTimeouts[selectedConversation?.id || ''] ? '' : 'animate-bounce'}`} />
+                          <Bell className={`w-4 h-4 sm:w-5 sm:h-5 ${cooldownTimeouts[selectedConversation?.id || ''] ? '' : 'animate-bounce'}`} />
                           {cooldownTimeouts[selectedConversation?.id || ''] && (
-                            <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-[9px] px-1 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[18px] text-center border border-white">
+                            <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-[9px] px-1 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[16px] text-center border border-white">
                               {cooldownTimeouts[selectedConversation?.id || '']}s
                             </span>
                           )}
@@ -2918,7 +2915,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     )}
                     {/* Popup de Mensagens Rápidas */}
                     {showQuickMsgPopup && (
-                      <div className="absolute bottom-[100%] left-4 right-4 md:left-12 md:right-12 mb-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2 duration-200 font-sans max-h-60 overflow-y-auto custom-scrollbar">
+                      <div className="absolute bottom-[100%] left-2 right-2 md:left-12 md:right-12 mb-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2 duration-200 font-sans max-h-60 overflow-y-auto custom-scrollbar">
                         <div className="p-3 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-transparent flex justify-between items-center">
                           <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Atalhos Rápidos (/{quickMsgFilter})</span>
                           <span className="text-[9px] text-gray-400">Use ↑ ↓ e Enter para selecionar</span>
@@ -2988,30 +2985,30 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
                       disabled={!canSendMessagesResult || isSending}
                       style={{ fontSize: `${chatFontSize}px` }}
-                      className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
+                      className="flex-1 min-w-0 max-h-32 min-h-[36px] sm:min-h-[40px] py-2 sm:py-3 px-1.5 sm:px-3 bg-transparent resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
                       rows={1}
                     />
                     {newMessage.trim() || attachedFile ? (
                       <button
                         onClick={handleSendMessage}
                         disabled={!canSendMessagesResult || isSending}
-                        className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
+                        className="p-2 sm:p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shrink-0"
                         title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
                       >
-                        <Send className="w-5 h-5 md:ml-1" />
+                        <Send className="w-4 h-4 sm:w-5 sm:h-5 md:ml-1" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={startRecording}
                         disabled={!canSendMessagesResult || isSending}
-                        className="p-2.5 md:p-3 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full md:rounded-2xl hover:bg-slate-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-95 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
+                        className="p-2 sm:p-2.5 md:p-3 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full md:rounded-2xl hover:bg-slate-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-95 shrink-0"
                         title={!canSendMessagesResult ? "Sem permissão para enviar áudios" : "Gravar Áudio"}
                       >
-                        <Mic className="w-5 h-5" />
+                        <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
               )}
