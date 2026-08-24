@@ -141,7 +141,8 @@ const UserFormModal: React.FC<{
         email_permissions: user?.email_permissions || {
             can_manage_accounts: false,
             can_view_all_accounts: false,
-            allowed_accounts: [], // IDs das contas permitidas
+            account_limit: 1,
+            allowed_accounts: [], 
         }
     });
 
@@ -329,6 +330,13 @@ const UserFormModal: React.FC<{
                                     <EnvelopeIcon className="w-3 h-3" /> PandaMail (E-mail Corporativo)
                                 </h5>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle 
+                                        icon={<EnvelopeIcon className="w-4 h-4" />} 
+                                        label="Acesso ao Módulo PandaMail" 
+                                        name="viewEmail" 
+                                        checked={formData.permissions.viewEmail} 
+                                        onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} 
+                                    />
                                     <PermissionToggle 
                                         icon={<Cog6ToothIcon className="w-4 h-4" />} 
                                         label="Pode Adicionar/Remover Contas" 
