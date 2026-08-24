@@ -819,11 +819,21 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
             
             const endpoint = mediatype === 'sticker' ? 'getBase64FromSticker' : 'getBase64FromMediaMessage';
             
+            // Tentar extrair a mensagem "limpa" para a Evolution
+            const cleanMessage = JSON.parse(JSON.stringify(message));
+            const unwrap = (obj) => {
+                if (obj.message?.ephemeralMessage) obj.message = obj.message.ephemeralMessage.message;
+                if (obj.message?.viewOnceMessage) obj.message = obj.message.viewOnceMessage.message;
+                if (obj.message?.viewOnceMessageV2) obj.message = obj.message.viewOnceMessageV2.message;
+                if (obj.message?.documentWithCaptionMessage) obj.message = obj.message.documentWithCaptionMessage.message;
+            };
+            unwrap(cleanMessage);
+
             const resp = await fetch(`${evoUrl}/chat/${endpoint}/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: message
+                    message: cleanMessage
                 })
             });
 
@@ -909,6 +919,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         if (!remoteJid || remoteJid.includes('@broadcast')) return;
         const isGroup = remoteJid.includes('@g.us');
         
+        console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
+        
         // extrair telefone real
         let fromPhone;
         if (remoteJid.includes('@lid')) {
@@ -961,26 +973,59 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         
         if (exists) return;
 
-        // Extrair texto
-        let text = message.message?.conversation ||
-            message.message?.extendedTextMessage?.text || 
-            message.text || "";
+        // --- EXTRAÇÃO ROBUSTA DE CONTEÚDO ---
+        // Função auxiliar para extrair a mensagem real de wrappers (ephemeral, viewOnce, etc)
+        const getRealMessage = (m) => {
+            if (!m) return {};
+            if (m.ephemeralMessage) return getRealMessage(m.ephemeralMessage.message);
+            if (m.viewOnceMessage) return getRealMessage(m.viewOnceMessage.message);
+            if (m.viewOnceMessageV2) return getRealMessage(m.viewOnceMessageV2.message);
+            if (m.documentWithCaptionMessage) return getRealMessage(m.documentWithCaptionMessage.message);
+            return m;
+        };
+
+        const m = getRealMessage(message.message || {});
+        
+        // Extrair texto de várias fontes possíveis
+        let text = m.conversation || 
+                   m.extendedTextMessage?.text || 
+                   m.imageMessage?.caption || 
+                   m.videoMessage?.caption || 
+                   m.documentMessage?.caption ||
+                   message.text || "";
 
         let mediaUrl = null;
         let mediaType = null;
-        const m = message.message || {};
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
-
+        
         if (mediaMsg) {
-            mediaType = m.imageMessage ? 'image' : m.audioMessage ? 'audio' : m.videoMessage ? 'video' : m.stickerMessage ? 'sticker' : 'file';
+            mediaType = m.imageMessage ? 'image' : 
+                        m.audioMessage ? 'audio' : 
+                        m.videoMessage ? 'video' : 
+                        m.stickerMessage ? 'sticker' : 'file';
+            
             if (!text) text = `[Mídia: ${mediaType}]`;
+            
+            console.log(`[MEDIA] Mídia detectada: ${mediaType} na mensagem ${msgId}`);
             
             // DOWNLOAD E UPLOAD DE MÍDIA
             const instanceName = `conn_${connectionId}`;
-            const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
-            if (base64) {
-                mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId);
-                console.log(`[MEDIA] Mídia processada e salva: ${mediaUrl}`);
+            // Passamos o 'message' original mas o 'm' (real message content) pode ser necessário dependendo da versão
+            // Na v1/v2 da Evolution, getBase64 costuma querer o 'message' completo com keys
+            try {
+                const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
+                if (base64) {
+                    mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId);
+                    if (mediaUrl) {
+                        console.log(`[MEDIA] Sucesso! URL salva: ${mediaUrl}`);
+                    } else {
+                        console.error(`[MEDIA] Falha no upload para o Supabase.`);
+                    }
+                } else {
+                    console.error(`[MEDIA] Falha no download da Evolution API.`);
+                }
+            } catch (mediaErr) {
+                console.error(`[MEDIA] Erro catastrófico no processamento de mídia:`, mediaErr.message);
             }
         }
 
