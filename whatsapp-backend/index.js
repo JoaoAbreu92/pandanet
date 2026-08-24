@@ -50,20 +50,35 @@ async function authMiddleware(req, res, next) {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
   const token = authHeader.split(' ')[1];
+
+  // Strategy 1: Verify via Supabase auth.getUser (preferred)
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      console.error('[auth] WhatsApp: Token verification failed via Supabase:', error?.message);
-      return res.status(401).json({ error: 'Invalid or expired token: ' + (error?.message || 'User not found') });
+    if (!error && user) {
+      req.user = user;
+      return next();
     }
-
-    req.user = user;
-    next();
+    console.warn('[auth] Supabase getUser failed, trying JWT fallback:', error?.message);
   } catch (err) {
-    console.error('[auth] WhatsApp: Token verification failed:', err.message);
-    return res.status(401).json({ error: 'Invalid or expired token: ' + err.message });
+    console.warn('[auth] Supabase getUser threw error, trying JWT fallback:', err.message);
   }
+
+  // Strategy 2: Direct JWT verification using JWT_SECRET (fallback)
+  if (JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      // Supabase access tokens have a 'sub' (user ID) claim
+      if (decoded && (decoded.sub || decoded.role)) {
+        console.log('[auth] JWT verified via secret fallback. Role:', decoded.role, 'Sub:', decoded.sub);
+        req.user = { id: decoded.sub, role: decoded.role, email: decoded.email };
+        return next();
+      }
+    } catch (jwtErr) {
+      console.error('[auth] JWT secret fallback also failed:', jwtErr.message);
+    }
+  }
+
+  return res.status(401).json({ error: 'Invalid or expired token' });
 }
 
 app.get('/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
