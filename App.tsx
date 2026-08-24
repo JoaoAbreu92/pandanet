@@ -58,6 +58,7 @@ import EmailPage from './components/EmailPage';
 import CRMTasks from './components/CRMTasks';
 import AIAssistant from './components/AIAssistant';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
+import SupportInbox from './components/SupportInbox';
 import { CRMCustomer } from './types';
 
 
@@ -232,6 +233,9 @@ const AppContent: React.FC = () => {
 
     const [companyData, setCompanyData] = useState<AppData | null>(null);
     const [companySettings, setCompanySettings] = useState<any>(null);
+
+    // Trigger to reload CRMSales data when modals close
+    const [crmRefreshTrigger, setCrmRefreshTrigger] = useState(0);
 
     const { notifications, markAsRead, markAllAsRead, playNotificationSound } = useNotifications();
 
@@ -692,6 +696,7 @@ const AppContent: React.FC = () => {
                     <CRMSales
                         initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any}
                         onViewCustomer={handleViewCustomer}
+                        refreshTrigger={crmRefreshTrigger}
                         onNewRequest={(type) => {
                             if (type === 'item') setShowItemForm(true);
                             else if (type === 'subscription') setShowSubscriptionForm(true);
@@ -704,6 +709,7 @@ const AppContent: React.FC = () => {
                     <CRMSales
                         initialTab="subscriptions"
                         onViewCustomer={handleViewCustomer}
+                        refreshTrigger={crmRefreshTrigger}
                         onNewRequest={() => setShowSubscriptionForm(true)}
                     />
                 );
@@ -712,12 +718,14 @@ const AppContent: React.FC = () => {
                     <CRMSales
                         initialTab="contracts"
                         onViewCustomer={handleViewCustomer}
+                        refreshTrigger={crmRefreshTrigger}
                         onNewRequest={() => setShowContractForm(true)}
                     />
                 );
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
+            case 'support-inbox': return <SupportInbox onNavigate={handleNavigate} />;
 
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} />;
@@ -879,6 +887,7 @@ const AppContent: React.FC = () => {
                         onClose={() => setFinanceFormType(null)}
                         onSuccess={() => {
                             setFinanceFormType(null);
+                            setCrmRefreshTrigger(prev => prev + 1);
                         }}
                     />
                 )}
@@ -886,21 +895,30 @@ const AppContent: React.FC = () => {
                 {showItemForm && (
                     <CRMItemForm
                         onClose={() => setShowItemForm(false)}
-                        onSave={() => setShowItemForm(false)}
+                        onSave={() => {
+                            setShowItemForm(false);
+                            setCrmRefreshTrigger(prev => prev + 1);
+                        }}
                     />
                 )}
 
                 {showSubscriptionForm && (
                     <CRMSubscriptionForm
                         onClose={() => setShowSubscriptionForm(false)}
-                        onSave={() => setShowSubscriptionForm(false)}
+                        onSave={() => {
+                            setShowSubscriptionForm(false);
+                            setCrmRefreshTrigger(prev => prev + 1);
+                        }}
                     />
                 )}
 
                 {showContractForm && (
                     <CRMContractForm
                         onClose={() => setShowContractForm(false)}
-                        onSave={() => setShowContractForm(false)}
+                        onSave={() => {
+                            setShowContractForm(false);
+                            setCrmRefreshTrigger(prev => prev + 1);
+                        }}
                     />
                 )}
             </Layout>

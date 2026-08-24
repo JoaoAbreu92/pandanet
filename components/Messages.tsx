@@ -739,16 +739,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         lastMessageCount.current = messages.length;
     }, [messages]);
 
-    // Deselecionar se a conversa for fechada (Suporte)
-    useEffect(() => {
-        if (selectedConversationId) {
-            const current = conversations.find(c => c.id === selectedConversationId);
-            if (current && current.is_closed === true) {
-                console.log("Chat encerrado detectado, limpando seleção:", selectedConversationId);
-                setSelectedConversationId(null);
-            }
-        }
-    }, [conversations, selectedConversationId]);
+    // NOTE: Removed auto-deselect on closed conversations — support chats should remain selectable
+    // so the admin can still read history and re-open the conversation.
 
     const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
         if (isGhostMode) {
@@ -786,10 +778,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 }
             }
 
-            const compId = currentUser.company_id;
+            // Use the conversation's company_id (not sender's) to support cross-company chats
+            const currentConv = conversations.find(c => c.id === selectedConversationId);
+            const compId = currentConv?.company_id || currentUser.company_id;
             if (!compId) {
-                console.error("Missing company_id for current user", currentUser);
-                alert("Erro: Empresa não identificada no seu perfil.");
+                console.error("Missing company_id", currentUser);
+                alert("Erro: Empresa não identificada.");
                 return;
             }
 

@@ -48,6 +48,7 @@ const CRMItemForm: React.FC<CRMItemFormProps> = ({ onClose, onSave }) => {
                     tax_2: formData.tax_2,
                     unit: formData.unit,
                     item_group: formData.item_group,
+                    group_name: formData.item_group,
                     status: 'active'
                 }]);
 

@@ -20,6 +20,7 @@ export type Page =
   | 'profile-page'
   | 'saas-dashboard'
   | 'admin'
+  | 'support-inbox'
   | 'announcement-detail'
   | 'documentos'
   | 'documentos'
@@ -337,6 +338,7 @@ export interface Reaction {
 
 export interface Conversation {
   id: string; // Changed to string
+  company_id?: string;
   is_closed?: boolean;
   participantName: string;
   participantAvatarUrl: string;

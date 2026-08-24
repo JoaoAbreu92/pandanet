@@ -263,16 +263,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
                 {/* SaaS Super Admin Button */}
                 {currentUser.role === 'Super Admin' && (
-                    <button
-                        type="button"
-                        onClick={() => onNavigate('saas-dashboard')}
-                        className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
-                            } ${isOpen ? '' : 'justify-center'} mt-2 border-2 border-dashed border-purple-200 dark:border-gray-700`}
-                        title="Painel SaaS"
-                    >
-                        <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
-                        {isOpen && <span className="ml-4 truncate font-bold">{t('sidebar.saas_panel')}</span>}
-                    </button>
+                    <>
+                        <NavItem page="support-inbox" label="Suporte (Master)" icon={LifebuoyIcon} permission={true} />
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('saas-dashboard')}
+                            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
+                                } ${isOpen ? '' : 'justify-center'} mt-2 border-2 border-dashed border-purple-200 dark:border-gray-700`}
+                            title="Painel SaaS"
+                        >
+                            <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
+                            {isOpen && <span className="ml-4 truncate font-bold">{t('sidebar.saas_panel')}</span>}
+                        </button>
+                    </>
                 )}
 
                 {(currentUser.isAdmin || currentUser.isCompanyAdmin) && (

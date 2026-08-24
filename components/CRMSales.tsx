@@ -19,8 +19,9 @@ type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscript
 const CRMSales: React.FC<{
     initialTab?: SalesTab,
     onViewCustomer?: (id: string) => void,
-    onNewRequest?: (type: string) => void
-}> = ({ initialTab = 'invoices', onViewCustomer, onNewRequest }) => {
+    onNewRequest?: (type: string) => void,
+    refreshTrigger?: number
+}> = ({ initialTab = 'invoices', onViewCustomer, onNewRequest, refreshTrigger = 0 }) => {
     const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<SalesTab>(initialTab);
     const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +119,7 @@ const CRMSales: React.FC<{
 
     useEffect(() => {
         fetchData();
-    }, [activeTab, currentUser?.company_id]);
+    }, [activeTab, currentUser?.company_id, refreshTrigger]);
 
     const stats = {
         invoices: [
