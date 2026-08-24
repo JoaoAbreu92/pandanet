@@ -11,7 +11,7 @@ dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 // Force true service key, ignoring .env that might be broken
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NzA4OTgzMTYsImV4cCI6MjA4NjI1ODMxNn0.19fFdFsT0GDfnHIKASqy9O2pUC8ZB25YUpkDgeCBEzg'; // Use Service Key for backend
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NzMyNjgyMDgsImV4cCI6MjA4ODYyODIwOH0.-ZvC9gGVqzXFB0CfI2h_j6cuSiMztMiHSo30XRauE-g'; // Use Service Key for backend
 
 if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase URL or Service Key missing in .env');
