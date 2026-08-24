@@ -181,7 +181,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
             fetchMessages(selectedConversationId);
 
-            // BROADCAST NUDGE (Faster than DB)
+
+            // 1. BROADCAST NUDGE (Imediato)
             const channel = supabase.channel('global-nudges');
             channel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
@@ -191,12 +192,28 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                         event: 'nudge',
                         payload: {
                             sender_id: currentUser?.id,
-                            conversation_id: selectedConversationId
+                            conversation_id: selectedConversationId,
+                            receiver_id: selectedConversation?.participantId // Importante para o novo filtro
                         }
                     });
-                    // Do NOT remove channel here, as it is shared with App.tsx listener!
+                    // Do NOT remove channel here
                 }
             });
+
+            // 2. DEDICATED NUDGE TABLE (Garantia de entrega)
+            if (selectedConversation?.participantId) {
+                const { error: nudgeError } = await supabase
+                    .from('nudges')
+                    .insert({
+                        sender_id: currentUser.id,
+                        receiver_id: selectedConversation.participantId, // ID do destinatário direto
+                        conversation_id: selectedConversationId
+                    });
+
+                if (nudgeError) console.error('Erro ao registrar nudge na tabela:', nudgeError);
+                else console.log('Nudge registrado na tabela dedicada.');
+            }
+
 
         } catch (err) {
             console.error('Erro ao enviar nudge:', err);

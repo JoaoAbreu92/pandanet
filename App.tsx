@@ -77,6 +77,17 @@ const AppContent: React.FC = () => {
                     handleNudge(newMsg.sender_id, newMsg.conversation_id);
                 }
             })
+            // LISTENER 2: Dedicated NUDGES Table (High Reliability)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'nudges',
+                filter: `receiver_id=eq.${currentUser.id}` // Filtro crucial
+            }, async (payload) => {
+                const newNudge = payload.new as any;
+                console.log('[PandaNet] DEDICATED NUDGE TABLE detectado:', newNudge);
+                handleNudge(newNudge.sender_id, newNudge.conversation_id);
+            })
             .on('broadcast', { event: 'nudge' }, (payload) => {
                 console.log('[PandaNet] Broadcast Nudge detectado:', payload);
                 const { sender_id, conversation_id } = payload.payload; // Broadcast payload wrapper
