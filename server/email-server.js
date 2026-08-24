@@ -39,7 +39,8 @@ const ensureNumber = (val) => {
 };
 
 // --- FETCH EMAILS (IMAP) ---
-app.post('/api/email/fetch', authMiddleware, async (req, res) => {
+// Nginx remove o prefixo /api/email, então a rota deve ser apenas /fetch
+app.post('/fetch', authMiddleware, async (req, res) => {
     const { config, path } = req.body;
     const mailboxPath = path || 'INBOX';
     if (!config || !config.imap_host) {
@@ -190,10 +191,13 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
     }
 });
 
-// --- MOVE EMAILS (FOLDERS/TRASH) ---
-app.post('/api/email/move', authMiddleware, async (req, res) => {
-    const { config, uids, path } = req.body;
-    if (!config || !uids || !path) return res.status(400).json({ error: 'Missing parameters' });
+// --- MOVE EMAIL ---
+app.post('/move', authMiddleware, async (req, res) => {
+    const { config, uids, fromPath, toPath } = req.body;
+    const fromMailboxPath = fromPath || 'INBOX';
+    if (!config || !uids || !toPath) return res.status(400).json({ error: 'Missing parameters' });
+
+    console.log(`[email-server] MOVE: UIDs ${uids.join(',')} from ${fromMailboxPath} to ${toPath}`);
 
     const client = new ImapFlow({
         host: config.imap_host,
@@ -206,9 +210,9 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
 
     try {
         await client.connect();
-        const lock = await client.getMailboxLock('INBOX');
+        const lock = await client.getMailboxLock(fromMailboxPath);
         try {
-            await client.messageMove(uids, path, { uid: true });
+            await client.messageMove(uids, toPath, { uid: true });
             return res.json({ success: true });
         } finally {
             lock.release();
@@ -221,9 +225,11 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
 });
 
 // --- MANAGE FOLDERS ---
-app.post('/api/email/folders', authMiddleware, async (req, res) => {
+app.post('/folders', authMiddleware, async (req, res) => {
     const { config, action, path, newPath } = req.body; // action: 'list', 'create', 'rename', 'delete'
     if (!config) return res.status(400).json({ error: 'Missing config' });
+
+    console.log(`[email-server] FOLDERS: Action: ${action} - Path: ${path || 'N/A'} - NewPath: ${newPath || 'N/A'}`);
 
     const client = new ImapFlow({
         host: config.imap_host,
@@ -271,8 +277,8 @@ const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false }
 }) : null;
 
-// --- SEND EMAIL (SMTP + IMAP Append + Contacts) ---
-app.post('/api/email/send', authMiddleware, async (req, res) => {
+// --- SEND EMAIL (SMTP) ---
+app.post('/send', authMiddleware, async (req, res) => {
     const { config, payload, user_id } = req.body; // user_id passed from frontend or decoded from token
     if (!config || !payload) {
         return res.status(400).json({ error: 'Missing config or payload' });
@@ -284,7 +290,7 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     if (payload.cc) recipients.push(...payload.cc.split(',').map(e => e.trim()));
     if (payload.bcc) recipients.push(...payload.bcc.split(',').map(e => e.trim()));
 
-    console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> ${payload.to}`);
+    console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> To: ${payload.to} - Subject: ${payload.subject}`);
 
     const transporter = nodemailer.createTransport({
         host: config.smtp_host,
@@ -383,9 +389,11 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
 });
 
 // --- TEST CONNECTION ---
-app.post('/api/email/test', authMiddleware, async (req, res) => {
+app.post('/test', authMiddleware, async (req, res) => {
     const { config } = req.body;
     const results = { imap: false, smtp: false };
+
+    console.log(`[email-server] TEST CONNECTION: IMAP: ${config.imap_host}:${config.imap_port}, SMTP: ${config.smtp_host}:${config.smtp_port}`);
 
     // Test IMAP
     const imapClient = new ImapFlow({
@@ -400,6 +408,7 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
         await imapClient.connect();
         await imapClient.logout();
         results.imap = true;
+        console.log('[email-server] IMAP test successful.');
     } catch (err) {
         console.error('[email-server] IMAP test failed:', err.message);
     }
@@ -415,6 +424,7 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
     try {
         await transporter.verify();
         results.smtp = true;
+        console.log('[email-server] SMTP test successful.');
     } catch (err) {
         console.error('[email-server] SMTP test failed:', err.message);
     }
@@ -422,8 +432,8 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
     return res.json(results);
 });
 
-// --- Health check ---
-app.get('/api/email/health', (req, res) => res.json({ status: 'ok' }));
+// --- HEALTH CHECK ---
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
     console.log(`[email-server] Running on port ${PORT}`);
