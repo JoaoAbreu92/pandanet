@@ -994,5 +994,14 @@ CREATE POLICY "Authenticated Deletes" ON storage.objects FOR DELETE TO authentic
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 
+-- ==========================================
+-- 17. CHAT MESSAGES PAYLOAD COLUMN
+-- ==========================================
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT NULL;
+
+-- Final Force Schema Cache Reload
+NOTIFY pgrst, 'reload schema';
+
+
 
 
