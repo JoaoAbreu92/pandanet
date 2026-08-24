@@ -71,7 +71,7 @@ interface MessagesProps {
 }
 
 const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
-    const { currentUser, isGhostMode } = useAuth();
+    const { currentUser, profile, isGhostMode } = useAuth();
     const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
@@ -1020,7 +1020,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const isMasterAdmin = (currentUser?.email === 'ti@grupopixel.com.br' || currentUser.id === MASTER_ADMIN_ID) && isGhostMode;
+        const isMasterAdmin = (profile?.email === 'ti@grupopixel.com.br' || profile?.id === MASTER_ADMIN_ID) && isGhostMode;
         if (!isMasterAdmin) {
             alert("Apenas o Administrador Master (em Modo Fantasma) tem permissão para apagar conversas permanentemente.");
             return;
@@ -1326,7 +1326,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                     <p className="text-sm font-semibold text-brand-text truncate">{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        {((currentUser.email === 'ti@grupopixel.com.br' || currentUser.id === MASTER_ADMIN_ID) && isGhostMode) && (
+                                                        {((profile?.email === 'ti@grupopixel.com.br' || profile?.id === MASTER_ADMIN_ID) && isGhostMode) && (
                                                             <button
                                                                 onClick={(e) => handleDeleteConversation(conv.id, e)}
                                                                 className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"
