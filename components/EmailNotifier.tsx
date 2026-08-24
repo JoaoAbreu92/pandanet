@@ -24,12 +24,17 @@ const EmailNotifier: React.FC = () => {
     }, [currentUser]);
 
     // Polling
+    const isFetching = useRef(false);
+
     useEffect(() => {
         if (!settings || !settings.imap_host || !settings.imap_user || !settings.imap_pass) return;
 
         let lastCount = lastUnseenCount;
 
         const checkEmails = async () => {
+            if (isFetching.current) return;
+            isFetching.current = true;
+
             const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
                 `${window.location.origin}/api/email`;
 
@@ -37,7 +42,10 @@ const EmailNotifier: React.FC = () => {
                 const session = await supabase.auth.getSession();
                 const token = session.data.session?.access_token;
 
-                if (!token) return;
+                if (!token) {
+                    isFetching.current = false;
+                    return;
+                }
 
                 const response = await fetch(`${EMAIL_SERVER_URL}/fetch`, {
                     method: 'POST',
@@ -53,6 +61,12 @@ const EmailNotifier: React.FC = () => {
                     })
                 });
                 
+                if (response.status === 429) {
+                    console.warn("[EmailNotifier] Rate limited (429). Aguardando próxima rodada...");
+                    isFetching.current = false;
+                    return;
+                }
+
                 const data = await response.json();
                 
                 if (data && typeof data.unseen === 'number') {
@@ -63,6 +77,7 @@ const EmailNotifier: React.FC = () => {
                     if (lastCount === null) {
                         lastCount = currentUnseen;
                         setLastUnseenCount(currentUnseen);
+                        isFetching.current = false;
                         return;
                     }
 
@@ -102,13 +117,16 @@ const EmailNotifier: React.FC = () => {
                 }
             } catch (err) {
                 console.error("[EmailNotifier] Falha no polling:", err);
+            } finally {
+                isFetching.current = false;
             }
         };
 
         checkEmails();
-        const interval = setInterval(checkEmails, 60000); // Polling a cada 60s em vez de 30s
+        const interval = setInterval(checkEmails, 90000); // Polling a cada 90s para evitar 429
         return () => clearInterval(interval);
     }, [settings, currentUser?.id, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]);
+
 
     // Limpa a notificação de banco de dados se a tela de Email reportar zero
     useEffect(() => {

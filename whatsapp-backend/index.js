@@ -357,111 +357,112 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
         console.log(`[SYNC] Iniciando syncEvolutionData para ${instanceName}...`);
-        console.log(`[SYNC] evoUrl: ${evoUrl}`);
         
-        // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API (v1 e v2)
-        const endpoints = [
-            { url: `${evoUrl}/chat/findChats/${instanceName}`, method: 'GET' },
-            { url: `${evoUrl}/chat/fetchContacts/${instanceName}`, method: 'POST', body: {} },
-            { url: `${evoUrl}/chat/getContacts/${instanceName}`, method: 'POST', body: {} },
-            { url: `${evoUrl}/contact/fetchContacts/${instanceName}`, method: 'POST', body: {} },
-            { url: `${evoUrl}/chat/findContacts/${instanceName}`, method: 'GET' },
-            { url: `${evoUrl}/chat/fetchContacts/${instanceName}`, method: 'GET' },
-            { url: `${evoUrl}/contact/fetchContacts/${instanceName}`, method: 'GET' },
-            { url: `${evoUrl}/instance/fetchContacts/${instanceName}`, method: 'GET' }
-        ];
-
+        // 1. Buscar Chats (Conversas ativas, incluindo grupos)
+        // O endpoint findChats é o mais completo para recuperar o estado atual do celular
+        const chatEp = `${evoUrl}/chat/findChats/${instanceName}`;
+        console.log(`[SYNC] Buscando chats via: ${chatEp}`);
         
-        let contacts = [];
-        let successEndpoint = null;
+        const response = await fetch(chatEp, {
+            method: 'GET',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
+        });
 
-        for (const ep of endpoints) {
-            try {
-                console.log(`[SYNC] Tentando endpoint ${ep.method}: ${ep.url}`);
-                const options = {
-                    method: ep.method,
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
-                };
-                if (ep.method === 'POST') options.body = JSON.stringify(ep.body);
+        if (!response.ok) {
+            throw new Error(`Falha ao buscar chats: ${response.status}`);
+        }
 
-                const res = await fetch(ep.url, options);
-                
-                if (!res.ok) {
-                    const errText = await res.text().catch(() => '');
-                    console.warn(`[SYNC] Endpoint ${ep.url} falhou (${res.status}): ${errText.slice(0, 100)}`);
-                    continue;
-                }
+        const chats = await response.json();
+        console.log(`[SYNC] ${chats.length} chats encontrados.`);
 
-                const data = await res.json();
-                console.log(`[SYNC] OK! Endpoint ${ep.url} retornou dados.`);
+        const contactsToUpsert = [];
+        const conversationsToUpsert = [];
+        const processedJids = new Set();
 
-                // Evolution pode retornar array direto ou { contacts: [] } ou { data: [] }
-                contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
-                
-                if (Array.isArray(contacts) && contacts.length > 0) {
-                    console.log(`[SYNC] SUCESSO: ${contacts.length} contatos encontrados via ${ep.url}`);
-                    successEndpoint = ep.url;
-                    break;
-                } else {
-                    console.log(`[SYNC] Endpoint ${ep.url} retornou lista vazia.`);
-                }
-            } catch (e) {
-                console.warn(`[SYNC] Falha ao tentar ${ep.url}:`, e.message);
-            }
+        for (const chat of chats) {
+            const jid = chat.id || chat.remoteJid || chat.jid;
+            if (!jid || processedJids.has(jid)) continue;
+            processedJids.add(jid);
+
+            const isGroup = jid.includes('@g.us');
+            const phone = isGroup ? jid : jid.split('@')[0];
+            const name = chat.name || chat.pushName || chat.contact?.name || phone;
+
+            // Preparar Contato
+            contactsToUpsert.push({
+                company_id: companyId,
+                phone: phone,
+                name: name,
+                updated_at: new Date().toISOString()
+            });
+
+            // Preparar Conversa (se houve mensagem)
+            // Se o chat tem 'lastMessage', usamos o timestamp dela
+            const lastMsgAt = chat.messageTimestamp 
+                ? new Date(chat.messageTimestamp * 1000).toISOString() 
+                : new Date().toISOString();
+
+            conversationsToUpsert.push({
+                company_id: companyId,
+                connection_id: connectionId,
+                contact_name: name,
+                contact_phone: phone,
+                status: 'aberto', // Chats sincronizados entram como abertos
+                last_message_at: lastMsgAt,
+                unread_count: chat.unreadCount || 0
+            });
         }
 
 
-        if (contacts.length > 0) {
-            console.log(`[SYNC] ${contacts.length} contatos brutos encontrados via ${successEndpoint}. Processando...`);
+        // 2. Upsert de Contatos
+        if (contactsToUpsert.length > 0) {
+            console.log(`[SYNC] Upsert de ${contactsToUpsert.length} contatos...`);
+            const { error: errC } = await supabase
+                .from('whatsapp_contacts')
+                .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
+            if (errC) console.error('[SYNC] Erro contatos:', errC.message);
+        }
+
+        // 3. Upsert de Conversas
+        if (conversationsToUpsert.length > 0) {
+            console.log(`[SYNC] Upsert de ${conversationsToUpsert.length} conversas...`);
+            // Nota: whatsapp_conversations usa company_id, connection_id e contact_phone como critério de busca
+            // Mas o upsert real depende da constraint do banco. Geralmente id ou um índice único.
+            // Para evitar duplicatas, vamos iterar e garantir que não criamos 2 conversas pro mesmo número na mesma conexão.
             
-            const contactsToUpsert = [];
-            const processedPhones = new Set();
+            for (const conv of conversationsToUpsert) {
+                // Verificar se já existe
+                const { data: existing } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('id')
+                    .eq('company_id', companyId)
+                    .eq('connection_id', connectionId)
+                    .eq('contact_phone', conv.contact_phone)
+                    .maybeSingle();
 
-            for (const c of contacts) {
-                const jid = c.id || c.remoteJid || c.jid;
-                if (!jid) continue;
-
-                const phone = jid.split('@')[0];
-                if (phone && !jid.includes('@g.us') && !processedPhones.has(phone)) {
-                    processedPhones.add(phone);
-                    const name = c.name || c.pushName || c.notify || phone;
-                    contactsToUpsert.push({
-                        company_id: companyId,
-                        phone: phone,
-                        name: name,
-                        updated_at: new Date().toISOString()
-                    });
+                if (existing) {
+                    await supabase
+                        .from('whatsapp_conversations')
+                        .update({ 
+                            last_message_at: conv.last_message_at,
+                            unread_count: conv.unread_count,
+                            contact_name: conv.contact_name
+                        })
+                        .eq('id', existing.id);
+                } else {
+                    await supabase
+                        .from('whatsapp_conversations')
+                        .insert(conv);
                 }
             }
-
-            if (contactsToUpsert.length > 0) {
-                console.log(`[SYNC] Realizando upsert de ${contactsToUpsert.length} contatos únicos no Supabase...`);
-                
-                // Dividir em lotes de 100 para evitar limites de timeout/payload
-                const batchSize = 100;
-                for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
-                    const batch = contactsToUpsert.slice(i, i + batchSize);
-                    const { error: upsertErr } = await supabase
-                        .from('whatsapp_contacts')
-                        .upsert(batch, { onConflict: 'company_id,phone' });
-                    
-                    if (upsertErr) {
-                        console.error(`[SYNC] Erro no lote ${i/batchSize}:`, upsertErr.message);
-                    } else {
-                        console.log(`[SYNC] Lote ${i/batchSize + 1} processado com sucesso.`);
-                    }
-                }
-                console.log(`[SYNC] Sincronização finalizada com sucesso.`);
-            } else {
-                console.warn('[SYNC] Nenhum contato válido após filtragem.');
-            }
-        } else {
-            console.warn('[SYNC] Nenhum contato retornado por nenhum endpoint.');
         }
+
+        console.log(`[SYNC] Sincronização de ${instanceName} concluída.`);
     } catch (err) {
-        console.error(`[SYNC] Erro fatal:`, err.message);
+        console.error(`[SYNC] Erro fatal em syncEvolutionData:`, err.message);
     }
 }
+
 
 async function runChatbot(message, conversation, companyId, connectionId) {
     try {

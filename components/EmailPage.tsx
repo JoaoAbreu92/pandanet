@@ -156,6 +156,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [searchQuery, setSearchQuery] = useState('');
     const [filterTag, setFilterTag] = useState<string | null>(null);
 
+    const fetchInProgress = useRef(false);
+
     // --- State: Compose ---
     const [composeTo, setComposeTo] = useState('');
     const [composeCc, setComposeCc] = useState('');
@@ -742,7 +744,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const fetchEmails = async (isBackground = false, forceRefresh = false) => {
-        if (!settings.imap_user) return;
+        if (!settings.imap_user || fetchInProgress.current) return;
+        fetchInProgress.current = true;
 
         const isSearchingGlobal = searchQuery.trim().length > 0;
         const cacheKey = `${currentUser.id}_${isSearchingGlobal ? 'SEARCH_' + searchQuery : currentFolder}_${page}`;
@@ -753,6 +756,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setEmails(cached.emails);
             setTotalEmails(cached.total);
             if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(cached.unseen);
+            fetchInProgress.current = false;
             return;
         }
 
@@ -766,8 +770,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 : { config: settings, path: currentFolder, page, pageSize };
 
             const { data, error } = await callEmailServer(action, payload);
-            if (error) throw error;
+            
+            if (error) {
+                if (error.message?.includes('429')) {
+                    console.warn("[EmailPage] Rate limit hit (429).");
+                }
+                throw error;
+            }
             if (data.error) throw new Error(data.error);
+
 
             // Handle Response (Array or Object with total)
             const emailList = (Array.isArray(data) ? data : data.emails) || [];
@@ -809,8 +820,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         } finally {
             setLoading(false);
             setRefreshing(false);
+            fetchInProgress.current = false;
         }
     };
+
 
 
     // Refresh when page or folder changes
