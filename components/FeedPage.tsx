@@ -45,12 +45,27 @@ export const PostCard: React.FC<{
         }, 1500);
     };
 
+    const getEmbedUrl = (content: string) => {
+        const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+        const vimeoRegex = /(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/)([0-9]+)/;
+
+        const ytMatch = content.match(youtubeRegex);
+        if (ytMatch) return { type: 'youtube', id: ytMatch[1], url: `https://www.youtube.com/embed/${ytMatch[1]}` };
+
+        const vimeoMatch = content.match(vimeoRegex);
+        if (vimeoMatch) return { type: 'vimeo', id: vimeoMatch[1], url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+
+        return null;
+    };
+
     const renderContent = (content: string) => {
+        // Primeiro, resolve as menções
         const parts = content.split(/(@[\w\s]+)/g);
         return parts.map((part, i) => {
             if (part.startsWith('@')) {
                 return <span key={i} className="text-brand-primary font-bold bg-emerald-50 px-1 rounded">{part}</span>;
             }
+            // Detectar links e transformá-los em links clicáveis (opcional, mas bom para UX)
             return part;
         });
     };
@@ -80,11 +95,21 @@ export const PostCard: React.FC<{
 
             {post.mediaUrl && (
                 <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border text-center">
-                    {post.mediaType === 'image' ? (
-                        <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-cover max-h-[500px]" />
-                    ) : (
-                        <video src={post.mediaUrl} controls className="w-full max-h-[500px]" />
-                    )}
+                    <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-cover max-h-[500px]" />
+                </div>
+            )}
+
+            {!post.mediaUrl && getEmbedUrl(post.content) && (
+                <div className="mb-4 rounded-lg overflow-hidden bg-black aspect-video shadow-inner">
+                    <iframe
+                        width="100%"
+                        height="100%"
+                        src={getEmbedUrl(post.content)?.url}
+                        title="Video player"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                    ></iframe>
                 </div>
             )}
 
