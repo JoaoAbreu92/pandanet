@@ -95,7 +95,7 @@ export const PostCard: React.FC<{
                     </div>
                 </div>
                 {isAuthor && (
-                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title={t('feed.delete_post')}>
+                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 transition-colors" title={t('feed.delete_post')}>
                         <TrashIcon className="w-5 h-5" />
                     </button>
                 )}
@@ -107,7 +107,7 @@ export const PostCard: React.FC<{
 
             {post.mediaUrl && (
                 <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 dark:bg-slate-700 dark:border-slate-600 text-center">
-                    <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-cover max-h-[500px]" />
+                    <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-contain max-h-[500px]" />
                 </div>
             )}
 
@@ -144,20 +144,20 @@ export const PostCard: React.FC<{
                     <button 
                         disabled={isGhostMode}
                         onClick={() => { if (!isGhostMode) setShowReactionMenu(!showReactionMenu); }}
-                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 z-30 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-center gap-1">
                                 {quickReactions.map(emoji => (
-                                    <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-2xl w-10 h-10 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
+                                    <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl active:scale-95 text-white">
                                         {emoji}
                                     </button>
                                 ))}
                                 <button
                                     onClick={() => setShowFullReactions(!showFullReactions)}
-                                    className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all text-sm font-bold"
+                                    className="w-8 h-8 flex items-center justify-center text-white/60 rounded-xl transition-all text-sm font-bold"
                                     title="Ver todos"
                                 >
                                     {showFullReactions ? '✕' : '+'}
@@ -166,7 +166,7 @@ export const PostCard: React.FC<{
                             {showFullReactions && (
                                 <div className="grid grid-cols-6 gap-1 mt-2 pt-2 border-t border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
                                     {allReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
-                                        <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-xl w-9 h-9 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
+                                        <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-xl w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 text-white">
                                             {emoji}
                                         </button>
                                     ))}
@@ -175,10 +175,10 @@ export const PostCard: React.FC<{
                         </div>
                     )}
                 </div>
-                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98] transition-all duration-300">
+                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg active:scale-[0.98] transition-all duration-300">
                     <ChatBubbleLeftIcon className="w-5 h-5" /><span>{t('feed.comment')}</span>
                 </button>
-                <button onClick={() => isGhostMode ? null : onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98] transition-all duration-300">
+                <button onClick={() => isGhostMode ? null : onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg active:scale-[0.98] transition-all duration-300">
                     <ShareIcon className="w-5 h-5" /><span>{t('feed.share')}</span>
                 </button>
             </div>
@@ -210,7 +210,7 @@ export const PostCard: React.FC<{
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
                         />
-                        <button type="submit" className="absolute right-2 top-1.5 text-brand-primary p-1 rounded-full hover:bg-emerald-50 transition-colors">
+                        <button type="submit" className="absolute right-2 top-1.5 text-brand-primary p-1 rounded-full transition-colors">
                             <PaperAirplaneIcon className="w-4 h-4" />
                         </button>
                     </div>
@@ -249,13 +249,13 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                     <div className="space-y-3">
                         <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">{t('feed.online_now')}</p>
                         {onlineUsers.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <div className="relative">
                                     <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate transition-colors">{user.name}</p>
                                     <p className="text-xs text-brand-subtle-text dark:text-gray-400 truncate">{user.role}</p>
                                 </div>
                             </div>
@@ -269,10 +269,10 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                         <p className="text-xs text-gray-400 italic">{t('common.no_results') || 'Nenhum outro usuário encontrado.'}</p>
                     ) : (
                         displaySuggestions.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate transition-colors">{user.name}</p>
                                     <p className="text-xs text-brand-subtle-text dark:text-gray-400 truncate">{user.role}</p>
                                 </div>
                             </div>
@@ -280,7 +280,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                     )}
                 </div>
             </div>
-            <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">{t('feed.discover_more')}</button>
+            <button className="w-full mt-4 text-xs font-bold text-brand-primary transition-colors uppercase tracking-wider">{t('feed.discover_more')}</button>
         </Card>
     );
 };
@@ -479,6 +479,36 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 };
             };
         });
+    };
+
+    const handleRotateImage = () => {
+        if (!mediaFile) return;
+        const img = new Image();
+        img.src = mediaFile.url;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.height;
+            canvas.height = img.width;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((90 * Math.PI) / 180);
+                ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const rotatedFile = new File([blob], mediaFile.file?.name || 'rotated.jpg', {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        setMediaFile({
+                            url: URL.createObjectURL(rotatedFile),
+                            type: 'image',
+                            file: rotatedFile
+                        });
+                    }
+                }, 'image/jpeg', 0.9);
+            }
+        };
     };
 
     const handleCreatePost = async (e: React.FormEvent) => {
@@ -759,7 +789,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                 {allEmployees
                                                     .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
                                                     .map(user => (
-                                                        <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
+                                                        <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
                                                             <img src={user.avatarUrl || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full object-cover" alt="" />
                                                             <div><p className="text-sm font-bold text-brand-text dark:text-gray-100">{user.name}</p><p className="text-xs text-brand-subtle-text dark:text-gray-400">{user.role}</p></div>
                                                         </div>
@@ -770,25 +800,40 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 </div>
     
                                 {mediaFile && (
-                                    <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800">
-                                        <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
-                                        <button onClick={() => setMediaFile(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-all shadow-lg scale-90 group-hover:scale-100 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-5 h-5" /></button>
+                                    <div className="relative mb-4 ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800 p-2 flex flex-col items-center">
+                                        <img src={mediaFile.url} className="max-w-full h-auto object-contain max-h-[350px] rounded-lg" alt="Preview" />
+                                        <div className="flex gap-2 mt-2 w-full justify-center">
+                                            <button 
+                                                type="button" 
+                                                onClick={handleRotateImage}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-primary bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-lg transition-colors border border-emerald-100 dark:border-emerald-500/20"
+                                            >
+                                                🔄 Girar 90° (Mudar Orientação)
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setMediaFile(null)} 
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 rounded-lg transition-colors border border-red-100"
+                                            >
+                                                ✕ Remover
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
     
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
                                     <div className="flex justify-around sm:justify-start space-x-2">
-                                        <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
-                                        <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
+                                        <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
+                                        <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
                                     </div>
-                                    <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
+                                    <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl disabled:opacity-50 transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
                                 </div>
                                 <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 dark:border-slate-800 pt-3 gap-2">
                                     <div className="flex items-start space-x-2">
                                         <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
                                         <span className="text-orange-600 font-bold leading-tight">{t('feed.important')}</span>
                                     </div>
-                                    <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organizado e eficiente'}</span>
+                                    <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organized e eficiente'}</span>
                                 </div>
     
                                 <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
