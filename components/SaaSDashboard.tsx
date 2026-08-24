@@ -621,6 +621,33 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         }
     };
 
+    const handleDeleteUser = async (userId: string, userEmail: string, userName: string) => {
+        if (currentUser?.role !== 'Super Admin' && currentUser?.email !== 'ti@grupopixel.com.br') {
+            showToast('Apenas administradores master podem excluir usuários.', 'error');
+            return;
+        }
+
+        const nameLabel = userName ? `${userName} (${userEmail})` : userEmail;
+        if (!window.confirm(`ATENÇÃO: Deseja realmente excluir permanentemente o usuário "${nameLabel}" da empresa e de todo o banco de dados? Esta ação não pode ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            console.log(`[SaaS] Excluindo usuário permanentemente: ${userId}`);
+            const { error } = await supabase.rpc('delete_user_admin', { target_user_id: userId });
+
+            if (error) throw error;
+
+            showToast('Usuário excluído permanentemente!', 'success');
+            if (selectedCompany?.id) {
+                fetchCompanyUsers(selectedCompany.id);
+            }
+        } catch (err: any) {
+            console.error("Erro ao excluir usuário:", err);
+            showToast('Erro ao excluir: ' + (err.message || 'Falha na exclusão'), 'error');
+        }
+    };
+
     // --- Validação de Usuários ---
     const handleApproveUser = async (user: Employee) => {
         setIsValidating(user.id);
@@ -2222,11 +2249,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         <th className="px-4 py-3">Email</th>
                                         <th className="px-4 py-3">Papel</th>
                                         <th className="px-4 py-3 text-center">Admin da Empresa</th>
+                                        {(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') && (
+                                            <th className="px-4 py-3 text-center">Ações</th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                     {companyUsers.length === 0 ? (
-                                        <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">Nenhum usuário encontrado nesta empresa.</td></tr>
+                                        <tr><td colSpan={(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') ? 5 : 4} className="px-4 py-8 text-center text-gray-400">Nenhum usuário encontrado nesta empresa.</td></tr>
                                     ) : (
                                         companyUsers.map(user => (
                                             <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -2244,6 +2274,17 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user.isCompanyAdmin ? 'translate-x-6' : 'translate-x-1'}`} />
                                                     </button>
                                                 </td>
+                                                {(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') && (
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user.id, user.email, user.name || '')}
+                                                            className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
+                                                            title="Excluir Usuário do Banco de Dados"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))
                                     )}
