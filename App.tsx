@@ -118,19 +118,22 @@ const AppContent: React.FC = () => {
 
         const handleNudge = (senderId: string, conversationId: string) => {
             const isSender = senderId === currentUser.id;
+            const testMode = localStorage.getItem('nudge_test_mode') === 'true';
+
             console.log(`[PandaNet] ========== NUDGE HANDLER START ==========`);
             console.log(`[PandaNet] Sender ID: ${senderId}`);
             console.log(`[PandaNet] Current User ID: ${currentUser.id}`);
             console.log(`[PandaNet] Is Sender? ${isSender}`);
+            console.log(`[PandaNet] Test Mode? ${testMode}`);
             console.log(`[PandaNet] Conversation ID: ${conversationId}`);
 
             // Play sound
             console.log(`[PandaNet] Playing nudge sound...`);
             playNotificationSound('nudge');
 
-            // Force navigation only for receiver
-            if (!isSender) {
-                console.log(`[PandaNet] RECEIVER MODE: Navigating to messages page...`);
+            // Force navigation only for receiver (or in test mode, treat as receiver)
+            if (!isSender || testMode) {
+                console.log(`[PandaNet] ${testMode ? 'TEST MODE' : 'RECEIVER MODE'}: Navigating to messages page...`);
                 setCurrentPage('messages');
                 setPageContext({ conversationId: conversationId });
             } else {
