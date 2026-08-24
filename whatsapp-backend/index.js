@@ -181,6 +181,14 @@ async function runAutoMigration() {
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar novas colunas de chatbot:', e));
 
+        console.log('[MIGRATION] Verificando e criando coluna created_at nas tabelas de campanhas e alvos...');
+        await supabase.rpc('exec_sql', {
+            sql: `
+                ALTER TABLE public.whatsapp_scheduled_targets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+                ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+            `
+        }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna created_at:', e));
+
         // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar todas as atualizações
         await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
         console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');

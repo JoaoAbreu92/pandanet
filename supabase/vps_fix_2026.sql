@@ -1025,6 +1025,8 @@ CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_quick_messages
 ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_max_retries INTEGER DEFAULT 2;
 ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retries INTEGER DEFAULT 0;
 ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.whatsapp_scheduled_targets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 -- 21. WHATSAPP CAMPAIGNS RLS POLICIES FOR FRONTEND ACCESS
 ALTER TABLE public.whatsapp_scheduled_campaigns ENABLE ROW LEVEL SECURITY;
