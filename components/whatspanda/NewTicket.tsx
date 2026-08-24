@@ -196,7 +196,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                 .select(`
                     *,
                     assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-                    department:departments(id, name),
+                    queue:departments(id, name),
                     channel:whatsapp_settings!connection_id(channel_type, connection_name)
                 `)
                 .eq('id', conversationId)

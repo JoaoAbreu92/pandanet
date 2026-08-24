@@ -226,7 +226,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .select(`
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-        department:departments(id, name),
+        queue:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
       `)
@@ -237,7 +237,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setSelectedConversation(data as WhatsAppConversationWithDetails);
       if (data.status) setActiveTab(data.status as any);
       // If it's a group, ensure the filter allows it
-      if (data.is_group || data.contact_phone?.includes('@g.us')) {
+      if (data.contact_phone?.includes('@g.us')) {
         setChatTypeFilter('group');
       } else {
         setChatTypeFilter('private');
@@ -259,7 +259,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .select(`
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-        department:departments(id, name),
+        queue:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
       `)
@@ -277,11 +277,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (filterAssignee.length > 0) query = query.in('assigned_to', filterAssignee);
 
     // Filtro de Tipo (Privado / Grupo)
-    // Se o filtro for 'group', pega onde is_group é true OU o telefone termina em @g.us
-    if (chatTypeFilter === 'private') {
-      query = query.or('is_group.eq.false,is_group.is.null').not('contact_phone', 'ilike', '%@g.us%');
-    } else if (chatTypeFilter === 'group') {
-      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
+    if (chatTypeFilter === 'group') {
+      query = query.ilike('contact_phone', '%@g.us%');
+    } else if (chatTypeFilter === 'private') {
+      query = query.not('contact_phone', 'ilike', '%@g.us%');
     }
 
     // Logica de visibilidade:
