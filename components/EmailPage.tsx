@@ -77,6 +77,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [emails, setEmails] = useState<EmailMessage[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    // Tracks the saved imap_user (from DB), NOT the form input — prevents fetchEmails from firing on every keystroke
+    const [savedImapUser, setSavedImapUser] = useState('');
     
     // --- State: Search & Filters ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -118,18 +120,21 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     }, [currentUser]);
 
     // Auto-load emails when settings are ready (fixes "Refresh Required" bug)
+    // Uses savedImapUser (set only by loadSettings) to avoid triggering on every keystroke in the settings form
     useEffect(() => {
-        if (settings.imap_user) {
+        if (savedImapUser) {
             fetchEmails(false); // Initial load
             // Poll every 2 minutes
+            if (pollingRef.current) clearInterval(pollingRef.current);
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
         }
-    }, [settings.imap_user]); // Dependency on imap_user ensures it runs after settings load
+    }, [savedImapUser]); // Only fires when settings are loaded from DB, not when user types
 
     // --- Actions ---
 
     const loadSettings = async () => {
-        const { data } = await supabase.from('email_settings').select('*').eq('user_id', currentUser.id).single();
+        // maybeSingle() returns null (not 406 error) when no row exists
+        const { data } = await supabase.from('email_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
         if (data) {
             setSettings({
                 imap_host: data.imap_host,
@@ -144,6 +149,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 smtp_ssl: data.smtp_ssl ?? true,
                 signature: data.signature || ''
             });
+            // Only update savedImapUser if there's a valid saved configuration
+            setSavedImapUser(data.imap_user || '');
         }
     };
 
@@ -154,6 +161,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         else {
             alert('Configurações salvas!');
             setView('inbox');
+            setSavedImapUser(settings.imap_user); // Update savedImapUser so polling uses new config
             fetchEmails(true); // Force refresh with new settings
         }
     };
