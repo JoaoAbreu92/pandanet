@@ -18,6 +18,8 @@ dotenv.config({ path: path.join(__dirname, '../.env.local'), override: true });
 dotenv.config({ path: '/root/pandanet/.env', override: true });
 if (!process.env.JWT_SECRET) {
   dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: true });
+}
+
 // Ignorar erros de certificado SSL expirado/inválido em conexões internas/HTTPs
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -939,6 +941,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             return 'document';
         };
 
+        let savedMediaUrl = mediaUrl || null;
+
         if (mediaUrl) {
             // Suporte a base64 direto (data: URI) ou URL pública do Supabase
             let base64Data;
@@ -973,7 +977,6 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             const fileName = cleanUrl.split('/').pop() || 'file';
 
             // Fazer upload de mídias base64 para o Supabase Storage para obter URL pública HTTPS limpa
-            let savedMediaUrl = mediaUrl;
             const audioDataUri = mediaUrl.startsWith('data:')
                 ? mediaUrl
                 : `data:${mediaType || 'audio/webm'};base64,${base64Data}`;
