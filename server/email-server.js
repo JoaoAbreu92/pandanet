@@ -3,7 +3,11 @@ const cors = require('cors');
 const { ImapFlow } = require('imapflow');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
-require('dotenv').config({ path: '/root/supabase/supabase/docker/.env' });
+require('dotenv').config({ path: '/root/pandanet/.env', override: true });
+// Fallback: load Supabase env if JWT_SECRET not found yet
+if (!process.env.JWT_SECRET) {
+    require('dotenv').config({ path: '/root/supabase/supabase/docker/.env', override: true });
+}
 
 const app = express();
 const PORT = 3001;
@@ -39,8 +43,7 @@ const ensureNumber = (val) => {
 };
 
 // --- FETCH EMAILS (IMAP) ---
-// Nginx remove o prefixo /api/email, então a rota deve ser apenas /fetch
-app.post('/fetch', authMiddleware, async (req, res) => {
+app.post('/api/email/fetch', authMiddleware, async (req, res) => {
     const { config, path } = req.body;
     const mailboxPath = path || 'INBOX';
     if (!config || !config.imap_host) {
@@ -192,7 +195,7 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
 });
 
 // --- MOVE EMAIL ---
-app.post('/move', authMiddleware, async (req, res) => {
+app.post('/api/email/move', authMiddleware, async (req, res) => {
     const { config, uids, fromPath, toPath } = req.body;
     const fromMailboxPath = fromPath || 'INBOX';
     if (!config || !uids || !toPath) return res.status(400).json({ error: 'Missing parameters' });
@@ -225,7 +228,7 @@ app.post('/move', authMiddleware, async (req, res) => {
 });
 
 // --- MANAGE FOLDERS ---
-app.post('/folders', authMiddleware, async (req, res) => {
+app.post('/api/email/folders', authMiddleware, async (req, res) => {
     const { config, action, path, newPath } = req.body; // action: 'list', 'create', 'rename', 'delete'
     if (!config) return res.status(400).json({ error: 'Missing config' });
 
@@ -278,7 +281,7 @@ const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey, {
 }) : null;
 
 // --- SEND EMAIL (SMTP) ---
-app.post('/send', authMiddleware, async (req, res) => {
+app.post('/api/email/send', authMiddleware, async (req, res) => {
     const { config, payload, user_id } = req.body; // user_id passed from frontend or decoded from token
     if (!config || !payload) {
         return res.status(400).json({ error: 'Missing config or payload' });
@@ -389,7 +392,7 @@ app.post('/send', authMiddleware, async (req, res) => {
 });
 
 // --- TEST CONNECTION ---
-app.post('/test', authMiddleware, async (req, res) => {
+app.post('/api/email/test', authMiddleware, async (req, res) => {
     const { config } = req.body;
     const results = { imap: false, smtp: false };
 
@@ -433,6 +436,8 @@ app.post('/test', authMiddleware, async (req, res) => {
 });
 
 // --- HEALTH CHECK ---
+app.get('/api/email/health', (req, res) => res.json({ status: 'ok' }));
+// Also support root /health for direct testing
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
