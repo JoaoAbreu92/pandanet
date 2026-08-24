@@ -353,7 +353,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (activeAccountId) {
             const activeAccount = accounts.find(a => a.id === activeAccountId);
             if (activeAccount) {
-                setSettings({
+                const config: EmailSettings = {
                     imap_host: activeAccount.imap_host,
                     imap_port: activeAccount.imap_port,
                     imap_user: activeAccount.imap_user,
@@ -365,7 +365,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     smtp_pass: activeAccount.smtp_pass,
                     smtp_ssl: activeAccount.smtp_ssl ?? true,
                     signature: activeAccount.signature || ''
-                });
+                };
+                setSettings(config);
                 setSavedImapUser(activeAccount.imap_user || '');
                 // Clear state for new account
                 setEmails([]);
@@ -373,6 +374,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 setUnseenCount(0);
                 setFolders([]);
                 setPage(1);
+
+                // Fetch folders and emails directly using this active config to avoid race conditions or stale state
+                fetchFolders(config);
+                fetchEmails(false, false, config, activeAccountId);
             }
         }
     }, [activeAccountId, accounts]);
@@ -381,13 +386,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // Uses savedImapUser (set only by loadSettings) to avoid triggering on every keystroke in the settings form
     useEffect(() => {
         if (savedImapUser) {
-            fetchEmails(false); // Initial load
             // Poll every 2 minutes
             // @ts-ignore
             if (pollingRef.current) clearInterval(pollingRef.current);
             // @ts-ignore - Bypass Deno vs Browser typing on setInterval
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
-            fetchFolders(); // Load folders once
             fetchTags();    // Load tags once
             fetchContacts(); // Load contacts once
             fetchContactGroups(); // Load contact groups
@@ -800,9 +803,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         }
     };
 
-    const fetchFolders = async () => {
-        if (!settings.imap_host) return;
-        const { data, error } = await callEmailServer('folders', { config: settings, action: 'list' });
+    const fetchFolders = async (configOverride?: EmailSettings) => {
+        const activeConfig = configOverride || settings;
+        if (!activeConfig.imap_host) return;
+        const { data, error } = await callEmailServer('folders', { config: activeConfig, action: 'list' });
         if (data && !error) {
             setFolders(data);
         } else {
@@ -964,8 +968,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         fetchEmails(false, true);
     };
 
-    const fetchEmails = async (isBackground = false, forceRefresh = false) => {
-        if (!settings.imap_user || fetchInProgress.current) return;
+    const fetchEmails = async (isBackground = false, forceRefresh = false, configOverride?: EmailSettings, accountIdOverride?: string) => {
+        const activeConfig = configOverride || settings;
+        if (!activeConfig.imap_user || fetchInProgress.current) return;
         fetchInProgress.current = true;
 
         try {
@@ -979,6 +984,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 setEmails(cached.emails);
                 setTotalEmails(cached.total);
                 if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(cached.unseen);
+                fetchInProgress.current = false; // RELEASE LOCK!
                 return;
             }
 
@@ -996,10 +1002,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 if (taggedIds.length === 0) {
                     setEmails([]);
                     setTotalEmails(0);
+                    fetchInProgress.current = false; // RELEASE LOCK!
                     return;
                 }
 
-                const { data, error } = await callEmailServer('fetch-by-ids', { config: settings, messageIds: taggedIds });
+                const { data, error } = await callEmailServer('fetch-by-ids', { config: activeConfig, messageIds: taggedIds });
                 
                 if (error) {
                     if (error.message?.includes('429')) console.warn("[EmailPage] Rate limit hit (429).");
@@ -1025,13 +1032,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 
                 setEmails(mergedEmails);
                 setTotalEmails(mergedEmails.length);
+                fetchInProgress.current = false; // RELEASE LOCK!
                 return;
             }
 
             const action = isSearchingGlobal ? 'search' : 'fetch';
             const payload = isSearchingGlobal 
-                ? { config: settings, query: searchQuery.trim() }
-                : { config: settings, path: currentFolder, page, pageSize };
+                ? { config: activeConfig, query: searchQuery.trim() }
+                : { config: activeConfig, path: currentFolder, page, pageSize };
 
             const { data, error } = await callEmailServer(action, payload);
             
@@ -1054,11 +1062,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             // Fetch local metadata (tags, notes) from Supabase
             let metadataList: any[] = [];
-            if (activeAccountId && activeAccountId !== 'undefined' && activeAccountId !== 'null') {
+            const targetAccountId = accountIdOverride || activeAccountId;
+            if (targetAccountId && targetAccountId !== 'undefined' && targetAccountId !== 'null') {
                 const { data } = await supabase
                     .from('email_metadata')
                     .select('*')
-                    .eq('account_id', activeAccountId)
+                    .eq('account_id', targetAccountId)
                     .in('message_id', emailList.map((e: any) => e.messageId || e.uid));
                 if (data) metadataList = data;
             }
