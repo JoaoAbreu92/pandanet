@@ -2698,15 +2698,19 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
             return null;
         }
 
-        let { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-        
-        // CORREÇÃO: Forçar URL Pública com HTTPS oficial
-        const storageIdx = publicUrl.indexOf('/storage/v1/object/public/');
-        if (storageIdx !== -1) {
-            publicUrl = `https://pandanet.grupopixel.com.br${publicUrl.substring(storageIdx)}`;
-        }
-        console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
-        return publicUrl;
+        const { data: signedData, error: signedError } = await supabase.storage
+        .from('chat-media')
+        .createSignedUrl(filePath, 3600);
+
+    if (signedError || !signedData?.signedUrl) {
+        console.error(`[STORAGE] Erro ao gerar URL assinada:`, signedError?.message);
+        return null;
+    }
+
+    const publicUrl = signedData.signedUrl;
+
+    console.log(`[STORAGE] Upload concluído! URL assinada gerada`);
+    return publicUrl;
     } catch (e) {
         console.error(`[STORAGE] Erro fatal no upload:`, e.message);
         return null;
