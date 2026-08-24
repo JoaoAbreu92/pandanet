@@ -92,7 +92,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const range = `${startIndex}:${endIndex}`;
             console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
-            for await (const message of client.fetch(range, { envelope: true }, { uid: true })) {
+            for await (const message of client.fetch(range, { envelope: true, uid: true })) {
                 emails.push({
                     uid: message.uid,
                     messageId: message.envelope.messageId,
