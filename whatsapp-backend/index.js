@@ -561,7 +561,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 addDebugLog('SYNC_CONTACTS_RAW', `Encontrados ${list.length} contatos pessoais.`);
                 for (const c of list) {
                     const jid = c.remoteJid || c.jid || c.id || '';
-                    if (!jid || jid.includes('@g.us')) continue;
+                    if (!jid || jid.includes('@g.us') || jid.includes('@newsletter') || jid.includes('@broadcast')) continue;
                     const phone = jid.split('@')[0];
                     
                     // Ignorar se for o próprio telefone da conexão
@@ -606,7 +606,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 // Extrair contatos também dos chats ativos para garantir que apareçam
                 for (const chat of activeChats) {
                     const jid = chat.remoteJid || chat.jid || chat.id || '';
-                    if (!jid || jid.includes('@g.us') || jid.includes('@broadcast')) continue;
+                    if (!jid || jid.includes('@g.us') || jid.includes('@broadcast') || jid.includes('@newsletter')) continue;
                     const phone = jid.split('@')[0];
                     
                     // Ignorar se for o próprio telefone da conexão
@@ -645,48 +645,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
         }
 
-        console.log(`[SYNC] Histórico para ${activeChats.length} chats...`);
-        const batchSize = 5; 
-        for (let i = 0; i < activeChats.length; i += batchSize) {
-            const batch = activeChats.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (chat) => {
-                const jid = chat.remoteJid || chat.jid || chat.id;
-                if (!jid || jid.includes('@broadcast')) return; // Ignorar status/broadcast no histórico
-                
-                try {
-                    addDebugLog('SYNC_MSG_START', `Buscando mensagens do chat ${jid}`);
-                    // Aumentar o limite para buscar mais histórico (ex: 50 mensagens)
-                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, { 
-                        method: 'POST', 
-                        headers, 
-                        body: JSON.stringify({ 
-                            where: { remoteJid: jid }, 
-                            limit: 50 
-                        }) 
-                    });
-
-                    if (msgResp.ok) {
-                        const messages = await msgResp.json();
-                        const msgs = Array.isArray(messages) ? messages : (messages.messages || messages.data || []);
-                        addDebugLog('SYNC_MSG_RAW', `Obtidas ${msgs.length} mensagens para ${jid}`);
-                        if (msgs.length > 0) {
-                            console.log(`[SYNC-MSG] Processando ${msgs.length} mensagens para ${jid}...`);
-                            for (const m of msgs) {
-                                // Usar a função centralizada de processamento para garantir mídias, etc.
-                                await processInboundMessage(m, companyId, connectionId, true);
-                            }
-                        }
-                    } else {
-                        const errText = await msgResp.text();
-                        addDebugLog('SYNC_MSG_ERR', `Erro findMessages para ${jid}: ${msgResp.status} - ${errText}`);
-                    }
-                } catch(e) { 
-                    console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); 
-                    addDebugLog('SYNC_MSG_EXCEPTION', `Exceção em findMessages para ${jid}: ${e.message}`);
-                }
-            }));
-            await new Promise(r => setTimeout(r, 800)); // Delay um pouco maior entre batches para evitar rate limit
-        }
+        console.log(`[SYNC] Histórico para ${activeChats.length} chats ignorado por configuração (apenas novas mensagens geram atendimentos).`);
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
         console.error(`[SYNC] Erro fatal:`, err.message);
@@ -1120,12 +1079,18 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             conv = existingConv;
         } else {
             const creationPromise = (async () => {
-                let { data: existing } = await supabase
+                let { data: existingList, error: findErr } = await supabase
                     .from('whatsapp_conversations')
                     .select('*')
                     .eq('company_id', companyId)
                     .eq('contact_phone', fromPhone)
-                    .maybeSingle();
+                    .order('created_at', { ascending: true });
+
+                if (findErr) {
+                    console.error('[MSG] Erro ao buscar conversas existentes:', findErr.message);
+                }
+
+                const existing = (existingList && existingList.length > 0) ? existingList[0] : null;
 
                 if (existing) {
                     return existing.id;
@@ -1133,13 +1098,34 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
                 isNewConversation = true;
                 const initialStatus = 'aberto';
-                const resolvedGroupName = message?.subject || 'Grupo (Sem Nome)';
+                
+                // Resolver nome amigável do contato/grupo
+                let resolvedName = null;
+                if (isGroup) {
+                    resolvedName = message?.subject || 'Grupo (Sem Nome)';
+                } else {
+                    const { data: dbContact } = await supabase
+                        .from('whatsapp_contacts')
+                        .select('name')
+                        .eq('company_id', companyId)
+                        .eq('phone', fromPhone)
+                        .maybeSingle();
+                    
+                    if (dbContact && dbContact.name && !/^\d+$/.test(dbContact.name)) {
+                        resolvedName = dbContact.name;
+                    } else if (pushName && !/^\d+$/.test(pushName)) {
+                        resolvedName = pushName;
+                    } else {
+                        resolvedName = formatPhoneDisplay(fromPhone);
+                    }
+                }
+
                 const { data: newConv, error: createErr } = await supabase
                     .from('whatsapp_conversations')
                     .insert({
                         company_id: companyId,
                         contact_phone: fromPhone,
-                        contact_name: isGroup ? resolvedGroupName : (pushName || formatPhoneDisplay(fromPhone)),
+                        contact_name: resolvedName,
                         status: initialStatus,
                         unread_count: isHistorical ? 0 : 1,
                         connection_id: connectionId,
@@ -1174,13 +1160,34 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     nextStatus = 'aberto';
                 }
                 
+                // Tentar obter um nome melhor se o atual for apenas o número bruto
+                let resolvedName = conv.contact_name;
+                if (!isGroup) {
+                    if (!resolvedName || /^\d+$/.test(resolvedName) || resolvedName.startsWith('+55')) {
+                        const { data: dbContact } = await supabase
+                            .from('whatsapp_contacts')
+                            .select('name')
+                            .eq('company_id', companyId)
+                            .eq('phone', fromPhone)
+                            .maybeSingle();
+                        
+                        if (dbContact && dbContact.name && !/^\d+$/.test(dbContact.name)) {
+                            resolvedName = dbContact.name;
+                        } else if (pushName && !/^\d+$/.test(pushName)) {
+                            resolvedName = pushName;
+                        } else if (!resolvedName) {
+                            resolvedName = formatPhoneDisplay(fromPhone);
+                        }
+                    }
+                }
+                
                 await supabase
                     .from('whatsapp_conversations')
                     .update({
                         unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), 
                         last_message_at: new Date().toISOString(),
                         status: nextStatus,
-                        contact_name: isGroup ? conv.contact_name : (pushName || conv.contact_name || formatPhoneDisplay(fromPhone))
+                        contact_name: resolvedName
                     }).eq('id', conversationId);
             }
         }
