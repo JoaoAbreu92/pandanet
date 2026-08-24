@@ -113,6 +113,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             <PlayCircleIcon className="w-4 h-4" />
                             <span className="hidden sm:inline">Ativar Toques</span>
                         </button>
+
                         <div
                             className="relative"
                             onMouseEnter={handleSoundMenuEnter}
@@ -123,20 +124,22 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             </button>
                             {/* Dropdown de Sons */}
                             {isSoundMenuOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in-down">
-                                    <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
-                                        Escolher Toque
+                                <div className="absolute right-0 top-full pt-4 w-48 z-50 animate-fade-in-down">
+                                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                                        <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
+                                            Escolher Toque
+                                        </div>
+                                        {availableSounds?.map((sound) => (
+                                            <button
+                                                key={sound.id}
+                                                onClick={() => changeSound(sound.id)}
+                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-bold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
+                                            >
+                                                <span>{sound.name}</span>
+                                                {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
+                                            </button>
+                                        ))}
                                     </div>
-                                    {availableSounds?.map((sound) => (
-                                        <button
-                                            key={sound.id}
-                                            onClick={() => changeSound(sound.id)}
-                                            className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-bold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
-                                        >
-                                            <span>{sound.name}</span>
-                                            {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
-                                        </button>
-                                    ))}
                                 </div>
                             )}
                         </div>

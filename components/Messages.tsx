@@ -145,6 +145,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             const compId = currentUser?.company_id;
             if (!compId) return;
 
+            // OPTIMISTIC UI: Shake immediately!
+            if ((window as any).triggerDetectionShake) {
+                console.log("Triggering local shake immediately");
+                (window as any).triggerDetectionShake();
+            }
+
             const { error } = await supabase.from('messages').insert({
                 conversation_id: selectedConversationId,
                 sender_id: currentUser?.id,

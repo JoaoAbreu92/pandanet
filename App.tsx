@@ -76,63 +76,42 @@ const AppContent: React.FC = () => {
                 if (newMsg.file_type === 'nudge') {
                     console.log('[PandaNet] Nudge detectado:', newMsg);
 
-                    // Check participation robustly
-                    const { data: participation, error: partError } = await supabase
-                        .from('conversation_participants')
-                        .select('user_id')
-                        .eq('conversation_id', newMsg.conversation_id)
-                        .eq('user_id', currentUser.id);
+                    // RLS Check: If we received this from Supabase Realtime, we ARE a participant.
+                    // The 'messages' table policy strictly enforces 'conversation_id IN get_safe_conversation_ids()'.
+                    // Therefore, we can skip the manual DB check which was causing 403 errors.
 
-                    if (partError) {
-                        console.error('[PandaNet] Erro ao verificar participação:', partError);
-                        return;
+                    const isSender = newMsg.sender_id === currentUser.id;
+                    console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
+
+                    // Play sound for everyone for immediate feedback
+                    playNotificationSound('nudge');
+
+                    // Always shake! (MSN Style)
+                    console.log('[PandaNet] Executing Nudge Shake!');
+
+                    // Force navigation only for receiver
+                    if (!isSender) {
+                        setCurrentPage('messages');
+                        setPageContext({ conversationId: newMsg.conversation_id });
                     }
 
-                    // Ensure participation is not empty
-                    const isParticipant = participation && participation.length > 0;
-
-                    if (isParticipant) {
-                        const isSender = newMsg.sender_id === currentUser.id;
-                        console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
-
-                        // Play sound only for receiver (or both if desired, user requested sender feedback too)
-                        // User specifically asked for shake for sender, didn't specify sound for sender but implied feedback.
-                        // Standard MSN behavior: Sender hears it too.
-                        // Logic below plays for everyone (since override logic was removed in snippet I'm replacing, let's keep it safe)
-                        // Actually, previous code said "Play sound only for receiver".
-                        // I will play for BOTH to ensure feedback, unless it's annoying. Let's stick to receiver for sound to avoid echo if local optimistic UI plays it.
-                        // Wait, check NotificationContext. If I call playNotificationSound, it plays.
-
-                        if (!isSender) {
-                            playNotificationSound('nudge');
-                        } else {
-                            // Optional: play a quieter sound for sender? 
-                            // For now, let's play it for everyone so they know it worked.
-                            playNotificationSound('nudge'); 
-                        }
-
-                        // Always shake! (MSN Style)
-                        console.log('[PandaNet] Executing Nudge Shake!');
-
-                        // Force navigation only for receiver
-                        if (!isSender) {
-                            setCurrentPage('messages');
-                            setPageContext({ conversationId: newMsg.conversation_id });
-                        }
-
-                        // Tremer a tela
-                        setIsShaking(true);
-                        setTimeout(() => {
-                            console.log('[PandaNet] Parando tremor.');
-                            setIsShaking(false);
-                        }, 5000); // 5 seconds shake? That's long. MSN was like 1-2s. CSS animation is 0.3s infinite.
-                        // I will reduce timeout to 1s? No, user might want dramatic effect. Left at 5000 as per previous code.
-                    } else {
-                        console.log('[PandaNet] Nudge ignorado (não participo desta conversa).');
-                    }
+                    // Tremer a tela
+                    setIsShaking(true);
+                    setTimeout(() => {
+                        console.log('[PandaNet] Parando tremor.');
+                        setIsShaking(false);
+                    }, 5000);
                 }
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log('[PandaNet] Realtime Connection Status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('[PandaNet] Listening for nudges...');
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('[PandaNet] Realtime Error. Check API Key or Network.');
+                }
+            });
 
         // DEV: Allow manual triggering via console
         (window as any).triggerDetectionShake = () => {
