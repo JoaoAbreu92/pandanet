@@ -6,7 +6,7 @@ import RecognitionModal from './RecognitionModal';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
-import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon } from './icons';
+import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon } from './icons';
 import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page } from '../types';
 
 export const PostCard: React.FC<{
@@ -15,7 +15,8 @@ export const PostCard: React.FC<{
     onToggleReaction: (postId: string, emoji: string) => void;
     onSubmitComment: (postId: string, text: string) => void;
     onShare: (post: Post) => void;
-}> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare }) => {
+    onDelete: (postId: string) => void;
+}> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare, onDelete }) => {
     const [commentText, setCommentText] = useState('');
     const [showReactionMenu, setShowReactionMenu] = useState(false);
     const timeoutRef = useRef<any>(null);
@@ -54,14 +55,23 @@ export const PostCard: React.FC<{
         });
     };
 
+    const isAuthor = currentUser.id === post.authorId;
+
     return (
         <Card title="" className="pb-2 overflow-visible">
-            <div className="flex items-center mb-4">
-                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
-                <div>
-                    <h4 className="font-bold text-brand-text">{post.authorName}</h4>
-                    <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                    <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                    <div>
+                        <h4 className="font-bold text-brand-text">{post.authorName}</h4>
+                        <p className="text-xs text-gray-500">{new Date(post.timestamp).toLocaleString()}</p>
+                    </div>
                 </div>
+                {isAuthor && (
+                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Excluir postagem">
+                        <TrashIcon className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
             <div className="text-brand-text whitespace-pre-wrap mb-4">
@@ -430,6 +440,26 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         }
     };
 
+    const handleDeletePost = async (postId: string) => {
+        if (!window.confirm("Tem certeza que deseja excluir esta postagem?")) return;
+
+        // Optimistic update
+        setPosts(prev => prev.filter(p => p.id !== postId));
+
+        try {
+            const { error } = await supabase.from('posts').delete().eq('id', postId);
+            if (error) {
+                console.error("Error deleting post:", error);
+                alert("Erro ao excluir postagem.");
+                fetchPosts(); // Revert
+            }
+        } catch (err) {
+            console.error("Error deleting post:", err);
+            fetchPosts(); // Revert
+        }
+    };
+
+
     const handleSubmitComment = async (postId: string, text: string) => {
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
@@ -531,9 +561,19 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            {posts.map(post => (
-                                <PostCard key={post.id} post={post} currentUser={currentUser} onToggleReaction={handleToggleReaction} onSubmitComment={handleSubmitComment} onShare={() => { }} />
-                            ))}
+                            <div className="space-y-6">
+                                {posts.map(post => (
+                                    <PostCard
+                                        key={post.id}
+                                        post={post}
+                                        currentUser={currentUser}
+                                        onToggleReaction={handleToggleReaction}
+                                        onSubmitComment={handleSubmitComment}
+                                        onShare={() => { }}
+                                        onDelete={handleDeletePost}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

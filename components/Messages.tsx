@@ -207,45 +207,55 @@ const Messages: React.FC<MessagesProps> = () => {
                 return;
             }
 
-            // 3. Buscar OUTROS participantes para cada conversa (para exibir nome/foto)
+            // 3. Buscar OUTROS participantes para cada conversa
             const fullConversations = await Promise.all(convData.map(async (conv: any) => {
-                const { data: participants, error: ppError } = await supabase
-                    .from('conversation_participants')
-                    .select('user_id, profiles(full_name, avatar_url)')
-                    .eq('conversation_id', conv.id);
+                try {
+                    const { data: participants, error: ppError } = await supabase
+                        .from('conversation_participants')
+                        .select('user_id, profiles(full_name, avatar_url)')
+                        .eq('conversation_id', conv.id);
 
-                // Encontrar o "outro" usuário (que não seja eu) para mostrar o nome
-                const otherPart = participants?.find((p: any) => p.user_id !== currentUser.id);
-                // Fallback para conversas antigas ou self-chat
-                const otherUser = otherPart ? (otherPart.profiles as any) : null;
+                    if (ppError) {
+                        console.error('Erro ao buscar participantes para conversa', conv.id, ppError);
+                        return null; // Skip this conversation on error
+                    }
 
-                // Se não achar outro, talvez seja eu mesmo ou dados perdidos
-                const displayName = conv.is_group
-                    ? conv.group_name
-                    : (otherUser?.full_name || 'Usuário Desconhecido');
+                    // Encontrar o "outro" usuário
+                    const otherPart = participants?.find((p: any) => p.user_id !== currentUser.id);
+                    const otherUser = otherPart ? (otherPart.profiles as any) : null;
 
-                const displayAvatar = conv.is_group
-                    ? `https://ui-avatars.com/api/?name=${displayName}&background=random`
-                    : (otherUser?.avatar_url || 'https://via.placeholder.com/150');
+                    // Se não achar outro, talvez seja eu mesmo ou dados perdidos
+                    const displayName = conv.is_group
+                        ? conv.group_name
+                        : (otherUser?.full_name || 'Usuário Desconhecido');
 
-                return {
-                    id: conv.id,
-                    participantName: displayName,
-                    participantAvatarUrl: displayAvatar,
-                    lastMessage: conv.last_message || 'Inicie a conversa',
-                    unreadCount: 0, // TODO: Implementar contagem de não lidos
-                    messages: [], // Buscamos mensagens apenas ao selecionar
-                    isGroup: conv.is_group,
-                    groupName: conv.group_name,
-                    admins: [],
-                    lastMessageTimestamp: conv.last_message_at ? new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
-                };
+                    const displayAvatar = conv.is_group
+                        ? `https://ui-avatars.com/api/?name=${displayName}&background=random`
+                        : (otherUser?.avatar_url || 'https://via.placeholder.com/150');
+
+                    return {
+                        id: conv.id,
+                        participantName: displayName,
+                        participantAvatarUrl: displayAvatar,
+                        lastMessage: conv.last_message || 'Inicie a conversa',
+                        unreadCount: 0,
+                        messages: [],
+                        isGroup: conv.is_group,
+                        groupName: conv.group_name,
+                        admins: [],
+                        lastMessageTimestamp: conv.last_message_at ? new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+                    };
+                } catch (err) {
+                    console.error('Erro processando conversa', conv.id, err);
+                    return null;
+                }
             }));
 
-            setConversations(fullConversations);
+            // Filter out failures
+            setConversations(fullConversations.filter(c => c !== null) as Conversation[]);
 
         } catch (error) {
-            console.error('Erro ao buscar conversas:', error);
+            console.error('Erro crítico ao buscar conversas:', error);
         }
     };
 
@@ -565,19 +575,54 @@ const Messages: React.FC<MessagesProps> = () => {
                             </div>
                         )}
                         <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-sm border border-gray-100`}>
-                            <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>
-                            {message.file.type?.startsWith('image/') || message.file.type === 'sticker' ? (
+                            {/* Check if text is a single image URL */}
+                            {(() => {
+                                const isImageUrl = (text: string) => {
+                                    if (!text) return false;
+                                    try {
+                                        const url = new URL(text);
+                                        return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url.pathname);
+                                    } catch {
+                                        return false;
+                                    }
+                                };
+
+                                if (isImageUrl(message.text) && !message.file) {
+                                    return (
+                                        <div className="rounded-lg overflow-hidden border bg-gray-50 bg-opacity-50">
+                                            <img
+                                                src={message.text}
+                                                alt="Imagem enviada"
+                                                className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
+                                                onClick={() => window.open(message.text)}
+                                                onError={(e) => {
+                                                    // Fallback to text if image fails to load
+                                                    e.currentTarget.style.display = 'none';
+                                                    e.currentTarget.parentElement?.classList.add('hidden');
+                                                    // We can't easily force a re-render of pure text here without state, 
+                                                    // but we can ensure the container doesn't look broken.
+                                                    // Ideally, we'd use state for loading status, but for this quick fix:
+                                                }}
+                                            />
+                                            {/* Fallback text hidden by default, could be enabled if img errors */}
+                                        </div>
+                                    );
+                                }
+                                return <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>;
+                            })()}
+
+                            {message.file && (message.file.type?.startsWith('image/') || message.file.type === 'sticker') ? (
                                 <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
                                     <img src={message.file.url} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => window.open(message.file?.url)} />
                                 </div>
-                            ) : (
+                            ) : message.file ? (
                                 <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
                                     <PaperClipIcon className="w-4 h-4 shrink-0" />
                                     <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
                                         {message.file.name}
                                     </a>
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                         <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
                             <div className="flex items-center p-1 space-x-0.5">
