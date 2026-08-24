@@ -35,7 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (error || !data) {
                 // FALLBACK FOR MASTER ADMIN
-                if ((email || '').toLowerCase() === 'ti@acrilight.com.br') {
+                const isMaster = (email || '').toLowerCase() === 'ti@acrilight.com.br' || (email || '').toLowerCase() === 'ti@grupopixel.com.br';
+                if (isMaster) {
                     console.log("Profile not found for Master Admin, using fallback.");
                     const masterAdmin: Employee = {
                         id: userId,
@@ -70,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             if (data) {
-                const isMasterAdmin = (email || '').toLowerCase() === 'ti@acrilight.com.br';
+                const isMasterAdmin = (email || '').toLowerCase() === 'ti@acrilight.com.br' || (email || '').toLowerCase() === 'ti@grupopixel.com.br';
 
                 const employee: Employee = {
                     id: data.id,

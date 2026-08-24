@@ -93,7 +93,8 @@ const AppContent: React.FC = () => {
                     let targetCompanyId = profile.company_id;
 
                     // Fallback para Master Admin sem ID de empresa
-                    if (!targetCompanyId && userEmail === 'ti@acrilight.com.br') {
+                    const isMaster = userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br';
+                    if (!targetCompanyId && isMaster) {
                         console.log("Master Admin sem company_id. Buscando domínio grupopixel.com.br...");
                         const { data: companyByDomain } = await supabase
                             .from('companies')
@@ -128,7 +129,7 @@ const AppContent: React.FC = () => {
                         } else {
                             throw new Error("Dados da empresa não encontrados.");
                         }
-                    } else if (userEmail === 'ti@acrilight.com.br') {
+                    } else if (userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br') {
                         throw new Error("Empresa Grupo Pixel (Master) não localizada no sistema.");
                     } else {
                         console.log("Usuário sem empresa vinculada. Aguardando RepairProfile.");
@@ -340,18 +341,19 @@ const AppContent: React.FC = () => {
         const handleRepairProfile = async () => {
             if (!session.user.email) return;
             const userEmail = session.user.email.toLowerCase();
-            const isMaster = userEmail === 'ti@acrilight.com.br';
-            const domain = isMaster ? 'grupopixel.com.br' : userEmail.split('@')[1];
+            const isMaster = userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br';
+            let domain = isMaster ? 'grupopixel.com.br' : userEmail.split('@')[1];
+            domain = domain.trim().toLowerCase();
 
             try {
-                const { data: cos } = await supabase.from('companies').select('id, responsible_email').eq('domain', domain);
+                const { data: cos } = await supabase.from('companies').select('id, responsible_email').ilike('domain', domain);
                 if (cos && cos.length > 0) {
                     const companyId = cos[0].id;
                     const isResp = (cos[0].responsible_email || '').toLowerCase() === userEmail;
 
                     await supabase.from('profiles').upsert({
                         id: session.user.id,
-                        full_name: session.user.user_metadata?.full_name || userEmail.split('@')[0],
+                        full_name: isMaster ? 'Master TI' : (session.user.user_metadata?.full_name || userEmail.split('@')[0]),
                         email: userEmail,
                         company_id: companyId,
                         role: isMaster ? 'Super Admin' : (isResp ? 'admin' : 'employee'),
