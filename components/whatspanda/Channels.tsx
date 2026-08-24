@@ -633,20 +633,18 @@ const Channels: React.FC = () => {
                             <span className="text-emerald-500 font-bold uppercase tracking-widest">Painel de Diagnóstico WhatsPanda</span>
                             <span className="text-[9px] opacity-50 uppercase">v1.2.0</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                                <p className="opacity-50 mb-1">Empresa ID:</p>
-                                <p className="text-white truncate">{profile?.company_id || user?.user_metadata?.company_id || 'N/A'}</p>
+                        
+                        {channels.filter(c => c.last_sync_error).map(c => (
+                            <div key={c.id} className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 mb-4 animate-in slide-in-from-top-2 duration-300">
+                                <p className="text-red-400 font-bold mb-1 uppercase tracking-widest text-[9px]">Erro em: {c.connection_name} ({c.phone_number})</p>
+                                <p className="text-red-300 break-words font-medium">{c.last_sync_error}</p>
                             </div>
-                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                                <p className="opacity-50 mb-1">Conexão Ativa:</p>
-                                <p className="text-white truncate">{currentId || 'NENHUMA'}</p>
-                            </div>
-                        </div>
-                        {currentId && channels.find(c => c.id === currentId)?.last_sync_error && (
-                            <div className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 mb-4 animate-in slide-in-from-top-2 duration-500">
-                                <p className="text-red-400 font-bold mb-1 uppercase tracking-widest text-[9px]">Erro Detalhado de Sincronização:</p>
-                                <p className="text-red-300 break-words font-medium">{channels.find(c => c.id === currentId)?.last_sync_error}</p>
+                        ))}
+                        
+                        {channels.filter(c => c.last_sync_error).length === 0 && (
+                            <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10 mb-4">
+                                <p className="text-emerald-500 font-bold uppercase tracking-widest text-[9px]">Sincronização:</p>
+                                <p className="text-emerald-400/60 break-words font-medium italic">Nenhum erro de sincronização registrado no banco até o momento.</p>
                             </div>
                         )}
                         <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">

@@ -531,12 +531,14 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 console.log(`[SYNC] ${groupList.length} grupos encontrados na Evolution API.`);
                 
                 if (groupList.length === 0) {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `Nenhum grupo retornado pela API (${instanceName})` }).eq('id', connectionId);
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A Evolution API não retornou nenhum grupo para a instância ${instanceName}.` }).eq('id', connectionId);
+                } else {
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados na API. Processando...` }).eq('id', connectionId);
                 }
 
                 for (const g of groupList) {
                     const jid = g.jid || g.id || g.remoteJid || '';
-                    if (!jid || !jid.includes('@g.us')) continue;
+                    if (!jid || (!jid.includes('@g.us') && !jid.includes('-'))) continue;
                     
                     const phone = jid.split('@')[0];
                     if (processedJids.has(phone)) continue;
@@ -567,17 +569,12 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             if (errC) console.error('[SYNC] Erro upsert contatos:', errC.message);
 
             // --- GARANTIA DE CONVERSA PARA GRUPOS ---
-            // Criar conversa apenas se for grupo e se a coluna is_group for suportada
-            const groupJids = Array.from(processedJids).filter(jid => jid.includes('@g.us') || (typeof jid === 'string' && jid.length > 15)); 
-            
-            // Aqui vamos usar a lista original de contatos buscados para pegar o nome
             const groupEntries = contactsToUpsert.filter(c => {
-                // Heurística básica se o nome/telefone indica grupo (geralmente JIDs de grupo são longos)
                 return c.phone && (c.phone.length > 15 || c.phone.includes('-'));
             });
 
             if (groupEntries.length > 0) {
-                console.log(`[SYNC] Garantindo ${groupEntries.length} conversas de grupo em whatsapp_conversations...`);
+                console.log(`[SYNC] Garantindo ${groupEntries.length} conversas de grupo...`);
                 for (const group of groupEntries) {
                     try {
                         const { data: existing } = await supabase
@@ -598,11 +595,22 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                                 unread_count: 0
                             });
                         }
-                    } catch (errConv) {
-                        console.error(`[SYNC-GROUP] Erro ao criar conversa para ${group.phone}:`, errConv.message);
+                    } catch (e) {
+                        console.error(`[SYNC] Erro garantia grupo ${group.phone}:`, e.message);
                     }
                 }
+                
+                await supabase.from('whatsapp_settings').update({ 
+                    last_sync_error: `✅ Sincronização concluída com sucesso às ${new Date().toLocaleTimeString()}. ${groupEntries.length} grupos importados.` 
+                }).eq('id', connectionId);
+            } else {
+                await supabase.from('whatsapp_settings').update({ 
+                    last_sync_error: `✅ Sincronização concluída. Nenhum grupo novo para importar.` 
+                }).eq('id', connectionId);
             }
+        } catch (e) {
+            console.error(`[SYNC] Erro busca grupos:`, e.message); 
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção Grupos: ${e.message}` }).eq('id', connectionId);
         }
 
         // 4. Buscar Histórico (10 msgs) para cada conversa ativa
