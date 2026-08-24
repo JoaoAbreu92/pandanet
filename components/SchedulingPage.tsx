@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
+import { useToast } from './ToastContext';
 import { 
     CalendarIcon, 
     PlusIcon, 
@@ -24,6 +25,7 @@ interface SchedulingPageProps {
 const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 'appointments' }) => {
     const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<'events' | 'bookings' | 'templates' | 'settings'>('events');
     const [bookingFilter, setBookingFilter] = useState<'pending' | 'confirmed' | 'past_cancelled'>('pending');
 
@@ -68,7 +70,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             cnpj: false,
             company_name: false,
             cpf: false,
-            allow_multiple_bookings: false
+            allow_multiple_bookings: false,
+            event_mode: mode
         },
         availability: {
             days: [1, 2, 3, 4, 5],
@@ -123,11 +126,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             // Client-side filtering by mode
             const allEvents = data || [];
             const filteredEvents = allEvents.filter(e => {
-                if (mode === 'events') {
-                    return e.disable_time_slots === true;
-                } else {
-                    return !e.disable_time_slots;
-                }
+                const eventMode = e.requirements?.event_mode || (e.disable_time_slots ? 'events' : 'appointments');
+                return eventMode === mode;
             });
             setEventTypes(filteredEvents);
         } catch (err: any) {
@@ -150,11 +150,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             const allBookings = data || [];
             const filteredBookings = allBookings.filter(b => {
                 const disableTimeSlots = b.event_types?.disable_time_slots || false;
-                if (mode === 'events') {
-                    return disableTimeSlots === true;
-                } else {
-                    return !disableTimeSlots;
-                }
+                const eventMode = b.event_types?.requirements?.event_mode || (disableTimeSlots ? 'events' : 'appointments');
+                return eventMode === mode;
             });
             setBookings(filteredBookings);
         } catch (err: any) {
@@ -572,7 +569,10 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                 disable_time_slots: eventForm.disable_time_slots,
                 is_paid: eventForm.is_paid,
                 price: eventForm.is_paid ? Number(eventForm.price) : 0,
-                requirements: eventForm.requirements,
+                requirements: {
+                    ...eventForm.requirements,
+                    event_mode: mode
+                },
                 availability: eventForm.availability,
                 is_active: eventForm.is_active,
                 has_capacity_limit: eventForm.has_capacity_limit,
@@ -599,12 +599,13 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
 
             if (error) throw error;
             
+            showToast('Salvo com sucesso!', 'success');
             setShowEventModal(false);
             setEditingEvent(null);
             fetchEventTypes();
             setEventForm({
                 name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
-                requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false },
+                requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false, event_mode: mode },
                 availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00', specific_date: null },
                 is_active: true,
                 has_capacity_limit: false,
@@ -637,7 +638,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                 cnpj: event.requirements?.cnpj ?? false,
                 company_name: event.requirements?.company_name ?? false,
                 cpf: event.requirements?.cpf ?? false,
-                allow_multiple_bookings: event.requirements?.allow_multiple_bookings ?? false
+                allow_multiple_bookings: event.requirements?.allow_multiple_bookings ?? false,
+                event_mode: event.requirements?.event_mode ?? mode
             },
             availability: {
                 days: event.availability?.days ?? [1, 2, 3, 4, 5],
@@ -661,6 +663,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
         try {
             const { error } = await supabase.from('scheduling_event_types').delete().eq('id', id);
             if (error) throw error;
+            showToast('Excluído com sucesso!', 'success');
             fetchEventTypes();
         } catch (err: any) {
             alert('Erro ao excluir: ' + err.message);
@@ -930,7 +933,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                     setEditingEvent(null);
                                     setEventForm({
                                         name: '', slug: '', description: '', duration: mode === 'events' ? 1 : 30, duration_unit: mode === 'events' ? 'days' : 'minutes', disable_time_slots: mode === 'events' ? true : false, is_paid: false, price: 0,
-                                        requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false },
+                                        requirements: { phone: true, cnpj: false, company_name: false, cpf: false, allow_multiple_bookings: false, event_mode: mode },
                                         availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00', specific_date: null },
                                         is_active: true,
                                         has_capacity_limit: false,

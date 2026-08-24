@@ -95,13 +95,13 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             
             // Buscar todas as reservas ativas para verificar ocupação de horários e limite de capacidade
             const { data: bookingsData } = await supabase
-                .from('scheduling_booked_slots')
+                .from('scheduling_bookings')
                 .select('*')
                 .eq('event_type_id', eventTypeId)
                 .neq('status', 'rejected')
                 .neq('status', 'cancelled');
 
-            setExistingBookings(bookingsData || []);
+            setExistingBookings((bookingsData || []) as any);
         } catch (err: any) {
             setError(err.message || 'Erro ao carregar detalhes do agendamento.');
         } finally {
@@ -264,7 +264,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             // Verificar limite de capacidade atualizado antes de confirmar
             if (eventType.has_capacity_limit) {
                 const { data: latestBookings, error: countErr } = await supabase
-                    .from('scheduling_booked_slots')
+                    .from('scheduling_bookings')
                     .select('id')
                     .eq('event_type_id', eventType.id)
                     .neq('status', 'rejected')
@@ -305,16 +305,16 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
 
             if (insertErr) throw insertErr;
 
-            // Enviar notificação para o anfitrião no banco
-            await supabase.from('notifications').insert({
+            // Enviar notificação para o anfitrião no banco (fire-and-forget, não bloqueia)
+            supabase.from('notifications').insert({
                 user_id: eventType.owner_id,
                 company_id: eventType.company_id,
                 type: 'event',
                 title: 'Nova Reserva Pendente',
-                description: `${guestName} agendou para ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} às ${selectedTime}.`,
+                description: `${guestName} solicitou reserva para ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}${selectedTime !== 'Dia Inteiro' ? ' às ' + selectedTime : ' (Dia Inteiro)'}.`,
                 isRead: false,
                 link: '/scheduling'
-            });
+            }).then(); // fire-and-forget
 
             setStep('success');
         } catch (err: any) {

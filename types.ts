@@ -863,6 +863,7 @@ export interface SchedulingEventType {
     company_name?: boolean;
     cpf?: boolean;
     allow_multiple_bookings?: boolean;
+    event_mode?: 'appointments' | 'events';
   };
   availability: {
     days: number[]; // ex: [1, 2, 3, 4, 5]
