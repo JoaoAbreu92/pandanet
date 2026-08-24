@@ -111,14 +111,20 @@ const Channels: React.FC = () => {
     const startSession = async (companyId: string, connectionId: string) => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`, {
+            const res = await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${session?.access_token}`
+                    'Authorization': `Bearer ${session?.access_token}`,
+                    'Content-Type': 'application/json'
                 }
             });
+            const jsonResp = await res.json().catch(() => null);
+            console.log('[startSession] Status:', res.status, 'Response:', jsonResp);
+            if (!res.ok) {
+                console.error('[startSession] Falha na API:', jsonResp);
+            }
         } catch (error) {
-            console.error('[startSession] Error:', error);
+            console.error('[startSession] Network/Fetch Error:', error);
         }
     };
 
@@ -279,7 +285,12 @@ const Channels: React.FC = () => {
                                         </button>
 
                                         {channel.channel_type === 'whatsapp' && !channel.is_connected && (
-                                            <button onClick={() => { setCurrentId(channel.id); setView('qr'); }} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
+                                            <button onClick={() => {
+                                                setCurrentId(channel.id);
+                                                setView('qr');
+                                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                                if (companyId) startSession(companyId, channel.id);
+                                            }} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                                 <QrCode className="w-3.5 h-3.5" /> QR Code
                                             </button>
                                         )}
