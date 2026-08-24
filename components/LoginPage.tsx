@@ -100,7 +100,7 @@ const LoginPage: React.FC = () => {
                         .from('profiles')
                         .update({
                             company_id: companyData?.id || null,
-                            status: 'pending', // Requer aprovação do admin real
+                            status: isFirstUser ? 'active' : 'pending', // Criador da empresa ativo, colaboradores pendentes
                             role: isFirstUser ? 'admin' : 'employee',
                             is_company_admin: isFirstUser
                         })
@@ -110,10 +110,16 @@ const LoginPage: React.FC = () => {
                 }, 1500); // Wait for trigger + some buffer
 
                 setMessage(language === 'pt'
-                    ? 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação.'
+                    ? (isFirstUser 
+                        ? 'Cadastro realizado com sucesso! Verifique seu email para confirmar e acessar a plataforma.'
+                        : 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação do administrador.')
                     : language === 'en'
-                        ? 'Sign up successful! Please check your email to confirm. Your account will undergo approval.'
-                        : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.');
+                        ? (isFirstUser
+                            ? 'Sign up successful! Please check your email to confirm and access the platform.'
+                            : 'Sign up successful! Please check your email to confirm. Your account will undergo approval.')
+                        : (isFirstUser
+                            ? '¡Registro exitoso! Verifique su correo para confirmar y acceder a la plataforma.'
+                            : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.'));
                 setIsSignUp(false); // Switch back to login for UX
             }
         } else {

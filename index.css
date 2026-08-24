@@ -29,6 +29,10 @@
     letter-spacing: -0.02em;
   }
 
+  .font-brand {
+    font-family: var(--font-sans);
+  }
+
   .dark body {
     background-color: #020617; /* Deep Slate 950 */
     background-image: radial-gradient(at 0% 0%, rgba(15, 23, 42, 1) 0, transparent 50%), 
