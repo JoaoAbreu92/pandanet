@@ -32,3 +32,8 @@ generate-clean-keys.js
 verify-local-keys.js
 test-vps-auth.js
 
+# Deploy e VPS
+backups/
+certbot/
+*.sql
+*.sql.gz

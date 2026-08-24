@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Backend WhatsApp
+  # ============================================
+  whatsapp-backend:
+    container_name: pandanet_backend
+    build: 
+      context: ./whatsapp-backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      # Usa o nome do container Kong do Supabase na rede Docker
+      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - COMPANY_ID=${COMPANY_ID:-1}
+      - PORT=3000
+    networks:
+      - pandanet_network
+      - supabase_default  # Conecta à rede do Supabase
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================
+  # Frontend PandaNet
+  # ============================================
+  pandanet-frontend:
+    container_name: pandanet_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Usa o IP público para acesso externo
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    restart: always
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS (se configurar SSL)
+    depends_on:
+      whatsapp-backend:
+        condition: service_healthy
+    networks:
+      - pandanet_network
+    volumes:
+      # Para certificados SSL (se usar Certbot)
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ============================================
+# Redes
+# ============================================
+networks:
+  # Rede interna do PandaNet
+  pandanet_network:
+    driver: bridge
+    
+  # Rede externa do Supabase (criada pelo docker-compose do Supabase)
+  supabase_default:
+    external: true
+
+# ============================================
+# Volumes (opcional - para persistência)
+# ============================================
+volumes:
+  certbot_conf:
+  certbot_www:
