@@ -36,9 +36,10 @@ interface ChatProps {
   onConversationSelect?: (isActive: boolean) => void;
   initialSearch?: string;
   type?: 'private' | 'group' | 'all';
+  initialConversationId?: string | null;
 }
 
-const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private' }) => {
+const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private', initialConversationId }) => {
   const { user, profile, currentUser } = useAuth();
   const activeProfile = currentUser || profile;
   const permissions = (activeProfile?.whatspanda_permissions as any) || {};
@@ -212,6 +213,37 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setChatTypeFilter(type);
     }
   }, [type]);
+
+  useEffect(() => {
+    if (initialConversationId) {
+      selectConversationById(initialConversationId);
+    }
+  }, [initialConversationId]);
+
+  const selectConversationById = async (id: string) => {
+    const { data, error } = await supabase
+      .from('whatsapp_conversations')
+      .select(`
+        *,
+        assigned_user:profiles!assigned_to(id, full_name, avatar_url),
+        department:departments(id, name),
+        channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
+        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
+      `)
+      .eq('id', id)
+      .single();
+
+    if (data && !error) {
+      setSelectedConversation(data as WhatsAppConversationWithDetails);
+      if (data.status) setActiveTab(data.status as any);
+      // If it's a group, ensure the filter allows it
+      if (data.is_group || data.contact_phone?.includes('@g.us')) {
+        setChatTypeFilter('group');
+      } else {
+        setChatTypeFilter('private');
+      }
+    }
+  };
 
 
   const fetchConversations = async () => {
