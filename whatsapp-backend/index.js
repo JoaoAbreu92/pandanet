@@ -1714,6 +1714,33 @@ async function importHistoricalMessages(conv, instanceName) {
 
             if (!text && !mediaType) { skipped++; continue; }
 
+            // Download e upload de mídia (imagem, áudio, vídeo, sticker, documento)
+            let mediaUrl = null;
+            let mimeType = null;
+            let fileName = null;
+            if (mediaType) {
+                const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.stickerMessage || m.documentMessage;
+                if (mediaMsg) {
+                    mimeType = mediaMsg.mimetype || null;
+                    fileName = mediaMsg.fileName || mediaMsg.title || null;
+                }
+                try {
+                    const base64 = await downloadEvolutionMedia(instanceName, msg, mediaType);
+                    if (base64) {
+                        mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId, mimeType, fileName);
+                        if (mediaUrl) {
+                            console.log(`[HIST-IMPORT] Mídia ${mediaType} da mensagem ${msgId} carregada com sucesso.`);
+                        } else {
+                            console.warn(`[HIST-IMPORT] Falha no upload da mídia ${mediaType} para ${msgId}.`);
+                        }
+                    } else {
+                        console.warn(`[HIST-IMPORT] Falha no download da mídia ${mediaType} para ${msgId} (pode ter expirado).`);
+                    }
+                } catch (mediaErr) {
+                    console.error(`[HIST-IMPORT] Erro no processamento de mídia para ${msgId}:`, mediaErr.message);
+                }
+            }
+
             const createdAt = msg.messageTimestamp
                 ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
                 : new Date().toISOString();
@@ -1741,6 +1768,7 @@ async function importHistoricalMessages(conv, instanceName) {
                 message_text: text || null,
                 is_from_customer: !isFromMe,
                 whatsapp_message_id: msgId || null,
+                media_url: mediaUrl,
                 media_type: mediaType,
                 sender_phone: senderPhone,
                 sender_name: senderName,
