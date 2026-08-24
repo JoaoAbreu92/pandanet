@@ -132,6 +132,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [bodyError, setBodyError] = useState<string | null>(null);
     const [folders, setFolders] = useState<any[]>([]);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
+    const [showFolderModal, setShowFolderModal] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
     
     // --- State: Tags ---
     const [availableTags, setAvailableTags] = useState<{ id: string, label: string, color: string }[]>([]);
@@ -468,19 +470,20 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const createFolder = async () => {
-        const folderName = prompt('Nome da nova pasta:');
-        if (!folderName) return;
+        if (!newFolderName.trim()) return;
 
         const { error } = await callEmailServer('folders', {
             config: settings,
             action: 'create',
-            path: folderName
+            path: newFolderName.trim()
         });
 
         if (error) {
             showToast('Erro ao criar pasta: ' + error.message, 'error');
         } else {
             showToast('Pasta criada com sucesso!', 'success');
+            setShowFolderModal(false);
+            setNewFolderName('');
             fetchFolders();
         }
     };
@@ -750,9 +753,19 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setView('inbox');
         } catch (err: any) {
             console.error("Send Email Error:", err);
-            showToast('Erro ao enviar: O e-mail não pôde ser enviado devido a um problema de comunicação com o servidor SMTP. A mensagem foi salva e permanecerá na janela de composição.', 'error');
+            showToast('Erro ao enviar o e-mail: Verifique se as configurações de SMTP (porta e host) estão corretas em Configurações.', 'error');
+            showToast('Sua mensagem foi mantida na tela como Rascunho para você não perdê-la.', 'info');
             // We do NOT clear the state so the user doesn't lose their draft.
-            // In a more complete implementation, we might explicitly save to a "Drafts" folder here.
+            // Attempt to save to IMAP Drafts folder as backup
+            callEmailServer('save-draft', {
+                config: settings,
+                payload: {
+                    to: toTags.join(', '),
+                    subject: composeSubject,
+                    text: composeBody.replace(/<[^>]*>?/gm, ''),
+                    html: composeBody
+                }
+            }).catch(() => { }); // silently fail if server doesn't support save-draft yet
         } finally {
             setLoading(false);
         }
@@ -935,7 +948,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 );
                             })}
 
-                        <button onClick={createFolder} className="w-full text-left px-3 py-2 text-xs text-brand-primary hover:bg-gray-100 rounded flex items-center gap-2 mt-2 font-semibold">
+                        <button onClick={() => setShowFolderModal(true)} className="w-full text-left px-3 py-2 text-xs text-brand-primary hover:bg-gray-100 rounded flex items-center gap-2 mt-2 font-semibold">
                             {t('email.new_folder')}
                         </button>
                     </nav>
@@ -1195,9 +1208,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             </button>
                             <button onClick={() => {
                                 // Move to Junk/Spam
-                                const spamFolder = folders.find(f => f.specialUse === '\\Junk' || f.path.includes('Junk') || f.path.includes('Spam'))?.path || 'Junk';
+                                const spamFolder = folders.find((f: any) => f.specialUse === '\\Junk' || f.path.includes('Junk') || f.path.includes('Spam'))?.path || 'Junk';
                                 callEmailServer('move', { config: settings, uids: [selectedEmail.uid], path: spamFolder });
-                                alert('Movido para Spam');
+                                showToast('Movido para Spam', 'success');
                                 setView('inbox');
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
                                 <ExclamationTriangleIcon className="w-4 h-4" /> Spam
@@ -1601,6 +1614,51 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </div>
                 ) : null}
             </div>
+
+            {/* --- Create Folder Modal --- */}
+            {showFolderModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl p-6 w-[400px] shadow-2xl transform transition-all animate-scale-in">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary">
+                                <FolderIcon className="w-5 h-5" />
+                            </div>
+                            <h3 className="text-xl font-bold font-brand text-gray-900">Nova Pasta</h3>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Pasta</label>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border"
+                                    placeholder="Ex: Projetos Importantes"
+                                    value={newFolderName}
+                                    onChange={e => setNewFolderName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && createFolder()}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3">
+                            <button
+                                onClick={() => { setShowFolderModal(false); setNewFolderName(''); }}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors font-medium"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={createFolder}
+                                disabled={!newFolderName.trim()}
+                                className="px-6 py-2 bg-brand-primary text-white rounded-xl shadow hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary font-bold transition-colors"
+                            >
+                                Criar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- Tag Management Modal --- */}
             {showTagModal && (
