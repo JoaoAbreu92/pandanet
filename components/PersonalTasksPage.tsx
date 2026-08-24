@@ -57,12 +57,14 @@ const PersonalTasksPage: React.FC<PersonalTasksPageProps> = ({ currentUser, isGh
     const sqlInstruction = `-- CRIE A TABELA DE TAREFAS PESSOAIS NO SEU BANCO DE DADOS
 CREATE TABLE IF NOT EXISTS personal_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL DEFAULT 'Nova Tarefa',
     date DATE,
+    limit_date DATE,
     items JSONB NOT NULL DEFAULT '[]'::jsonb,
     completed BOOLEAN NOT NULL DEFAULT false,
     completed_at DATE,
+    notify_daily BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
