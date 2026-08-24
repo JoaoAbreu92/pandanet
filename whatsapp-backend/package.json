@@ -16,6 +16,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.3",
     "pino": "^8.19.0",
     "qrcode-terminal": "^0.12.0"
   },
