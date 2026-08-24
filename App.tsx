@@ -115,8 +115,6 @@ const AppContent: React.FC = () => {
 
                         if (company) {
                             const mappedCompany = company as unknown as Company;
-                            setCurrentCompany(mappedCompany);
-
                             const baseData = (mappedCompany.data || {}) as any;
                             const mergedData: AppData = {
                                 employees: baseData.employees || [],
@@ -140,6 +138,12 @@ const AppContent: React.FC = () => {
                                 wellnessItems: baseData.wellnessItems || []
                             };
 
+                            const mergedCompany: Company = {
+                                ...mappedCompany,
+                                data: mergedData
+                            };
+
+                            setCurrentCompany(mergedCompany);
                             setCompanyData(mergedData);
                             setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
                             console.log("Empresa carregada com sucesso:", mappedCompany.name);

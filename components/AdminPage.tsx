@@ -60,25 +60,25 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         switch (activeTab) {
             case 'dashboard':
                 return <Dashboard
-                    banners={company.data.banners}
+                    banners={company.data?.banners || []}
                     setBanners={(b) => handleSetData('banners', b)}
                 />;
             case 'users':
-                return <UserManager users={company.data.employees} setUsers={(u) => handleSetData('employees', u)} plan={plan} />;
+                return <UserManager users={company.data?.employees || []} setUsers={(u) => handleSetData('employees', u)} plan={plan} />;
             case 'teams':
-                return <TeamManager users={company.data.employees} setUsers={(u) => handleSetData('employees', u)} />;
+                return <TeamManager users={company.data?.employees || []} setUsers={(u) => handleSetData('employees', u)} />;
             case 'forms':
-                return <FormSubmissionsManager submissions={company.data.formSubmissions} setSubmissions={(s) => handleSetData('formSubmissions', s)} />;
+                return <FormSubmissionsManager submissions={company.data?.formSubmissions || []} setSubmissions={(s) => handleSetData('formSubmissions', s)} />;
             case 'marketplace':
-                return <MarketplaceManager items={company.data.marketplaceItems} setItems={(i) => handleSetData('marketplaceItems', i)} />;
+                return <MarketplaceManager items={company.data?.marketplaceItems || []} setItems={(i) => handleSetData('marketplaceItems', i)} />;
             case 'events':
-                return <EventsManager events={company.data.events} setEvents={(e) => handleSetData('events', e)} employees={company.data.employees} />;
+                return <EventsManager events={company.data?.events || []} setEvents={(e) => handleSetData('events', e)} employees={company.data?.employees || []} />;
             case 'training':
-                return <TrainingManager trainings={company.data.trainings} setTrainings={(t) => handleSetData('trainings', t)} />;
+                return <TrainingManager trainings={company.data?.trainings || []} setTrainings={(t) => handleSetData('trainings', t)} />;
             case 'kb':
                 return <GenericManager<KBArticle>
                     title="Base de Conhecimento"
-                    items={company.data.kbArticles}
+                    items={company.data?.kbArticles || []}
                     setItems={(i) => handleSetData('kbArticles', i)}
                     newItemTemplate={{ id: '', title: '', category: 'Geral', content: '', views: 0, mediaUrl: '', mediaType: 'image' }}
                     fields={[
@@ -93,7 +93,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'status':
                 return <GenericManager<ServiceStatusItem>
                     title="Status de Serviços"
-                    items={company.data.services}
+                    items={company.data?.services || []}
                     setItems={(i) => handleSetData('services', i)}
                     newItemTemplate={{ id: '', name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
                     fields={[
@@ -115,7 +115,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'infosec':
                 return <GenericManager<SecurityAlert>
                     title="Alertas de Segurança"
-                    items={company.data.securityAlerts}
+                    items={company.data?.securityAlerts || []}
                     setItems={(i) => handleSetData('securityAlerts', i)}
                     newItemTemplate={{ id: '', title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
                     fields={[{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descrição', type: 'textarea' }, { key: 'level', label: 'Nível', type: 'select', options: ['info', 'warning', 'critical'] }, { key: 'date', label: 'Data' }]}
@@ -124,7 +124,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'policies':
                 return <GenericManager<ResourceDocument>
                     title="Documentos e Políticas"
-                    items={company.data.documents}
+                    items={company.data?.documents || []}
                     setItems={(i) => handleSetData('documents', i)}
                     newItemTemplate={{ id: '', title: '', category: 'RH', type: 'PDF', url: '#', updatedAt: new Date().toISOString().split('T')[0] }}
                     fields={[
@@ -136,11 +136,11 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
                 />;
             case 'polls':
-                return <PollManager polls={company.data.polls} setPolls={(p) => handleSetData('polls', p)} />;
+                return <PollManager polls={company.data?.polls || []} setPolls={(p) => handleSetData('polls', p)} />;
             case 'bem-estar':
                 return <GenericManager<WellnessItem>
                     title="Itens de Bem-Estar"
-                    items={company.data.wellnessItems}
+                    items={company.data?.wellnessItems || []}
                     setItems={(i) => handleSetData('wellnessItems', i)}
                     newItemTemplate={{ id: '', title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
                     fields={[

@@ -73,6 +73,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (data) {
                 const isMasterAdmin = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
 
+                const defaultAdminPermissions = {
+                    viewMessages: true, viewCalendar: true, useMarketplace: true,
+                    canPostText: true, canPostImage: true, canPostVideo: true,
+                    viewDirectory: true, viewForms: true, viewBenefits: true,
+                    viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
+                    viewTiDashboard: true, openTickets: true, openTiRequests: true,
+                    viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
+                };
+
                 const employee: Employee = {
                     id: data.id,
                     name: isMasterAdmin ? 'Master TI' : (data.full_name || 'Usuário'),
@@ -84,13 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     birthDate: data.birth_date || new Date().toISOString(),
                     isAdmin: isMasterAdmin ? true : (data.is_admin || false),
                     isOnline: true, // Isso seria em tempo real em um app completo
-                    permissions: isMasterAdmin ? {
-                        viewMessages: true, viewCalendar: true, useMarketplace: true,
-                        canPostText: true, canPostImage: true, canPostVideo: true,
-                        viewDirectory: true, viewForms: true, viewBenefits: true,
-                        viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
-                        viewTiDashboard: true, openTickets: true, openTiRequests: true,
-                        viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
+                    permissions: (isMasterAdmin || data.is_company_admin || data.is_admin) ? {
+                        ...defaultAdminPermissions,
+                        ...(data.permissions || {})
                     } : (data.permissions || {}),
                     following: data.following || [],
                     phone: data.phone || '',
