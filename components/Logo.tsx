@@ -51,7 +51,7 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
                 <img
                     src={logoSrc}
                     alt="Logo"
-                    className="max-h-full w-auto object-contain transition-all duration-300"
+                    className="max-h-full w-auto object-contain transition-all duration-300 dark:brightness-110 dark:contrast-105 dark:drop-shadow-[0_0_3px_rgba(255,255,255,0.45)]"
                 />
             )}
             {showText && (

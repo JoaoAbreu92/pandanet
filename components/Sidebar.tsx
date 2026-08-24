@@ -278,9 +278,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
             ${isImpersonating ? 'border-t-4 border-t-red-500' : ''}
         `}>
-            <div className="h-20 md:h-24 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
+            <div className="h-16 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
                 <div className="hover:scale-105 transition-transform duration-300 transition-all">
-                    <Logo showText={isOpen} className={isOpen ? 'h-10 md:h-12' : 'h-8 md:h-10'} />
+                    <Logo showText={isOpen} className={isOpen ? 'h-8 md:h-9' : 'h-6 md:h-7'} />
                 </div>
             </div>
             <nav

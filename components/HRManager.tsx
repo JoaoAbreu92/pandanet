@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import HRCalculatorAI from './HRCalculatorAI';
 
 interface VacationRequest {
   id: string; employee_id: string; start_date: string; end_date: string;
@@ -853,6 +854,7 @@ const HRManager: React.FC = () => {
           </div>
         </div>
       )}
+      {profile && <HRCalculatorAI currentUser={profile} />}
     </div>
   );
 };

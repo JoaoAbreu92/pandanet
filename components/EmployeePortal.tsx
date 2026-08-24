@@ -14,6 +14,7 @@ import {
     StarIcon
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import HRCalculatorAI from './HRCalculatorAI';
 
 interface Payslip {
     id: string;
@@ -935,6 +936,7 @@ const EmployeePortal: React.FC = () => {
                         )}
                     </div>
                 </main>
+                {profile && <HRCalculatorAI currentUser={profile} />}
             </div>
         </div>
     );
