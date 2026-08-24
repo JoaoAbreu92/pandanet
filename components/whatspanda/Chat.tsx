@@ -1678,73 +1678,36 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     return /^\[Mídia:?.*\]$/i.test(trimmed) || /^\[Arquivo\/Mídia\]$/i.test(trimmed) || trimmed === '[Mídia]';
   };
 
+  // Constrói URL autenticada para o proxy de mídia (aceita token via query param)
+  const getProxyUrl = async (rawUrl: string, forDownload = false): Promise<string | null> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token || !rawUrl) return null;
+    const encodedUrl = encodeURIComponent(rawUrl);
+    return `/api/whatsapp/media/proxy?url=${encodedUrl}&token=${encodeURIComponent(token)}${forDownload ? '&dl=1' : ''}`;
+  };
+
   const handleDownloadMedia = async (e: React.MouseEvent, rawUrl?: string | null, defaultFilename?: string) => {
     e.preventDefault();
     e.stopPropagation();
     if (!rawUrl) return;
 
-    // Se estiver rodando dentro do APK (Capacitor), abre a URL no navegador padrão do Android
-    // para que o download seja gerenciado de forma nativa pelo sistema operacional.
-    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
-    if (isCapacitor) {
-      const url = fixMediaUrl(rawUrl);
-      if (url) window.open(url, '_system');
-      return;
-    }
-
     try {
-      // Usa o proxy do backend para baixar a mídia com headers corretos (Content-Disposition: attachment)
-      // Isso evita problemas de CORS e garante que o nginx não sirva index.html ao invés do arquivo.
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('Sessão expirada');
-
-      const encodedUrl = encodeURIComponent(rawUrl);
-      const proxyUrl = `/api/whatsapp/media/proxy?url=${encodedUrl}`;
-
-      const response = await fetch(proxyUrl, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        // Se o proxy falhar, tenta abrir diretamente (fallback)
-        throw new Error(`Proxy retornou ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = blobUrl;
-
-      let filename = defaultFilename;
-      if (!filename) {
-        const urlParts = rawUrl.split('/');
-        const lastPart = urlParts[urlParts.length - 1]?.split('?')[0];
-        filename = lastPart || 'documento';
-      }
-
-      // Se o nome do arquivo não possuir extensão, tentar inferir do MIME type do Blob
-      if (!filename.includes('.')) {
-        const mime = blob.type.toLowerCase();
-        if (mime.includes('pdf')) filename += '.pdf';
-        else if (mime.includes('spreadsheetml') || mime.includes('excel') || mime.includes('xls')) filename += '.xlsx';
-        else if (mime.includes('wordprocessingml') || mime.includes('msword')) filename += '.docx';
-        else if (mime.includes('zip') || mime.includes('compressed')) filename += '.zip';
-        else if (mime.includes('png')) filename += '.png';
-        else if (mime.includes('jpeg') || mime.includes('jpg')) filename += '.jpg';
-        else if (mime.includes('ogg') || mime.includes('webm') || mime.includes('mp4') || mime.includes('mpeg')) filename += '.mp3';
-      }
-
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      const proxyUrl = await getProxyUrl(rawUrl, true);
+      if (!proxyUrl) throw new Error('Sessão expirada');
+      // Abre o proxy diretamente - o header Content-Disposition: attachment garante o download
+      window.open(proxyUrl, '_blank');
     } catch (err: any) {
-      console.warn('Download via proxy falhou:', err);
+      console.warn('Download falhou:', err);
       alert('Não foi possível baixar o arquivo no momento. Verifique sua conexão e tente novamente.');
     }
+  };
+
+  // Gera URL de áudio para o player - via proxy para evitar problemas de SSL/CORS
+  const getAudioProxyUrl = (rawUrl?: string | null): string => {
+    if (!rawUrl) return '';
+    // Retorna a URL do proxy com token será resolvida no useEffect
+    return fixMediaUrl(rawUrl); // fallback sincrónico, substituido async abaixo
   };
 
   const handleUploadSticker = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2829,8 +2792,27 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                                   <Download className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity">
-                                <source src={fixMediaUrl(msg.media_url)} />
+                              <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity"
+                                src={(() => {
+                                  // Usar URL direta - o proxy é chamado somente no download
+                                  // Para reprodução, usamos a URL pública diretamente (funciona no PC via HTTPS)
+                                  return fixMediaUrl(msg.media_url);
+                                })()}
+                                onError={(ev) => {
+                                  // Se falhar por SSL/CORS, tenta carregar via proxy com token
+                                  const audioEl = ev.currentTarget;
+                                  if (audioEl.dataset.proxyTried) return;
+                                  audioEl.dataset.proxyTried = '1';
+                                  supabase.auth.getSession().then(({ data }) => {
+                                    const tk = data?.session?.access_token;
+                                    if (tk && msg.media_url) {
+                                      const proxyUrl = `/api/whatsapp/media/proxy?url=${encodeURIComponent(msg.media_url)}&token=${encodeURIComponent(tk)}`;
+                                      audioEl.src = proxyUrl;
+                                      audioEl.load();
+                                    }
+                                  });
+                                }}
+                              >
                                 Seu navegador não suporta áudio.
                               </audio>
                             </div>

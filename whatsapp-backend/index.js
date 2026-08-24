@@ -1284,11 +1284,23 @@ router.get('/debug-logs', (req, res) => {
 });
 
 // API: Proxy de Download de Mídia do Supabase Storage
-// Tenta múltiplos métodos (SDK do Supabase + URLs candidatas internas/públicas)
-// para garantir 100% de sucesso no download de arquivos
-router.get('/media/proxy', authMiddleware, async (req, res) => {
-    const { url } = req.query;
+// Aceita token via query param (?token=...) OU via header Authorization
+// para permitir navegação direta do browser (window.open) com Content-Disposition: attachment
+router.get('/media/proxy', async (req, res) => {
+    const { url, token: queryToken } = req.query;
     if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
+
+    // Verificar autenticação via query param ou header
+    const authHeader = req.headers['authorization'];
+    const headerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = queryToken || headerToken;
+    if (!token) return res.status(401).json({ error: 'Token de autenticação obrigatório' });
+
+    try {
+        jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+        return res.status(401).json({ error: 'Token inválido ou expirado' });
+    }
 
     try {
         const rawUrl = decodeURIComponent(url);
