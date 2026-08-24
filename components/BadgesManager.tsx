@@ -1335,6 +1335,18 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [previewUrl, setPreviewUrl] = useState<string>('');
 
+    const [levelName, setLevelName] = useState<string>('');
+    const [levelXP, setLevelXP] = useState<number>(0);
+
+    const currentConfig = companyLevels.find(l => l.level_number === selectedLevel);
+
+    useEffect(() => {
+        if (currentConfig) {
+            setLevelName(currentConfig.name || '');
+            setLevelXP(currentConfig.required_xp || 0);
+        }
+    }, [selectedLevel, companyLevels]);
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const PRESETS = [
@@ -1517,12 +1529,12 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
             ctx.save();
             ctx.fillStyle = borderColor || '#ffffff';
             ctx.shadowColor = glowColor;
-            ctx.shadowBlur = 8;
-            const starRadius = 20;
-            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.16;
+            ctx.shadowBlur = 10;
+            const starRadius = 40;
+            const startAngle = -Math.PI / 2 - (starsCount - 1) * 0.22;
             for (let i = 0; i < starsCount; i++) {
-                const angle = startAngle + i * 0.32;
-                const dist = outerRadius + 22;
+                const angle = startAngle + i * 0.44;
+                const dist = outerRadius + 38;
                 const sx = cx + dist * Math.cos(angle);
                 const sy = cy + dist * Math.sin(angle);
                 drawStar(ctx, sx, sy, 5, starRadius, starRadius / 2);
@@ -1591,6 +1603,36 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
                 return;
             }
 
+            // Validação de XP
+            if (selectedLevel === 1 && Number(levelXP) !== 0) {
+                alert("O Nível 1 deve requerer 0 XP.");
+                setIsSaving(false);
+                return;
+            }
+
+            const sortedLevels = [...companyLevels].sort((a, b) => a.level_number - b.level_number);
+            const targetIndex = sortedLevels.findIndex(l => l.level_number === selectedLevel);
+            if (targetIndex > 0) {
+                const prevLevel = sortedLevels[targetIndex - 1];
+                if (Number(levelXP) <= Number(prevLevel.required_xp)) {
+                    alert(`Erro: O XP do Nível ${selectedLevel} (${levelXP} XP) deve ser maior que o do Nível ${prevLevel.level_number} (${prevLevel.required_xp} XP).`);
+                    setIsSaving(false);
+                    return;
+                }
+            }
+            const nextLevel = sortedLevels[targetIndex + 1];
+            if (nextLevel && Number(levelXP) >= Number(nextLevel.required_xp)) {
+                alert(`Erro: O XP do Nível ${selectedLevel} (${levelXP} XP) deve ser menor que o do Nível ${nextLevel.level_number} (${nextLevel.required_xp} XP).`);
+                setIsSaving(false);
+                return;
+            }
+
+            if (!levelName.trim()) {
+                alert("O nome do Elo não pode ficar vazio.");
+                setIsSaving(false);
+                return;
+            }
+
             const blob = await new Promise<Blob | null>((resolve) => {
                 canvas.toBlob((b) => resolve(b), 'image/png');
             });
@@ -1617,12 +1659,16 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
             const { error: dbError } = await supabase
                 .from('company_levels')
-                .update({ ring_image_url: publicUrl })
+                .update({ 
+                    ring_image_url: publicUrl,
+                    name: levelName,
+                    required_xp: Number(levelXP)
+                })
                 .eq('id', targetConfig.id);
 
             if (dbError) throw dbError;
 
-            alert(`Design do anel aplicado com sucesso ao Nível ${selectedLevel}!`);
+            alert(`Design do anel e configurações salvos com sucesso para o Nível ${selectedLevel}!`);
             await fetchCompanyLevels();
             await recalculateAllUsersXPAndLevels();
         } catch (err: any) {
@@ -1651,6 +1697,28 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Nome do Elo</label>
+                                <input
+                                    type="text"
+                                    value={levelName}
+                                    onChange={(e) => setLevelName(e.target.value)}
+                                    className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs bg-white dark:bg-slate-750 text-slate-850 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">XP Requerido</label>
+                                <input
+                                    type="number"
+                                    value={levelXP}
+                                    disabled={selectedLevel === 1}
+                                    onChange={(e) => setLevelXP(Number(e.target.value))}
+                                    className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs bg-white dark:bg-slate-750 text-slate-850 dark:text-white disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                                />
+                            </div>
                         </div>
 
                         <div>
