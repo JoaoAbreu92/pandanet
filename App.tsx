@@ -45,6 +45,7 @@ import KPIDashboard from './components/KPIDashboard.tsx';
 import ManualPage from './components/ManualPage.tsx';
 import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
+import AIAssistant from './components/AIAssistant';
 
 
 const AppContent: React.FC = () => {
@@ -693,6 +694,7 @@ const AppContent: React.FC = () => {
                 isShaking={isShaking}
             >
                 {renderPage()}
+                <AIAssistant currentUser={currentUser} />
             </Layout>
         );
     }

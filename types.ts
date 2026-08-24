@@ -205,6 +205,9 @@ export interface EmployeePermissions {
   createEvents: boolean;
   manageMarketplace: boolean;
   viewWhatsPanda: boolean;
+
+  // AI Assistant Config
+  ai_assistant: boolean;
 }
 
 // WhatsApp Permissions
@@ -257,6 +260,19 @@ export interface Employee {
   marital_status?: string;
   education_level?: string;
   status?: 'pending' | 'active' | 'rejected';
+
+  // Panda IA Assistant
+  ai_api_key?: string | null;
+  ai_provider?: 'gemini' | 'openai' | null;
+  ai_behavior?: 'popup' | 'sidebar' | 'tab' | null;
+}
+
+export interface AIMessage {
+  id: string;
+  user_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
 }
 
 export interface Task {

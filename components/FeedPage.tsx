@@ -139,23 +139,23 @@ export const PostCard: React.FC<{
 
             <div className="flex justify-around py-1 relative">
                 <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="flex-1">
-                    <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
                         <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
                             {reactions.map(emoji => (
-                                <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
+                                <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform duration-200 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
                                     {emoji}
                                 </button>
                             ))}
                         </div>
                     )}
                 </div>
-                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                     <ChatBubbleLeftIcon className="w-5 h-5" /><span>{t('feed.comment')}</span>
                 </button>
-                <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                     <ShareIcon className="w-5 h-5" /><span>{t('feed.share')}</span>
                 </button>
             </div>
@@ -620,6 +620,28 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             if (!error) fetchPosts(); // Refresh immediately to show the comment
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleShare = async (post: Post) => {
+        const url = `${window.location.protocol}//${window.location.host}/feed?post=${post.id}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Post de ${post.authorName}`,
+                    text: post.content.substring(0, 100) + '...',
+                    url: url,
+                });
+            } catch (err) {
+                console.error("Error sharing:", err);
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(url);
+                alert(t('feed.link_copied') || 'Link copiado para a área de transferência!');
+            } catch (err) {
+                console.error("Error copying link:", err);
+            }
         }
     };
 

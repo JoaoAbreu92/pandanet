@@ -12,7 +12,7 @@ interface CardProps {
 
 const Card: React.FC<CardProps> = ({ title, children, className = '', headerAction, noPadding = false, hideTypeBorder = false, icon }) => {
   return (
-    <div className={`premium-card ${hideTypeBorder ? '' : 'border-t-4 border-emerald-500'} ${noPadding ? '' : 'p-6'} dark:bg-slate-800 dark:border-slate-700 ${className}`}>
+    <div className={`premium-card ${hideTypeBorder ? '' : 'border-t border-gray-100 dark:border-slate-700'} ${noPadding ? '' : 'p-6'} dark:bg-slate-800 ${className}`}>
       {title && (
         <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2 dark:border-gray-800">
           <div className="flex items-center space-x-2">

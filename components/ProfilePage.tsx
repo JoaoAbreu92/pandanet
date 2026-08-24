@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Card from './Card';
-import { PencilIcon } from './icons';
+import { PencilIcon, SparklesIcon } from './icons';
 import type { Employee, Post } from '../types';
 import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
@@ -20,7 +20,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [isUploading, setIsUploading] = useState(false);
     const [targetUser, setTargetUser] = useState<Employee | null>(null);
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
-    const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'security'>(userId && userId !== currentUser.id ? 'activity' : 'info');
+    const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'security' | 'ai'>(userId && userId !== currentUser.id ? 'activity' : 'info');
     const [loading, setLoading] = useState(false);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -265,6 +265,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 birth_date: formatDateForDB(tempUserData.birthDate),
                 join_date: formatDateForDB(tempUserData.joinDate),
                 department_id: (tempUserData as any).department_id,
+                ai_api_key: tempUserData.ai_api_key,
+                ai_provider: tempUserData.ai_provider,
+                ai_behavior: tempUserData.ai_behavior,
                 updated_at: new Date().toISOString()
             };
 
@@ -320,7 +323,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     phone: freshProfile.phone,
                     officeLocation: freshProfile.office_location,
                     bio: freshProfile.bio,
-                    coverUrl: freshProfile.cover_url
+                    coverUrl: freshProfile.cover_url,
+                    ai_api_key: freshProfile.ai_api_key,
+                    ai_provider: freshProfile.ai_provider,
+                    ai_behavior: freshProfile.ai_behavior
                 };
                 
                 setTempUserData(reloadedUser);
@@ -598,6 +604,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 Segurança
                             </button>
                         )}
+                        {isOwnProfile && currentUser.permissions?.ai_assistant && (
+                            <button
+                                onClick={() => setActiveTab('ai')}
+                                className={`${activeTab === 'ai' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
+                            >
+                                <SparklesIcon className="w-4 h-4 text-emerald-500" />
+                                Assistente IA
+                            </button>
+                        )}
                     </nav>
                 </div>
 
@@ -780,6 +795,102 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             </button>
                         </div>
                     </Card>
+                    ) : activeTab === 'ai' && currentUser.permissions?.ai_assistant ? (
+                        <Card title="Assistente Panda IA">
+                            <div className="space-y-6 max-w-2xl bg-white dark:bg-slate-800">
+                                <div className="bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/40 p-4 rounded-xl text-sm text-emerald-800 dark:text-emerald-300">
+                                    <p><strong>Panda IA</strong> é o seu assistente virtual integrado nas atividades do dia-a-dia da empresa. Cole abaixo sua chave da API escolhida para desbloquear seus super poderes!</p>
+                                </div>
+
+                                {!isEditing ? (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <h4 className="text-sm font-semibold text-brand-subtle-text">Provedor de IA</h4>
+                                                <p className="text-brand-text flex items-center gap-2 mt-1">
+                                                    <span className="capitalize">{userData.ai_provider || 'Gemini (Google)'}</span>
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-semibold text-brand-subtle-text">Abertura do Chat</h4>
+                                                <p className="text-brand-text capitalize mt-1">
+                                                    {userData.ai_behavior || 'Popup Central'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="pt-2">
+                                            <h4 className="text-sm font-semibold text-brand-subtle-text mb-1">Status da API Key</h4>
+                                            <div className="flex items-center gap-2">
+                                                {userData.ai_api_key ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Conectado (Chave Oculta)
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Nenhuma chave fornecida
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 flex justify-end">
+                                            <button onClick={() => setIsEditing(true)} className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                                                <PencilIcon className="w-4 h-4" />
+                                                <span>Configurar Assistente</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="text-sm font-medium text-brand-subtle-text">Provedor da Inteligência Artificial</label>
+                                            <select
+                                                name="ai_provider"
+                                                value={tempUserData.ai_provider || 'gemini'}
+                                                onChange={(e) => setTempUserData(prev => ({ ...prev, ai_provider: e.target.value as any }))}
+                                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2 border focus:ring-emerald-500 focus:border-emerald-500"
+                                            >
+                                                <option value="gemini">Google Gemini (Recomendado / Mais Rápido)</option>
+                                                <option value="openai">ChatGPT (OpenAI GPT-4o)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-brand-subtle-text">Chave da API (API Key)</label>
+                                            <input
+                                                type="password"
+                                                name="ai_api_key"
+                                                value={tempUserData.ai_api_key || ''}
+                                                onChange={handleInputChange}
+                                                placeholder="Cole aqui sua sk-xxxx... ou AIzaSy..."
+                                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2 border focus:ring-emerald-500 focus:border-emerald-500"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Sua chave é salva com segurança no banco de dados e utilizada apenas pelo seu navegador.</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-brand-subtle-text">Abertura e Comportamento do Botão</label>
+                                            <select
+                                                name="ai_behavior"
+                                                value={tempUserData.ai_behavior || 'popup'}
+                                                onChange={(e) => setTempUserData(prev => ({ ...prev, ai_behavior: e.target.value as any }))}
+                                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2 border focus:ring-emerald-500 focus:border-emerald-500"
+                                            >
+                                                <option value="popup">Janela Deslizante (Popup flutuante no Centro)</option>
+                                                <option value="sidebar">Painel Lateral (Abre aba na direita da tela)</option>
+                                                <option value="tab">Nova Página (Vai para página inteira exclusiva da IA)</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 dark:border-slate-800">
+                                            <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium bg-gray-200 rounded-md hover:bg-gray-300">
+                                                Cancelar
+                                            </button>
+                                            <button onClick={handleSave} disabled={isUploading} className={`px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors ${isUploading ? 'opacity-50' : ''}`}>
+                                                {isUploading ? 'Salvando...' : 'Salvar Preferências da IA'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
                 ) : (
                     <div className="space-y-6">
                         {filteredPosts.length > 0 ? (
