@@ -282,7 +282,10 @@ BEGIN
     SET 
         email = EXCLUDED.email,
         company_id = COALESCE(public.profiles.company_id, EXCLUDED.company_id),
-        role = CASE WHEN public.profiles.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END;
+        role = CASE 
+            WHEN public.profiles.role IN ('admin', 'Super Admin') THEN public.profiles.role 
+            ELSE EXCLUDED.role 
+        END;
 
     RETURN NEW;
 END;

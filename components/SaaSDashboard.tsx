@@ -156,9 +156,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         // Initialize form data based on context
         if (type === 'createCompany') {
             const defaultPlan = localPlans.length > 0 ? localPlans[0].name : 'Standard';
-            setFormData({ name: '', domain: '', whatsapp: '', plan: defaultPlan, responsibleName: '', responsibleEmail: '' });
+            setFormData({ name: '', domain: '', cnpj: '', whatsapp: '', plan: defaultPlan, responsibleName: '', responsibleEmail: '' });
         } else if (type === 'edit' && company) {
-            setFormData({ name: company.name, domain: company.domain });
+            setFormData({ name: company.name, domain: company.domain, cnpj: company.cnpj || '' });
         } else if (type === 'createPlan') {
             setFormData({ name: '', userLimit: '', price: '' });
             setFeaturesState({});
@@ -290,6 +290,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 .update({
                     name: formData.name,
                     domain: formData.domain,
+                    cnpj: formData.cnpj,
                     plan_id: selectedPlan?.id // Update plan_id
                 })
                 .eq('id', selectedCompany.id);
@@ -684,6 +685,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                     <div className="p-6 space-y-4">
                         <input type="text" placeholder="Nome da Empresa" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                         <input type="text" placeholder="Domínio" value={formData.domain || ''} onChange={(e) => handleInputChange('domain', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        <input type="text" placeholder="CNPJ" value={formData.cnpj || ''} onChange={(e) => handleInputChange('cnpj', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                         <select
                             value={formData.plan || ''}
                             onChange={(e) => handleInputChange('plan', e.target.value)}
