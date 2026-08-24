@@ -90,7 +90,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   // States para Arquivos e Figurinhas
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
-  const [stickerTab, setStickerTab] = useState<'gallery' | 'saved'>('gallery');
+  const [stickerTab, setStickerTab] = useState<'emojis' | 'gallery' | 'saved'>('emojis');
   const [customStickers, setCustomStickers] = useState<string[]>(() => {
     const saved = localStorage.getItem('custom_stickers');
     return saved ? JSON.parse(saved) : [
@@ -457,6 +457,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .from('whatsapp_conversations')
       .update({ unread_count: 0 })
       .eq('id', conversationId);
+  };
+
+  const EMOJI_LIST = [
+    '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '🤨', '🧐', '🖐️', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🙏', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '🔥', '✨', '⚡', '💣', '💥', '💨', '💦', '🕳️', '💤', '👋'
+  ];
+
+  const handleSendEmoji = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
   };
 
   // --- Funções de Mídia e Figurinhas ---
@@ -1079,47 +1087,66 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             </div>
 
             {/* Input Area */}
-            <div className="px-3 py-2 md:px-6 md:py-5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-[max(env(safe-area-inset-bottom),8px)] md:pb-5 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
+            <div className="px-3 py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-[max(env(safe-area-inset-bottom),4px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
               
               {/* Sticker Picker UI */}
               {showStickerPicker && (
                 <div className="absolute bottom-[100%] left-4 right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
                   <div className="flex border-b border-slate-100 dark:border-white/5">
-                    <button onClick={() => setStickerTab('gallery')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${stickerTab === 'gallery' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}>Padrão</button>
-                    <button onClick={() => setStickerTab('saved')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}>Meus Gifs</button>
+                    <button onClick={() => setStickerTab('emojis')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'emojis' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Emojis</button>
+                    <button onClick={() => setStickerTab('gallery')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'gallery' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Figus</button>
+                    <button onClick={() => setStickerTab('saved')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-50/10' : 'text-slate-400'}`}>Gifs</button>
                     <button onClick={() => setShowStickerPicker(false)} className="px-4 text-slate-400 hover:text-red-500"><X className="w-5 h-5" /></button>
                   </div>
-                  <div className="p-4 max-h-64 overflow-y-auto grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                    {(stickerTab === 'gallery' ? [
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
-                      'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e6/512.gif'
-                    ] : customStickers).map((url, i) => (
-                      <div key={i} className="relative group aspect-square">
-                        <img 
-                          src={url} 
-                          alt="sticker" 
-                          className="w-full h-full object-contain cursor-pointer hover:scale-110 transition-transform" 
-                          onClick={() => handleSendSticker(url)}
-                        />
+                  <div className="p-4 max-h-64 overflow-y-auto custom-scrollbar">
+                    {stickerTab === 'emojis' ? (
+                      <div className="grid grid-cols-7 sm:grid-cols-9 md:grid-cols-12 gap-1 px-1">
+                        {EMOJI_LIST.map((emoji, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSendEmoji(emoji)}
+                            className="p-2 text-2xl hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all active:scale-90"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-3">
+                        {(stickerTab === 'gallery' ? [
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
+                          'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e6/512.gif'
+                        ] : customStickers).map((url, i) => (
+                          <div key={i} className="relative group aspect-square max-w-[60px] mx-auto">
+                            <img 
+                              src={url} 
+                              alt="sticker" 
+                              className="w-full h-full object-contain cursor-pointer hover:scale-110 transition-transform drop-shadow-sm" 
+                              onClick={() => handleSendSticker(url)}
+                            />
+                            {stickerTab === 'saved' && (
+                              <button onClick={() => removeSticker(url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
+                            )}
+                          </div>
+                        ))}
                         {stickerTab === 'saved' && (
-                          <button onClick={() => removeSticker(url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
+                          <div className="relative aspect-square max-w-[60px] mx-auto">
+                            <button 
+                              onClick={() => stickerUploadRef.current?.click()}
+                              className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all"
+                            >
+                              <Plus className="w-5 h-5" />
+                              <span className="text-[8px] font-bold mt-1">NOVO</span>
+                            </button>
+                          </div>
                         )}
                       </div>
-                    ))}
-                    {stickerTab === 'saved' && (
-                      <button 
-                        onClick={() => stickerUploadRef.current?.click()}
-                        className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:border-emerald-500 hover:text-emerald-500 transition-all"
-                      >
-                        <Plus className="w-6 h-6" />
-                        <span className="text-[10px] font-bold mt-1">NOVO</span>
-                      </button>
                     )}
                   </div>
                 </div>

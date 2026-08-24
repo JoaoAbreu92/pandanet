@@ -329,7 +329,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         };
 
         if (mediaUrl) {
-            const isSticker = mediaType === 'sticker';
+            // Se for figurinha MAS for GIF, melhor tratar como mídia imagem (Evolution converte melhor no celular)
+            const isGif = mediaUrl.toLowerCase().endsWith('.gif');
+            const isSticker = mediaType === 'sticker' && !isGif;
             const endpoint = isSticker ? 'sendSticker' : 'sendMedia';
             
             const body = isSticker ? {
@@ -340,7 +342,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             } : {
                 number: phoneNumber,
                 mediaMessage: {
-                    mediatype: getEvoMediaType(mediaType),
+                    mediatype: isGif ? 'image' : getEvoMediaType(mediaType), // GIFs são mediatype image na Evolution
                     caption: message || '',
                     media: mediaUrl
                 }
@@ -386,13 +388,12 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             console.error('[SEND API] FALHA NO ENVIO:', JSON.stringify(detail));
             
             // Verifica se o número não existe no WhatsApp
-            if (Array.isArray(detail) && detail[0]?.exists === false) {
-                return res.status(400).json({ 
-                    error: 'Número não encontrado no WhatsApp', 
-                    details: `O número ${phoneNumber} não está cadastrado no WhatsApp.` 
-                });
-            }
-            return res.status(500).json({ error: 'Falha ao enviar mensagem via WhatsApp', details: detail });
+            console.error(`[SEND FAILURE] Erro retornado pela Evolution API:`, JSON.stringify(sendRes));
+            return res.status(500).json({ 
+                error: 'Falha ao enviar mensagem via WhatsApp (Evolution API)', 
+                details: sendRes,
+                evolutionStatus: sendRes?.status || 'desconhecido'
+            });
         }
 
         // 3. Save message in Supabase
