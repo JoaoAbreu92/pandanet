@@ -59,7 +59,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const channel = supabase
                 .channel(`notifications-${currentUser.id}`)
                 .on('postgres_changes', {
-                    event: 'INSERT',
+                    event: '*',
                     schema: 'public',
                     table: 'notifications',
                     filter: `user_id=eq.${currentUser.id}`

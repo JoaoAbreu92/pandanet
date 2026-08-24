@@ -55,8 +55,8 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
                         {unreadNotificationsCount > 0 && (
-                            <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-gray-800">
-                                {unreadNotificationsCount}
+                            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm px-1">
+                                {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                             </span>
                         )}
                     </button>
