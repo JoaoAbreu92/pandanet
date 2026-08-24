@@ -1975,7 +1975,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <div>
                   <p className="text-slate-500 mb-1">Fila / Setor</p>
                   <div className="flex flex-wrap gap-1">
-                    {queues.map((q: any) => (
+                    {queues
+                      .filter((q: any) => {
+                        if (isAdmin || permissions?.can_see_all_departments === true) return true;
+                        const allowed = permissions?.assigned_queues || [];
+                        return allowed.includes(q.id);
+                      })
+                      .map((q: any) => (
                       <button
                         key={q.id}
                         onClick={() => setFilterQueue(prev =>

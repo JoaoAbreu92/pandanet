@@ -204,6 +204,68 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
     const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
     const [accountUnseenCounts, setAccountUnseenCounts] = useState<Record<string, number>>({});
+    const [viewAllCompanyEmails, setViewAllCompanyEmails] = useState(() => {
+        return localStorage.getItem(`panda_view_all_company_emails_${currentUser?.id}`) === 'true';
+    });
+    const [allowUsersMultipleEmails, setAllowUsersMultipleEmails] = useState(false);
+
+    const isUserAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br';
+
+    const loadCompanySettings = async () => {
+        if (!currentUser?.company_id) return;
+        const { data, error } = await supabase
+            .from('companies')
+            .select('custom_features')
+            .eq('id', currentUser.company_id)
+            .maybeSingle();
+        if (data && !error) {
+            setAllowUsersMultipleEmails(!!data.custom_features?.allow_users_multiple_emails);
+        }
+    };
+
+    const toggleViewAllCompanyEmails = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newVal = e.target.checked;
+        setViewAllCompanyEmails(newVal);
+        localStorage.setItem(`panda_view_all_company_emails_${currentUser?.id}`, newVal ? 'true' : 'false');
+        showToast(newVal ? 'Você agora pode visualizar todas as contas de e-mail da empresa.' : 'Você agora visualiza apenas suas contas de e-mail.', 'info');
+        await fetchAccounts();
+    };
+
+    const toggleUsersMultipleEmails = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isGhostMode) return;
+        const newVal = e.target.checked;
+        setAllowUsersMultipleEmails(newVal);
+        
+        try {
+            const { data: company } = await supabase
+                .from('companies')
+                .select('custom_features')
+                .eq('id', currentUser.company_id)
+                .maybeSingle();
+                
+            const currentFeatures = company?.custom_features || {};
+            const updatedFeatures = {
+                ...currentFeatures,
+                allow_users_multiple_emails: newVal
+            };
+            
+            const { error } = await supabase
+                .from('companies')
+                .update({ custom_features: updatedFeatures })
+                .eq('id', currentUser.company_id);
+                
+            if (error) throw error;
+            
+            showToast(newVal ? 'Múltiplos e-mails permitidos para usuários comum.' : 'Múltiplos e-mails desativados para usuários comum.', 'success');
+            
+            if (currentUser.company) {
+                currentUser.company.custom_features = updatedFeatures;
+            }
+        } catch (err: any) {
+            showToast('Erro ao atualizar configuração: ' + err.message, 'error');
+            setAllowUsersMultipleEmails(!newVal);
+        }
+    };
 
     const [folders, setFolders] = useState<any[]>([]);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
@@ -448,6 +510,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     useEffect(() => {
         const initialize = async () => {
             await fetchAccounts();
+            await loadCompanySettings();
         };
         initialize();
         return () => {
@@ -513,7 +576,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         
         const perms = currentUser.email_permissions;
         const isSuperOrMaster = currentUser.role === 'Super Admin' || currentUser.email === 'ti@grupopixel.com.br';
-        const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true;
+        const isAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || isSuperOrMaster;
+        const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true || (isAdmin && viewAllCompanyEmails);
         
         if (!canViewAll) {
             if (perms?.allowed_accounts && perms.allowed_accounts.length > 0) {
@@ -560,10 +624,21 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (!currentUser?.company_id) return;
         
         // Verificação de limite individual ou do plano
-        const currentLimit = currentUser.email_permissions?.account_limit || 1;
-        if (!activeAccountId && accounts.length >= currentLimit) {
-            showToast(`Você atingiu o seu limite de ${currentLimit} conta(s) de e-mail.`, 'warning');
-            return;
+        if (!activeAccountId) {
+            const myOwnedAccounts = accounts.filter(a => a.user_id === currentUser.id);
+            const isUserAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br';
+            const multipleAllowed = allowUsersMultipleEmails;
+
+            if (!isUserAdmin && !multipleAllowed && myOwnedAccounts.length >= 1) {
+                showToast("Usuários comuns só podem cadastrar 1 conta de e-mail. Entre em contato com um administrador.", "warning");
+                return;
+            }
+
+            const currentLimit = currentUser.email_permissions?.account_limit || 1;
+            if (myOwnedAccounts.length >= currentLimit) {
+                showToast(`Você atingiu o seu limite de ${currentLimit} conta(s) de e-mail.`, 'warning');
+                return;
+            }
         }
         
         const payload = { 
@@ -2910,6 +2985,48 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                     </select>
                                                 </div>
                                             </div>
+
+                                            {isUserAdmin && (
+                                                <div className="bg-white dark:bg-slate-900/60 p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl mt-6">
+                                                    <h3 className="font-black text-gray-900 dark:text-white mb-2 text-xl tracking-tight flex items-center gap-3">
+                                                        <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg text-amber-600">
+                                                            <UserGroupIcon className="w-5 h-5" />
+                                                        </div>
+                                                        Painel Administrativo de E-mail
+                                                    </h3>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Configurações globais de e-mail para os usuários de sua empresa.</p>
+                                                    
+                                                    <div className="space-y-6">
+                                                        {/* Toggle to allow users to register multiple emails */}
+                                                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/5">
+                                                            <div>
+                                                                <label className="text-sm font-black text-gray-700 dark:text-gray-300">Permitir múltiplos e-mails para usuários comuns</label>
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Se desativado, usuários comuns só poderão cadastrar no máximo 1 conta de e-mail.</p>
+                                                            </div>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer" 
+                                                                checked={allowUsersMultipleEmails} 
+                                                                onChange={toggleUsersMultipleEmails} 
+                                                            />
+                                                        </div>
+
+                                                        {/* Toggle to see all company emails in the inbox */}
+                                                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/5">
+                                                            <div>
+                                                                <label className="text-sm font-black text-gray-700 dark:text-gray-300">Visualizar todas as contas de e-mail da empresa</label>
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ative este toggle para visualizar e gerenciar as contas de e-mail de todos os usuários cadastrados na sua conta.</p>
+                                                            </div>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer" 
+                                                                checked={viewAllCompanyEmails} 
+                                                                onChange={toggleViewAllCompanyEmails} 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex justify-end gap-4 p-8 bg-white dark:bg-slate-900/60 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">

@@ -189,6 +189,63 @@ async function runAutoMigration() {
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna shared_with:', e));
 
+        console.log('[MIGRATION] Verificando e aplicando correção de segurança RLS para whatsapp_conversations...');
+        await supabase.rpc('exec_sql', {
+            sql: `
+                CREATE OR REPLACE FUNCTION public.get_user_assigned_queues()
+                RETURNS JSONB
+                LANGUAGE plpgsql
+                SECURITY DEFINER
+                SET search_path = public
+                STABLE
+                AS $$
+                BEGIN
+                  RETURN (SELECT COALESCE(whatspanda_permissions->'assigned_queues', '[]'::jsonb) FROM public.profiles WHERE id = auth.uid());
+                END;
+                $$;
+
+                DROP POLICY IF EXISTS "whatsapp_conversations_select_policy" ON public.whatsapp_conversations;
+                CREATE POLICY "whatsapp_conversations_select_policy"
+                  ON public.whatsapp_conversations
+                  FOR SELECT
+                  USING (
+                    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+                    AND (
+                      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
+                      OR
+                      assigned_to = auth.uid()
+                      OR
+                      (
+                        queue_id IS NOT NULL 
+                        AND public.get_user_assigned_queues() ? queue_id::text
+                      )
+                      OR
+                      (assigned_to IS NULL AND queue_id IS NULL)
+                    )
+                  );
+
+                DROP POLICY IF EXISTS "whatsapp_conversations_update_policy" ON public.whatsapp_conversations;
+                CREATE POLICY "whatsapp_conversations_update_policy"
+                  ON public.whatsapp_conversations
+                  FOR UPDATE
+                  USING (
+                    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+                    AND (
+                      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
+                      OR
+                      assigned_to = auth.uid()
+                      OR
+                      (
+                        queue_id IS NOT NULL 
+                        AND public.get_user_assigned_queues() ? queue_id::text
+                      )
+                      OR
+                      (assigned_to IS NULL AND queue_id IS NULL)
+                    )
+                  );
+            `
+        }).catch(e => console.error('[MIGRATION] Erro ao atualizar RLS de whatsapp_conversations:', e));
+
         console.log('[MIGRATION] Verificando e criando coluna created_at nas tabelas de campanhas e alvos...');
         await supabase.rpc('exec_sql', {
             sql: `
