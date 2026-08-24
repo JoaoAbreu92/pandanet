@@ -529,10 +529,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     imap_user: activeAccount.imap_user,
                     imap_pass: activeAccount.imap_pass,
                     imap_ssl: activeAccount.imap_ssl ?? true,
-                    smtp_host: activeAccount.smtp_host,
-                    smtp_port: activeAccount.smtp_port,
-                    smtp_user: activeAccount.smtp_user,
-                    smtp_pass: activeAccount.smtp_pass,
+                    smtp_host: activeAccount.smtp_host || activeAccount.imap_host,
+                    smtp_port: activeAccount.smtp_port || 465,
+                    smtp_user: (activeAccount.smtp_user && activeAccount.smtp_user.trim()) ? activeAccount.smtp_user.trim() : activeAccount.imap_user,
+                    smtp_pass: (activeAccount.smtp_pass && activeAccount.smtp_pass.trim()) ? activeAccount.smtp_pass.trim() : activeAccount.imap_pass,
                     smtp_ssl: activeAccount.smtp_ssl ?? true,
                     signature: activeAccount.signature || ''
                 };
@@ -641,11 +641,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             }
         }
         
+        const safeSettings = {
+            ...settings,
+            smtp_user: (settings.smtp_user && settings.smtp_user.trim()) ? settings.smtp_user.trim() : settings.imap_user,
+            smtp_pass: (settings.smtp_pass && settings.smtp_pass.trim()) ? settings.smtp_pass.trim() : settings.imap_pass
+        };
         const payload = { 
             id: activeAccountId || undefined, 
             company_id: currentUser.company_id,
             user_id: currentUser.id, 
-            ...settings 
+            ...safeSettings 
         };
         
         const { data, error } = await supabase.from('email_settings').upsert(payload).select();

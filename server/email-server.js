@@ -624,25 +624,34 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> To: ${payload.to} - Subject: ${payload.subject}`);
     console.log(`[email-server] SEND PAYLOAD: html_len=${(payload.html || '').length}, text_len=${(payload.text || '').length}, attachments=${(payload.attachments || []).length}`);
 
-    const transporter = nodemailer.createTransport({
+    const smtpUser = (config.smtp_user && String(config.smtp_user).trim()) ? String(config.smtp_user).trim() : (config.imap_user ? String(config.imap_user).trim() : '');
+    const smtpPass = (config.smtp_pass && String(config.smtp_pass).trim()) ? String(config.smtp_pass).trim() : (config.imap_pass ? String(config.imap_pass).trim() : '');
+    const fromAddress = config.from || smtpUser || config.imap_user;
+
+    const transportOpts = {
         host: config.smtp_host,
         port: ensureNumber(config.smtp_port),
         secure: config.smtp_ssl !== false,
-        auth: { user: config.smtp_user, pass: config.smtp_pass },
         tls: { rejectUnauthorized: false },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 15000
-    });
+    };
+
+    if (smtpUser && smtpPass) {
+        transportOpts.auth = { user: smtpUser, pass: smtpPass };
+    }
+
+    const transporter = nodemailer.createTransport(transportOpts);
 
     try {
         // 1. Send via SMTP
         const info = await transporter.sendMail({
-            from: config.smtp_user,
+            from: fromAddress,
             to: payload.to,
             cc: payload.cc,
             bcc: payload.bcc,
-            replyTo: payload.replyTo,
+            replyTo: payload.replyTo || fromAddress,
             subject: payload.subject,
             text: payload.text,
             html: payload.html,
@@ -683,11 +692,11 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
             // Use nodemailer lib's built-in MailComposer for robust formatting
             const MailComposer = require('nodemailer/lib/mail-composer');
             const mail = new MailComposer({
-                from: config.smtp_user,
+                from: fromAddress,
                 to: payload.to,
                 cc: payload.cc,
                 bcc: payload.bcc,
-                replyTo: payload.replyTo,
+                replyTo: payload.replyTo || fromAddress,
                 subject: payload.subject,
                 text: payload.text,
                 html: payload.html,
@@ -788,16 +797,24 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
     }
 
     // Test SMTP
-    const transporter = nodemailer.createTransport({
+    const smtpUser = (config.smtp_user && String(config.smtp_user).trim()) ? String(config.smtp_user).trim() : (config.imap_user ? String(config.imap_user).trim() : '');
+    const smtpPass = (config.smtp_pass && String(config.smtp_pass).trim()) ? String(config.smtp_pass).trim() : (config.imap_pass ? String(config.imap_pass).trim() : '');
+
+    const transportOpts = {
         host: config.smtp_host,
         port: ensureNumber(config.smtp_port),
         secure: config.smtp_ssl !== false,
-        auth: { user: config.smtp_user, pass: config.smtp_pass },
         tls: { rejectUnauthorized: false },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 15000
-    });
+    };
+
+    if (smtpUser && smtpPass) {
+        transportOpts.auth = { user: smtpUser, pass: smtpPass };
+    }
+
+    const transporter = nodemailer.createTransport(transportOpts);
     try {
         await transporter.verify();
         results.smtp = true;
