@@ -1856,7 +1856,6 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
         addDebugLog('MSG_PROCESS', `Processando mensagem: ${message.key?.id} | De: ${remoteJid} | fromMe: ${isFromMe} | Histórico: ${isHistorical}`);
 
-        const msgId = message.key?.id;
         const pushName = message.pushName || message.pushname || message.contact?.name || message.verifiedName || null;
 
         // Auto-criar contato para indivíduos (não grupos)
