@@ -21,6 +21,7 @@ interface Submission {
     completed: boolean;
     answers: number[];
     created_at: string;
+    status?: string;
     profile?: {
         full_name: string;
     };
@@ -38,6 +39,11 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
     const [selectedTrainingForProgress, setSelectedTrainingForProgress] = useState<TrainingModule | null>(null);
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+
+    // Quiz Correction states
+    const [selectedSubmissionForCorrection, setSelectedSubmissionForCorrection] = useState<Submission | null>(null);
+    const [correctionScore, setCorrectionScore] = useState<number>(0);
+    const [isSavingCorrection, setIsSavingCorrection] = useState(false);
 
     // Form fields state
     const [title, setTitle] = useState('');
@@ -101,6 +107,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                     score,
                     answers,
                     completed_at,
+                    status,
                     profiles:employee_id (
                         full_name
                     )
@@ -116,6 +123,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                     completed: true,
                     answers: s.answers || [],
                     created_at: s.completed_at,
+                    status: s.status || 'pending',
                     profile: {
                         full_name: s.profiles?.full_name || 'Desconhecido'
                     }
@@ -160,8 +168,8 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
     };
 
     const handleAddQuizQuestion = () => {
-        if (quizQuestions.length >= 5) {
-            alert('Um quiz pode conter no máximo 5 perguntas.');
+        if (quizQuestions.length >= 15) {
+            alert('Um quiz pode conter no máximo 15 perguntas.');
             return;
         }
         setQuizQuestions(prev => [
@@ -342,6 +350,30 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
         }
     };
 
+    const handleSaveCorrection = async () => {
+        if (!selectedSubmissionForCorrection || !selectedTrainingForProgress) return;
+        setIsSavingCorrection(true);
+        try {
+            const { error } = await supabase
+                .from('training_submissions')
+                .update({
+                    score: correctionScore,
+                    status: 'corrected'
+                })
+                .eq('id', selectedSubmissionForCorrection.id);
+
+            if (error) throw error;
+
+            await fetchSubmissions(selectedTrainingForProgress.id);
+            setSelectedSubmissionForCorrection(null);
+        } catch (err: any) {
+            console.error('Error saving correction:', err);
+            alert('Erro ao liberar resultado: ' + (err?.message || JSON.stringify(err)));
+        } finally {
+            setIsSavingCorrection(false);
+        }
+    };
+
     const handleSelectTrainingForProgress = (training: TrainingModule) => {
         setSelectedTrainingForProgress(training);
         fetchSubmissions(training.id);
@@ -451,6 +483,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                         <th className="px-4 py-3">Status</th>
                                         <th className="px-4 py-3">Nota / Acertos</th>
                                         <th className="px-4 py-3">Conclusão</th>
+                                        <th className="px-4 py-3 text-right">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -471,23 +504,47 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {sub?.completed ? (
-                                                        <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">Concluído</span>
+                                                    {!sub ? (
+                                                        <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800 rounded-full dark:bg-slate-700 dark:text-gray-350">Pendente</span>
+                                                    ) : sub.status === 'corrected' ? (
+                                                        <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full dark:bg-emerald-950/35 dark:text-emerald-400">Concluído</span>
                                                     ) : (
-                                                        <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full">Pendente</span>
+                                                        <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full dark:bg-amber-950/35 dark:text-amber-400">Aguardando Correção</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {sub?.completed ? (
-                                                        <span className="font-semibold text-gray-900 dark:text-white">
+                                                    {sub ? (
+                                                        <span className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
                                                             {sub.score}% ({sub.answers?.length ? Math.round((sub.score / 100) * selectedTrainingForProgress.quiz?.length) : 0}/{selectedTrainingForProgress.quiz?.length})
+                                                            {sub.status !== 'corrected' && (
+                                                                <span className="text-[10px] font-normal text-gray-450 dark:text-gray-400">(Não Liberado)</span>
+                                                            )}
                                                         </span>
                                                     ) : (
                                                         <span className="text-gray-400">-</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-500">
-                                                    {sub?.completed ? new Date(sub.created_at).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                    {sub ? new Date(sub.created_at).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {sub ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedSubmissionForCorrection(sub);
+                                                                setCorrectionScore(sub.score);
+                                                            }}
+                                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                                                                sub.status === 'corrected'
+                                                                    ? 'bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-gray-700 dark:text-gray-200'
+                                                                    : 'bg-emerald-50 hover:bg-emerald-100 text-brand-primary dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-950/30'
+                                                            }`}
+                                                        >
+                                                            {sub.status === 'corrected' ? 'Revisar' : 'Corrigir'}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs">-</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -638,10 +695,10 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                     <button
                                         type="button"
                                         onClick={handleAddQuizQuestion}
-                                        disabled={quizQuestions.length >= 5}
+                                        disabled={quizQuestions.length >= 15}
                                         className="text-xs font-semibold bg-emerald-50 text-brand-primary hover:bg-emerald-100 dark:bg-slate-850 px-3 py-1.5 rounded-lg border border-brand-primary/20 disabled:opacity-50"
                                     >
-                                        + Adicionar Pergunta ({quizQuestions.length}/5)
+                                        + Adicionar Pergunta ({quizQuestions.length}/15)
                                     </button>
                                 </div>
 
@@ -713,6 +770,144 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Quiz Correction Modal */}
+            {selectedSubmissionForCorrection && selectedTrainingForProgress && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                            onClick={() => setSelectedSubmissionForCorrection(null)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                            disabled={isSavingCorrection}
+                        >
+                            <XMarkIcon className="w-6 h-6" />
+                        </button>
+                        
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                            Corrigir Avaliação
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-6 border-b dark:border-white/5 pb-2">
+                            Colaborador: <strong className="text-gray-700 dark:text-gray-200">{selectedSubmissionForCorrection.profile?.full_name || 'Desconhecido'}</strong><br />
+                            Treinamento: <strong className="text-gray-700 dark:text-gray-200">{selectedTrainingForProgress.title}</strong>
+                        </p>
+
+                        <div className="space-y-6 mb-8">
+                            {selectedTrainingForProgress.quiz?.map((q, qIndex) => {
+                                const userAnswerIndex = selectedSubmissionForCorrection.answers[qIndex];
+                                const isCorrect = userAnswerIndex === q.correctOptionIndex;
+
+                                return (
+                                    <div key={qIndex} className="p-4 bg-gray-50 dark:bg-slate-800/55 rounded-xl border dark:border-white/5 space-y-3">
+                                        <div className="flex justify-between items-start">
+                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                                                Questão {qIndex + 1}: {q.questionText}
+                                            </h4>
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
+                                                isCorrect 
+                                                    ? 'bg-green-100 text-green-800 dark:bg-emerald-950/40 dark:text-emerald-400' 
+                                                    : 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400'
+                                            }`}>
+                                                {isCorrect ? 'Correta' : 'Incorreta'}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {q.options.map((opt, oIndex) => {
+                                                const isUserChosen = userAnswerIndex === oIndex;
+                                                const isCorrectOption = q.correctOptionIndex === oIndex;
+
+                                                let borderStyle = 'border-gray-200 dark:border-gray-700';
+                                                let bgStyle = 'bg-white dark:bg-slate-900';
+                                                
+                                                if (isCorrectOption) {
+                                                    borderStyle = 'border-green-500';
+                                                    bgStyle = 'bg-green-50/50 dark:bg-emerald-950/15';
+                                                } else if (isUserChosen && !isCorrect) {
+                                                    borderStyle = 'border-red-500';
+                                                    bgStyle = 'bg-red-50/50 dark:bg-red-950/15';
+                                                }
+
+                                                return (
+                                                    <div
+                                                        key={oIndex}
+                                                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-medium ${borderStyle} ${bgStyle}`}
+                                                    >
+                                                        <span className="text-gray-800 dark:text-gray-300">{opt}</span>
+                                                        <div className="flex items-center space-x-1.5 text-[10px] font-bold">
+                                                            {isCorrectOption && (
+                                                                <span className="text-green-600 dark:text-emerald-400">✓ Resposta Correta</span>
+                                                            )}
+                                                            {isUserChosen && (
+                                                                <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                                                                    Selecionada
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-4 bg-gray-50 dark:bg-slate-800/35 rounded-xl border dark:border-white/5 space-y-4">
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white">Resultado e Liberação</h4>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                <div>
+                                    <p className="text-xs text-gray-500">Nota Calculada Automaticamente</p>
+                                    <p className="text-lg font-bold text-brand-primary dark:text-emerald-400 mt-1">
+                                        {(() => {
+                                            const total = selectedTrainingForProgress.quiz?.length || 0;
+                                            let correct = 0;
+                                            selectedTrainingForProgress.quiz?.forEach((q, idx) => {
+                                                if (q.correctOptionIndex === selectedSubmissionForCorrection.answers[idx]) {
+                                                    correct++;
+                                                }
+                                            });
+                                            const autoScore = total > 0 ? Math.round((correct / total) * 100) : 100;
+                                            return `${autoScore}% (${correct}/${total} corretas)`;
+                                        })()}
+                                    </p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Nota Final (Override)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={correctionScore}
+                                        onChange={e => setCorrectionScore(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                                        className="w-full border border-gray-350 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-3 pt-6 border-t dark:border-white/5 mt-6">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedSubmissionForCorrection(null)}
+                                disabled={isSavingCorrection}
+                                className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:text-gray-300 rounded-lg"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveCorrection}
+                                disabled={isSavingCorrection}
+                                className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                            >
+                                {isSavingCorrection ? 'Salvando...' : 'Liberar Resultado'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

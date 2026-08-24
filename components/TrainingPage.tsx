@@ -204,6 +204,7 @@ const TrainingPage: React.FC = () => {
                     employee_id: currentUser.id,
                     answers: quizAnswers,
                     score,
+                    status: 'pending',
                     completed_at: new Date().toISOString()
                 }]);
 
@@ -223,7 +224,9 @@ const TrainingPage: React.FC = () => {
 
     const getTrainingStatus = (trainingId: string) => {
         const sub = submissions.find(s => s.training_id === trainingId);
-        return sub ? { completed: true, score: sub.score } : { completed: false, score: 0 };
+        return sub 
+            ? { completed: true, score: sub.score, status: sub.status || 'pending' } 
+            : { completed: false, score: 0, status: 'none' };
     };
 
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando seus treinamentos...</div>;
@@ -313,6 +316,14 @@ const TrainingPage: React.FC = () => {
                                     (() => {
                                         const status = getTrainingStatus(selectedTraining.id);
                                         if (status.completed) {
+                                            if (status.status === 'pending') {
+                                                return (
+                                                    <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 p-3 rounded-lg border border-amber-200 dark:border-amber-900/50">
+                                                        <p className="font-bold text-sm">Avaliação Enviada!</p>
+                                                        <p className="text-xs mt-1">Aguardando correção pelo administrador.</p>
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <div className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50">
                                                     <p className="font-bold text-sm">Treinamento Concluído!</p>
@@ -367,7 +378,11 @@ const TrainingPage: React.FC = () => {
                                         </div>
                                         <span className="absolute bottom-2 right-2 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded font-medium">{training.duration}</span>
                                         {status.completed && (
-                                            <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider shadow">Concluído</span>
+                                            status.status === 'pending' ? (
+                                                <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider shadow">Aguardando Correção</span>
+                                            ) : (
+                                                <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider shadow">Concluído</span>
+                                            )
                                         )}
                                     </div>
                                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
