@@ -107,20 +107,20 @@ const LoginPage: React.FC = () => {
                         .eq('id', authData.user!.id);
 
                     if (updateError) console.error("Error updating profile with company/status:", updateError);
-                }, 1500); // Wait for trigger + some buffer
 
-                setMessage(language === 'pt'
-                    ? (isFirstUser 
-                        ? 'Cadastro realizado com sucesso! Verifique seu email para confirmar e acessar a plataforma.'
-                        : 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação do administrador.')
-                    : language === 'en'
-                        ? (isFirstUser
-                            ? 'Sign up successful! Please check your email to confirm and access the platform.'
-                            : 'Sign up successful! Please check your email to confirm. Your account will undergo approval.')
-                        : (isFirstUser
-                            ? '¡Registro exitoso! Verifique su correo para confirmar y acceder a la plataforma.'
-                            : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.'));
-                setIsSignUp(false); // Switch back to login for UX
+                    setMessage(language === 'pt'
+                        ? (isFirstUser 
+                            ? 'Cadastro realizado com sucesso! Verifique seu email para confirmar e acessar a plataforma.'
+                            : 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação do administrador.')
+                        : language === 'en'
+                            ? (isFirstUser
+                                ? 'Sign up successful! Please check your email to confirm and access the platform.'
+                                : 'Sign up successful! Please check your email to confirm. Your account will undergo approval.')
+                            : (isFirstUser
+                                ? '¡Registro exitoso! Verifique su correo para confirmar y acceder a la plataforma.'
+                                : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.'));
+                    setIsSignUp(false); // Switch back to login for UX
+                }, 1500); // Wait for trigger + some buffer
             }
         } else {
             // Login Logic
