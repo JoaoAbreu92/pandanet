@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const WsTransport = require('ws');
 const { analyzeMessageForTransfer } = require('./utils/geminiService');
 const pushService = require('./utils/pushService');
 
@@ -92,12 +93,12 @@ if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('1
     .replace('77.37.43.60', 'supabase-kong');
 }
 
-let publicSupabaseUrl = internalSupabaseUrl;
-// Em produção, a conexão direta via contêiner ou IP pode falhar no WebSocket (Realtime) devido a cabeçalhos de Host do Kong.
-// Forçar o uso da URL pública com SSL garante que o WebSocket suba com sucesso através do Nginx.
-if (process.env.NODE_ENV === 'production' || publicSupabaseUrl.includes('supabase-kong') || publicSupabaseUrl.includes('77.37.43.60')) {
-    publicSupabaseUrl = 'https://pandanet.grupopixel.com.br';
-}
+// O backend executa dentro da mesma rede Docker do Supabase.
+// Para listeners server-side, usar o Kong interno evita DNS publico,
+// TLS/Nginx e hairpin de rede desnecessarios.
+// A conectividade WebSocket + PHX_JOIN pelo Kong interno foi validada
+// diretamente antes deste ajuste.
+const realtimeSupabaseUrl = internalSupabaseUrl;
 
 if (evoUrl.includes('localhost') || evoUrl.includes('127.0.0.1')) {
     evoUrl = evoUrl.replace('localhost', 'evolution-api').replace('127.0.0.1', 'evolution-api');
@@ -135,207 +136,145 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABA
 // Client for queries (uses internal fast URL to avoid SSL/DNS/Proxy issues)
 const supabase = createClient(internalSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 // Client for public Realtime websockets
-const realtimeSupabase = createClient(publicSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
+const realtimeSupabase = createClient(
+    realtimeSupabaseUrl,
+    supabaseKey ? supabaseKey.trim() : '',
+    {
+        realtime: {
+            transport: WsTransport
+        }
+    }
+);
 // Client for authenticating user tokens safely using the public anon key (bypasses service key issues)
 const supabaseAnon = createClient(internalSupabaseUrl, supabaseAnonKey ? supabaseAnonKey.trim() : '');
 
-// --- AUTO-MIGRAÇÃO DE SCHEMA ---
-async function runAutoMigration() {
-    try {
-        console.log('[MIGRATION] Verificando e adicionando coluna chatbot_delay à public.whatsapp_settings...');
-        const { error } = await supabase.rpc('exec_sql', {
-            sql: 'ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_delay INTEGER DEFAULT 0;'
-        });
-        if (error) {
-            console.error('[MIGRATION] Erro ao executar RPC exec_sql para chatbot_delay:', error.message);
-        } else {
-            console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna chatbot_delay).');
-        }
-
-        console.log('[MIGRATION] Verificando e adicionando coluna media_type à public.whatsapp_scheduled_campaigns...');
-        const { error: errMedia } = await supabase.rpc('exec_sql', {
-            sql: 'ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS media_type VARCHAR(50) DEFAULT \'image\';'
-        });
-        if (errMedia) {
-            console.error('[MIGRATION] Erro ao adicionar media_type a whatsapp_scheduled_campaigns:', errMedia.message);
-        } else {
-            console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna media_type em whatsapp_scheduled_campaigns).');
-        }
-
-        console.log('[MIGRATION] Verificando e criando tabela public.whatsapp_quick_messages se não existir...');
-        const { error: errQuickMsg } = await supabase.rpc('exec_sql', {
-            sql: `
-                CREATE TABLE IF NOT EXISTS public.whatsapp_quick_messages (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-                    shortcut TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    is_public BOOLEAN DEFAULT TRUE,
-                    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-            `
-        });
-        if (errQuickMsg) {
-            console.error('[MIGRATION] Erro ao garantir whatsapp_quick_messages:', errQuickMsg.message);
-        } else {
-            console.log('[MIGRATION] Auto-migração da tabela whatsapp_quick_messages executada.');
-        }
-
-        console.log('[MIGRATION] Verificando e criando colunas adicionais para chatbot, retries e bloqueio de bot...');
-        await supabase.rpc('exec_sql', {
-            sql: `
-                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_max_retries INTEGER DEFAULT 2;
-                ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retries INTEGER DEFAULT 0;
-                ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
-                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_invalid_option_msg TEXT DEFAULT 'Opção inválida. Por favor, escolha uma das opções do menu:';
-            `
-        }).catch(e => console.error('[MIGRATION] Erro ao adicionar novas colunas de chatbot:', e));
-
-        console.log('[MIGRATION] Verificando e criando coluna shared_with para whatsapp_quick_messages...');
-        await supabase.rpc('exec_sql', {
-            sql: `
-                ALTER TABLE public.whatsapp_quick_messages ADD COLUMN IF NOT EXISTS shared_with UUID[] DEFAULT '{}';
-            `
-        }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna shared_with:', e));
-
-        console.log('[MIGRATION] Verificando e criando colunas de gerenciamento de acesso a grupos e toggles de mensagem...');
-        await supabase.rpc('exec_sql', {
-            sql: `
-                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS allow_all_groups_access BOOLEAN DEFAULT TRUE;
-                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS enable_away_message BOOLEAN DEFAULT TRUE;
-                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS enable_close_message BOOLEAN DEFAULT TRUE;
-                ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS allowed_users UUID[] DEFAULT '{}';
-            `
-        }).catch(e => console.error('[MIGRATION] Erro ao adicionar colunas de acesso a grupos e toggles:', e));
-
-        console.log('[MIGRATION] Verificando e aplicando correção de segurança RLS para whatsapp_conversations...');
-        await supabase.rpc('exec_sql', {
-            sql: `
-                -- Drop conflicting SELECT policies
-                DROP POLICY IF EXISTS "Users can view conversations from their company" ON public.whatsapp_conversations;
-                DROP POLICY IF EXISTS "whatsapp_conversations_isolation_v2" ON public.whatsapp_conversations;
-                DROP POLICY IF EXISTS "conversations_isolation" ON public.whatsapp_conversations;
-                DROP POLICY IF EXISTS "Restricted view for Whatsapp Conversations" ON public.whatsapp_conversations;
-
-                -- Drop conflicting UPDATE policies
-                DROP POLICY IF EXISTS "Agents can update conversations" ON public.whatsapp_conversations;
-
-                -- Helper to fetch whatspanda_permissions
-                CREATE OR REPLACE FUNCTION public.get_user_whatspanda_permissions()
-                RETURNS JSONB
-                LANGUAGE plpgsql
-                SECURITY DEFINER
-                SET search_path = public
-                STABLE
-                AS $$
-                BEGIN
-                  RETURN (SELECT COALESCE(whatspanda_permissions, '{}'::jsonb) FROM public.profiles WHERE id = auth.uid());
-                END;
-                $$;
-
-                -- Helper to fetch assigned queues
-                CREATE OR REPLACE FUNCTION public.get_user_assigned_queues()
-                RETURNS JSONB
-                LANGUAGE plpgsql
-                SECURITY DEFINER
-                SET search_path = public
-                STABLE
-                AS $$
-                BEGIN
-                  RETURN (SELECT COALESCE(whatspanda_permissions->'assigned_queues', '[]'::jsonb) FROM public.profiles WHERE id = auth.uid());
-                END;
-                $$;
-
-                DROP POLICY IF EXISTS "whatsapp_conversations_select_policy" ON public.whatsapp_conversations;
-                CREATE POLICY "whatsapp_conversations_select_policy"
-                  ON public.whatsapp_conversations
-                  FOR SELECT
-                  USING (
-                    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
-                    AND (
-                      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
-                      OR
-                      (
-                        is_group = true
-                        AND (
-                          (SELECT COALESCE(allow_all_groups_access, true) FROM public.whatsapp_settings WHERE id = connection_id) = true
-                          OR
-                          auth.uid() = ANY(allowed_users)
-                        )
-                      )
-                      OR
-                      (
-                        (is_group = false OR is_group IS NULL)
-                        AND (
-                          assigned_to = auth.uid()
-                          OR
-                          (
-                            queue_id IS NOT NULL 
-                            AND public.get_user_assigned_queues() ? queue_id::text
-                          )
-                          OR
-                          (assigned_to IS NULL AND queue_id IS NULL)
-                        )
-                      )
-                    )
-                  );
-
-                DROP POLICY IF EXISTS "whatsapp_conversations_update_policy" ON public.whatsapp_conversations;
-                CREATE POLICY "whatsapp_conversations_update_policy"
-                  ON public.whatsapp_conversations
-                  FOR UPDATE
-                  USING (
-                    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
-                    AND (
-                      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
-                      OR
-                      (
-                        is_group = true
-                        AND (
-                          (SELECT COALESCE(allow_all_groups_access, true) FROM public.whatsapp_settings WHERE id = connection_id) = true
-                          OR
-                          auth.uid() = ANY(allowed_users)
-                        )
-                      )
-                      OR
-                      (
-                        (is_group = false OR is_group IS NULL)
-                        AND (
-                          assigned_to = auth.uid()
-                          OR
-                          (
-                            queue_id IS NOT NULL 
-                            AND public.get_user_assigned_queues() ? queue_id::text
-                          )
-                          OR
-                          (assigned_to IS NULL AND queue_id IS NULL)
-                        )
-                      )
-                    )
-                  );
-            `
-        }).catch(e => console.error('[MIGRATION] Erro ao atualizar RLS de whatsapp_conversations:', e));
-
-        console.log('[MIGRATION] Verificando e criando coluna created_at nas tabelas de campanhas e alvos...');
-        await supabase.rpc('exec_sql', {
-            sql: `
-                ALTER TABLE public.whatsapp_scheduled_targets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-                ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-            `
-        }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna created_at:', e));
-
-        // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar todas as atualizações
-        await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
-        console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');
-    } catch (err) {
-        console.error('[MIGRATION] Falha ao rodar auto-migração:', err.message);
-    }
-}
-runAutoMigration();
+// --- SCHEMA / MIGRATIONS ---
+//
+// O schema do PandaNet é gerenciado fora do startup da aplicação.
+// Migrations não devem ser executadas automaticamente pelo backend.
+//
+// Motivos:
+// - a antiga RPC administrativa nao faz parte do schema atual;
+// - alterações estruturais/RLS não pertencem ao ciclo de inicialização;
+// - o schema necessário já foi validado diretamente no PostgreSQL.
+//
+// Alterações futuras devem ser aplicadas por migration versionada e auditada.
 
 // Cache em memória para IDs de mensagens processadas recentemente (anti-duplicação por concorrência)
+
 const recentMessageIds = new Set();
+
+/**
+ * Resolve um LID do WhatsApp para o número real (PN) previamente aprendido.
+ *
+ * O mapping é isolado por empresa + conexão porque o relacionamento LID/PN
+ * pertence à identidade da sessão WhatsApp, não apenas ao cadastro global
+ * de contato.
+ */
+async function resolveWhatsAppLidMapping(companyId, connectionId, lid) {
+    try {
+        const cleanLid = String(lid || '').replace(/\D/g, '');
+
+        if (!companyId || !connectionId || !cleanLid) {
+            return null;
+        }
+
+        const { data, error } = await supabase
+            .from('whatsapp_lid_mappings')
+            .select('phone')
+            .eq('company_id', companyId)
+            .eq('connection_id', connectionId)
+            .eq('lid', cleanLid)
+            .maybeSingle();
+
+        if (error) {
+            console.error(`[LID-MAP] Erro ao resolver LID ${cleanLid}:`, error.message);
+            addDebugLog(
+                'MSG_LID_RESOLVE_ERR',
+                `Erro resolvendo LID ${cleanLid}: ${error.message}`
+            );
+            return null;
+        }
+
+        const phone = data?.phone
+            ? String(data.phone).replace(/\D/g, '')
+            : null;
+
+        return phone || null;
+    } catch (err) {
+        console.error(`[LID-MAP] Falha inesperada ao resolver LID:`, err.message);
+        addDebugLog(
+            'MSG_LID_RESOLVE_ERR',
+            `Falha inesperada resolvendo LID: ${err.message}`
+        );
+        return null;
+    }
+}
+
+/**
+ * Aprende ou atualiza um relacionamento LID -> PN.
+ *
+ * Não interrompe o processamento da mensagem caso a persistência falhe:
+ * senderPn continua sendo a fonte principal quando veio no próprio evento.
+ */
+async function rememberWhatsAppLidMapping(
+    companyId,
+    connectionId,
+    lid,
+    phone
+) {
+    try {
+        const cleanLid = String(lid || '').replace(/\D/g, '');
+        const cleanPhone = String(phone || '').replace(/\D/g, '');
+
+        if (!companyId || !connectionId || !cleanLid || !cleanPhone) {
+            return;
+        }
+
+        const { error } = await supabase
+            .from('whatsapp_lid_mappings')
+            .upsert(
+                {
+                    company_id: companyId,
+                    connection_id: connectionId,
+                    lid: cleanLid,
+                    phone: cleanPhone,
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    onConflict: 'company_id,connection_id,lid',
+                    ignoreDuplicates: false
+                }
+            );
+
+        if (error) {
+            console.error(
+                `[LID-MAP] Erro ao persistir ${cleanLid} -> ${cleanPhone}:`,
+                error.message
+            );
+
+            addDebugLog(
+                'MSG_LID_LEARN_ERR',
+                `Erro persistindo LID ${cleanLid} -> ${cleanPhone}: ${error.message}`
+            );
+
+            return;
+        }
+
+        addDebugLog(
+            'MSG_LID_LEARNED',
+            `LID ${cleanLid} associado ao telefone ${cleanPhone}`
+        );
+    } catch (err) {
+        console.error(`[LID-MAP] Falha inesperada ao persistir mapping:`, err.message);
+
+        addDebugLog(
+            'MSG_LID_LEARN_ERR',
+            `Falha inesperada persistindo mapping LID: ${err.message}`
+        );
+    }
+}
+
 
 global.realtimeStatus = {
     notifications: 'unknown',
@@ -2936,6 +2875,72 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         let remoteJid = message.key?.remoteJid || '';
         const msgId = message.key?.id;
 
+        
+        // Ignorar broadcasts mas permitir grupos e @lid
+        if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) return;
+        const isGroup = remoteJid.includes('@g.us');
+        
+        // Extrair telefone real.
+        //
+        // Para JIDs @lid:
+        // 1. senderPn presente -> usa PN e aprende LID -> PN;
+        // 2. senderPn ausente -> tenta resolver pelo mapping persistido;
+        // 3. mapping desconhecido -> aguarda sem bloquear o msgId.
+        let fromPhone;
+
+        if (remoteJid.includes('@lid')) {
+            const lid = remoteJid.split('@')[0].replace(/\D/g, '');
+            const senderPn = message.key?.senderPn || message.senderPn || '';
+
+            if (senderPn) {
+                fromPhone = senderPn.split('@')[0].replace(/\D/g, '');
+
+                // Aprende o mapping para futuros eventos fromMe que podem
+                // chegar somente como @lid, sem senderPn.
+                await rememberWhatsAppLidMapping(
+                    companyId,
+                    connectionId,
+                    lid,
+                    fromPhone
+                );
+            } else {
+                fromPhone = await resolveWhatsAppLidMapping(
+                    companyId,
+                    connectionId,
+                    lid
+                );
+
+                if (fromPhone) {
+                    console.log(
+                        `[MSG] JID @lid ${lid} resolvido pelo mapping persistido para ${fromPhone}.`
+                    );
+
+                    addDebugLog(
+                        'MSG_LID_RESOLVED',
+                        `LID ${lid} resolvido para ${fromPhone} na msg ${message.key?.id}`
+                    );
+                } else {
+                    console.log(
+                        `[MSG] JID @lid ${lid} sem senderPn e sem mapping conhecido. Aguardando.`
+                    );
+
+                    addDebugLog(
+                        'MSG_LID_WAIT',
+                        `JID @lid ${lid} sem senderPn/mapping para msg ${message.key?.id}; ID liberado para permitir reprocessamento`
+                    );
+
+                    return;
+                }
+            }
+        } else {
+            fromPhone = remoteJid.split('@')[0];
+        }
+
+        if (!fromPhone) return;
+
+        // Deduplicacao concorrente somente apos resolver a identidade da mensagem.
+        // Eventos @lid podem chegar inicialmente sem senderPn e serem reenviados
+        // pela Evolution depois com o numero real preenchido.
         if (msgId) {
             if (recentMessageIds.has(msgId)) {
                 console.log(`[MSG] Ignorando processamento duplicado em concorrência para ID: ${msgId}`);
@@ -2944,27 +2949,6 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             recentMessageIds.add(msgId);
             setTimeout(() => recentMessageIds.delete(msgId), 15000);
         }
-        
-        // Ignorar broadcasts mas permitir grupos e @lid
-        if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) return;
-        const isGroup = remoteJid.includes('@g.us');
-        
-        // extrair telefone real
-        let fromPhone;
-        if (remoteJid.includes('@lid')) {
-            const senderPn = message.key?.senderPn || message.senderPn || '';
-            if (senderPn) {
-                fromPhone = senderPn.split('@')[0];
-            } else {
-                console.log(`[MSG] JID @lid sem senderPn. Ignorando.`);
-                addDebugLog('MSG_LID_ERR', `JID @lid sem senderPn para msg ${message.key?.id}`);
-                return;
-            }
-        } else {
-            fromPhone = remoteJid.split('@')[0];
-        }
-
-        if (!fromPhone) return;
 
         // Buscar dados do canal para saber o próprio número e ignorá-lo caso envie para si mesmo
         const { data: channelSettings } = await supabase
@@ -3322,6 +3306,13 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             senderName = pushName;
         }
 
+        // Chave Gemini da conexão.
+        //
+        // Precisa existir neste escopo antes do INSERT porque o fluxo de áudio
+        // pode iniciar a transcrição logo após salvar a mensagem.
+        // O mesmo valor é reutilizado posteriormente pelo chatbot/triagem.
+        let geminiKey = null;
+
         // 2. Inserir a mensagem
         if (conversationId) {
             let existingId = null;
@@ -3446,7 +3437,6 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         const currentConv = conv || { id: conversationId, contact_phone: fromPhone, queue_id: null, assigned_to: null };
                         
                         let chatbotMode = 'disabled';
-                        let geminiKey = null;
                         let businessHours = null;
 
                         if (disableBotForContact) {
@@ -4344,62 +4334,12 @@ async function processScheduledCampaigns() {
 setInterval(processScheduledCampaigns, 15000);
 
 
-app.get('/debug-db', async (req, res) => {
-    try {
-        const results = {};
-        
-        // 1. Verificar colunas de whatsapp_quick_messages
-        try {
-            const { data: qmCols, error: qmErr } = await supabase.rpc('exec_sql', {
-                sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_quick_messages';"
-            });
-            results.whatsapp_quick_messages_columns = qmCols || { error: qmErr?.message };
-        } catch (e) {
-            results.whatsapp_quick_messages_columns = { error: e.message };
-        }
+// --- DIAGNOSTICO DE BANCO ---
+//
+// O antigo endpoint administrativo de diagnostico SQL foi removido.
+// Auditorias de schema, RLS e PostgreSQL sao executadas fora do
+// runtime da aplicacao por scripts administrativos controlados.
 
-        // 2. Verificar colunas de whatsapp_scheduled_campaigns
-        try {
-            const { data: scCols, error: scErr } = await supabase.rpc('exec_sql', {
-                sql: "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'whatsapp_scheduled_campaigns';"
-            });
-            results.whatsapp_scheduled_campaigns_columns = scCols || { error: scErr?.message };
-        } catch (e) {
-            results.whatsapp_scheduled_campaigns_columns = { error: e.message };
-        }
-
-        // 3. Verificar hora atual do banco
-        try {
-            const { data: timeData, error: timeErr } = await supabase.rpc('exec_sql', {
-                sql: "SELECT NOW() as pg_now, CURRENT_TIME as pg_time, timezone('America/Sao_Paulo', NOW()) as sp_now;"
-            });
-            results.db_time = timeData || { error: timeErr?.message };
-        } catch (e) {
-            results.db_time = { error: e.message };
-        }
-
-        // 4. Verificar hora atual do Node na VPS
-        results.node_time = {
-            now: new Date().toISOString(),
-            sp_now: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-        };
-
-        // 5. Verificar campanhas cadastradas e seus status
-        const { data: campaigns } = await supabase.from('whatsapp_scheduled_campaigns').select('*');
-        results.campaigns = campaigns;
-
-        // 6. Verificar alvos (amostra)
-        const { data: targets } = await supabase.from('whatsapp_scheduled_targets').select('id, campaign_id, status, error_message, sent_at').limit(20);
-        results.targets_sample = targets;
-
-        // 7. Retornar os últimos logs em memória
-        results.debug_logs = global.debugLogs;
-
-        return res.json(results);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
-});
 
 app.listen(port, () => {
   console.log(`🚀 Servidor WhatsPanda (Evolution Proxy) rodando na porta ${port}`);
