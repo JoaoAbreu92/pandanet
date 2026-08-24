@@ -22,3 +22,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: true
     }
 });
+
+/**
+ * Normaliza e reescreve URLs absolutas de mídia do Supabase que utilizam HTTP
+ * na porta 8000 da VPS para usar o origin atual do site (HTTPS/Nginx),
+ * prevenindo o bloqueio de conteúdo misto pelo navegador.
+ */
+export function getCleanImageUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    if (url.startsWith('blob:')) return url;
+    if (url.includes('/storage/v1/object/public/')) {
+        const idx = url.indexOf('/storage/v1/object/public/');
+        if (idx !== -1) {
+            const path = url.substring(idx);
+            if (typeof window !== 'undefined') {
+                return `${window.location.origin}${path}`;
+            }
+            return path;
+        }
+    }
+    return url;
+}
+

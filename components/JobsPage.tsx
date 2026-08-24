@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { BriefcaseIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
 
@@ -12,6 +12,8 @@ interface Job {
   type: string;
   status: string;
   salary_range?: string;
+  cover_url?: string;
+  description_image?: string;
 }
 
 const JobsPage: React.FC = () => {
@@ -66,26 +68,37 @@ const JobsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {jobs.map(job => (
-                    <div key={job.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-                                <BriefcaseIcon className="w-6 h-6" />
+                    <div key={job.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden">
+                        <div>
+                            {job.cover_url && (
+                                <div className="h-36 w-full overflow-hidden relative border-b border-gray-100">
+                                    <img src={getCleanImageUrl(job.cover_url)} alt="" className="w-full h-full object-cover" />
+                                </div>
+                            )}
+                            <div className="p-6">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
+                                        <BriefcaseIcon className="w-6 h-6" />
+                                    </div>
+                                    <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full uppercase">
+                                        {job.type}
+                                    </span>
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2 truncate" title={job.title}>{job.title}</h3>
+                                <div className="flex items-center text-gray-500 text-sm space-x-4 mb-4">
+                                    <span className="flex items-center"><MapPinIcon className="w-4 h-4 mr-1" /> {job.location}</span>
+                                    <span className="flex items-center"><ClockIcon className="w-4 h-4 mr-1" /> Aberta</span>
+                                </div>
                             </div>
-                            <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full uppercase">
-                                {job.type}
-                            </span>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{job.title}</h3>
-                        <div className="flex items-center text-gray-500 text-sm space-x-4 mb-4">
-                            <span className="flex items-center"><MapPinIcon className="w-4 h-4 mr-1" /> {job.location}</span>
-                            <span className="flex items-center"><ClockIcon className="w-4 h-4 mr-1" /> Aberta recentemente</span>
+                        <div className="p-6 pt-0">
+                            <button 
+                                onClick={() => setSelectedJob(job)}
+                                className="w-full py-2.5 bg-gray-50 text-gray-700 font-semibold rounded-xl hover:bg-brand-primary hover:text-white transition-all text-sm"
+                            >
+                                Ver Detalhes
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => setSelectedJob(job)}
-                            className="w-full py-2 bg-gray-50 text-gray-700 font-semibold rounded-xl hover:bg-brand-primary hover:text-white transition-all"
-                        >
-                            Ver Detalhes
-                        </button>
                     </div>
                 ))}
             </div>
@@ -101,28 +114,54 @@ const JobsPage: React.FC = () => {
             {selectedJob && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                        {selectedJob.cover_url && (
+                            <div className="h-44 w-full overflow-hidden relative border-b border-gray-200">
+                                <img src={getCleanImageUrl(selectedJob.cover_url)} alt="Capa" className="w-full h-full object-cover" />
+                                <button 
+                                    onClick={() => setSelectedJob(null)} 
+                                    className="absolute top-4 right-4 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow transition-all outline-none"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        )}
                         <div className="p-8">
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h2>
                                     <p className="text-brand-primary font-medium">{selectedJob.location} • {selectedJob.type}</p>
                                 </div>
-                                <button onClick={() => setSelectedJob(null)} className="text-gray-400 hover:text-gray-600">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                                {!selectedJob.cover_url && (
+                                    <button onClick={() => setSelectedJob(null)} className="text-gray-400 hover:text-gray-600">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-                                <div>
-                                    <h4 className="font-bold text-gray-900 mb-2">Descrição</h4>
-                                    <p className="text-gray-600 leading-relaxed whitespace-pre-line">{selectedJob.description}</p>
-                                </div>
+                            <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2">
+                                {selectedJob.description_image && (
+                                    <div className="w-full rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center p-2 mb-4">
+                                        <img src={getCleanImageUrl(selectedJob.description_image)} alt="Descrição Visual" className="w-full max-h-80 object-contain rounded-lg" />
+                                    </div>
+                                )}
+                                {selectedJob.description && (
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-2">Descrição</h4>
+                                        <p className="text-gray-600 leading-relaxed whitespace-pre-line">{selectedJob.description}</p>
+                                    </div>
+                                )}
                                 {selectedJob.requirements && selectedJob.requirements.length > 0 && (
                                     <div>
                                         <h4 className="font-bold text-gray-900 mb-2">Requisitos</h4>
                                         <ul className="list-disc list-inside text-gray-600 space-y-1">
                                             {selectedJob.requirements.map((req, i) => <li key={i}>{req}</li>)}
                                         </ul>
+                                    </div>
+                                )}
+                                {selectedJob.salary_range && (
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-1">Faixa Salarial</h4>
+                                        <p className="text-gray-600">{selectedJob.salary_range}</p>
                                     </div>
                                 )}
                             </div>
@@ -148,3 +187,4 @@ const JobsPage: React.FC = () => {
 };
 
 export default JobsPage;
+

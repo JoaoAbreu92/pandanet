@@ -21,7 +21,7 @@ interface OrgFlowEditorProps {
 export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdateEmployees }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [saving, setSaving] = useState(false);
-    const [localAssignments, setLocalAssignments] = useState<Record<string, { reports_to: string | null, sector_manager_id: string | null }>>({});
+    const [localAssignments, setLocalAssignments] = useState<Record<string, { reports_to: string | null, sector_manager_id: string | null, is_manager: boolean }>>({});
 
     // Filter employees based on search
     const filteredEmployees = useMemo(() => {
@@ -33,25 +33,58 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
     }, [employees, searchTerm]);
 
     const handleAssignManager = (employeeId: string, managerId: string | null) => {
-        setLocalAssignments(prev => ({
-            ...prev,
-            [employeeId]: {
-                ...prev[employeeId],
-                reports_to: managerId === 'none' ? null : managerId,
-                // Automatically set sector manager to the same as reports_to for now if not set
-                sector_manager_id: prev[employeeId]?.sector_manager_id || (managerId === 'none' ? null : managerId)
-            }
-        }));
+        setLocalAssignments(prev => {
+            const current = prev[employeeId] || {
+                reports_to: employees.find(e => e.id === employeeId)?.reports_to || null,
+                sector_manager_id: employees.find(e => e.id === employeeId)?.sector_manager_id || null,
+                is_manager: employees.find(e => e.id === employeeId)?.is_manager || false
+            };
+            return {
+                ...prev,
+                [employeeId]: {
+                    ...current,
+                    reports_to: managerId === 'none' ? null : managerId,
+                    sector_manager_id: current.sector_manager_id || (managerId === 'none' ? null : managerId)
+                }
+            };
+        });
     };
 
     const handleAssignSectorManager = (employeeId: string, sectorManagerId: string | null) => {
-        setLocalAssignments(prev => ({
-            ...prev,
-            [employeeId]: {
-                ...prev[employeeId],
-                sector_manager_id: sectorManagerId === 'none' ? null : sectorManagerId
-            }
-        }));
+        setLocalAssignments(prev => {
+            const current = prev[employeeId] || {
+                reports_to: employees.find(e => e.id === employeeId)?.reports_to || null,
+                sector_manager_id: employees.find(e => e.id === employeeId)?.sector_manager_id || null,
+                is_manager: employees.find(e => e.id === employeeId)?.is_manager || false
+            };
+            return {
+                ...prev,
+                [employeeId]: {
+                    ...current,
+                    sector_manager_id: sectorManagerId === 'none' ? null : sectorManagerId
+                }
+            };
+        });
+    };
+
+    const handleToggleManager = (employeeId: string, isManager: boolean) => {
+        setLocalAssignments(prev => {
+            const current = prev[employeeId] || {
+                reports_to: employees.find(e => e.id === employeeId)?.reports_to || null,
+                sector_manager_id: employees.find(e => e.id === employeeId)?.sector_manager_id || null,
+                is_manager: employees.find(e => e.id === employeeId)?.is_manager || false
+            };
+            return {
+                ...prev,
+                [employeeId]: {
+                    ...current,
+                    is_manager: isManager,
+                    // Ao se tornar gestor, removemos a hierarquia de reporte e setor
+                    reports_to: isManager ? null : current.reports_to,
+                    sector_manager_id: isManager ? null : current.sector_manager_id
+                }
+            };
+        });
     };
 
     const handleBulkSave = async () => {
@@ -60,14 +93,16 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
             const updates = Object.entries(localAssignments).map(([empId, data]) => ({
                 id: empId,
                 reports_to: data.reports_to,
-                sector_manager_id: data.sector_manager_id
+                sector_manager_id: data.sector_manager_id,
+                is_manager: data.is_manager
             }));
 
             for (const update of updates) {
-                const { error } = await supabase.rpc('update_user_profile', {
+                const { error } = await supabase.rpc('update_user_hierarchy', {
                     p_user_id: update.id,
                     p_reports_to: update.reports_to,
-                    p_sector_manager_id: update.sector_manager_id
+                    p_sector_manager_id: update.sector_manager_id,
+                    p_is_manager: update.is_manager
                 });
 
                 if (error) throw error;
@@ -80,7 +115,8 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
                     return { 
                         ...emp, 
                         reports_to: assignment.reports_to,
-                        sector_manager_id: assignment.sector_manager_id
+                        sector_manager_id: assignment.sector_manager_id,
+                        is_manager: assignment.is_manager
                     };
                 }
                 return emp;
@@ -148,7 +184,11 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
                 {/* Assignment List */}
                 <div className="w-full overflow-y-auto p-4 space-y-3">
                     {filteredEmployees.map(emp => {
-                        const currentAssignment = localAssignments[emp.id] || { reports_to: emp.reports_to, sector_manager_id: emp.sector_manager_id };
+                        const currentAssignment = localAssignments[emp.id] || { 
+                            reports_to: emp.reports_to, 
+                            sector_manager_id: emp.sector_manager_id,
+                            is_manager: emp.is_manager 
+                        };
                         
                         return (
                             <div 
@@ -172,54 +212,74 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">{emp.name}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                                             <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium">{emp.role}</span>
                                             <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">{emp.team}</span>
-                                            {emp.is_manager && (
+                                            {currentAssignment.is_manager && (
                                                 <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Gestor</span>
                                             )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`is-manager-${emp.id}`}
+                                                className="rounded text-brand-primary focus:ring-brand-primary h-3.5 w-3.5 cursor-pointer"
+                                                checked={currentAssignment.is_manager}
+                                                onChange={(e) => handleToggleManager(emp.id, e.target.checked)}
+                                            />
+                                            <label htmlFor={`is-manager-${emp.id}`} className="text-[11px] text-gray-500 font-semibold cursor-pointer select-none">
+                                                {emp.name.split(' ')[0]} é gestor(a)
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-6">
-                                    <div className="flex flex-col min-w-[180px]">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 px-1 flex items-center gap-1">
-                                            <ArrowPathIcon className="w-2 h-2" /> Responde a:
-                                        </label>
-                                        <select
-                                            value={currentAssignment.reports_to || 'none'}
-                                            onChange={(e) => handleAssignManager(emp.id, e.target.value)}
-                                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all cursor-pointer hover:bg-white"
-                                        >
-                                            <option value="none">Sem Gestor Direto</option>
-                                            {employees
-                                                .filter(m => m.id !== emp.id)
-                                                .map(m => (
-                                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                                ))
-                                            }
-                                        </select>
-                                    </div>
+                                    {currentAssignment.is_manager ? (
+                                        <div className="flex items-center min-w-[380px] h-10 justify-center px-4 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs text-emerald-800 font-bold">
+                                            Líder/Gestor(a) - Sem necessidade de atribuição direta
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-6">
+                                            <div className="flex flex-col min-w-[180px]">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 px-1 flex items-center gap-1">
+                                                    <ArrowPathIcon className="w-2 h-2" /> Responde a:
+                                                </label>
+                                                <select
+                                                    value={currentAssignment.reports_to || 'none'}
+                                                    onChange={(e) => handleAssignManager(emp.id, e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all cursor-pointer hover:bg-white"
+                                                >
+                                                    <option value="none">Sem Gestor Direto</option>
+                                                    {employees
+                                                        .filter(m => m.id !== emp.id)
+                                                        .map(m => (
+                                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            </div>
 
-                                    <div className="flex flex-col min-w-[180px]">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase mb-1 px-1 flex items-center gap-1">
-                                            <UserGroupIcon className="w-2 h-2" /> Gestor do Setor:
-                                        </label>
-                                        <select
-                                            value={currentAssignment.sector_manager_id || 'none'}
-                                            onChange={(e) => handleAssignSectorManager(emp.id, e.target.value)}
-                                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all cursor-pointer hover:bg-white"
-                                        >
-                                            <option value="none">Sem Gestor de Setor</option>
-                                            {employees
-                                                .filter(m => m.id !== emp.id)
-                                                .map(m => (
-                                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                                ))
-                                            }
-                                        </select>
-                                    </div>
+                                            <div className="flex flex-col min-w-[180px]">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 px-1 flex items-center gap-1">
+                                                    <UserGroupIcon className="w-2 h-2" /> Gestor do Setor:
+                                                </label>
+                                                <select
+                                                    value={currentAssignment.sector_manager_id || 'none'}
+                                                    onChange={(e) => handleAssignSectorManager(emp.id, e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all cursor-pointer hover:bg-white"
+                                                >
+                                                    <option value="none">Sem Gestor de Setor</option>
+                                                    {employees
+                                                        .filter(m => m.id !== emp.id)
+                                                        .map(m => (
+                                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -247,7 +307,11 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
                                                     <img src={emp?.avatarUrl} className="w-6 h-6 rounded-lg object-cover" alt="" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-[10px] font-bold text-gray-700 truncate">{emp?.name}</p>
-                                                        <p className="text-[9px] text-gray-400">→ {manager?.name || 'Sem Gestor'}</p>
+                                                        {data.is_manager !== emp?.is_manager ? (
+                                                            <p className="text-[9px] text-emerald-600 font-bold">{data.is_manager ? 'Promovido a Gestor' : 'Removido como Gestor'}</p>
+                                                        ) : (
+                                                            <p className="text-[9px] text-gray-400">→ {manager?.name || 'Sem Gestor'}</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );

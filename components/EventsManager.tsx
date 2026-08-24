@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, CalendarDaysIcon, XMarkIcon, PhotoIcon } from './icons';
 import type { Event, Employee } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 interface EventsManagerProps {
@@ -50,7 +50,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                     date: e.date?.split('T')[0] || e.start_time?.split('T')[0],
                     time: e.start_time?.split('T')[1]?.substring(0, 5) || e.time || '09:00',
                     location: e.location || '',
-                    imageUrl: e.imageUrl,
+                    imageUrl: getCleanImageUrl(e.image_url),
                     category: e.category || 'Social',
                     attendees: e.attendees || [],
                     invited_ids: e.invited_ids || [],

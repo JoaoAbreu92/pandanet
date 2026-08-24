@@ -28,7 +28,7 @@ interface AdminPageProps {
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate }) => {
     const { profile } = useAuth();
     const [activeTab, setActiveTab] = useState('dashboard');
-    const [activeCategory, setActiveCategory] = useState('Conteúdo');
+    const [activeCategory, setActiveCategory] = useState('Social');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
 
@@ -133,36 +133,36 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     };
 
     const allTabs = [
-        { id: 'dashboard', label: 'Feed/Mural', category: 'Conteúdo', featureId: 'feed' },
-        { id: 'mural', label: 'Reconhecimentos', category: 'Conteúdo' },
-        { id: 'polls', label: 'Enquetes', category: 'Conteúdo' },
-        { id: 'events', label: 'Eventos', category: 'Conteúdo', featureId: 'events' },
+        { id: 'dashboard', label: 'Feed/Mural', category: 'Social', featureId: 'feed' },
+        { id: 'mural', label: 'Reconhecimentos', category: 'Social' },
+        { id: 'polls', label: 'Enquetes', category: 'Social' },
+        { id: 'events', label: 'Eventos', category: 'Social', featureId: 'events' },
+        { id: 'marketplace', label: 'Marketplace', category: 'Social', featureId: 'marketplace' },
+        { id: 'bem-estar', label: 'Bem Estar', category: 'Social', featureId: 'wellness' },
 
-        { id: 'users', label: 'Usuários', category: 'Pessoas' },
-        { id: 'badges', label: 'Selos / Gamificação', category: 'Pessoas' },
-        { id: 'departments', label: 'Departamentos', category: 'Pessoas' },
-        { id: 'teams', label: 'Equipes', category: 'Pessoas' },
-        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Pessoas' },
-        { id: 'training', label: 'Treinamentos', category: 'Pessoas' },
-        { id: 'jobs', label: 'Gestão de Vagas', category: 'Pessoas', featureId: 'jobs' },
-        { id: 'hr', label: 'Gestão RH', category: 'Pessoas' },
+        { id: 'users', label: 'Usuários', category: 'Recursos Humanos (RH)' },
+        { id: 'badges', label: 'Selos / Gamificação', category: 'Recursos Humanos (RH)' },
+        { id: 'departments', label: 'Departamentos', category: 'Recursos Humanos (RH)' },
+        { id: 'teams', label: 'Equipes', category: 'Recursos Humanos (RH)' },
+        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Recursos Humanos (RH)' },
+        { id: 'training', label: 'Treinamentos', category: 'Recursos Humanos (RH)' },
+        { id: 'jobs', label: 'Gestão de Vagas', category: 'Recursos Humanos (RH)', featureId: 'jobs' },
+        { id: 'hr', label: 'Gestão RH', category: 'Recursos Humanos (RH)' },
+        { id: 'forms', label: 'Formulários', category: 'Recursos Humanos (RH)' },
 
-        { id: 'forms', label: 'Formulários', category: 'Operações' },
-        { id: 'marketplace', label: 'Marketplace', category: 'Operações', featureId: 'marketplace' },
-        { id: 'crm_settings', label: 'CRM / Vendas', category: 'Operações', featureId: 'crm' },
-        { id: 'bem-estar', label: 'Bem Estar', category: 'Operações', featureId: 'wellness' },
-        { id: 'kpis', label: 'Metas/KPIs', category: 'Operações', featureId: 'kpis' },
+        { id: 'ti-requests', label: 'Chamados T.I.', category: 'Tecnologia & TI' },
+        { id: 'status', label: 'Status TI', category: 'Tecnologia & TI' },
+        { id: 'kb', label: 'Base de Con.', category: 'Tecnologia & TI', featureId: 'kb' },
+        { id: 'infosec', label: 'Segurança', category: 'Tecnologia & TI' },
+        { id: 'policies', label: 'Políticas', category: 'Tecnologia & TI', featureId: 'policies' },
 
-        { id: 'ti-requests', label: 'Chamados T.I.', category: 'Suporte & TI' },
-        { id: 'status', label: 'Status TI', category: 'Suporte & TI' },
-        { id: 'kb', label: 'Base de Con.', category: 'Suporte & TI', featureId: 'kb' },
-        { id: 'infosec', label: 'Segurança', category: 'Suporte & TI' },
-        { id: 'policies', label: 'Políticas', category: 'Suporte & TI', featureId: 'policies' },
+        { id: 'crm_settings', label: 'CRM / Vendas', category: 'Operações & Vendas', featureId: 'crm' },
+        { id: 'kpis', label: 'Metas/KPIs', category: 'Operações & Vendas', featureId: 'kpis' },
 
         { id: 'settings', label: 'Geral', category: 'Configurações' },
     ];
 
-    const categories = ['Conteúdo', 'Pessoas', 'Operações', 'Suporte & TI', 'Configurações'];
+    const categories = ['Social', 'Recursos Humanos (RH)', 'Tecnologia & TI', 'Operações & Vendas', 'Configurações'];
 
     const tabs = allTabs.filter(tab => {
         if (tab.category !== activeCategory) return false;
@@ -205,6 +205,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<TrainingModule>
                     title="Módulos de Treinamento"
                     tableName="training_modules"
+                    companyId={company.id}
                     newItemTemplate={{ title: '', duration: '', category: '', thumbnail: '', participants: [] }}
                     users={employees}
                     fields={[
@@ -220,6 +221,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<KBArticle>
                     title="Base de Conhecimento"
                     tableName="kb_articles"
+                    companyId={company.id}
                     newItemTemplate={{ title: '', category: 'Geral', content: '', mediaUrl: '', mediaType: 'image' }}
                     fields={[
                         { key: 'title', label: 'Título' },
@@ -234,6 +236,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<ServiceStatusItem>
                     title="Status de Serviços"
                     tableName="services"
+                    companyId={company.id}
                     newItemTemplate={{ name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
                     fields={[
                         { key: 'name', label: 'Serviço' },
@@ -255,6 +258,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<SecurityAlert>
                     title="Alertas de Segurança"
                     tableName="security_alerts"
+                    companyId={company.id}
                     newItemTemplate={{ title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
                     fields={[
                         { key: 'title', label: 'Título' },
@@ -268,6 +272,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<ResourceDocument>
                     title="Documentos e Políticas"
                     tableName="policies"
+                    companyId={company.id}
                     newItemTemplate={{ title: '', category: 'RH', type: 'PDF', url: '' }}
                     fields={[
                         { key: 'title', label: 'Título' },
@@ -283,6 +288,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<WellnessItem>
                     title="Itens de Bem-Estar"
                     tableName="wellness_items"
+                    companyId={company.id}
                     newItemTemplate={{ title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
                     fields={[
                         { key: 'title', label: 'Título' },
@@ -300,6 +306,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<Recognition>
                     title="Mural de Reconhecimentos"
                     tableName="recognitions"
+                    companyId={company.id}
                     newItemTemplate={{ message: '', type: 'Trabalho em Equipe', value: 'Trabalho em Equipe', from_id: '', to_id: '' } as any}
                     fields={[
                         { key: 'message', label: 'Mensagem', type: 'textarea' },
@@ -313,6 +320,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<TIRequest>
                     title="Gerenciamento de Solicitações de T.I."
                     tableName="ti_requests"
+                    companyId={company.id}
                     newItemTemplate={{ itemName: '', justification: '', requestType: 'Hardware', status: 'Pendente' } as any}
                     fields={[
                         { key: 'itemName', label: 'Item', dbColumn: 'item_name' },
@@ -332,22 +340,27 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<any>
                     title="Gestão de Vagas Internas"
                     tableName="jobs"
-                    newItemTemplate={{ title: '', description: '', requirements: [], location: '', type: 'Full-time', status: 'open', salary_range: '' }}
+                    companyId={company.id}
+                    storageBucket="feed-media"
+                    newItemTemplate={{ title: '', description: '', requirements: [], location: '', type: 'Tempo Integral', status: 'open', salary_range: '', cover_url: '', description_image: '' }}
                     fields={[
                         { key: 'title', label: 'Título da Vaga' },
                         { key: 'status', label: 'Status', type: 'select', options: ['open', 'closed'] },
-                        { key: 'type', label: 'Tipo', type: 'select', options: ['Full-time', 'Part-time', 'Internship', 'Freelance'] },
+                        { key: 'type', label: 'Tipo de Vaga (ex: Tempo Integral, Meio Período)' },
                         { key: 'location', label: 'Localização' },
-                        { key: 'salary_range', label: 'Faixa Salarial' },
-                        { key: 'description', label: 'Descrição', type: 'textarea' },
-                        { key: 'requirements', label: 'Requisitos (um por linha)', type: 'textarea' }
+                        { key: 'salary_range', label: 'Faixa Salarial', optional: true },
+                        { key: 'cover_url', label: 'Imagem de Capa (Upload)', type: 'file', dbColumn: 'cover_url' },
+                        { key: 'description_image', label: 'Imagem da Descrição (Opcional)', type: 'file', dbColumn: 'description_image' },
+                        { key: 'description', label: 'Descrição (Texto)', type: 'textarea', optional: true },
+                        { key: 'requirements', label: 'Requisitos (um por linha)', type: 'textarea', optional: true }
                     ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-xs">{i.location} • {i.status}</p></div>}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-xs">{i.location} • {i.status} • {i.type}</p></div>}
                 />;
             case 'kpis':
                 return <SupabaseGenericManager<any>
                     title="Gestão de Metas e KPIs"
                     tableName="kpis"
+                    companyId={company.id}
                     newItemTemplate={{ name: '', target: 100, current: 0, unit: '%', category: 'Geral', period: 'Mensal', powerbi_url: '' }}
                     fields={[
                         { key: 'name', label: 'Nome do Indicador' },
@@ -366,6 +379,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <SupabaseGenericManager<any>
                     title="Configurações CRM / Vendas"
                     tableName="crm_settings"
+                    companyId={company.id}
                     newItemTemplate={{ name: 'Perfex CRM', url: '', api_key: '', active: true }}
                     fields={[
                         { key: 'name', label: 'Nome da Integração' },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, PhotoIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Employee } from '../types';
 
@@ -8,12 +8,14 @@ interface SupabaseGenericManagerProps<T> {
     title: string;
     tableName: string;
     storageBucket?: string;
+    companyId?: string;
     fields: {
         key: string;
         label: string;
         type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list';
         options?: string[];
         dbColumn?: string; // If mapping is different
+        optional?: boolean;
     }[];
     renderItem: (item: T) => React.ReactNode;
     newItemTemplate: Partial<T>;
@@ -24,12 +26,14 @@ export function SupabaseGenericManager<T extends { id: string }>({
     title,
     tableName,
     storageBucket = 'announcements-media',
+    companyId,
     fields,
     renderItem,
     newItemTemplate,
     users = []
 }: SupabaseGenericManagerProps<T>) {
     const { currentUser } = useAuth();
+    const activeCompanyId = companyId || currentUser?.company_id;
     const [items, setItems] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,13 +43,13 @@ export function SupabaseGenericManager<T extends { id: string }>({
     const [isProcessing, setIsProcessing] = useState(false);
 
     const fetchItems = async () => {
-        if (!currentUser?.company_id) return;
+        if (!activeCompanyId) return;
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from(tableName)
                 .select('*')
-                .eq('company_id', currentUser.company_id)
+                .eq('company_id', activeCompanyId)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -70,7 +74,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
     useEffect(() => {
         fetchItems();
-    }, [currentUser?.company_id, tableName]);
+    }, [activeCompanyId, tableName]);
 
     const handleOpenModal = (item?: T) => {
         if (item) {
@@ -97,11 +101,11 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser?.company_id) return;
+        if (!activeCompanyId) return;
         setIsProcessing(true);
 
         try {
-            const payload: any = { company_id: currentUser.company_id };
+            const payload: any = { company_id: activeCompanyId };
 
             // Handle updates/inserts
             for (const field of fields) {
@@ -218,7 +222,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                             className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
                                             value={formData[field.key] || ''}
                                             onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required
+                                            required={!field.optional}
                                         >
                                             <option value="">Selecione...</option>
                                             {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -229,14 +233,14 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                             rows={4}
                                             value={Array.isArray(formData[field.key]) ? formData[field.key].join('\n') : (formData[field.key] || '')}
                                             onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required
+                                            required={!field.optional}
                                         />
                                     ) : field.type === 'file' ? (
                                         <div className="mt-1">
                                             <div className="flex items-center space-x-4">
                                                 {formData[field.key] && formData[field.key].startsWith('http') && (
                                                     <div className="w-16 h-16 rounded border overflow-hidden flex-shrink-0">
-                                                        <img src={formData[field.key]} alt="Preview" className="w-full h-full object-cover" />
+                                                        <img src={getCleanImageUrl(formData[field.key])} alt="Preview" className="w-full h-full object-cover" />
                                                     </div>
                                                 )}
                                                 <input
@@ -275,7 +279,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                             className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
                                             value={formData[field.key] || ''}
                                             onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required
+                                            required={!field.optional}
                                         />
                                     )}
                                 </div>

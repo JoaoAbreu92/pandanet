@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserGroupIcon, PlusIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from './icons';
 import type { Event } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -58,7 +58,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                     time: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '00:00',
                     endTime: e.end_time || '00:00',
                     location: e.location || '',
-                    imageUrl: e.imageUrl,
+                    imageUrl: getCleanImageUrl(e.image_url),
                     category: (e.category as any) || 'Outro',
                     imageType: 'url',
                     meeting_url: e.meeting_url,

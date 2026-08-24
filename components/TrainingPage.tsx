@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RocketLaunchIcon, PlayCircleIcon } from './icons';
 import type { TrainingModule } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
@@ -28,7 +28,7 @@ const TrainingPage: React.FC = () => {
                         id: t.id,
                         title: t.title,
                         duration: t.duration || '0 min',
-                        thumbnail: t.thumbnail || 'https://via.placeholder.com/300x200?text=Training',
+                        thumbnail: getCleanImageUrl(t.thumbnail) || 'https://via.placeholder.com/300x200?text=Training',
                         videoUrl: t.video_url,
                         category: t.category
                     })));

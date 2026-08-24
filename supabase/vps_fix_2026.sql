@@ -524,5 +524,85 @@ USING (
   conversation_id IN (SELECT id FROM public.conversations WHERE created_by = auth.uid())
 );
 
+-- ==========================================
+-- UPDATE 11/06/2026: VAGAS, IMAGENS E HIERARQUIA
+-- ==========================================
+
+-- 1. Alterações na tabela jobs (Vagas Internas)
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS cover_url TEXT;
+ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS description_image TEXT;
+
+-- Remover a check constraint de tipo na tabela jobs para suportar digitação manual livre
+DO $$
+DECLARE
+    constraint_name_var text;
+BEGIN
+    SELECT tc.constraint_name
+    INTO constraint_name_var
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+    WHERE tc.table_name = 'jobs' AND ccu.column_name = 'type' AND tc.constraint_type = 'CHECK';
+
+    IF constraint_name_var IS NOT NULL THEN
+        EXECUTE 'ALTER TABLE public.jobs DROP CONSTRAINT ' || constraint_name_var;
+    END IF;
+END $$;
+
+-- 2. Atualizar apply_tenant_policies para dar bypass nos Super Admins
+CREATE OR REPLACE FUNCTION apply_tenant_policies()
+RETURNS VOID AS $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN 
+        SELECT tablename 
+        FROM pg_tables 
+        WHERE schemaname = 'public' 
+        AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings')
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I', t);
+        EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
+                        USING (company_id = get_user_company_id() OR EXISTS (
+                            SELECT 1 FROM public.profiles 
+                            WHERE id = auth.uid() AND is_admin = TRUE
+                        )) 
+                        WITH CHECK (company_id = get_user_company_id() OR EXISTS (
+                            SELECT 1 FROM public.profiles 
+                            WHERE id = auth.uid() AND is_admin = TRUE
+                        ))', t);
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Re-aplicar políticas em todas as tabelas
+SELECT apply_tenant_policies();
+
+-- 3. Criar RPC update_user_hierarchy para atualizar hierarquia do organograma de forma limpa e leve
+CREATE OR REPLACE FUNCTION public.update_user_hierarchy(
+    p_user_id UUID,
+    p_reports_to UUID DEFAULT NULL,
+    p_sector_manager_id UUID DEFAULT NULL,
+    p_is_manager BOOLEAN DEFAULT FALSE
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.profiles
+    SET
+        reports_to = p_reports_to,
+        sector_manager_id = p_sector_manager_id,
+        is_manager = p_is_manager,
+        updated_at = now()
+    WHERE id = p_user_id;
+END;
+$$;
+
+-- Conceder permissões para a nova função
+GRANT EXECUTE ON FUNCTION public.update_user_hierarchy(UUID, UUID, UUID, BOOLEAN) TO authenticated, service_role;
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
