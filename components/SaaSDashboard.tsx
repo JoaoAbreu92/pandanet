@@ -30,7 +30,13 @@ import {
     LockClosedIcon,
     MagnifyingGlassIcon,
     ShieldCheckIcon,
-    PhotoIcon
+    PhotoIcon,
+    EnvelopeIcon,
+    BuildingStorefrontIcon,
+    RocketLaunchIcon,
+    HeartIcon,
+    SparklesIcon,
+    NewspaperIcon
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon } from '@heroicons/react/24/outline';
 import { useToast } from './ToastContext';
@@ -68,6 +74,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const [loading, setLoading] = useState(true);
     const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // Estado para usuários no modal
     const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
+    const [usageStats, setUsageStats] = useState<any>(null);
+    const [statsLoading, setStatsLoading] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
@@ -291,21 +299,43 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         } else if (type === 'editPlan' && planId) {
             const plan = localPlans.find(p => p.id === planId);
             if (plan) {
-                setFormData({
-                    name: plan.name,
-                    userLimit: plan.userLimit,
-                    price: plan.price
-                });
+                setFormData({ name: plan.name, userLimit: plan.userLimit.toString(), price: (plan.price || 0).toString() });
                 setFeaturesState(plan.features || {});
             }
         } else if (type === 'config' && company) {
-            // Carrega recursos da empresa se existirem, caso contrário usa o padrão
             setFeaturesState(company.custom_features || company.plan?.features || {});
         } else if (type === 'newUpdate') {
             setFormData({ version: SYSTEM_VERSION, description: '' });
         } else if (type === 'users' && company) {
             // Fetch users for this company
             fetchCompanyUsers(company.id!);
+        } else if (type === 'stats' && company) {
+            fetchUsageStats(company.id!);
+        }
+    };
+
+    const fetchUsageStats = async (companyId: string) => {
+        setStatsLoading(true);
+        // Reset old stats
+        setUsageStats(null);
+
+        const tables = ['profiles', 'posts', 'emails', 'tickets', 'messages', 'announcements', 'marketplace_items', 'events', 'benefits', 'form_submissions', 'ti_requests'];
+        const stats: Record<string, number> = {};
+
+        try {
+            await Promise.all(tables.map(async (table) => {
+                const { count, error } = await supabase
+                    .from(table)
+                    .select('*', { count: 'exact', head: true })
+                    .eq('company_id', companyId);
+
+                if (!error) stats[table] = count || 0;
+            }));
+            setUsageStats(stats);
+        } catch (e) {
+            console.error("Error fetching stats", e);
+        } finally {
+            setStatsLoading(false);
         }
     };
 
@@ -472,6 +502,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             } else {
                 fetchData();
                 showToast('30 dias adicionados com sucesso!', 'success');
+                closeModal(); // Close modal after success
             }
         }
     };
@@ -579,38 +610,54 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     );
 
     const ConfigFeaturesList = () => {
-        const Toggle = ({ label, id }: { label: string, id: string }) => (
-            <div className="flex items-center justify-between py-3">
-                <span className="text-sm text-gray-600 font-medium">{label}</span>
+        const Toggle = ({ label, id, icon: Icon }: { label: string, id: string, icon?: any }) => (
+            <div className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg transition-colors">
+                <div className="flex items-center gap-3">
+                    {Icon && <Icon className="w-5 h-5 text-gray-400" />}
+                    <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">{label}</span>
+                </div>
                 <div
                     onClick={() => handleFeatureToggle(id)}
                     className="relative inline-flex items-center cursor-pointer"
                 >
                     <input type="checkbox" checked={!!featuresState[id]} readOnly className="sr-only peer" />
-                    <div className={`w-11 h-6 rounded-full peer peer-focus:outline-none transition-colors ${featuresState[id] ? 'bg-blue-600' : 'bg-gray-200'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${featuresState[id] ? 'after:translate-x-full after:border-white' : ''}`}></div>
+                    <div className={`w-11 h-6 rounded-full peer peer-focus:outline-none transition-colors ${featuresState[id] ? 'bg-brand-primary' : 'bg-gray-200 dark:bg-gray-600'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${featuresState[id] ? 'after:translate-x-full after:border-white' : ''}`}></div>
                 </div>
             </div>
         );
 
+        const SectionTitle = ({ title }: { title: string }) => (
+            <h5 className="font-bold text-gray-400 dark:text-gray-500 text-[10px] uppercase tracking-widest col-span-full mt-6 mb-2 border-b border-gray-100 dark:border-gray-700 pb-1">{title}</h5>
+        );
+
         return (
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 max-h-[400px] overflow-y-auto">
-                <h5 className="font-bold text-gray-700 col-span-full mb-2">Opções do Menu</h5>
-                <Toggle label="Feed de Notícias" id="feed" />
-                <Toggle label="Mensagens" id="messages" />
-                <Toggle label="Calendário" id="calendar" />
-                <Toggle label="Marketplace" id="marketplace" />
-                <Toggle label="Bem Estar" id="wellness" />
-                <Toggle label="Eventos" id="events" />
+            <div className="p-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[500px] overflow-y-auto custom-scrollbar">
+                <SectionTitle title="Módulos Gerais" />
+                <Toggle label="Feed de Notícias" id="feed" icon={NewspaperIcon} />
+                <Toggle label="Mensagens / Chat" id="messages" icon={ChatBubbleLeftRightIcon} />
+                <Toggle label="Calendário Corp." id="calendar" icon={CalendarDaysIcon} />
+                <Toggle label="E-mail Integrado" id="email" icon={EnvelopeIcon} />
+                <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
+                <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
+                <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />
 
-                <h5 className="font-bold text-gray-700 col-span-full mt-4 mb-2">Recursos de RH</h5>
-                <Toggle label="Benefícios" id="benefits" />
-                <Toggle label="Políticas" id="policies" />
-                <Toggle label="Mural" id="wall" />
+                <SectionTitle title="Recursos de RH" />
+                <Toggle label="Portal Meu RH" id="meu-rh" icon={BuildingOfficeIcon} />
+                <Toggle label="Diretório / Organograma" id="org-chart" icon={UserGroupIcon} />
+                <Toggle label="Vagas e Recrutamento" id="jobs" icon={RocketLaunchIcon} />
+                <Toggle label="Treinamentos (LMS)" id="training" icon={RocketLaunchIcon} />
+                <Toggle label="Pesquisas Internas" id="surveys" icon={ChatBubbleLeftRightIcon} />
+                <Toggle label="Benefícios" id="benefits" icon={HeartIcon} />
+                <Toggle label="Políticas e Docs" id="policies" icon={ShieldCheckIcon} />
+                <Toggle label="Onboarding" id="onboarding" icon={PlusIcon} />
+                <Toggle label="Agradecimentos / Mural" id="wall" icon={SparklesIcon} />
+                <Toggle label="Bem Estar" id="wellness" icon={HeartIcon} />
 
-                <h5 className="font-bold text-gray-700 col-span-full mt-4 mb-2">Recursos de TI</h5>
-                <Toggle label="Chamados" id="tickets" />
-                <Toggle label="Equipamentos" id="equip" />
-                <Toggle label="Base de Conhecimento" id="kb" />
+                <SectionTitle title="Suporte e T.I." />
+                <Toggle label="Central de Chamados" id="tickets" icon={TicketIcon} />
+                <Toggle label="Requisição de Equip." id="equip" icon={PlusIcon} />
+                <Toggle label="Base de Conhecimento" id="kb" icon={LifebuoyIcon} />
+                <Toggle label="Segurança da Info." id="infosec" icon={ShieldCheckIcon} />
             </div>
         );
     }
@@ -704,7 +751,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                             <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                 <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{comp.name}</td>
                                                 <td className="px-6 py-4">
-                                                    {comp.status === 'inactive' ? <XCircle /> : <CheckCircle />}
+                                                    {comp.status === 'inactive' ? (
+                                                        <XMarkIcon className="w-5 h-5 text-red-500" />
+                                                    ) : (
+                                                        <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500 font-bold">
                                                     {/* We can fetch this individually or optimize later / For now let's use a sub-component to fetch */}
@@ -744,32 +795,39 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                         <div className="flex justify-start mb-4">
                             <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> Adicionar</button>
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-100 overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="border-b border-gray-100 text-xs font-bold text-gray-500 uppercase">
-                                    <tr>
-                                        <th className="px-6 py-4">Nome</th>
-                                        <th className="px-6 py-4 text-center">Usuários</th>
-                                        <th className="px-6 py-4 text-right">Valor</th>
-                                        <th className="px-6 py-4 text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-xs divide-y divide-gray-50">
-                                    {localPlans.map(plan => (
-                                        <tr key={plan.id}>
-                                            <td className="px-6 py-4 font-medium">{plan.name}</td>
-                                            <td className="px-6 py-4 text-center">{plan.userLimit}</td>
-                                            <td className="px-6 py-4 text-right">{(plan.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-3 text-green-500">
-                                                    <button onClick={() => openModal('editPlan', null, plan.id)} className="hover:text-blue-600"><PencilIcon className="w-4 h-4" /></button>
-                                                    <button onClick={() => openModal('deletePlan', null, plan.id)} className="hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {localPlans.map(plan => (
+                                <div key={plan.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col hover:shadow-md transition-all group">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-gray-800 dark:text-white group-hover:text-brand-primary transition-colors">{plan.name}</h3>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ID: {plan.id.slice(0, 8)}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => openModal('editPlan', null, plan.id)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar"><PencilIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => openModal('deletePlan', null, plan.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><TrashIcon className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 mb-6 flex-1">
+                                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                            <UsersIcon className="w-4 h-4 text-gray-400" />
+                                            <span>Capacidade: <strong>{plan.userLimit} usuários</strong></span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                            <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
+                                            <span>{Object.values(plan.features || {}).filter(v => v === true).length} recursos ativos</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
+                                        <span className="text-sm text-gray-400 font-medium">Investimento</span>
+                                        <span className="text-xl font-bold text-brand-text dark:text-white">
+                                            {(plan.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
@@ -890,26 +948,69 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             </div>
 
             {/* --- MODALS --- */}
-            {modalOpen.invoices && selectedCompany && (
-                <Modal onClose={closeModal} title="Faturas em Aberto">
-                    <div className="p-4">
-                        <div className="bg-yellow-50 text-yellow-800 p-3 rounded mb-4 text-sm font-medium border border-yellow-200">
-                            Simulação: Visualize e gerencie as faturas desta empresa.
+            {modalOpen.stats && selectedCompany && (
+                <Modal onClose={closeModal} title={`Estatísticas: ${selectedCompany.name}`} width="max-w-2xl">
+                    <div className="p-6">
+                        {statsLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <ArrowPathIcon className="w-10 h-10 text-brand-primary animate-spin" />
+                                <p className="text-sm text-gray-500 mt-4">Calculando uso de dados...</p>
+                            </div>
+                        ) : usageStats ? (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                                        <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase">Usuários</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.profiles || 0}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase">Posts / Feed</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.posts || 0}</p>
+                                    </div>
+                                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800">
+                                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase">Mensagens</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.messages || 0}</p>
+                                    </div>
+                                    <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg border border-pink-100 dark:border-pink-800">
+                                        <p className="text-[10px] text-pink-600 dark:text-pink-400 font-bold uppercase">Chamados TI</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.tickets || 0}</p>
+                                    </div>
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-100 dark:border-amber-800">
+                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">E-mails</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.emails || 0}</p>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-600">
+                                        <p className="text-[10px] text-gray-600 dark:text-gray-400 font-bold uppercase">Eventos</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{usageStats.events || 0}</p>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <h4 className="text-sm font-bold text-gray-700 dark:text-white mb-3">Resumo da Infraestrutura</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-500">Total de Registros (DB)</span>
+                                            <span className="font-bold text-gray-800 dark:text-white">
+                                                {Object.values(usageStats).reduce((a: any, b: any) => a + b, 0) as number} linhas
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-500">Estimativa de Disco</span>
+                                            <span className="font-bold text-gray-800 dark:text-white">~ {(Object.values(usageStats).reduce((a: any, b: any) => a + b, 0) as number * 0.5 / 1024).toFixed(2)} MB</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs pt-2 border-t dark:border-gray-600">
+                                            <span className="text-gray-500">Servidor / VPS</span>
+                                            <span className="text-green-500 font-bold uppercase">Operational / 100% stable</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-center py-8 text-gray-400">Erro ao carregar estatísticas.</p>
+                        )}
+                        <div className="mt-8 flex justify-end">
+                            <button onClick={closeModal} className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 rounded font-bold text-xs uppercase">Fechar</button>
                         </div>
-                        <table className="w-full text-xs text-left">
-                            <thead className="border-b border-gray-200"><tr><th className="py-2">Plano</th><th className="py-2">Valor</th><th className="py-2">Status</th><th className="py-2 text-right">Ações</th></tr></thead>
-                            <tbody>
-                                <tr>
-                                    <td className="py-3">{selectedCompany.plan?.name || 'Standard'}</td>
-                                    <td className="py-3">R$ 330,00</td>
-                                    <td className="py-3"><span className="bg-yellow-300 text-yellow-900 px-2 py-1 font-bold rounded">ABERTO</span></td>
-                                    <td className="py-3 text-right flex justify-end gap-2">
-                                        <button className="text-green-600 hover:bg-green-50 p-1" title="Pagar"><CurrencyDollarIcon className="w-5 h-5" /></button>
-                                        <button className="text-red-500 hover:bg-red-50 p-1" title="Excluir"><TrashIcon className="w-5 h-5" /></button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </Modal>
             )}

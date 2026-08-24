@@ -125,12 +125,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
 
                 <NavMenu label="RH & Gestão" icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
-                    <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" />
-                    <NavItem page="org-chart" label="Organograma" icon={ArrowPathIcon} permission="viewOrgChart" />
-                    <NavItem page="meu-rh" label="Portal Meu RH" icon={BuildingOfficeIcon} permission="viewMeuRH" />
-                    <NavItem page="jobs" label="Portal de Vagas" icon={RocketLaunchIcon} permission="viewJobs" />
-                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
-                    <NavItem page="surveys" label="Pesquisas Internas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
+                    <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
+                    <NavItem page="org-chart" label="Organograma" icon={ArrowPathIcon} permission="viewOrgChart" featureId="org-chart" />
+                    <NavItem page="meu-rh" label="Portal Meu RH" icon={BuildingOfficeIcon} permission="viewMeuRH" featureId="meu-rh" />
+                    <NavItem page="jobs" label="Portal de Vagas" icon={RocketLaunchIcon} permission="viewJobs" featureId="jobs" />
+                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" featureId="training" />
+                    <NavItem page="surveys" label="Pesquisas Internas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" featureId="surveys" />
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
                     <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
@@ -139,12 +139,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
 
                 <NavMenu label="T.I. & Suporte" icon={LifebuoyIcon} menuKey="ti" permission={hasTiAccess}>
-                    <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" />
+                    <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" featureId="tickets" />
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
-                    <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
+                    <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" featureId="equip" />
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
-                    <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
+                    <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>
 
                 {/* SaaS Super Admin Button */}
