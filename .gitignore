@@ -37,3 +37,9 @@ backups/
 certbot/
 *.sql
 *.sql.gz
+
+# Scratch and temporary files
+scratch/
+test_*.mjs
+test_*.js
+*.txt

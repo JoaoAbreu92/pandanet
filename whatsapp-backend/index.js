@@ -79,6 +79,22 @@ function formatPhoneDisplay(phoneStr) {
     return phoneStr;
 }
 
+// Suporte robusto para timestamp protobuf Long do webhook
+function parseMessageTimestamp(ts) {
+    if (!ts) return new Date().toISOString();
+    if (typeof ts === 'object' && ts !== null) {
+        const val = typeof ts.low === 'number' ? ts.low : (typeof ts.low === 'string' ? parseInt(ts.low) : null);
+        if (val !== null && !isNaN(val)) {
+            return new Date(val * 1000).toISOString();
+        }
+    }
+    const num = Number(ts);
+    if (!isNaN(num)) {
+        return new Date(num * 1000).toISOString();
+    }
+    return new Date().toISOString();
+}
+
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
@@ -375,15 +391,22 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             } : isAudio ? {
                 number: phoneNumber,
-                audio: base64Data,
-                ptt: true
+                audioMessage: {
+                    audio: base64Data,
+                    ptt: true
+                },
+                options: {
+                    encoding: true
+                }
             } : {
                 number: phoneNumber,
-                mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
-                mimetype: mediaType,
-                media: base64Data,
-                fileName: fileName,
-                caption: message || ''
+                mediaMessage: {
+                    mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
+                    mimetype: mediaType,
+                    media: base64Data,
+                    fileName: fileName,
+                    caption: message || ''
+                }
             };
             console.log(`[SEND API] Enviando para Evolution: endpoint=${endpoint} | body length=`, JSON.stringify(body).length);
 
@@ -756,17 +779,22 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         const groupInfo = await fetchGroupInfo(instanceName, jid);
                         const groupName = groupInfo?.subject || chat.name || chat.subject || 'Grupo (Sem Nome)';
                         
-                        await supabase.from('whatsapp_conversations').insert({
+                        const { error: insertErr } = await supabase.from('whatsapp_conversations').insert({
                             company_id: companyId,
                             connection_id: connectionId,
                             contact_phone: phone,
                             contact_name: groupName,
                             is_group: true,
-                            status: 'fechado',
+                            status: 'aberto',
                             unread_count: 0,
                             last_message_at: new Date().toISOString()
                         });
-                        console.log(`[SYNC] Grupo importado com sucesso: ${groupName} (${phone})`);
+                        if (insertErr) {
+                            console.error(`[SYNC] Erro ao importar grupo:`, insertErr.message);
+                            addDebugLog('SYNC_GROUP_INSERT_ERR', `Erro ao importar grupo ${groupName}: ${insertErr.message}`);
+                        } else {
+                            console.log(`[SYNC] Grupo importado com sucesso: ${groupName} (${phone})`);
+                        }
                     }
                 }
             }
@@ -809,17 +837,22 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
                     if (!convExists) {
                         const groupName = g.subject || g.name || 'Grupo (Sem Nome)';
-                        await supabase.from('whatsapp_conversations').insert({
+                        const { error: insertErr } = await supabase.from('whatsapp_conversations').insert({
                             company_id: companyId,
                             connection_id: connectionId,
                             contact_phone: phone,
                             contact_name: groupName,
                             is_group: true,
-                            status: 'fechado',
+                            status: 'aberto',
                             unread_count: 0,
                             last_message_at: new Date().toISOString()
                         });
-                        console.log(`[SYNC] Grupo importado via fetchAllGroups: ${groupName} (${phone})`);
+                        if (insertErr) {
+                            console.error(`[SYNC] Erro ao importar grupo via fetchAllGroups:`, insertErr.message);
+                            addDebugLog('SYNC_GROUP_FETCHALL_INSERT_ERR', `Erro ao importar grupo ${groupName}: ${insertErr.message}`);
+                        } else {
+                            console.log(`[SYNC] Grupo importado via fetchAllGroups: ${groupName} (${phone})`);
+                        }
                     }
                 }
             } else {
@@ -1418,7 +1451,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 whatsapp_message_id: msgId,
                 media_url: mediaUrl,
                 media_type: mediaType,
-                created_at: message.messageTimestamp ? new Date(message.messageTimestamp * 1000).toISOString() : new Date().toISOString()
+                created_at: parseMessageTimestamp(message.messageTimestamp)
             });
 
             if (insertErr) {
