@@ -40,7 +40,8 @@ const ensureNumber = (val) => {
 
 // --- FETCH EMAILS (IMAP) ---
 app.post('/api/email/fetch', authMiddleware, async (req, res) => {
-    const { config } = req.body;
+    const { config, path } = req.body;
+    const mailboxPath = path || 'INBOX';
     if (!config || !config.imap_host) {
         return res.status(400).json({ error: 'Missing IMAP config' });
     }
@@ -58,7 +59,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
     try {
         await client.connect();
-        const lock = await client.getMailboxLock('INBOX');
+        const lock = await client.getMailboxLock(mailboxPath);
         const emails = [];
 
         try {
@@ -95,7 +96,8 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 const simpleParser = require('mailparser').simpleParser;
 
 app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
-    const { config, uid } = req.body;
+    const { config, uid, path } = req.body;
+    const mailboxPath = path || 'INBOX';
     if (!config || !uid) return res.status(400).json({ error: 'Missing config or uid' });
 
     console.log(`[email-server] FETCH BODY: UID ${uid}`);
@@ -111,7 +113,7 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
     try {
         await client.connect();
-        const lock = await client.getMailboxLock('INBOX');
+        const lock = await client.getMailboxLock(mailboxPath);
         try {
             const message = await client.fetchOne(uid, { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });

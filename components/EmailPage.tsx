@@ -14,7 +14,9 @@ import {
     TagIcon,
     InboxIcon,
     PencilSquareIcon,
-    ChevronLeftIcon
+    ChevronLeftIcon,
+    FolderIcon,
+    NoSymbolIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 
 // --- Types ---
@@ -82,6 +84,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [showEmailPass, setShowEmailPass] = useState(false);
     const [loadingBody, setLoadingBody] = useState(false);
     const [folders, setFolders] = useState<any[]>([]);
+    const [currentFolder, setCurrentFolder] = useState('INBOX');
     
     // --- State: Search & Filters ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -205,7 +208,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         if (email.html || email.text) return; // Already has body
 
         setLoadingBody(true);
-        const { data, error } = await callEmailServer('fetch-body', { config: settings, uid: email.uid });
+        const { data, error } = await callEmailServer('fetch-body', {
+            config: settings,
+            uid: email.uid,
+            path: currentFolder
+        });
         setLoadingBody(false);
 
         if (error) {
@@ -288,7 +295,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         else setRefreshing(true);
 
         try {
-            const { data, error } = await callEmailServer('fetch', { config: settings });
+            const { data, error } = await callEmailServer('fetch', {
+                config: settings,
+                path: currentFolder
+            });
             if (error) throw error;
             if (data.error) throw new Error(data.error);
 
@@ -404,17 +414,42 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </button>
 
                     <nav className="space-y-1">
-                        <button onClick={() => { setView('inbox'); setFilterTag(null); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                        {/* Always show INBOX first */}
+                        <button
+                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
                             <InboxIcon className="w-5 h-5" />
                             Caixa de Entrada
-                            <span className="ml-auto bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                                {emails.length}
-                            </span>
+                            {currentFolder === 'INBOX' && (
+                                <span className="ml-auto bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                                    {emails.length}
+                                </span>
+                            )}
                         </button>
-                        <button disabled className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-400 cursor-not-allowed">
-                            <PaperAirplaneIcon className="w-5 h-5" />
-                            Enviados (Em breve)
-                        </button>
+
+                        {/* Render other folders */}
+                        {folders
+                            .filter((f: any) => f.path !== 'INBOX')
+                            .map((folder: any) => {
+                                const isSpecial = folder.specialUse;
+                                let Icon = FolderIcon;
+                                if (isSpecial === '\\Sent') Icon = PaperAirplaneIcon;
+                                if (isSpecial === '\\Trash') Icon = TrashIcon;
+                                if (isSpecial === '\\Drafts') Icon = PencilSquareIcon;
+                                if (isSpecial === '\\Junk') Icon = NoSymbolIcon;
+
+                                return (
+                                    <button
+                                        key={folder.path}
+                                        onClick={() => { setView('inbox'); setCurrentFolder(folder.path); setFilterTag(null); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === folder.path ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    >
+                                        <Icon className="w-5 h-5" />
+                                        {folder.path.split('/').pop()} {/* Simple name */}
+                                    </button>
+                                );
+                            })}
                     </nav>
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
