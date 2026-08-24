@@ -92,6 +92,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [newTagLabel, setNewTagLabel] = useState('');
     const [newTagColor, setNewTagColor] = useState('#EF4444'); // Default Red
 
+    // --- State: Pagination ---
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10); // User requested 10
+    const [totalEmails, setTotalEmails] = useState(0);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [filterTag, setFilterTag] = useState<string | null>(null);
 
@@ -333,10 +338,18 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         try {
             const { data, error } = await callEmailServer('fetch', {
                 config: settings,
-                path: currentFolder
+                path: currentFolder,
+                page,
+                pageSize
             });
             if (error) throw error;
             if (data.error) throw new Error(data.error);
+
+            // Handle Response (Array or Object with total)
+            const emailList = Array.isArray(data) ? data : data.emails;
+            const total = Array.isArray(data) ? data.length : data.total; // Default to length if API old
+
+            setTotalEmails(total);
 
             // Fetch Local Metadata (Tags/Notes)
             const { data: metadataList } = await supabase
@@ -345,7 +358,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 .eq('user_id', currentUser.id);
 
             // Merge metadata
-            const mergedEmails = data.map((email: any) => {
+            const mergedEmails = emailList.map((email: any) => {
                 const meta = metadataList?.find((m: any) => m.message_id === email.messageId); // Assuming function returns messageId
                 return {
                     ...email,
@@ -362,6 +375,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setRefreshing(false);
         }
     };
+
+    // Refresh when page changes
+    useEffect(() => {
+        if (savedImapUser) fetchEmails();
+    }, [page, pageSize]);
 
     const sendEmail = async () => {
         setLoading(true);
@@ -452,14 +470,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     <nav className="space-y-1">
                         {/* Always show INBOX first */}
                         <button
-                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); }}
+                            onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); setPage(1); }}
                             className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             <InboxIcon className="w-5 h-5" />
                             Caixa de Entrada
                             {currentFolder === 'INBOX' && (
                                 <span className="ml-auto bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                                    {emails.length}
+                                    {totalEmails}
                                 </span>
                             )}
                         </button>
@@ -478,7 +496,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 return (
                                     <button
                                         key={folder.path}
-                                        onClick={() => { setView('inbox'); setCurrentFolder(folder.path); setFilterTag(null); }}
+                                        onClick={() => { setView('inbox'); setCurrentFolder(folder.path); setFilterTag(null); setPage(1); }}
                                         className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === folder.path ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                                     >
                                         <Icon className="w-5 h-5" />
@@ -502,7 +520,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         {availableTags.map(tag => (
                             <button 
                                 key={tag.id}
-                                onClick={() => { setView('inbox'); setFilterTag(tag.label); }}
+                                onClick={() => { setView('inbox'); setFilterTag(tag.label); setPage(1); }}
                                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${filterTag === tag.label ? 'bg-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                             >
                                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
@@ -591,6 +609,31 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 <button onClick={() => { /* Delete Logic */ closeContextMenu(); alert('Em breve'); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                                     <TrashIcon className="w-4 h-4" />
                                     Excluir
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {view === 'inbox' && (
+                        <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                                Página {page} de {Math.ceil(totalEmails / pageSize) || 1}
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1 || loading}
+                                    className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Anterior
+                                </button>
+                                <button
+                                    onClick={() => setPage(p => p + 1)}
+                                    disabled={page * pageSize >= totalEmails || loading}
+                                    className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Próxima
                                 </button>
                             </div>
                         </div>

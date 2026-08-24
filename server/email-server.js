@@ -66,9 +66,24 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const status = client.mailbox;
             if (!status || status.exists === 0) return res.json([]);
 
-            // Fetch last 20 emails
-            const fetchStart = Math.max(1, status.exists - 19);
-            const range = `${fetchStart}:*`;
+            // Pagination Logic
+            const page = parseInt(req.body.page) || 1;
+            const pageSize = parseInt(req.body.pageSize) || 10;
+            const total = status.exists;
+
+            if (total === 0) return res.json({ emails: [], total: 0 });
+
+            // IMAP ranges are 1-based. 
+            // Page 1 (newest): total -> total - pageSize + 1
+            // Page 2: total - pageSize -> total - 2*pageSize + 1
+
+            const endIndex = total - (page - 1) * pageSize;
+            const startIndex = Math.max(1, endIndex - pageSize + 1);
+
+            if (endIndex < 1) return res.json({ emails: [], total });
+
+            const range = `${startIndex}:${endIndex}`;
+            console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
             for await (const message of client.fetch(range, { envelope: true }, { uid: true })) {
                 emails.push({
@@ -80,8 +95,10 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
                     flags: message.flags
                 });
             }
+            // Sort by date desc
             emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            return res.json(emails);
+
+            return res.json({ emails, total });
         } finally {
             lock.release();
             await client.logout();
