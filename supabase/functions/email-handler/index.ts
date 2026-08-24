@@ -3,26 +3,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Edge Function 'email-handler' V11 (Robust) iniciada.");
+console.log("Edge Function 'email-handler' V12 (TLS Bypass) iniciada.");
 
 Deno.serve(async (req) => {
-  // 1. Lidar com preflight CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // 2. Lidar com GET (Health Check / Teste de Navegador)
   if (req.method === 'GET') {
     return new Response(JSON.stringify({
-      success: true,
-      message: 'Edge Function email-handler está online (V11). Use POST para ações reais.'
+      success: true, 
+      message: 'Edge Function email-handler está online (V12). Suporte a TLS Bypass ativo.'
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }
 
   try {
-    // 3. Validar se é POST e tem corpo
     if (req.method !== 'POST') {
       throw new Error(`Método ${req.method} não suportado.`);
     }
@@ -39,7 +36,6 @@ Deno.serve(async (req) => {
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações (settings) não fornecidas.");
 
-      // Imports dinâmicos para evitar problemas de carregamento no topo
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
@@ -53,7 +49,10 @@ Deno.serve(async (req) => {
             user: settings.user,
             pass: settings.pass,
           },
-          tls: { rejectUnauthorized: false }
+          tls: {
+            rejectUnauthorized: false,
+            checkServerIdentity: () => undefined
+          }
         })
         await transporter.verify();
         console.log("SMTP OK");
@@ -72,7 +71,10 @@ Deno.serve(async (req) => {
             pass: settings.pass,
           },
           logger: false,
-          tls: { rejectUnauthorized: false }
+          tls: {
+            rejectUnauthorized: false,
+            checkServerIdentity: () => undefined
+          }
         })
         await client.connect();
         await client.logout();
@@ -89,7 +91,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Outras ações (sync-emails, etc) podem ser adicionadas aqui
     return new Response(JSON.stringify({
       success: true,
       message: `Ação '${action}' recebida, mas não implementada nesta versão.`
@@ -99,13 +100,11 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error("ERRO:", error.message);
-    // Retornamos um status 200 com success:false para que o frontend 
-    // receba a mensagem amigável em vez de um erro de rede 500.
     return new Response(JSON.stringify({
       success: false,
       error: error.message
     }), {
-      status: 200,
+      status: 200, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
