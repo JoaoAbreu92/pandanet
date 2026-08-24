@@ -16,7 +16,12 @@ import {
     PencilSquareIcon,
     ChevronLeftIcon,
     FolderIcon,
-    NoSymbolIcon
+    NoSymbolIcon,
+    UsersIcon,
+    UserPlusIcon,
+    ArrowUturnLeftIcon,
+    ArrowRightOnRectangleIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 
 // --- Types ---
@@ -52,6 +57,12 @@ interface EmailMetadata {
     id?: string;
     tags: { label: string; color: string }[];
     notes?: string;
+}
+
+interface Contact {
+    id: string;
+    name: string;
+    email: string;
 }
 
 // --- Components ---
@@ -103,8 +114,18 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
     // --- State: Compose ---
     const [composeTo, setComposeTo] = useState('');
+    const [composeCc, setComposeCc] = useState('');
+    const [composeBcc, setComposeBcc] = useState('');
+    const [composeReplyTo, setComposeReplyTo] = useState('');
     const [composeSubject, setComposeSubject] = useState('');
     const [composeBody, setComposeBody] = useState('');
+    const [showCc, setShowCc] = useState(false);
+
+    // --- State: Contacts ---
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [showContactsModal, setShowContactsModal] = useState(false);
+    const [newContactName, setNewContactName] = useState('');
+    const [newContactEmail, setNewContactEmail] = useState('');
 
     // --- Refs ---
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,6 +167,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
             fetchFolders(); // Load folders once
             fetchTags();    // Load tags once
+            fetchContacts(); // Load contacts once
         }
     }, [savedImapUser]); // Only fires when settings are loaded from DB, not when user types
 
@@ -418,17 +440,25 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 config: settings,
                 payload: {
                     to: composeTo,
+                    cc: composeCc,
+                    bcc: composeBcc,
+                    replyTo: composeReplyTo,
                     subject: composeSubject,
                     text: composeBody,
                     html: fullBody
                 }
             });
 
+
+
             if (error) throw error;
             if (data.error) throw new Error(data.error);
 
             alert('E-mail enviado com sucesso!');
             setComposeTo('');
+            setComposeCc('');
+            setComposeBcc('');
+            setComposeReplyTo('');
             setComposeSubject('');
             setComposeBody('');
             setView('inbox');
@@ -437,6 +467,47 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // --- Contacts & Folders Helpers ---
+
+    const getFolderName = (path: string) => {
+        if (path === 'INBOX') return 'Caixa de Entrada';
+        const name = path.split('/').pop() || path;
+        if (name === 'Sent' || path.includes('Sent')) return 'Enviados';
+        if (name === 'Drafts' || path.includes('Drafts')) return 'Rascunhos';
+        if (name === 'Trash' || path.includes('Trash')) return 'Lixeira';
+        if (name === 'Junk' || path.includes('Junk') || name === 'Spam') return 'Spam';
+        return name;
+    }
+
+    const fetchContacts = async () => {
+        const { data } = await supabase.from('email_contacts').select('*').eq('user_id', currentUser.id).order('name', { ascending: true });
+        if (data) setContacts(data);
+    };
+
+    const addContact = async () => {
+        if (!newContactEmail) return;
+        const { data, error } = await supabase.from('email_contacts').insert({
+            user_id: currentUser.id,
+            name: newContactName || newContactEmail.split('@')[0],
+            email: newContactEmail
+        }).select();
+
+        if (error) alert('Erro ao salvar contato: ' + error.message);
+        else if (data) {
+            setContacts(prev => [...prev, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
+            setNewContactName('');
+            setNewContactEmail('');
+            // Optional: alert('Contato salvo!');
+        }
+    };
+
+    const deleteContact = async (id: string) => {
+        if (!confirm('Excluir este contato?')) return;
+        const { error } = await supabase.from('email_contacts').delete().eq('id', id);
+        if (error) alert('Erro ao excluir: ' + error.message);
+        else setContacts(prev => prev.filter(c => c.id !== id));
     };
 
     // --- Helpers ---
@@ -527,7 +598,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === folder.path ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                                     >
                                         <Icon className="w-5 h-5" />
-                                        {folder.path.split('/').pop()} {/* Simple name */}
+                                        {getFolderName(folder.path)}
                                     </button>
                                 );
                             })}
@@ -690,30 +761,55 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 {view === 'read' && selectedEmail ? (
                     <div className="flex-1 flex flex-col h-full overflow-hidden">
                         {/* Toolbar */}
-                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                            <h2 className="text-lg font-bold text-gray-800 truncate pr-4">{selectedEmail.subject}</h2>
-                            <div className="flex gap-2">
-                                <button onClick={() => deleteEmail(selectedEmail)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-red-500" title="Mover para Lixeira">
-                                    <TrashIcon className="w-5 h-5" />
-                                </button>
-                                <div className="relative group">
-                                    <button className="p-2 hover:bg-gray-200 rounded-full text-gray-500" title="Adicionar Tag">
-                                        <TagIcon className="w-5 h-5" />
-                                    </button>
-                                    <div className="absolute right-0 top-full mt-1 bg-white shadow-lg rounded-lg border border-gray-200 p-2 hidden group-hover:block min-w-[150px] z-50">
-                                        {availableTags.map(tag => (
-                                            <button key={tag.id} onClick={() => handleAddTag(selectedEmail, tag.label, tag.color)} className="block w-full text-left px-3 py-1 text-sm hover:bg-gray-100 rounded flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span> {tag.label}
-                                            </button>
-                                        ))}
-                                        <div className="border-t mt-1 pt-1">
-                                            <button onClick={() => setShowTagModal(true)} className="block w-full text-left px-3 py-1 text-xs text-brand-primary hover:bg-gray-50 rounded italic">
-                                                + Gerenciar Tags
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="p-2 border-b border-gray-200 flex flex-wrap gap-2 items-center bg-gray-50">
+                            <button onClick={() => setView('inbox')} className="md:hidden p-2 text-gray-600">
+                                <ChevronLeftIcon className="w-5 h-5" />
+                            </button>
+                            <button onClick={() => {
+                                setView('compose');
+                                setComposeTo(selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from);
+                                setComposeSubject('Re: ' + selectedEmail.subject);
+                                setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
+                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                                <ArrowUturnLeftIcon className="w-4 h-4" /> Responder
+                            </button>
+                            <button onClick={() => {
+                                setView('compose');
+                                const from = selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from;
+                                const ccs = selectedEmail.to; // Simplification
+                                setComposeTo(from);
+                                setComposeCc(ccs);
+                                setComposeSubject('Re: ' + selectedEmail.subject);
+                                setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
+                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                                <UsersIcon className="w-4 h-4" /> Todos
+                            </button>
+                            <button onClick={() => {
+                                setView('compose');
+                                setComposeSubject('Fwd: ' + selectedEmail.subject);
+                                setComposeBody(`<br/><br/>---------- Forwarded message ---------<br/>From: ${selectedEmail.from}<br/>Date: ${new Date(selectedEmail.date).toLocaleString()}<br/>Subject: ${selectedEmail.subject}<br/><br/>${selectedEmail.html || selectedEmail.text}`);
+                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                                <ArrowRightOnRectangleIcon className="w-4 h-4" /> Encaminhar
+                            </button>
+                            <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                            <button onClick={() => deleteEmail(selectedEmail)} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-red-50 text-xs font-medium text-red-600">
+                                <TrashIcon className="w-4 h-4" /> Excluir
+                            </button>
+                            <button onClick={() => {
+                                // Move to Junk/Spam
+                                const spamFolder = folders.find(f => f.specialUse === '\\Junk' || f.path.includes('Junk') || f.path.includes('Spam'))?.path || 'Junk';
+                                callEmailServer('move', { config: settings, uids: [selectedEmail.uid], path: spamFolder });
+                                alert('Movido para Spam');
+                                setView('inbox');
+                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                                <ExclamationTriangleIcon className="w-4 h-4" /> Spam
+                            </button>
+                            <button onClick={() => {
+                                toggleFlag(selectedEmail, '\\Seen', false);
+                                setView('inbox');
+                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                                <EnvelopeIcon className="w-4 h-4" /> Não lido
+                            </button>
                         </div>
 
                         {/* Metadata */}
@@ -757,18 +853,50 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 ) : view === 'compose' ? (
                     <div className="flex-1 flex flex-col h-full bg-white">
                         <div className="p-6 flex-1 flex flex-col space-y-4">
-                            <input 
-                                        className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary placeholder-gray-400"
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2 items-center">
+                                            <input 
+                                                className="flex-1 border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary placeholder-gray-400"
                                         placeholder="Para:"
-                                value={composeTo}
+                                                value={composeTo}
                                         onChange={e => setComposeTo(e.target.value)}
                                     />
-                            <input 
-                                        className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary font-medium placeholder-gray-400"
-                                        placeholder="Assunto"
-                                value={composeSubject}
-                                        onChange={e => setComposeSubject(e.target.value)}
-                            />
+                                            <button onClick={() => setShowContactsModal(true)} className="text-gray-400 hover:text-brand-primary" title="Contatos">
+                                                <UsersIcon className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={() => setShowCc(!showCc)} className="text-xs text-gray-500 hover:text-brand-primary font-medium">
+                                                CC/CCO
+                                            </button>
+                                        </div>
+                                        {showCc && (
+                                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-2 rounded">
+                                                <input
+                                                    className="border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                    placeholder="CC:"
+                                                    value={composeCc}
+                                                    onChange={e => setComposeCc(e.target.value)}
+                                                />
+                                                <input
+                                                    className="border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                    placeholder="CCO:"
+                                                    value={composeBcc}
+                                                    onChange={e => setComposeBcc(e.target.value)}
+                                                />
+                                                <input
+                                                    className="col-span-2 border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                    placeholder="Reply-To (Opcional):"
+                                                    value={composeReplyTo}
+                                                    onChange={e => setComposeReplyTo(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+                                        <input
+                                            className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary font-medium placeholder-gray-400"
+                                            placeholder="Assunto"
+                                            value={composeSubject}
+                                            onChange={e => setComposeSubject(e.target.value)}
+                                        />
+                                    </div>
 
                                     <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
                                         <ReactQuill
@@ -921,6 +1049,66 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                         <div className="mt-6 flex justify-end">
                             <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --- Contacts Modal --- */}
+            {showContactsModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-gray-700">Contatos</h3>
+                            <button onClick={() => setShowContactsModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <span className="text-2xl">&times;</span>
+                            </button>
+                        </div>
+                        <div className="p-4 border-b bg-gray-50">
+                            <div className="flex gap-2">
+                                <input
+                                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                                    placeholder="Nome (Opcional)"
+                                    value={newContactName}
+                                    onChange={e => setNewContactName(e.target.value)}
+                                />
+                                <input
+                                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                                    placeholder="Email"
+                                    value={newContactEmail}
+                                    onChange={e => setNewContactEmail(e.target.value)}
+                                />
+                                <button onClick={addContact} disabled={!newContactEmail} className="bg-brand-primary text-white px-3 py-2 rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                                    <UserPlusIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {contacts.length === 0 ? (
+                                <p className="text-center text-gray-500 text-sm">Nenhum contato salvo.</p>
+                            ) : (
+                                contacts.map(contact => (
+                                    <div key={contact.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 group">
+                                        <div>
+                                            <div className="font-medium text-gray-800">{contact.name}</div>
+                                            <div className="text-xs text-gray-500">{contact.email}</div>
+                                        </div>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => {
+                                                    setComposeTo(prev => prev ? `${prev}, ${contact.email}` : contact.email);
+                                                    setShowContactsModal(false);
+                                                }}
+                                                className="text-brand-primary hover:underline text-xs font-bold"
+                                            >
+                                                Usar
+                                            </button>
+                                            <button onClick={() => deleteContact(contact.id)} className="text-red-500 hover:underline text-xs">
+                                                Excluir
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

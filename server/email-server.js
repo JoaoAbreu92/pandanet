@@ -261,12 +261,28 @@ app.post('/api/email/folders', authMiddleware, async (req, res) => {
     }
 });
 
-// --- SEND EMAIL (SMTP) ---
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Supabase Client (Service Role for backend ops)
+// Note: We use process.env vars which should be available
+const supabaseUrl = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+const supabaseKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+}) : null;
+
+// --- SEND EMAIL (SMTP + IMAP Append + Contacts) ---
 app.post('/api/email/send', authMiddleware, async (req, res) => {
-    const { config, payload } = req.body;
+    const { config, payload, user_id } = req.body; // user_id passed from frontend or decoded from token
     if (!config || !payload) {
         return res.status(400).json({ error: 'Missing config or payload' });
     }
+
+    // Extract recipients for contacts saving
+    const recipients = [];
+    if (payload.to) recipients.push(...payload.to.split(',').map(e => e.trim()));
+    if (payload.cc) recipients.push(...payload.cc.split(',').map(e => e.trim()));
+    if (payload.bcc) recipients.push(...payload.bcc.split(',').map(e => e.trim()));
 
     console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> ${payload.to}`);
 
@@ -279,14 +295,87 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     });
 
     try {
-        await transporter.sendMail({
+        // 1. Send via SMTP
+        const info = await transporter.sendMail({
             from: config.smtp_user,
             to: payload.to,
+            cc: payload.cc,
+            bcc: payload.bcc,
+            replyTo: payload.replyTo,
             subject: payload.subject,
             text: payload.text,
             html: payload.html
         });
-        return res.json({ success: true });
+
+        // 2. Append to Sent Folder (IMAP)
+        // We use a separate async operation for this to valid "sent" status quickly, 
+        // but it's safer to wait to ensure consistency.
+        const client = new ImapFlow({
+            host: config.imap_host,
+            port: ensureNumber(config.imap_port),
+            secure: config.imap_ssl !== false,
+            auth: { user: config.imap_user, pass: config.imap_pass },
+            tls: { rejectUnauthorized: false },
+            logger: false
+        });
+
+        try {
+            await client.connect();
+            // Try to find the correct Sent folder
+            let sentFolder = 'INBOX.Sent'; // Default fallback
+            const boxes = await client.list();
+            const sentBox = boxes.find(b => b.specialUse === '\\Sent');
+            if (sentBox) sentFolder = sentBox.path;
+
+            // Construct MIME message for appending
+            // Ideally we'd use the raw message from nodemailer, but info.messageId isn't the raw.
+            // We'll reconstruct a simple version or just text.
+            // For a robust implementation, we should use a composer lib, but let's try a simple text append first.
+            // Better: Nodemailer can return the raw stream if we ask, or we just append the text.
+            // Actually, ImapFlow `append` takes a string or buffer.
+
+            // Re-using nodemailer to build raw (but not send) is tricky without a stream.
+            // We'll construct a basic MIME string manually for the Append.
+            const mimeMessage = [
+                `From: ${config.smtp_user}`,
+                `To: ${payload.to}`,
+                payload.cc ? `Cc: ${payload.cc}` : '',
+                `Subject: ${payload.subject}`,
+                `Date: ${new Date().toUTCString()}`,
+                `Content-Type: text/html; charset=utf-8`,
+                '',
+                payload.html || payload.text
+            ].filter(Boolean).join('\r\n');
+
+            await client.append(sentFolder, mimeMessage, ['\\Seen']);
+            await client.logout();
+        } catch (imapErr) {
+            console.error('[email-server] Failed to append to Sent:', imapErr);
+            // Non-blocking error for the user, but logged.
+        }
+
+        // 3. Save Contacts (Fire and Forget)
+        if (supabase && user_id) {
+            (async () => {
+                for (const email of recipients) {
+                    if (!email.includes('@')) continue; // Basic validation
+                    const cleanEmail = email.replace(/<.*>/, '').trim();
+                    const name = email.includes('<') ? email.split('<')[0].trim() : cleanEmail.split('@')[0];
+
+                    try {
+                        await supabase.from('email_contacts').upsert({
+                            user_id: user_id,
+                            email: cleanEmail,
+                            name: name
+                        }, { onConflict: 'user_id,email' });
+                    } catch (dbErr) {
+                        console.error('[email-server] Contact save error:', dbErr);
+                    }
+                }
+            })();
+        }
+
+        return res.json({ success: true, messageId: info.messageId });
     } catch (err) {
         console.error('[email-server] SMTP Error:', err.message);
         return res.status(500).json({ error: `SMTP Error: ${err.message}` });
