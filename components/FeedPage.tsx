@@ -1,9 +1,8 @@
-
 import React, { useState, useRef } from 'react';
 import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
 import RecognitionWidget from './RecognitionWidget';
-import EmployeeOfTheMonth from './EmployeeOfTheMonth';
+import RecognitionModal from './RecognitionModal';
 import type { Post, Employee, Event, Recognition } from '../types';
 import { VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, PaperAirplaneIcon, ShareIcon, FaceSmileIcon, UserGroupIcon, HashtagIcon, CakeIcon } from './icons';
 
@@ -14,13 +13,14 @@ interface FeedPageProps {
     allEmployees?: Employee[];
     events?: Event[];
     recognitions?: Recognition[];
+    onAddRecognition?: (rec: Recognition) => void;
 }
 
 export const PostCard: React.FC<{
     post: Post;
     currentUser: Employee;
-    onToggleReaction: (postId: number, emoji: string) => void;
-    onSubmitComment: (postId: number, text: string) => void;
+    onToggleReaction: (postId: string, emoji: string) => void;
+    onSubmitComment: (postId: string, text: string) => void;
     onShare: (post: Post) => void;
 }> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare }) => {
     const [commentText, setCommentText] = useState('');
@@ -187,17 +187,25 @@ export const PostCard: React.FC<{
     );
 };
 
-const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEmployees = [], events = [], recognitions = [] }) => {
+const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
     const [newPostContent, setNewPostContent] = useState('');
     const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
+    const [showRecognitionModal, setShowRecognitionModal] = useState(false);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleBirthdayClick = (name: string) => {
-        setNewPostContent(`Parabéns @${name}! 🥳 `);
-        postTextareaRef.current?.focus();
+    const handleRecognitionSubmit = (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
+        if (onAddRecognition) {
+            const newRec: Recognition = {
+                id: Date.now().toString(),
+                from: currentUser.name,
+                fromAvatar: currentUser.avatarUrl,
+                ...data
+            };
+            onAddRecognition(newRec);
+        }
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
@@ -213,7 +221,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         if (!newPostContent.trim() && !mediaFile) return;
 
         // Detect mentions
-        const mentions: number[] = [];
+        const mentions: string[] = [];
         if (allEmployees) {
             allEmployees.forEach(emp => {
                 if (newPostContent.includes(`@${emp.name}`)) {
@@ -223,7 +231,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         }
 
         const newPost: Post = {
-            id: Date.now(),
+            id: Date.now().toString(),
             authorId: currentUser.id,
             authorName: currentUser.name,
             authorAvatar: currentUser.avatarUrl,
@@ -290,12 +298,17 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         });
     };
 
-    // Determine Employee of the Month (Mock logic: Pick random or specific one)
-    // For demo, let's pick the 3rd employee or random if available
-    const employeeOfTheMonth = allEmployees.length > 2 ? allEmployees[2] : (allEmployees[0] || currentUser);
+    // Determine Employee of the Month (Removed mock logic)
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <RecognitionModal
+                isOpen={showRecognitionModal}
+                onClose={() => setShowRecognitionModal(false)}
+                onSubmit={handleRecognitionSubmit}
+                employees={allEmployees || []}
+                currentUserId={currentUser.id}
+            />
             {/* Left Sidebar - Profile & Shortcuts */}
             <div className="hidden lg:block space-y-6">
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden p-4 border border-gray-100">
@@ -437,41 +450,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
             {/* Right Sidebar - Widgets */}
             <div className="hidden lg:block space-y-6">
 
-                {/* Employee of The Month */}
-                <EmployeeOfTheMonth employee={employeeOfTheMonth} />
-
                 {/* Recognition Wall */}
-                <RecognitionWidget recognitions={recognitions} onRecognize={() => alert('Feature coming soon!')} />
-
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
-                    <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase flex items-center">
-                        <CakeIcon className="w-5 h-5 mr-2 text-pink-500" />
-                        Aniversariantes
-                    </h3>
-                    <div className="space-y-3">
-                        {/* Mock Birthdays */}
-                        <div
-                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                            onClick={() => handleBirthdayClick('Mariana Costa')}
-                        >
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-emoji">🎂</div>
-                            <div>
-                                <p className="text-sm font-semibold text-gray-800">Mariana Costa</p>
-                                <p className="text-xs text-brand-primary font-bold">Hoje!</p>
-                            </div>
-                        </div>
-                        <div
-                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                            onClick={() => handleBirthdayClick('Carlos Silva')}
-                        >
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-emoji">🎈</div>
-                            <div>
-                                <p className="text-sm font-semibold text-gray-800">Carlos Silva</p>
-                                <p className="text-xs text-gray-500">Amanhã</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <RecognitionWidget recognitions={recognitions} onRecognize={() => setShowRecognitionModal(true)} />
 
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
                     <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase">Tópicos em Alta</h3>

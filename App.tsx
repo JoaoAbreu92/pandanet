@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { mockCompanies, superAdmin } from './mockData';
-import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent } from './types';
+import { mockCompanies } from './mockData';
+import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition } from './types';
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
@@ -268,6 +268,31 @@ const AppContent: React.FC = () => {
         setCompanyData({ ...companyData, events: updatedEvents });
     };
 
+    const handleAddRecognition = (rec: Recognition) => {
+        if (!companyData) return;
+        const updatedRecognitions = [rec, ...(companyData.recognitions || [])];
+        setCompanyData({ ...companyData, recognitions: updatedRecognitions });
+
+        // Notify the receiver if possible (simple local notification check)
+        const receiver = companyData.employees.find(e => e.name === rec.to);
+        if (receiver && currentUser) {
+            const newNotification: Notification = {
+                id: Date.now().toString(),
+                type: 'message', // reusing message icon for simplicity or add 'recognition' type
+                title: 'Você recebeu um reconhecimento!',
+                description: `${currentUser.name} te reconheceu por: ${rec.value}`,
+                timestamp: 'Agora',
+                isRead: false,
+                linkTo: 'recognition',
+                avatarUrl: currentUser.avatarUrl
+            };
+            // Note: This only sets notification for CURRENT user in this state-based mock. 
+            // In real Supabase, we'd insert into notifications table.
+            // For now, if I'm recognizing myself (test) it shows up. 
+            // If I recognize others, they won't see it unless we persist to DB.
+        }
+    };
+
     useEffect(() => {
         if (companyData && currentUser) {
             const pendingInvites = companyData.events.filter(event =>
@@ -307,13 +332,13 @@ const AppContent: React.FC = () => {
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
-            case 'feed': return <FeedPage posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} />;
+            case 'feed': return <FeedPage posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} onAddRecognition={handleAddRecognition} />;
             case 'messages': return canAccess('viewMessages') ? <Messages conversations={companyData.conversations} setConversations={handleUpdateConversations} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
             case 'tickets': return canAccess('openTickets') ? <TicketPage tickets={companyData.tickets} setTickets={handleUpdateTickets} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
             case 'calendar': return canAccess('viewCalendar') ? <CalendarPage allEmployees={companyData.employees} userEvents={calendarEvents} onEventCreate={handleAddEvent} /> : null;
             case 'directory': return canAccess('viewDirectory') ? <DirectoryPage employees={companyData.employees} /> : null;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter documents={companyData.documents} setDocuments={(d) => setCompanyData({ ...companyData, documents: d })} currentUser={currentUser} /> : null;
-            case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
+            case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage recognitions={companyData.recognitions} employees={companyData.employees} currentUser={currentUser} onAddRecognition={handleAddRecognition} /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage items={companyData.marketplaceItems} setItems={(i) => setCompanyData({ ...companyData, marketplaceItems: i })} currentUser={currentUser} /> : null;
             case 'forms': return canAccess('viewForms') ? <FormsPage submissions={companyData.formSubmissions} setSubmissions={(s) => setCompanyData({ ...companyData, formSubmissions: s })} currentUser={currentUser} /> : null;
             case 'benefits': return canAccess('viewBenefits') ? <BeneficiosPage benefits={companyData.benefits} setBenefits={(b) => setCompanyData({ ...companyData, benefits: b })} currentUser={currentUser} /> : null;

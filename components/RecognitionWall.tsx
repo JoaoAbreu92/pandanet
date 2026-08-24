@@ -1,47 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Card from './Card';
 import { SparklesIcon, PlusIcon } from './icons';
-// FIX: Correcting the import path for types.
-import type { Recognition } from '../types';
+import type { Recognition, Employee } from '../types';
+import RecognitionModal from './RecognitionModal';
 
-const mockRecognitions: Recognition[] = [
-    {
-        id: 1,
-        to: 'Jane Smith',
-        from: 'John Doe',
-        toAvatar: 'https://picsum.photos/id/1011/100/100',
-        fromAvatar: 'https://picsum.photos/id/1005/100/100',
-        message: 'Obrigado pela ajuda incrível no design do novo dashboard. Ficou fantástico!',
-        value: 'Trabalho em Equipe'
-    },
-    {
-        id: 2,
-        to: 'Peter Jones',
-        from: 'Ana Williams',
-        toAvatar: 'https://picsum.photos/id/1025/100/100',
-        fromAvatar: 'https://picsum.photos/id/237/100/100',
-        message: 'Sua solução para o problema no servidor foi genial e nos economizou muito tempo. Inovação pura!',
-        value: 'Inovação'
-    },
-    {
-        id: 3,
-        to: 'Mary Johnson',
-        from: 'Carlos Silva',
-        toAvatar: 'https://picsum.photos/id/1027/100/100',
-        fromAvatar: 'https://picsum.photos/id/1028/100/100',
-        message: 'A análise de dados que você apresentou foi super clara e nos deu insights valiosos. Excelente!',
-        value: 'Foco no Cliente'
-    },
-    {
-        id: 4,
-        to: 'Carlos Silva',
-        from: 'Fernanda Lima',
-        toAvatar: 'https://picsum.photos/id/1028/100/100',
-        fromAvatar: 'https://picsum.photos/id/106/100/100',
-        message: 'Parabéns pela entrega do novo front-end. A performance está incrível e a experiência do usuário melhorou muito.',
-        value: 'Qualidade'
-    }
-];
+interface RecognitionWallProps {
+    recognitions?: Recognition[];
+    employees?: Employee[];
+    currentUser?: Employee;
+    onAddRecognition?: (rec: Recognition) => void;
+}
 
 const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }) => {
     const valueColors: { [key: string]: string } = {
@@ -63,7 +31,7 @@ const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }
             </div>
             <p className="text-sm text-brand-subtle-text italic">"{recognition.message}"</p>
             <div className="pt-2">
-                 <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${valueColors[recognition.value] || 'bg-gray-100 text-gray-800'}`}>
+                <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${valueColors[recognition.value] || 'bg-gray-100 text-gray-800'}`}>
                     #{recognition.value.replace(' ', '')}
                 </span>
             </div>
@@ -71,21 +39,56 @@ const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }
     );
 };
 
+const RecognitionWall: React.FC<RecognitionWallProps> = ({ recognitions = [], employees = [], currentUser, onAddRecognition }) => {
+    const [showModal, setShowModal] = useState(false);
 
-const RecognitionWall: React.FC = () => {
+    const handleRecognitionSubmit = (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
+        if (onAddRecognition && currentUser) {
+            const newRec: Recognition = {
+                id: Date.now().toString(),
+                from: currentUser.name,
+                fromAvatar: currentUser.avatarUrl,
+                ...data
+            };
+            onAddRecognition(newRec);
+        }
+    };
+
     return (
-        <Card title="Mural de Reconhecimento" headerAction={
-            <button className="flex items-center space-x-2 px-3 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600">
-                <PlusIcon className="w-4 h-4" />
-                <span>Reconhecer</span>
-            </button>
-        }>
-            <div className="flex space-x-4 overflow-x-auto pb-4 -mb-4">
-                {mockRecognitions.map(rec => (
-                    <RecognitionCard key={rec.id} recognition={rec} />
-                ))}
-            </div>
-        </Card>
+        <>
+            <Card title="Mural de Reconhecimento" headerAction={
+                <button
+                    onClick={() => setShowModal(true)}
+                    disabled={!currentUser}
+                    className="flex items-center space-x-2 px-3 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <PlusIcon className="w-4 h-4" />
+                    <span>Reconhecer</span>
+                </button>
+            }>
+                {recognitions.length > 0 ? (
+                    <div className="flex space-x-4 overflow-x-auto pb-4 -mb-4">
+                        {recognitions.map(rec => (
+                            <RecognitionCard key={rec.id} recognition={rec} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="p-8 text-center text-gray-500 italic">
+                        Nenhum reconhecimento ainda. Seja o primeiro a reconhecer um colega!
+                    </div>
+                )}
+            </Card>
+
+            {currentUser && (
+                <RecognitionModal
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    onSubmit={handleRecognitionSubmit}
+                    employees={employees}
+                    currentUserId={currentUser.id}
+                />
+            )}
+        </>
     );
 };
 

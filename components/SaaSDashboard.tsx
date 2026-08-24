@@ -40,11 +40,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
     // --- Local State for Data & Filters ---
     const [localCompanies, setLocalCompanies] = useState<Company[]>(Array.isArray(companies) ? companies : []);
-    const [localPlans, setLocalPlans] = useState([
-        { id: 2, name: 'Acrilight', users: 21, conn: 1, val: 320.00, features: {} },
-        { id: 4, name: 'Deploy Info', users: 20, conn: 1, val: 1.00, features: {} },
-        { id: 3, name: 'Trial', users: 10, conn: 2, val: 1.00, features: {} },
-    ]);
+    const [localPlans, setLocalPlans] = useState<any[]>([]);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'

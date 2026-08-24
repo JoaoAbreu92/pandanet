@@ -46,10 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             return null;
         }
         return (
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate(page); }} className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'} ${isOpen ? '' : 'justify-center'}`} title={label}>
+            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'} ${isOpen ? '' : 'justify-center'}`} title={label}>
                 <Icon className="w-6 h-6 flex-shrink-0" />
                 {isOpen && <span className="ml-4 truncate">{label}</span>}
-            </a>
+            </button>
         );
     };
 
@@ -129,29 +129,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
                 {/* SaaS Super Admin Button */}
                 {currentUser.role === 'Super Admin' && (
-                    <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); onNavigate('saas-dashboard'); }}
-                        className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
+                    <button
+                        type="button"
+                        onClick={() => onNavigate('saas-dashboard')}
+                        className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
                             } ${isOpen ? '' : 'justify-center'} mt-2 border-2 border-dashed border-purple-200 dark:border-gray-700`}
                         title="Painel SaaS"
                     >
                         <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
                         {isOpen && <span className="ml-4 truncate font-bold">Painel SaaS</span>}
-                    </a>
+                    </button>
                 )}
 
                 {(currentUser.isAdmin && isImpersonating) && (
-                    <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}
-                        className={`flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'admin' ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'
+                    <button
+                        type="button"
+                        onClick={() => onNavigate('admin')}
+                        className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'admin' ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'
                             } ${isOpen ? '' : 'justify-center'}`}
                         title={t('sidebar.admin')}
                     >
                         <ShieldCheckIcon className="w-6 h-6 flex-shrink-0" />
                         {isOpen && <span className="ml-4 truncate">{t('sidebar.admin')}</span>}
-                    </a>
+                    </button>
                 )}
             </nav>
             <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
