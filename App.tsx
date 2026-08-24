@@ -104,15 +104,21 @@ const AppContent: React.FC = () => {
                 }
             })
             .on('broadcast', { event: 'nudge' }, (payload) => {
-                console.log('[PandaNet] Broadcast Nudge detectado:', payload);
+                console.log('[PandaNet] 📡 BROADCAST NUDGE RECEIVED');
+                console.log('[PandaNet] Full broadcast payload:', JSON.stringify(payload, null, 2));
+
                 const { sender_id, conversation_id, receiver_id } = payload.payload;
+                console.log('[PandaNet] Sender ID from broadcast:', sender_id);
+                console.log('[PandaNet] Receiver ID from broadcast:', receiver_id);
+                console.log('[PandaNet] My User ID:', currentUser.id);
 
                 // Validate receiver if present in payload
                 if (receiver_id && receiver_id !== currentUser.id) {
-                    console.log(`[PandaNet] Ignoring broadcast nudge for ${receiver_id}`);
+                    console.log(`[PandaNet] ❌ Ignoring broadcast nudge for ${receiver_id} (I am ${currentUser.id})`);
                     return;
                 }
 
+                console.log('[PandaNet] ✅ Broadcast nudge is for me! Calling handleNudge...');
                 handleNudge(sender_id, conversation_id);
             })
             .subscribe((status) => {
