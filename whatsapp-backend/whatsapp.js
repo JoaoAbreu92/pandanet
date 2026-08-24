@@ -124,10 +124,18 @@ async function connectToWhatsApp(companyId, connectionId) {
             } else {
                 console.log('Connection closed. You are logged out (or session corrupted). Action required by user.');
             }
+        } else if (connection === 'connecting') {
+            console.log(`[CONNECTING] O celular começou a parear para a conexão ${connectionId}...`);
+            // CANCELAR O TIMER DE EXPIRAÇÃO DE QR CODE PARA NÃO MATAR NO MEIO DO PAREAMENTO LENTO DO CELULAR
+            if (sessions.has(connectionId + '_timer')) {
+                console.log(`[PAREAMENTO] Cancelando timer de timeout, pareamento em andamento...`);
+                clearTimeout(sessions.get(connectionId + '_timer'));
+                sessions.delete(connectionId + '_timer');
+            }
         } else if (connection === 'open') {
             console.log('opened connection for connection', connectionId);
 
-            // CANCELAR O TIMER DE EXPIRAÇÃO DE QR CODE POIS CONECTOU COM SUCESSO!
+            // Garanja extra de limpar timer se chegou ao open direto
             if (sessions.has(connectionId + '_timer')) {
                 console.log(`[SUCCESS] Cancelando timer de timeout para a conexao ${connectionId}`);
                 clearTimeout(sessions.get(connectionId + '_timer'));

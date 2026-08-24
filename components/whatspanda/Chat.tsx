@@ -98,8 +98,16 @@ const Chat: React.FC = () => {
   };
 
   const fetchSettings = async () => {
-    const { data } = await supabase.from('whatsapp_settings').select('*').single();
-    if (data) setSettings(data);
+    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    if (!companyId) return;
+
+    const { data } = await supabase
+      .from('whatsapp_settings')
+      .select('*')
+      .eq('company_id', companyId)
+      .limit(1);
+
+    if (data && data.length > 0) setSettings(data[0]);
   };
 
   const fetchConversations = async () => {
