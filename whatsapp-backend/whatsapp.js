@@ -24,6 +24,9 @@ const supabase = createClient(supabaseUrl, supabaseKey.trim());
 
 // Map to store socket connections for multiple companies
 const sessions = new Map();
+// Map to track reconnection attempts
+const reconnectionAttempts = new Map();
+const MAX_RECONNECTION_ATTEMPTS = 3;
 
 async function connectToWhatsApp(companyId) {
     if (!companyId) {
@@ -70,22 +73,30 @@ async function connectToWhatsApp(companyId) {
             sessions.delete(companyId);
 
             if (shouldReconnect) {
-                // connectToWhatsApp(); // Recursive call might be dangerous if not handled carefully, but standard in Baileys examples
-                // For this structure, we might need a better reconnection strategy or let the main loop handle it.
-                // But since we are inside the function, we can just call it? 
-                // Better to let the process restart in docker or handle it cleanly.
-                // For now, let's try calling it again.
-                connectToWhatsApp(companyId);
+                // Check reconnection attempts
+                const attempts = reconnectionAttempts.get(companyId) || 0;
+                if (attempts < MAX_RECONNECTION_ATTEMPTS) {
+                    reconnectionAttempts.set(companyId, attempts + 1);
+                    console.log(`[RECONNECTION] Attempt ${attempts + 1}/${MAX_RECONNECTION_ATTEMPTS} for company ${companyId}`);
+                    connectToWhatsApp(companyId);
+                } else {
+                    console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for company ${companyId}. Stopping.`);
+                    await updateCompanySettings(companyId, { is_connected: false, qr_code: null });
+                    reconnectionAttempts.delete(companyId);
+                }
             } else {
                 console.log('Connection closed. You are logged out.');
                 // delete auth info if needed
                 await updateCompanySettings(companyId, { is_connected: false, qr_code: null });
                 sessions.delete(companyId);
+                reconnectionAttempts.delete(companyId);
             }
         } else if (connection === 'open') {
             console.log('opened connection for company', companyId);
             await updateCompanySettings(companyId, { is_connected: true, qr_code: null });
             sessions.set(companyId, sock);
+            // Reset reconnection attempts on successful connection
+            reconnectionAttempts.delete(companyId);
         }
     });
 
