@@ -2463,10 +2463,10 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
 
         let { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
         
-        // CORREÇÃO: Forçar URL Pública
-        const publicBase = process.env.PUBLIC_SUPABASE_URL || 'http://77.37.43.60:8000'; 
-        if (publicUrl.includes('supabase-kong:8000')) {
-            publicUrl = publicUrl.replace('http://supabase-kong:8000', publicBase);
+        // CORREÇÃO: Forçar URL Pública com HTTPS oficial
+        const storageIdx = publicUrl.indexOf('/storage/v1/object/public/');
+        if (storageIdx !== -1) {
+            publicUrl = `https://pandanet.grupopixel.com.br${publicUrl.substring(storageIdx)}`;
         }
         console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
         return publicUrl;

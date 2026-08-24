@@ -100,8 +100,13 @@ services:
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=EvolutionPandaSecret123
       - LOG_LEVEL=ERROR,WARN
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "pandanet.grupopixel.com.br:host-gateway"
+      - "77.37.43.60:host-gateway"
     networks:
       - pandanet_network
+      - supabase_default
     logging:
       driver: "json-file"
       options:
