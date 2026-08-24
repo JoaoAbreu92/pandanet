@@ -43,8 +43,8 @@ const AppContent: React.FC = () => {
     const { session, profile, loading } = useAuth();
 
     // Authentication & Tenant State
-    const [companies, setCompanies] = useState<Company[]>(mockCompanies);
-    const [currentCompany, setCurrentCompany] = useState<Company | null>(mockCompanies[0]);
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
     // Initialize currentUser as null, waiting for AuthContext
     const [currentUser, setCurrentUser] = useState<Employee | null>(null);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
@@ -66,8 +66,8 @@ const AppContent: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<Page>('home');
     const [pageContext, setPageContext] = useState<any>(null);
 
-    const [companyData, setCompanyData] = useState<AppData | null>(mockCompanies[0].data);
-    const [companySettings, setCompanySettings] = useState(mockCompanies[0].settings);
+    const [companyData, setCompanyData] = useState<AppData | null>(null);
+    const [companySettings, setCompanySettings] = useState<any>(null);
 
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -80,17 +80,36 @@ const AppContent: React.FC = () => {
     };
 
     useEffect(() => {
-        if (profile) {
-            setCurrentUser(profile);
-            // In a real multi-tenant app, we might check profile.company_id to setCurrentCompany
-            // For now, we continue using the mock company structure but with the real user
-            const company = mockCompanies[0];
-            setCurrentCompany(company);
-            setCompanyData(company.data);
-            setCompanySettings(company.settings);
-        } else {
-            setCurrentUser(null);
-        }
+        const loadInitialData = async () => {
+            if (profile) {
+                setCurrentUser(profile);
+
+                if (profile.company_id) {
+                    const { data: company, error } = await supabase
+                        .from('companies')
+                        .select('*, plan:plans(*)')
+                        .eq('id', profile.company_id)
+                        .single();
+
+                    if (!error && company) {
+                        const mappedCompany = company as unknown as Company;
+                        setCurrentCompany(mappedCompany);
+                        setCompanyData(mappedCompany.data || {
+                            employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
+                            formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
+                            events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                        });
+                        setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
+                    }
+                }
+            } else {
+                setCurrentUser(null);
+                setCurrentCompany(null);
+                setCompanyData(null);
+                setCompanySettings(null);
+            }
+        };
+        loadInitialData();
     }, [profile]);
 
     // Cleanup or additional side effects when session changes can be handled here if needed.
@@ -374,8 +393,8 @@ const AppContent: React.FC = () => {
         return (
             <Layout
                 currentUser={currentUser}
-                currentCompany={mockCompanies[0]}
-                companySettings={companyData.settings || mockCompanies[0].settings}
+                currentCompany={currentCompany || {} as Company}
+                companySettings={companySettings || {}}
                 isImpersonating={isImpersonating}
                 impersonatedCompanyName={impersonatedCompany?.name}
                 onNavigate={handleNavigate}

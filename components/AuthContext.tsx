@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (error || !data) {
                 // FALLBACK FOR MASTER ADMIN
-                if ((email || '').toLowerCase() === 'ti@grupopixel.com.br') {
+                if ((email || '').toLowerCase() === 'ti@acrilight.com.br') {
                     console.log("Profile not found for Master Admin, using fallback.");
                     const masterAdmin: Employee = {
                         id: userId,
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         email: email || 'ti@grupopixel.com.br',
                         role: 'Super Admin',
                         team: 'Admin',
-                        avatarUrl: 'https://ui-avatars.com/api/?name=Master+TI',
+                        avatarUrl: data?.avatar_url || 'https://ui-avatars.com/api/?name=Master+TI',
                         joinDate: new Date().toISOString(),
                         birthDate: new Date().toISOString(),
                         isAdmin: true,
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             if (data) {
-                const isMasterAdmin = (email || '').toLowerCase() === 'ti@grupopixel.com.br';
+                const isMasterAdmin = (email || '').toLowerCase() === 'ti@acrilight.com.br';
 
                 const employee: Employee = {
                     id: data.id,
@@ -95,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     phone: data.phone || '',
                     officeLocation: data.office_location || '',
                     bio: data.bio || '',
+                    isCompanyAdmin: data.is_company_admin || false
                 };
                 setProfile(employee);
             }

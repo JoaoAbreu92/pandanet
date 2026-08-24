@@ -180,7 +180,7 @@ export interface Employee {
   joinDate: string; // YYYY-MM-DD
   birthDate: string; // YYYY-MM-DD
   isAdmin: boolean;
-  is_company_admin?: boolean; // Added for SaaS Dashboard
+  isCompanyAdmin?: boolean; // Changed from is_company_admin
   isOnline?: boolean;
   permissions: EmployeePermissions;
   phone?: string;

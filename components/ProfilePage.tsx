@@ -15,6 +15,7 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, feedPosts = [], setFeedPosts, allEmployees = [] }) => {
     const [isEditing, setIsEditing] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
     const [activeTab, setActiveTab] = useState<'info' | 'activity'>('info');
 
@@ -99,6 +100,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
         const file = e.target.files?.[0];
         if (file) {
+            setIsUploading(true);
             // Show preview immediately
             const newUrl = URL.createObjectURL(file);
             if (type === 'avatar') {
@@ -107,14 +109,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                 setTempUserData(prev => ({ ...prev, coverUrl: newUrl }));
             }
 
-            // Upload in background or wait? Better to upload now and get URL
-            const publicUrl = await uploadImage(file, type === 'avatar' ? 'avatars' : 'covers');
-            if (publicUrl) {
-                if (type === 'avatar') {
-                    setTempUserData(prev => ({ ...prev, avatarUrl: publicUrl }));
-                } else {
-                    setTempUserData(prev => ({ ...prev, coverUrl: publicUrl }));
+            try {
+                const publicUrl = await uploadImage(file, type === 'avatar' ? 'avatars' : 'covers');
+                if (publicUrl) {
+                    if (type === 'avatar') {
+                        setTempUserData(prev => ({ ...prev, avatarUrl: publicUrl }));
+                    } else {
+                        setTempUserData(prev => ({ ...prev, coverUrl: publicUrl }));
+                    }
                 }
+            } finally {
+                setIsUploading(false);
             }
         }
     };
@@ -294,7 +299,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                                 </div>
                                 <div className="flex justify-end space-x-3 pt-4">
                                     <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-                                    <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">Salvar Alterações</button>
+                                    <button onClick={handleSave} disabled={isUploading} className={`px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        {isUploading ? 'Enviando...' : 'Salvar Alterações'}
+                                    </button>
                                 </div>
                             </div>
                         ) : (

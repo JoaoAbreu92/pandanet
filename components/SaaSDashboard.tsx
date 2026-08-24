@@ -133,7 +133,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             if (!error && count !== null) setTotalUsers(count);
 
             // Mock online users for now or use presence if available
-            setOnlineUsers(Math.floor(Math.random() * 5) + 1);
+            setOnlineUsers(1);
         };
         fetchCounts();
     }, [localCompanies]); // Refresh when companies change
@@ -290,13 +290,15 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 .update({
                     name: formData.name,
                     domain: formData.domain,
-                    cnpj: formData.cnpj,
-                    plan_id: selectedPlan?.id // Update plan_id
+                    cnpj: formData.cnpj || null, // Ensure null if empty
+                    plan_id: selectedPlan?.id,
+                    settings: { ...(selectedCompany.settings || {}), companyName: formData.name }
                 })
                 .eq('id', selectedCompany.id);
 
             if (error) {
                 showToast('Erro ao atualizar empresa: ' + error.message, 'error');
+                console.error("Update error:", error);
             } else {
                 showToast('Empresa atualizada com sucesso!', 'success');
                 fetchData();
@@ -374,15 +376,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
         if (modalOpen.createPlan) {
             const { error } = await supabase.from('plans').insert([planData]);
-            if (error) showToast('Erro ao criar plano: ' + error.message, 'error');
-            else {
+            if (error) {
+                showToast('Erro ao criar plano: ' + error.message, 'error');
+                console.error("Create plan error:", error);
+            } else {
                 showToast('Plano criado com sucesso!', 'success');
                 fetchData();
             }
         } else if (modalOpen.editPlan && selectedPlanId) {
             const { error } = await supabase.from('plans').update(planData).eq('id', selectedPlanId);
-            if (error) showToast('Erro ao atualizar plano: ' + error.message, 'error');
-            else {
+            if (error) {
+                showToast('Erro ao atualizar plano: ' + error.message, 'error');
+                console.error("Update plan error:", error);
+            } else {
                 showToast('Plano atualizado com sucesso!', 'success');
                 fetchData();
             }

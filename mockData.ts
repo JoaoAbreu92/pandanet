@@ -55,48 +55,4 @@ const mockServices: any[] = [];
 const mockSecurityAlerts: any[] = [];
 const conversations: Conversation[] = [];
 
-export const mockCompanies: Company[] = [
-    {
-        domain: 'demo.com',
-        name: 'Minha Intranet',
-        plan: {
-            id: 'enterprise',
-            name: 'Enterprise',
-            userLimit: 1000,
-            features: {
-                viewMessages: true, viewCalendar: true, useMarketplace: true,
-                canPostText: true, canPostImage: true, canPostVideo: true,
-                viewDirectory: true, viewForms: true, viewBenefits: true,
-                viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
-                viewTiDashboard: true, openTickets: true, openTiRequests: true,
-                viewTraining: true, viewSurveys: true, viewPolicies: true, viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true
-            }
-        },
-        subscriptionEndDate: '2030-12-31',
-        settings: {
-            companyName: 'Minha Intranet',
-            logoUrl: ''
-        },
-        data: {
-            employees: employees,
-            announcements: [],
-            banners: [],
-            conversations: [],
-            tickets: [],
-            marketplaceItems: [],
-            formSubmissions: [],
-            tiRequests: [],
-            documents: [],
-            benefits: [],
-            polls: [],
-            feedPosts: [],
-            events: [],
-            trainings: [],
-            kbArticles: [],
-            services: [],
-            securityAlerts: [],
-            recognitions: [],
-            wellnessItems: []
-        }
-    }
-]; 
+export const mockCompanies: Company[] = [];
