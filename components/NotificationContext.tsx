@@ -729,8 +729,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     .subscribe();
             }
 
+            const handleVisibility = () => {
+                if (document.visibilityState === 'visible') {
+                    console.log('[PandaNet] Aba visível. Forçando conexão do Supabase Realtime e buscando notificações...');
+                    try {
+                        supabase.realtime.connect();
+                    } catch (e) {
+                        console.error('Erro ao reconectar realtime global:', e);
+                    }
+                    fetchNotifications();
+                }
+            };
+            document.addEventListener('visibilitychange', handleVisibility);
+            window.addEventListener('focus', handleVisibility);
+
             return () => {
                 console.log('Finalizando Realtime e Polling');
+                document.removeEventListener('visibilitychange', handleVisibility);
+                window.removeEventListener('focus', handleVisibility);
                 if (pollInterval) clearInterval(pollInterval);
                 supabase.removeChannel(channel);
                 supabase.removeChannel(messagesChannel);
