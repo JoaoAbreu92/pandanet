@@ -44,6 +44,7 @@ services:
       - whatsapp-backend
     networks:
       - pandanet_network
+      - supabase_network
 
 networks:
   pandanet_network:
