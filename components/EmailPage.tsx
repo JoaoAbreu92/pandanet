@@ -53,6 +53,8 @@ interface EmailMessage {
     from: string;
     to: string;
     cc?: string;
+    to_full?: { address: string; name: string }[];
+    cc_full?: { address: string; name: string }[];
     subject: string;
     date: string;
     html?: string;
@@ -1485,8 +1487,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 setView('compose');
                                 const from = selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from;
                                 // Combine To and CC for Reply All, excluding self
-                                const originalTo = (selectedEmail.to || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user && e !== from);
-                                const originalCc = (selectedEmail.cc || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user && e !== from);
+                                const originalTo = (selectedEmail.to_full || []).map(e => e.address).filter(e => e && e !== settings.imap_user && e !== from);
+                                const originalCc = (selectedEmail.cc_full || []).map(e => e.address).filter(e => e && e !== settings.imap_user && e !== from);
                                 
                                 setToTags([from, ...originalTo]);
                                 setCcTags(originalCc);

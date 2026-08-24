@@ -184,13 +184,13 @@ const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
                         >
                             {/* Same UI as before */}
                             {item.imageUrl && (
-                                <div className="w-full h-auto max-h-[400px] bg-gray-50 rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100">
-                                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                                <div className="w-full h-auto max-h-[400px] bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-700">
+                                    <img src={item.imageUrl} alt={item.title} className="max-w-full max-h-[400px] object-contain" />
                                 </div>
                             )}
                             {item.videoUrl && (
-                                <div className="w-full h-auto max-h-[400px] bg-black rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100">
-                                    <video src={item.videoUrl} controls className="w-full h-full object-cover" />
+                                <div className="w-full h-auto max-h-[400px] bg-black rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-700">
+                                    <video src={item.videoUrl} controls className="max-w-full max-h-[400px] object-contain" />
                                 </div>
                             )}
                             <div className="flex items-center space-x-4 mb-2">

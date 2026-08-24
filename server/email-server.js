@@ -175,8 +175,16 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                             messageId: message.envelope.messageId,
                             subject: message.envelope.subject || '(Sem Assunto)',
                             from: message.envelope.from?.[0]?.address || 'Desconhecido',
-                            to: message.envelope.to || [],
-                            cc: message.envelope.cc || [],
+                            to: (message.envelope.to || []).map(addr => addr.address).join(', '),
+                            cc: (message.envelope.cc || []).map(addr => addr.address).join(', '),
+                            to_full: (message.envelope.to || []).map(addr => ({ 
+                                address: addr.address, 
+                                name: addr.name || addr.address.split('@')[0] 
+                            })),
+                            cc_full: (message.envelope.cc || []).map(addr => ({ 
+                                address: addr.address, 
+                                name: addr.name || addr.address.split('@')[0] 
+                            })),
                             date: message.envelope.date,
                             flags: message.flags,
                             snippet: snippet + (snippet.length === 100 ? '...' : ''),
@@ -266,8 +274,16 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
                     messageId: message.envelope.messageId,
                     subject: message.envelope.subject || '(Sem Assunto)',
                     from: message.envelope.from?.[0]?.address || 'Desconhecido',
-                    to: message.envelope.to || [],
-                    cc: message.envelope.cc || [],
+                    to: (message.envelope.to || []).map(addr => addr.address).join(', '),
+                    cc: (message.envelope.cc || []).map(addr => addr.address).join(', '),
+                    to_full: (message.envelope.to || []).map(addr => ({ 
+                        address: addr.address, 
+                        name: addr.name || addr.address.split('@')[0] 
+                    })),
+                    cc_full: (message.envelope.cc || []).map(addr => ({ 
+                        address: addr.address, 
+                        name: addr.name || addr.address.split('@')[0] 
+                    })),
                     date: message.envelope.date,
                     flags: message.flags,
                     snippet: snippet + (snippet.length === 100 ? '...' : '')
@@ -328,9 +344,17 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
                 text: parsed.text,
                 html: parsed.html || parsed.textAsHtml,
                 attachments,
-                cc: parsed.cc?.value || [],
-                to: parsed.to?.value || [],
-                from: parsed.from?.value || [],
+                to: (parsed.to?.value || []).map(addr => addr.address).join(', '),
+                cc: (parsed.cc?.value || []).map(addr => addr.address).join(', '),
+                to_full: (parsed.to?.value || []).map(addr => ({ 
+                    address: addr.address, 
+                    name: addr.name || addr.address.split('@')[0] 
+                })),
+                cc_full: (parsed.cc?.value || []).map(addr => ({ 
+                    address: addr.address, 
+                    name: addr.name || addr.address.split('@')[0] 
+                })),
+                from: parsed.from?.value?.[0]?.address || 'Desconhecido',
                 subject: parsed.subject,
                 messageId: parsed.messageId,
                 date: parsed.date

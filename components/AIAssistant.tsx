@@ -599,12 +599,23 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                     onMouseDown={handleMouseDown}
                     className="w-16 h-16 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all duration-500 bg-white border-4 border-emerald-50/50 overflow-hidden flex items-center justify-center p-0 group cursor-grab"
                 >
-                    <div className="w-full h-full flex items-center justify-center bg-white rounded-full">
-                        <img
-                            src={pandaIaIcon || "/logo.png"}
-                            alt="Panda IA" 
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
+                    <div className="w-full h-full flex items-center justify-center bg-white rounded-full overflow-hidden">
+                        {(pandaIaIcon?.toLowerCase().endsWith('.mp4') || pandaIaIcon?.toLowerCase().endsWith('.webm') || pandaIaIcon?.toLowerCase().endsWith('.mov')) ? (
+                            <video
+                                src={pandaIaIcon}
+                                autoPlay
+                                muted
+                                loop
+                                playsInline
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                        ) : (
+                            <img
+                                src={pandaIaIcon || "/logo.png"}
+                                alt="Panda IA" 
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                        )}
                     </div>
                     <span className="absolute -top-1 -right-1 flex h-4 w-4">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
