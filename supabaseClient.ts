@@ -43,7 +43,7 @@ export function sanitizeFileName(name: string): string {
 const originalFrom = supabase.storage.from.bind(supabase.storage);
 supabase.storage.from = (bucket: string) => {
     const fileApi = originalFrom(bucket);
-    
+
     const originalUpload = fileApi.upload.bind(fileApi);
     const originalUpdate = fileApi.update.bind(fileApi);
     const originalGetPublicUrl = fileApi.getPublicUrl.bind(fileApi);
@@ -76,9 +76,9 @@ supabase.storage.from = (bucket: string) => {
 export function getCleanImageUrl(url: string | null | undefined): string {
     if (!url) return '';
     if (url.startsWith('blob:')) return url;
-    
+
     let processedUrl = url;
-    
+
     // Se contiver host interno do supabase
     if (processedUrl.includes('supabase-kong:8000')) {
         processedUrl = processedUrl.replace('http://supabase-kong:8000', 'https://pandanet.grupopixel.com.br').replace('supabase-kong:8000', 'pandanet.grupopixel.com.br');
@@ -92,11 +92,11 @@ export function getCleanImageUrl(url: string | null | undefined): string {
             const hostname = window.location.hostname;
             const port = window.location.port;
             isDevServer = port === '3000' || port === '5173' || port === '3001' ||
-                          hostname === 'localhost' || 
-                          hostname === '127.0.0.1' || 
-                          hostname.startsWith('192.168.') || 
-                          hostname.startsWith('10.') || 
-                          hostname.startsWith('172.');
+                hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname.startsWith('192.168.') ||
+                hostname.startsWith('10.') ||
+                hostname.startsWith('172.');
         }
 
         // Em desenvolvimento local no PC (fora do Capacitor), mantém IP da VPS para acesso direto
@@ -125,13 +125,13 @@ export async function downloadFile(url: string, fileName: string) {
         if (!response.ok) throw new Error('Falha na resposta do servidor');
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
-        
+
         const link = document.createElement('a');
         link.href = blobUrl;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
-        
+
         window.URL.revokeObjectURL(blobUrl);
         document.body.removeChild(link);
     } catch (err) {
