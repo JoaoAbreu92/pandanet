@@ -20,9 +20,16 @@ $$ LANGUAGE plpgsql;
 
 -- Function to get current user company_id
 CREATE OR REPLACE FUNCTION get_user_company_id()
-RETURNS UUID AS $$
-  SELECT company_id FROM public.profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE;
+RETURNS UUID 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  RETURN (SELECT company_id FROM public.profiles WHERE id = auth.uid());
+END;
+$$;
 
 -- Function to check if current user is super admin
 CREATE OR REPLACE FUNCTION is_super_admin()

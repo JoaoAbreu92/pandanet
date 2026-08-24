@@ -550,9 +550,16 @@ END $$;
 
 -- 2. Atualizar apply_tenant_policies para dar bypass nos Super Admins
 CREATE OR REPLACE FUNCTION public.get_user_company_id()
-RETURNS UUID AS $$
-  SELECT company_id FROM public.profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE;
+RETURNS UUID 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  RETURN (SELECT company_id FROM public.profiles WHERE id = auth.uid());
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION apply_tenant_policies()
 RETURNS VOID AS $$
