@@ -2480,30 +2480,38 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
  */
 async function processScheduledCampaigns() {
     try {
-        // 1. Obter campanhas ativas (running) ou pendentes (pending) cuja data agendada seja hoje ou anterior
-        const todayStr = new Date().toISOString().split('T')[0];
-        
-        // Se a campanha já estiver 'running' (play ativo manual), rodamos independente da data.
-        // Se estiver 'pending', só roda se a scheduled_date for hoje ou anterior.
+        // Obter data e hora atual no fuso horário de Brasília
+        const todayStr = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).split(' ')[0];
+        const currentHourStr = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour12: false });
+
+        // 1. Obter todas as campanhas em status 'running' ou 'pending'
         const { data: campaigns, error: campErr } = await supabase
             .from('whatsapp_scheduled_campaigns')
             .select('*')
-            .or(`status.eq.running,and(status.eq.pending,scheduled_date.lte.${todayStr})`);
+            .in('status', ['running', 'pending']);
 
         if (campErr) throw campErr;
         if (!campaigns || campaigns.length === 0) return;
 
-        // Horário de Brasília atual
-        const now = new Date();
-        const spOffset = -3;
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-        const spTime = new Date(utc + (3600000 * spOffset));
-        const currentHourStr = spTime.toTimeString().slice(0, 8); // "HH:MM:SS"
+        // Filtrar campanhas no Javascript para máxima robustez e compatibilidade com qualquer versão do PostgREST
+        const validCampaigns = campaigns.filter(camp => {
+            if (camp.status === 'running') return true;
+            if (camp.status === 'pending') {
+                return camp.scheduled_date <= todayStr;
+            }
+            return false;
+        });
 
-        for (const camp of campaigns) {
+        if (validCampaigns.length === 0) return;
+
+        for (const camp of validCampaigns) {
             // Verificar limite de horário do expediente da campanha
-            if (currentHourStr < camp.start_time || currentHourStr > camp.end_time) {
-                console.log(`[CAMPANHA] Ignorando campanha "${camp.name}" (${camp.id}) porque está fora do horário permitido (${camp.start_time} - ${camp.end_time}). Hora atual: ${currentHourStr}`);
+            // Formatar os horários do banco de dados (ex: '08:00:00') para comparar corretamente com HH:MM:SS
+            const startTimeStr = camp.start_time.length === 5 ? `${camp.start_time}:00` : camp.start_time;
+            const endTimeStr = camp.end_time.length === 5 ? `${camp.end_time}:00` : camp.end_time;
+
+            if (currentHourStr < startTimeStr || currentHourStr > endTimeStr) {
+                console.log(`[CAMPANHA] Ignorando campanha "${camp.name}" (${camp.id}) porque está fora do horário permitido (${startTimeStr} - ${endTimeStr}). Hora atual: ${currentHourStr}`);
                 continue;
             }
 
@@ -2521,6 +2529,7 @@ async function processScheduledCampaigns() {
                     .from('whatsapp_scheduled_campaigns')
                     .update({ status: 'running' })
                     .eq('id', camp.id);
+                camp.status = 'running'; // Atualiza localmente no objeto
             }
 
             // 2. Buscar o próximo alvo pendente
