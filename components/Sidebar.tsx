@@ -145,8 +145,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 // Maps page to keywords in link or type
                 const pageKeywords: Record<string, string[]> = {
                     'feed': ['feed', 'like', 'mention'],
-                    'calendar': ['calendar', 'event'],
-                    'events': ['events', 'event'],
+                    'calendar': ['calendar', 'event', 'personal-tasks'],
+                    'events': ['events'],
                     'marketplace': ['marketplace'],
                     'tickets': ['ticket', 'tickets'],
                     'recognition': ['recognition'],

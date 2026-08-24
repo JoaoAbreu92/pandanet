@@ -269,28 +269,60 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             try {
                 const { data: pendingTasks } = await supabase
                     .from('personal_tasks')
-                    .select('id, title, user_id')
+                    .select('id, title, user_id, notification_time, notification_interval')
                     .eq('user_id', currentUser.id)
                     .eq('completed', false)
                     .eq('notify_daily', true);
 
                 if (pendingTasks && pendingTasks.length > 0) {
+                    const now = new Date();
                     for (const task of pendingTasks) {
-                        const todayStr = new Date().toISOString().split('T')[0];
-                        const { data: existingNotif } = await supabase
+                        const { data: lastNotifs } = await supabase
                             .from('notifications')
-                            .select('id')
+                            .select('created_at')
                             .eq('user_id', currentUser.id)
-                            .eq('type', 'event')
+                            .eq('type', 'system')
                             .eq('link', 'personal-tasks')
                             .eq('title', 'Lembrete de Tarefa')
                             .like('description', `%${task.title}%`)
-                            .gte('created_at', todayStr)
+                            .order('created_at', { ascending: false })
                             .limit(1);
 
-                        if (!existingNotif || existingNotif.length === 0) {
+                        const lastNotifDate = lastNotifs && lastNotifs[0] ? new Date(lastNotifs[0].created_at) : null;
+                        let shouldNotify = false;
+
+                        const interval = task.notification_interval || 'daily';
+                        if (interval === 'daily') {
+                            const [schedHour, schedMin] = (task.notification_time || '09:00').split(':').map(Number);
+                            const schedTime = new Date();
+                            schedTime.setHours(schedHour, schedMin, 0, 0);
+
+                            const isSentToday = lastNotifDate && lastNotifDate.toDateString() === now.toDateString();
+                            if (now >= schedTime && !isSentToday) {
+                                shouldNotify = true;
+                            }
+                        } else {
+                            // Intervalo em horas
+                            let hrs = 24;
+                            if (interval === '2_hours') hrs = 2;
+                            else if (interval === '4_hours') hrs = 4;
+                            else if (interval === '8_hours') hrs = 8;
+                            else if (interval === '12_hours') hrs = 12;
+
+                            if (!lastNotifDate) {
+                                shouldNotify = true;
+                            } else {
+                                const diffMs = now.getTime() - lastNotifDate.getTime();
+                                const diffHrs = diffMs / (1000 * 60 * 60);
+                                if (diffHrs >= hrs) {
+                                    shouldNotify = true;
+                                }
+                            }
+                        }
+
+                        if (shouldNotify) {
                             await addNotification({
-                                type: 'event',
+                                type: 'system',
                                 title: 'Lembrete de Tarefa',
                                 description: `A tarefa "${task.title}" continua pendente. Não se esqueça de concluí-la!`,
                                 avatarUrl: currentUser.avatarUrl,
@@ -436,7 +468,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     useEffect(() => {
         fetchNotifications();
 
+        let pollInterval: any = null;
+
         if (currentUser?.id) {
+            pollInterval = setInterval(() => {
+                console.log('[PandaNet] Polling para checar tarefas e novas notificações...');
+                fetchNotifications();
+            }, 120000); // 2 minutos
+
             registerPushNotifications(currentUser.id);
             console.log('--- TESTE REALTIME: Iniciando para usuário:', currentUser.id);
             const channel = supabase
@@ -568,7 +607,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             }
 
             return () => {
-                console.log('Finalizando Realtime');
+                console.log('Finalizando Realtime e Polling');
+                if (pollInterval) clearInterval(pollInterval);
                 supabase.removeChannel(channel);
                 supabase.removeChannel(messagesChannel);
                 if (whatsappChannel) supabase.removeChannel(whatsappChannel);

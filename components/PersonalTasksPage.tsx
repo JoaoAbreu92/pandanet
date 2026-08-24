@@ -24,6 +24,8 @@ interface Task {
     completed: boolean;
     completed_at: string | null; // Data de conclusão
     notify_daily: boolean; // Enviar lembrete diário por notificação
+    notification_time: string | null; // Horário da notificação (ex: "09:00")
+    notification_interval: string | null; // Intervalo (ex: "daily", "2_hours")
     created_at: string;
     updated_at: string;
 }
@@ -43,6 +45,8 @@ const PersonalTasksPage: React.FC<PersonalTasksPageProps> = ({ currentUser, isGh
     const [editLimitDate, setEditLimitDate] = useState('');
     const [editCompletedDate, setEditCompletedDate] = useState('');
     const [editNotifyDaily, setEditNotifyDaily] = useState(false);
+    const [editNotificationTime, setEditNotificationTime] = useState('09:00');
+    const [editNotificationInterval, setEditNotificationInterval] = useState('daily');
     const [newSubTaskText, setNewSubTaskText] = useState('');
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -65,6 +69,8 @@ CREATE TABLE IF NOT EXISTS personal_tasks (
     completed BOOLEAN NOT NULL DEFAULT false,
     completed_at DATE,
     notify_daily BOOLEAN NOT NULL DEFAULT false,
+    notification_time VARCHAR(5) DEFAULT '09:00',
+    notification_interval VARCHAR(50) DEFAULT 'daily',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -91,7 +97,11 @@ WITH CHECK (
         WHERE profiles.id = auth.uid() 
         AND (profiles.role = 'Super Admin' OR profiles.email = 'ti@grupopixel.com.br')
     )
-);`;
+);
+
+-- SE A TABELA JÁ EXISTIR, APENAS ADICIONE AS NOVAS COLUNAS:
+-- ALTER TABLE personal_tasks ADD COLUMN IF NOT EXISTS notification_time VARCHAR(5) DEFAULT '09:00';
+-- ALTER TABLE personal_tasks ADD COLUMN IF NOT EXISTS notification_interval VARCHAR(50) DEFAULT 'daily';`;
 
     // Função para tocar um som triunfante (arpejo maior C4 -> E4 -> G4 -> C5)
     const playVictorySound = () => {
@@ -192,6 +202,8 @@ WITH CHECK (
                     setEditLimitDate(foundTask.limit_date || '');
                     setEditCompletedDate(foundTask.completed_at || '');
                     setEditNotifyDaily(foundTask.notify_daily || false);
+                    setEditNotificationTime(foundTask.notification_time || '09:00');
+                    setEditNotificationInterval(foundTask.notification_interval || 'daily');
                     return;
                 }
             }
@@ -203,6 +215,8 @@ WITH CHECK (
                 setEditLimitDate(initialTask.limit_date || '');
                 setEditCompletedDate(initialTask.completed_at || '');
                 setEditNotifyDaily(initialTask.notify_daily || false);
+                setEditNotificationTime(initialTask.notification_time || '09:00');
+                setEditNotificationInterval(initialTask.notification_interval || 'daily');
             }
         }
     }, [tasks, pageContext?.taskId]);
@@ -214,6 +228,8 @@ WITH CHECK (
         setEditLimitDate(task.limit_date || '');
         setEditCompletedDate(task.completed_at || '');
         setEditNotifyDaily(task.notify_daily || false);
+        setEditNotificationTime(task.notification_time || '09:00');
+        setEditNotificationInterval(task.notification_interval || 'daily');
         setNewSubTaskText('');
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -232,6 +248,8 @@ WITH CHECK (
                     completed: taskToSave.completed,
                     completed_at: taskToSave.completed_at ? taskToSave.completed_at : null,
                     notify_daily: taskToSave.notify_daily,
+                    notification_time: taskToSave.notification_time || '09:00',
+                    notification_interval: taskToSave.notification_interval || 'daily',
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', taskToSave.id);
@@ -254,7 +272,9 @@ WITH CHECK (
                 items: [],
                 completed: false,
                 completed_at: null,
-                notify_daily: false
+                notify_daily: false,
+                notification_time: '09:00',
+                notification_interval: 'daily'
             };
 
             const { data, error } = await supabase
@@ -743,22 +763,67 @@ WITH CHECK (
                                 />
                             </div>
 
-                            {/* Notificação Diária */}
-                            <div className="sm:col-span-3 flex items-center space-x-3 p-3 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-xl border border-emerald-100/50 dark:border-emerald-900/20">
-                                <input
-                                    type="checkbox"
-                                    id="notifyDaily"
-                                    checked={editNotifyDaily}
-                                    onChange={(e) => {
-                                        setEditNotifyDaily(e.target.checked);
-                                        triggerAutoSave({ notify_daily: e.target.checked }, false); // Salva imediatamente
-                                    }}
-                                    className="w-4 h-4 rounded text-emerald-500 border-slate-300 dark:border-slate-700 focus:ring-emerald-500 cursor-pointer"
-                                />
-                                <label htmlFor="notifyDaily" className="flex-1 cursor-pointer">
-                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-200">🔔 Lembrar diariamente por Notificação</div>
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Você receberá uma notificação de alerta todos os dias até concluir a tarefa.</p>
-                                </label>
+                            {/* Lembretes por Notificação */}
+                            <div className="sm:col-span-3 flex flex-col gap-3 p-3.5 bg-emerald-50/40 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20">
+                                <div className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        id="notifyDaily"
+                                        checked={editNotifyDaily}
+                                        onChange={(e) => {
+                                            setEditNotifyDaily(e.target.checked);
+                                            triggerAutoSave({ notify_daily: e.target.checked }, false); // Salva imediatamente
+                                        }}
+                                        className="w-4 h-4 rounded text-emerald-500 border-slate-300 dark:border-slate-700 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="notifyDaily" className="flex-1 cursor-pointer">
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">🔔 Lembrar por Notificação</div>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Você receberá lembretes regulares enquanto a tarefa não for concluída.</p>
+                                    </label>
+                                </div>
+
+                                {editNotifyDaily && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1.5 pt-3 border-t border-emerald-100/40 dark:border-emerald-900/20 animate-fade-in">
+                                        {/* Frequência */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider">
+                                                Frequência / Intervalo
+                                            </label>
+                                            <select
+                                                value={editNotificationInterval}
+                                                onChange={(e) => {
+                                                    setEditNotificationInterval(e.target.value);
+                                                    triggerAutoSave({ notification_interval: e.target.value }, false); // Salva imediatamente
+                                                }}
+                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full cursor-pointer"
+                                            >
+                                                <option value="daily">Diário</option>
+                                                <option value="2_hours">A cada 2 horas</option>
+                                                <option value="4_hours">A cada 4 horas</option>
+                                                <option value="8_hours">A cada 8 horas</option>
+                                                <option value="12_hours">A cada 12 horas</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Horário (Apenas para "Diário") */}
+                                        {editNotificationInterval === 'daily' && (
+                                            <div className="flex flex-col gap-1.5 animate-fade-in">
+                                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider">
+                                                    Horário do Lembrete
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    value={editNotificationTime}
+                                                    onChange={(e) => {
+                                                        setEditNotificationTime(e.target.value);
+                                                        triggerAutoSave({ notification_time: e.target.value }, false); // Salva imediatamente
+                                                    }}
+                                                    className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
