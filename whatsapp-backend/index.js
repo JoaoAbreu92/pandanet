@@ -531,13 +531,38 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         } catch(e) { console.error(`[SYNC] Erro grupos:`, e.message); }
 
-        // 3. Upsert Contatos e Grupos
         if (contactsToUpsert.length > 0) {
             console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas (contatos/grupos)...`);
             const { error: errC } = await supabase
                 .from('whatsapp_contacts')
                 .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
             if (errC) console.error('[SYNC] Erro upsert contatos:', errC.message);
+
+            // --- GARANTIA DE CONVERSA PARA GRUPOS ---
+            // Criar conversa para todos os grupos novos, permitindo que apareçam na aba "Grupos"
+            const groupEntries = contactsToUpsert.filter(c => c.is_group);
+            if (groupEntries.length > 0) {
+                for (const group of groupEntries) {
+                    const { data: existing } = await supabase
+                        .from('whatsapp_conversations')
+                        .select('id')
+                        .eq('company_id', companyId)
+                        .eq('contact_phone', group.phone)
+                        .maybeSingle();
+                    
+                    if (!existing) {
+                        await supabase.from('whatsapp_conversations').insert({
+                            company_id: companyId,
+                            contact_phone: group.phone,
+                            contact_name: group.name,
+                            is_group: true,
+                            status: 'pendente',
+                            connection_id: connectionId,
+                            unread_count: 0
+                        });
+                    }
+                }
+            }
         }
 
         // 4. Buscar Histórico (10 msgs) para cada conversa ativa

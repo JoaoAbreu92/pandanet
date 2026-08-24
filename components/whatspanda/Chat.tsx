@@ -405,8 +405,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color)),
         kanban_column:whatsapp_kanban_columns!kanban_column_id(*)
       `)
-      .eq('company_id', companyId)
-      .eq('status', activeTab);
+      .eq('company_id', companyId);
+
+    // Na aba de grupos, mostramos todos independente do status (aberto/pendente/fechado)
+    if (chatTypeFilter !== 'group') {
+      query = query.eq('status', activeTab);
+    }
 
     // Pesquisa por nome ou telefone
     if (searchTerm) {
