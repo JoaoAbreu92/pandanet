@@ -587,6 +587,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     html: data.html, 
                     attachments: data.attachments,
                     cc: data.cc,
+                    subject: prev.subject === 'Carregando e-mail...' ? (data.subject || prev.subject) : prev.subject,
+                    from: !prev.from || prev.from === '' ? (data.from || prev.from) : prev.from,
+                    date: !prev.date || prev.date === '' ? (data.date || prev.date) : prev.date,
                     flags: (!isGhostMode && !flags.includes('\\Seen')) ? [...flags, '\\Seen'] : flags 
                 };
             });
@@ -1081,12 +1084,25 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // Handle initial email from context (notifications)
     useEffect(() => {
-        if (pageContext?.uid && emails.length > 0) {
+        if (pageContext?.uid) {
             const email = emails.find(e => e.uid === pageContext.uid);
             if (email) {
                 setSelectedEmail(email);
                 setView('read');
                 fetchEmailBody(email.uid, currentFolder);
+            } else {
+                // E-mail não está na página carregada. Criar um placeholder e carregar.
+                const placeholderEmail = {
+                    uid: pageContext.uid,
+                    subject: 'Carregando e-mail...',
+                    from: '',
+                    date: '',
+                    flags: [],
+                    metadata: { tags: [] }
+                } as any;
+                setSelectedEmail(placeholderEmail);
+                setView('read');
+                fetchEmailBody(pageContext.uid, currentFolder);
             }
         }
     }, [pageContext, emails.length]);

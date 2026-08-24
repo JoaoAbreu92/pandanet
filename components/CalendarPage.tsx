@@ -78,7 +78,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const { t } = useLanguage();
 
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [view, setView] = useState<'year' | 'month' | 'week'>('year');
+    const [view, setView] = useState<'year' | 'month' | 'week' | 'day'>('month');
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
@@ -87,6 +87,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [isRSVPModalOpen, setRSVPModalOpen] = useState(false);
     const [declineReason, setDeclineReason] = useState('');
+    const [selectedDayOptionsDate, setSelectedDayOptionsDate] = useState<Date | null>(null);
+    const [isDayOptionsOpen, setDayOptionsOpen] = useState(false);
     const [newEventData, setNewEventData] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
@@ -444,7 +446,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         }) : [];
 
                         return (
-                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}>
+                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer' : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
+                                  onClick={() => { if (day) { setSelectedDayOptionsDate(day); setDayOptionsOpen(true); } }}>
                                 {day && (
                                     <>
                                          <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
@@ -464,7 +467,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                          })()}
                                         <div className="mt-8 space-y-1 overflow-y-auto max-h-[calc(100%-2rem)]">
                                             {evs.map(e => (
-                                                <button key={e.id} onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>
+                                                <button key={e.id} onClick={(evt) => { evt.stopPropagation(); setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>
                                                     {e.category === 'Aniversário' && <GiftIcon className="w-3 h-3 inline mr-1" />}
                                                     {e.title}
                                                 </button>
@@ -472,6 +475,164 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const DayView = () => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const day = currentDate.getDate();
+        const theme = MONTH_THEMES[month] || MONTH_THEMES[0];
+
+        const dayEvents = allCalendarEvents.filter(e => {
+            const d = new Date(e.date);
+            return d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day;
+        });
+
+        const allDayEvents = dayEvents.filter(e => e.category === 'Aniversário' || e.category === 'Feriado');
+        
+        const getEventHour = (e: CalendarEvent) => {
+            if (!e.startTime) return 0;
+            const [h] = e.startTime.split(':');
+            return parseInt(h, 10);
+        };
+
+        const hours = Array.from({ length: 24 }, (_, i) => i);
+
+        const handlePrevDay = () => {
+            setCurrentDate(new Date(year, month, day - 1));
+        };
+
+        const handleNextDay = () => {
+            setCurrentDate(new Date(year, month, day + 1));
+        };
+
+        const formatHour = (h: number) => {
+            return `${String(h).padStart(2, '0')}:00`;
+        };
+
+        return (
+            <div className="animate-scale-in transition-all duration-500 bg-white dark:bg-slate-900 rounded-b-xl">
+                <div className={`p-4 ${theme.bg} border-b ${theme.border} dark:border-slate-800 flex items-center justify-between`}>
+                    <div className="flex items-center space-x-6">
+                        <button
+                            onClick={() => setView('month')}
+                            className="p-2 hover:bg-white/50 dark:hover:bg-slate-800/50 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all border border-transparent hover:border-white/50 dark:hover:border-slate-700"
+                            title="Voltar para Visão Mensal"
+                        >
+                            <ArrowUturnLeftIcon className="w-5 h-5" />
+                        </button>
+
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={handlePrevDay}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
+                            >
+                                <ChevronLeftIcon className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center min-w-[250px]">
+                                <h3 className={`text-2xl font-black ${theme.text} dark:text-gray-100`}>
+                                    {currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                </h3>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 italic mt-0.5">{theme.phrase}</p>
+                            </div>
+
+                            <button
+                                onClick={handleNextDay}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
+                            >
+                                <ChevronRightIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {allDayEvents.length > 0 && (
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b dark:border-slate-800">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-2">Dia Inteiro</span>
+                        <div className="flex flex-wrap gap-2">
+                            {allDayEvents.map(e => (
+                                <button
+                                    key={e.id}
+                                    onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border shadow-sm transition-all hover:scale-[1.02] flex items-center gap-1.5 ${getCategoryColor(e.category)}`}
+                                >
+                                    {e.category === 'Aniversário' ? <GiftIcon className="w-4 h-4" /> : <CalendarIcon className="w-4 h-4" />}
+                                    <span>{e.title}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/50 max-h-[600px] overflow-y-auto">
+                    {hours.map(h => {
+                        const eventsInHour = dayEvents.filter(e => {
+                            if (e.category === 'Aniversário' || e.category === 'Feriado') return false;
+                            return getEventHour(e) === h;
+                        });
+
+                        return (
+                            <div key={h} className="flex min-h-[72px] group">
+                                <div className="w-20 flex-shrink-0 py-4 px-3 text-right text-xs font-black text-slate-400 dark:text-slate-500 border-r border-slate-100 dark:border-slate-800/50 bg-slate-50/20 dark:bg-slate-900/10">
+                                    {formatHour(h)}
+                                </div>
+
+                                <div className="flex-grow p-2 flex flex-col justify-center relative bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                                    {eventsInHour.length > 0 ? (
+                                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+                                            {eventsInHour.map(e => (
+                                                <button
+                                                    key={e.id}
+                                                    onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }}
+                                                    className={`w-full text-left p-3 rounded-2xl text-xs font-bold border shadow-sm transition-all hover:scale-[1.01] flex items-center justify-between ${getCategoryColor(e.category)}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-black">{e.title}</span>
+                                                            {e.location && (
+                                                                <span className="text-[10px] opacity-75 font-normal flex items-center gap-1 mt-0.5">
+                                                                    <MapPinIcon className="w-3 h-3" /> {e.location}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[10px] font-black bg-white/50 dark:bg-slate-700/50 px-2.5 py-1 rounded-lg">
+                                                        {e.startTime} - {e.endTime}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                const clickedMonth = String(month + 1).padStart(2, '0');
+                                                const clickedDay = String(day).padStart(2, '0');
+                                                const formattedDate = `${year}-${clickedMonth}-${clickedDay}`;
+                                                const hourStr = String(h).padStart(2, '0');
+                                                const nextHourStr = String((h + 1) % 24).padStart(2, '0');
+                                                
+                                                setNewEventData(prev => ({
+                                                    ...prev,
+                                                    date: formattedDate,
+                                                    startTime: `${hourStr}:00`,
+                                                    endTime: `${nextHourStr}:00`
+                                                }));
+                                                setCreateModalOpen(true);
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 absolute inset-0 w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-brand-primary dark:hover:text-brand-primary transition-all font-black text-2xl"
+                                            title={`Agendar evento às ${formatHour(h)}`}
+                                        >
+                                            <PlusIcon className="w-6 h-6" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -521,11 +682,15 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
                         <button onClick={() => setView('year')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'year' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.year_view')}</button>
                         <button onClick={() => setView('month')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'month' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.month_view')}</button>
+                        {view === 'day' && (
+                            <button onClick={() => setView('day')} className="px-4 py-2 text-xs font-black rounded-xl bg-white text-slate-900 shadow-lg transition-all">Dia</button>
+                        )}
                     </div>
                 </header>
 
                 {view === 'year' && <YearView />}
                 {view === 'month' && <MonthView />}
+                {view === 'day' && <DayView />}
                 {view === 'week' && <div className="p-20 text-center text-gray-400">Em desenvolvimento</div>}
             </Card>
 
@@ -553,6 +718,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         <option>Reunião</option>
                                         <option>Evento da Empresa</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Horário de Início</label>
+                                    <input type="time" name="startTime" value={newEventData.startTime} onChange={handleInputChange} required className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Horário de Término</label>
+                                    <input type="time" name="endTime" value={newEventData.endTime} onChange={handleInputChange} required className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" />
                                 </div>
                             </div>
 
@@ -779,6 +954,57 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     RECUSAR
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isDayOptionsOpen && selectedDayOptionsDate && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
+                        <button onClick={() => setDayOptionsOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
+                        <div className="mb-6">
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-gray-100">
+                                {selectedDayOptionsDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </h3>
+                            <p className="text-slate-500 dark:text-gray-400 font-medium text-sm">O que você gostaria de fazer para este dia?</p>
+                        </div>
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => {
+                                    setCurrentDate(selectedDayOptionsDate);
+                                    setView('day');
+                                    setDayOptionsOpen(false);
+                                }}
+                                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
+                            >
+                                <ClockIcon className="w-4 h-4" />
+                                <span>Ver Horários do Dia (Agenda)</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const year = selectedDayOptionsDate.getFullYear();
+                                    const month = String(selectedDayOptionsDate.getMonth() + 1).padStart(2, '0');
+                                    const day = String(selectedDayOptionsDate.getDate()).padStart(2, '0');
+                                    const formattedDate = `${year}-${month}-${day}`;
+                                    
+                                    setNewEventData(prev => ({
+                                        ...prev,
+                                        date: formattedDate,
+                                        startTime: '09:00',
+                                        endTime: '10:00'
+                                    }));
+                                    setDayOptionsOpen(false);
+                                    setCreateModalOpen(true);
+                                }}
+                                className="w-full bg-brand-primary hover:bg-emerald-600 text-white p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-100 dark:shadow-none flex items-center justify-center gap-2"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Agendar Novo Evento</span>
+                            </button>
+                            <button onClick={() => setDayOptionsOpen(false)} className="w-full py-3 text-sm font-black text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300">
+                                CANCELAR
+                            </button>
                         </div>
                     </div>
                 </div>

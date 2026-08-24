@@ -8,7 +8,7 @@ interface NotificationsPanelProps {
     notifications: Notification[];
     onMarkAsRead: (id: string) => void;
     onClearAll: () => void;
-    onNavigate: (page: any) => void;
+    onNavigate: (page: any, context?: any) => void;
 }
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose, notifications, onMarkAsRead, onClearAll, onNavigate }) => {
@@ -64,8 +64,19 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
                                     onClick={() => {
                                         onMarkAsRead(notification.id);
                                         if (notification.link) {
-                                            const page = notification.link.split('/')[1];
-                                            onNavigate(page);
+                                            const urlStr = notification.link;
+                                            const cleanLink = urlStr.startsWith('/') ? urlStr.slice(1) : urlStr;
+                                            const [pagePart, queryPart] = cleanLink.split('?');
+                                            
+                                            let context: any = null;
+                                            if (queryPart) {
+                                                context = {};
+                                                const params = new URLSearchParams(queryPart);
+                                                for (const [key, val] of params.entries()) {
+                                                    context[key] = val;
+                                                }
+                                            }
+                                            onNavigate(pagePart, context);
                                         }
                                         onClose();
                                     }}

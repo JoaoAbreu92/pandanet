@@ -912,6 +912,8 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
         // CORREÇÃO: Forçar URL Pública
         const publicBase = process.env.PUBLIC_SUPABASE_URL || 'http://77.37.43.60:8000'; 
         if (publicUrl.includes('supabase-kong:8000')) {
+            publicUrl = publicUrl.replace('http://supabase-kong:8000', publicBase);
+        }
         console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
         return publicUrl;
     } catch (e) {
