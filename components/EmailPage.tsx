@@ -172,7 +172,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         if (savedImapUser) {
             fetchEmails(false); // Initial load
             // Poll every 2 minutes
+            // @ts-ignore
             if (pollingRef.current) clearInterval(pollingRef.current);
+            // @ts-ignore - Bypass Deno vs Browser typing on setInterval
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
             fetchFolders(); // Load folders once
             fetchTags();    // Load tags once
@@ -217,7 +219,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     // Calls the Node.js email server (bypasses Deno edge function which cannot do TLS/IMAP)
+    // @ts-ignore
     const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
+    // @ts-ignore
         `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
 
     const callEmailServer = async (action: string, body: any) => {
