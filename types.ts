@@ -43,7 +43,8 @@ export type Page =
   | 'job-manager'
   | 'manual-usuario'
   | 'projects'
-  | 'projects-planning';
+  | 'projects-planning'
+  | 'whatspanda';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
