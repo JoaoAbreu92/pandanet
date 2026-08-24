@@ -971,33 +971,27 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             const cleanUrl = mediaUrl.split('?')[0];
             const fileName = cleanUrl.split('/').pop() || 'file';
             
-            // Para envio de áudio, a Evolution API precisa da Data URI completa com MIME type (ex: data:audio/webm;base64,...)
-            // Se enviar apenas o base64 sem prefixo data:, o ffmpeg da Evolution não reconhece o container do webm e gera áudio mudo.
-            const audioDataUri = mediaUrl.startsWith('data:')
-                ? mediaUrl
-                : `data:${mediaType || 'audio/webm'};base64,${base64Data}`;
+            // Data URI ou URL pública do áudio
+            const audioSource = (savedMediaUrl && !savedMediaUrl.startsWith('data:'))
+                ? savedMediaUrl
+                : audioDataUri;
 
-            // Fazer upload do áudio para o Supabase Storage para salvar URL pública permanente
-            let savedMediaUrl = mediaUrl;
-            if (mediaUrl.startsWith('data:')) {
-                const uploadedUrl = await uploadMediaToSupabase(base64Data, isAudio ? 'audio' : 'document', conv.company_id, mediaType || 'audio/webm', isAudio ? `audio_${Date.now()}.webm` : 'file');
-                if (uploadedUrl) {
-                    savedMediaUrl = uploadedUrl;
-                }
-            }
-
+            // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
                 number: phoneNumber,
                 stickerMessage: {
                     sticker: base64Data
                 }
             } : isAudio ? {
-                // Formato padrão da Evolution API v2 para /message/sendWhatsAppAudio
-                // "audio" precisa estar no topo do payload (URL pública ou Data URI com prefixo data:)
                 number: phoneNumber,
-                audio: (savedMediaUrl && !savedMediaUrl.startsWith('data:')) ? savedMediaUrl : audioDataUri,
-                delay: 1200,
-                encoding: true
+                options: {
+                    delay: 1200,
+                    presence: 'recording',
+                    encoding: true
+                },
+                audioMessage: {
+                    audio: audioSource
+                }
             } : {
                 number: phoneNumber,
                 mediaMessage: {
@@ -1031,7 +1025,39 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes).substring(0, 500));
 
-            // Se falhou com sendWhatsAppAudio, tenta com sendMedia (fallback universal)
+            // Fallback 1: se audioMessage falhou, tentar audio no topo do payload (v2)
+            if (isAudio && (!sendReq.ok || sendRes?.error)) {
+                console.warn('[SEND API] audioMessage falhou, tentando fallback com audio no topo do payload...');
+                const legacyBody = {
+                    number: phoneNumber,
+                    audio: audioSource,
+                    delay: 1200,
+                    encoding: true
+                };
+                const legacyController = new AbortController();
+                const legacyTimeout = setTimeout(() => legacyController.abort(), 120000);
+                try {
+                    const legacyReq = await fetch(`${evoUrl}/message/sendWhatsAppAudio/${instanceName}`, {
+                        method: 'POST',
+                        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(legacyBody),
+                        signal: legacyController.signal
+                    });
+                    clearTimeout(legacyTimeout);
+                    let legacyRes = {};
+                    try { legacyRes = await legacyReq.json(); } catch(e) { }
+                    console.log(`[SEND API] Resposta fallback audio no topo (${legacyReq.status}):`, JSON.stringify(legacyRes).substring(0, 300));
+                    if (legacyReq.ok && !legacyRes?.error) {
+                        sendRes = legacyRes;
+                        sendReq = legacyReq;
+                    }
+                } catch (e) {
+                    clearTimeout(legacyTimeout);
+                    console.error('[SEND API] Fallback 1 falhou:', e.message);
+                }
+            }
+
+            // Fallback 2: se ainda falhou, tentar sendMedia com mediatype: 'audio'
             if (isAudio && (!sendReq.ok || sendRes?.error)) {
                 console.warn('[SEND API] sendWhatsAppAudio falhou, tentando fallback via sendMedia...');
                 const mediaBody = {
@@ -1039,7 +1065,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     mediaMessage: {
                         mediatype: 'audio',
                         mimetype: mediaType || 'audio/webm',
-                        media: (savedMediaUrl && !savedMediaUrl.startsWith('data:')) ? savedMediaUrl : audioDataUri,
+                        media: audioSource,
                         fileName: 'audio.webm'
                     }
                 };
@@ -1235,8 +1261,8 @@ router.get('/debug-logs', (req, res) => {
 });
 
 // API: Proxy de Download de Mídia do Supabase Storage
-// Usa a SDK do Supabase no Node.js para baixar arquivos diretamente dos buckets
-// garantindo suporte universal a downloads com Content-Disposition: attachment
+// Tenta múltiplos métodos (SDK do Supabase + URLs candidatas internas/públicas)
+// para garantir 100% de sucesso no download de arquivos
 router.get('/media/proxy', authMiddleware, async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
@@ -1251,56 +1277,76 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
         const storageIdx = rawUrl.indexOf('/storage/v1/object/public/');
 
         if (storageIdx !== -1) {
-            // Extrai o nome do bucket e a rota interna do arquivo
+            // 1. Tentar via SDK do Supabase
             const relativePath = rawUrl.substring(storageIdx + '/storage/v1/object/public/'.length);
             const pathParts = relativePath.split('/');
             const bucket = pathParts[0];
             const filePath = decodeURIComponent(pathParts.slice(1).join('/'));
 
-            console.log(`[MEDIA-PROXY] Baixando via Supabase SDK Client: bucket=${bucket}, path=${filePath}`);
-            const { data, error } = await supabase.storage.from(bucket).download(filePath);
+            try {
+                const { data, error } = await supabase.storage.from(bucket).download(filePath);
+                if (!error && data) {
+                    const arrayBuffer = await data.arrayBuffer();
+                    fileBuffer = Buffer.from(arrayBuffer);
+                    if (data.type) contentType = data.type;
+                    console.log(`[MEDIA-PROXY] Download via Supabase SDK OK (${fileBuffer.length} bytes)`);
+                }
+            } catch (e) {
+                console.warn(`[MEDIA-PROXY] Supabase SDK download falhou: ${e.message}`);
+            }
 
-            if (!error && data) {
-                const arrayBuffer = await data.arrayBuffer();
-                fileBuffer = Buffer.from(arrayBuffer);
-                if (data.type) contentType = data.type;
-                console.log(`[MEDIA-PROXY] Supabase SDK download OK (${fileBuffer.length} bytes)`);
-            } else {
-                console.warn(`[MEDIA-PROXY] Supabase SDK falhou (${error?.message}). Tentando HTTP fetch fallback...`);
+            // 2. Se o SDK falhou, tentar lista de URLs candidatas (Docker interno + público)
+            if (!fileBuffer) {
+                const storagePath = rawUrl.substring(storageIdx);
+                const candidates = [
+                    `http://supabase-kong:8000${storagePath}`,
+                    `http://host.docker.internal:8000${storagePath}`,
+                    `http://77.37.43.60:8000${storagePath}`,
+                    `https://pandanet.grupopixel.com.br${storagePath}`,
+                    rawUrl
+                ];
+
+                for (const targetUrl of candidates) {
+                    try {
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), 10000);
+                        const resp = await fetch(targetUrl, { signal: controller.signal });
+                        clearTimeout(timer);
+
+                        if (resp.ok) {
+                            const arrayBuf = await resp.arrayBuffer();
+                            fileBuffer = Buffer.from(arrayBuf);
+                            const fetchedType = resp.headers.get('content-type');
+                            if (fetchedType) contentType = fetchedType;
+                            console.log(`[MEDIA-PROXY] Download via HTTP OK de: ${targetUrl} (${fileBuffer.length} bytes)`);
+                            break;
+                        }
+                    } catch (fetchErr) {
+                        // Tenta a próxima URL candidata
+                    }
+                }
+            }
+        } else {
+            // Não é URL do Supabase Storage (mídia externa): fazer fetch direto
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            try {
+                const resp = await fetch(rawUrl, { signal: controller.signal });
+                clearTimeout(timer);
+                if (resp.ok) {
+                    const arrayBuf = await resp.arrayBuffer();
+                    fileBuffer = Buffer.from(arrayBuf);
+                    const fetchedType = resp.headers.get('content-type');
+                    if (fetchedType) contentType = fetchedType;
+                }
+            } catch (e) {
+                clearTimeout(timer);
             }
         }
 
-        // Fallback: se não for do Supabase ou a SDK falhar, faz HTTP fetch
         if (!fileBuffer) {
-            let targetUrl = rawUrl;
-            if (storageIdx !== -1 && internalSupabaseUrl) {
-                const storagePath = rawUrl.substring(storageIdx);
-                const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
-                targetUrl = `${base}${storagePath}`;
-            }
-
-            const proxyController = new AbortController();
-            const proxyTimeout = setTimeout(() => proxyController.abort(), 30000);
-
-            let fetchRes;
-            try {
-                fetchRes = await fetch(targetUrl, { signal: proxyController.signal });
-                if (!fetchRes.ok && targetUrl !== rawUrl) {
-                    fetchRes = await fetch(rawUrl, { signal: proxyController.signal });
-                }
-            } finally {
-                clearTimeout(proxyTimeout);
-            }
-
-            if (!fetchRes || !fetchRes.ok) {
-                console.error(`[MEDIA-PROXY] HTTP fetch falhou (${fetchRes?.status}) para ${targetUrl}`);
-                return res.status(fetchRes ? fetchRes.status : 500).json({ error: `Falha ao buscar mídia no servidor (HTTP ${fetchRes?.status})` });
-            }
-
-            const arrayBuffer = await fetchRes.arrayBuffer();
-            fileBuffer = Buffer.from(arrayBuffer);
-            const fetchedType = fetchRes.headers.get('content-type');
-            if (fetchedType) contentType = fetchedType;
+            console.error(`[MEDIA-PROXY] Todas as tentativas de buscar o arquivo falharam para ${rawUrl}`);
+            return res.status(404).json({ error: 'Arquivo não encontrado ou inacessível no servidor.' });
         }
 
         // Extrai o nome do arquivo da URL original
