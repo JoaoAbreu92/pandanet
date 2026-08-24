@@ -111,7 +111,21 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock(mailboxPath);
+
+        // Ensure folder exists and handle potential delimiter issues
+        // We can use list() to see how the server sees it
+        const folders = await client.list();
+        let targetFolder = folders.find(f => f.path === mailboxPath);
+
+        // If not found exactly, try fuzzy match (case insensitive or common naming)
+        if (!targetFolder) {
+            targetFolder = folders.find(f => f.path.toLowerCase() === mailboxPath.toLowerCase());
+        }
+
+        const finalPath = targetFolder ? targetFolder.path : mailboxPath;
+        console.log(`[email-server] FETCHING FOLDER: "${finalPath}" (Original: "${mailboxPath}")`);
+
+        const lock = await client.getMailboxLock(finalPath);
         const emails = [];
 
         try {
@@ -175,7 +189,16 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock(mailboxPath);
+
+        // Ensure folder exists and handle potential delimiter issues
+        const folders = await client.list();
+        let targetFolder = folders.find(f => f.path === mailboxPath);
+        if (!targetFolder) {
+            targetFolder = folders.find(f => f.path.toLowerCase() === mailboxPath.toLowerCase());
+        }
+        const finalPath = targetFolder ? targetFolder.path : mailboxPath;
+
+        const lock = await client.getMailboxLock(finalPath);
         try {
             const message = await client.fetchOne(uid, { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });
@@ -270,7 +293,7 @@ app.post('/api/email/folders', authMiddleware, async (req, res) => {
                 return res.status(400).json({ error: 'Invalid action or missing path' });
             }
         } finally {
-            await client.logout();
+            // No logout here for pooled clients
         }
     } catch (err) {
         console.error('[email-server] Folders Error:', err.message);
@@ -332,8 +355,22 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
             // Try to find the correct Sent folder
             let sentFolder = 'INBOX.Sent'; // Default fallback
             const boxes = await client.list();
+            // 1. Try SpecialUse
             const sentBox = boxes.find(b => b.specialUse === '\\Sent');
-            if (sentBox) sentFolder = sentBox.path;
+            if (sentBox) {
+                sentFolder = sentBox.path;
+            } else {
+                // 2. Try common names (Case Insensitive)
+                const fuzzySent = boxes.find(b =>
+                    b.path.toLowerCase() === 'sent' ||
+                    b.path.toLowerCase() === 'sent messages' ||
+                    b.path.toLowerCase() === 'enviados' ||
+                    b.path.toLowerCase().endsWith('.sent')
+                );
+                if (fuzzySent) sentFolder = fuzzySent.path;
+            }
+
+            console.log(`[email-server] Appending to Sent folder: ${sentFolder}`);
 
             // Construct MIME message for appending
             // Ideally we'd use the raw message from nodemailer, but info.messageId isn't the raw.

@@ -235,35 +235,52 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         }
     };
 
-    const fetchEmailBody = async (email: EmailMessage) => {
+    const fetchEmailBody = async (uid: string, folder: string) => {
         if (!settings.imap_host) return;
 
-        // Mark as seen locally immediately
-        if (!email.flags || !email.flags.includes('\\Seen')) {
-            toggleFlag(email, '\\Seen', true);
-        }
-
-        if (email.html || email.text) return; // Already has body
-
         setLoadingBody(true);
-        const { data, error } = await callEmailServer('fetch-body', {
-            config: settings,
-            uid: email.uid,
-            path: currentFolder
-        });
-        setLoadingBody(false);
+        try {
+            const { data, error } = await callEmailServer('fetch-body', {
+                config: settings,
+                uid,
+                path: folder
+            });
+            if (error) throw error;
+            if (data.error) throw new Error(data.error);
 
-        if (error) {
-            console.error('Error fetching body:', error);
-            return;
-        }
+            // Update local emails list with the body
+            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html } : e));
 
-        if (data) {
-            setEmails(prev => prev.map(e => e.uid === email.uid ? { ...e, html: data.html, text: data.text } : e));
-            setSelectedEmail(prev => prev?.uid === email.uid ? { ...prev, html: data.html, text: data.text } : prev);
+            // Mark as seen locally if needed
+            setEmails(prev => prev.map(e => {
+                if (e.uid === uid && !e.flags.includes('\\Seen')) {
+                    // We don't call toggleFlag here to avoid another server call if fetch-body already does it or we want to wait
+                    return { ...e, flags: [...e.flags, '\\Seen'] };
+                }
+                return e;
+            }));
+
+            // Update selected e-mail
+            setSelectedEmail(prev => prev && prev.uid === uid ? { ...prev, text: data.text, html: data.html, flags: prev.flags.includes('\\Seen') ? prev.flags : [...prev.flags, '\\Seen'] } : prev);
+
+            // Update cache
+            const cacheKey = `${currentUser.id}_${folder}_${page}`;
+            if (emailCache[cacheKey]) {
+                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, flags: e.flags.includes('\\Seen') ? e.flags : [...e.flags, '\\Seen'] } : e);
+            }
+
+            // Background update Seen flag on server if not seen
+            const email = emails.find(e => e.uid === uid);
+            if (email && !email.flags.includes('\\Seen')) {
+                toggleFlag(email, '\\Seen', true);
+            }
+
+        } catch (err: any) {
+            console.error("Fetch Body Error:", err);
+        } finally {
+            setLoadingBody(false);
         }
     };
-
     const toggleFlag = async (email: EmailMessage, flag: string, add: boolean) => {
         // Optimistic update
         const updateFlags = (flags: string[]) => {
@@ -357,6 +374,47 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         if (error) alert('Erro ao excluir: ' + error.message);
         else {
             setAvailableTags(prev => prev.filter(t => t.id !== tagId));
+        }
+    };
+
+    const moveEmail = async (emailUids: string[], toFolder: string) => {
+        try {
+            const { error } = await callEmailServer('move', {
+                config: settings,
+                uids: emailUids,
+                fromPath: currentFolder,
+                toPath: toFolder
+            });
+            if (error) throw error;
+
+            // Optimistic UI Update
+            setEmails(prev => prev.filter(e => !emailUids.includes(e.uid)));
+
+            // Invalidate current folder cache
+            const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+            delete emailCache[cacheKey];
+
+            // If background refreshing is on, it will eventually re-fetch
+        } catch (err: any) {
+            alert('Erro ao mover: ' + err.message);
+        }
+    };
+
+    const handleDragStart = (e: React.DragEvent, email: EmailMessage) => {
+        e.dataTransfer.setData('emailUid', email.uid);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e: React.DragEvent, targetFolder: string) => {
+        e.preventDefault();
+        const emailUid = e.dataTransfer.getData('emailUid');
+        if (emailUid && targetFolder !== currentFolder) {
+            moveEmail([emailUid], targetFolder);
         }
     };
 
@@ -455,6 +513,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         }
     };
 
+
     // Refresh when page changes
     useEffect(() => {
         if (savedImapUser) fetchEmails();
@@ -503,12 +562,27 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
     const getFolderName = (path: string) => {
         if (path === 'INBOX') return 'Caixa de Entrada';
-        const name = path.split('/').pop() || path;
-        if (name === 'Sent' || path.includes('Sent')) return 'Enviados';
-        if (name === 'Drafts' || path.includes('Drafts')) return 'Rascunhos';
-        if (name === 'Trash' || path.includes('Trash')) return 'Lixeira';
-        if (name === 'Junk' || path.includes('Junk') || name === 'Spam') return 'Spam';
-        return name;
+
+        // Remove prefix like 'INBOX.' or 'INBOX/'
+        let cleanPath = path.replace(/^INBOX[\./]/i, '');
+
+        // Standard translation mapping
+        const translations: Record<string, string> = {
+            'Sent': 'Enviados',
+            'Sent Messages': 'Enviados',
+            'Drafts': 'Rascunhos',
+            'Trash': 'Lixeira',
+            'Deleted Items': 'Lixeira',
+            'Junk': 'Spam',
+            'Spam': 'Spam',
+            'Archive': 'Arquivo',
+            'Outbox': 'Caixa de Saída'
+        };
+
+        const parts = cleanPath.split(/[\./]/);
+        const lastPart = parts[parts.length - 1];
+
+        return translations[lastPart] || lastPart || path;
     }
 
     const fetchContacts = async () => {
@@ -599,12 +673,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         {/* Always show INBOX first */}
                         <button
                             onClick={() => { setView('inbox'); setCurrentFolder('INBOX'); setFilterTag(null); setPage(1); }} 
-                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, 'INBOX')}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             <InboxIcon className="w-5 h-5" />
                             Caixa de Entrada
                             {unseenCount > 0 && (
-                                <span className="ml-auto bg-red-500 text-white py-0.5 px-2 rounded-full text-xs font-bold">
+                                <span className="ml-auto bg-red-500 text-white py-0.5 px-2 rounded-full text-[10px] font-bold">
                                     {unseenCount}
                                 </span>
                             )}
@@ -616,19 +692,26 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             .map((folder: any) => {
                                 const isSpecial = folder.specialUse;
                                 let Icon = FolderIcon;
-                                if (isSpecial === '\\Sent') Icon = PaperAirplaneIcon;
-                                if (isSpecial === '\\Trash') Icon = TrashIcon;
-                                if (isSpecial === '\\Drafts') Icon = PencilSquareIcon;
-                                if (isSpecial === '\\Junk') Icon = NoSymbolIcon;
+                                if (isSpecial === '\\Sent' || folder.path.toLowerCase().includes('sent')) Icon = PaperAirplaneIcon;
+                                if (isSpecial === '\\Trash' || folder.path.toLowerCase().includes('trash') || folder.path.toLowerCase().includes('deleted')) Icon = TrashIcon;
+                                if (isSpecial === '\\Drafts' || folder.path.toLowerCase().includes('draft')) Icon = PencilSquareIcon;
+                                if (isSpecial === '\\Junk' || folder.path.toLowerCase().includes('junk') || folder.path.toLowerCase().includes('spam')) Icon = NoSymbolIcon;
+
+                                // Calculate depth for indentation
+                                const depth = (folder.path.split(/[\./]/).length) - (folder.path.startsWith('INBOX') ? 1 : 0);
+                                const paddingLeft = Math.max(0, (depth - 1) * 16);
 
                                 return (
                                     <button
                                         key={folder.path}
                                         onClick={() => { setView('inbox'); setCurrentFolder(folder.path); setFilterTag(null); setPage(1); }}
-                                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${view === 'inbox' && currentFolder === folder.path ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, folder.path)}
+                                        style={{ paddingLeft: `${12 + paddingLeft}px` }}
+                                        className={`w-full flex items-center gap-3 py-2 text-sm font-medium rounded-md transition-colors ${view === 'inbox' && currentFolder === folder.path ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                                     >
-                                        <Icon className="w-5 h-5" />
-                                        {getFolderName(folder.path)}
+                                        <Icon className={`w-5 h-5 ${view === 'inbox' && currentFolder === folder.path ? 'text-brand-primary' : 'text-gray-400'}`} />
+                                        <span className="truncate">{getFolderName(folder.path)}</span>
                                     </button>
                                 );
                             })}
@@ -681,20 +764,21 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             filteredEmails.map(email => (
                                 <div
                                     key={email.uid}
-                                    onClick={() => { setSelectedEmail(email); setView('read'); fetchEmailBody(email); }}
+                                    onClick={() => { setSelectedEmail(email); setView('read'); fetchEmailBody(email.uid, currentFolder); }}
                                     onContextMenu={(e) => handleContextMenu(e, email)}
-                                    className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-white hover:shadow-sm transition-all ${selectedEmail?.uid === email.uid ? 'bg-white border-l-4 border-l-brand-primary shadow-sm' : 'bg-transparent'}`}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, email)}
+                                    className={`p-4 border-b border-gray-200 cursor-pointer transition-all hover:bg-white flex flex-col gap-1 relative ${selectedEmail?.uid === email.uid ? 'bg-white border-l-4 border-l-brand-primary shadow-sm' : ''} ${!(email.flags || []).includes('\\Seen') ? 'bg-emerald-50/30' : ''}`}
                                 >
-                                    {/* ... Email Item Content ... */}
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className={`font-medium text-sm truncate pr-2 ${email.flags && email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-bold'}`}>
-                                            {email.from.replace(/<.*>/, '')}
-                                        </span>
-                                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                                    <div className="flex justify-between items-start">
+                                        <div className={`text-sm truncate pr-2 ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                            {email.from}
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 whitespace-nowrap">
                                             {new Date(email.date).toLocaleDateString()}
-                                        </span>
                                     </div>
-                                    <div className={`text-sm mb-1 truncate ${email.flags && email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-semibold'}`}>
+                                    </div>
+                                    <div className={`text-sm line-clamp-1 ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
                                         {email.subject}
                                     </div>
                                     <div className="text-xs text-gray-500 line-clamp-2">
@@ -717,30 +801,63 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     {/* Context Menu */}
                     {contextMenu && (
                         <div
-                            className="fixed bg-white shadow-xl rounded-lg border border-gray-200 z-50 w-48 py-1"
+                            className="fixed bg-white shadow-2xl rounded-xl border border-gray-200 z-[100] w-56 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
                             style={{ top: contextMenu.y, left: contextMenu.x }}
-                            onClick={(e) => e.stopPropagation()} // Prevent closing immediately
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="px-3 py-2 text-xs font-bold text-gray-500 border-b bg-gray-50">
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b bg-gray-50/50">
+                                Ações Rápidas
+                            </div>
+
+                            <button
+                                onClick={() => { toggleFlag(contextMenu.email, '\\Seen', (contextMenu.email.flags || []).includes('\\Seen')); closeContextMenu(); }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
+                            >
+                                <EnvelopeIcon className="w-4 h-4 text-gray-400" />
+                                Marcar como {(contextMenu.email.flags || []).includes('\\Seen') ? 'Não Lido' : 'Lido'}
+                            </button>
+
+                            {/* Tags Submenu Header */}
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
                                 Adicionar Tag
                             </div>
-                            {['Urgente|#ef4444', 'Financeiro|#22c55e', 'Pessoal|#3b82f6', 'Trabalho|#f59e0b'].map(opt => {
-                                const [lbl, clr] = opt.split('|');
-                                return (
-                                    <button 
-                                        key={lbl}
-                                        onClick={() => { handleAddTag(contextMenu.email, lbl, clr); closeContextMenu(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                            <div className="max-h-32 overflow-y-auto">
+                                {availableTags.length > 0 ? availableTags.map(tag => (
+                                    <button
+                                        key={tag.id}
+                                        onClick={() => { handleAddTag(contextMenu.email, tag.label, tag.color); closeContextMenu(); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
                                     >
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: clr }}></span>
-                                        {lbl}
+                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
+                                        {tag.label}
                                     </button>
-                                );
-                            })}
+                                )) : (
+                                    <div className="px-4 py-2 text-xs text-gray-400 italic">Nenhuma tag cadastrada</div>
+                                )}
+                            </div>
+
+                            {/* Move to Folder Submenu */}
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
+                                Mover para
+                            </div>
+                            <div className="max-h-48 overflow-y-auto">
+                                {folders.map(f => (
+                                    <button 
+                                        key={f.path}
+                                        disabled={f.path === currentFolder}
+                                        onClick={() => { moveEmail([contextMenu.email.uid], f.path); closeContextMenu(); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent flex items-center gap-3 transition-colors"
+                                    >
+                                        <FolderIcon className="w-4 h-4 text-gray-400" />
+                                        <span className="truncate">{getFolderName(f.path)}</span>
+                                    </button>
+                                ))}
+                            </div>
+
                             <div className="border-t mt-1 pt-1">
-                                <button onClick={() => { /* Delete Logic */ closeContextMenu(); alert('Em breve'); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                                <button onClick={() => { deleteEmail(contextMenu.email); closeContextMenu(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors">
                                     <TrashIcon className="w-4 h-4" />
-                                    Excluir
+                                    Mover para Lixeira
                                 </button>
                             </div>
                         </div>
