@@ -526,28 +526,39 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             return true;
         } catch (err) {
             console.error('Erro ao gerar PDF:', err);
-            alert('Não foi possível gerar o PDF de histórico.');
             return false;
         }
     };
 
     const handleDelete = async (userId: string, userName: string) => {
-        if (window.confirm(`AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente e afetará todo o banco de dados. \n\nUm PDF com o histórico de conversas será gerado antes da exclusão. Continuar?`)) {
+        const msgConfirm = `AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente. \n\nUm PDF com o histórico será gerado agora. Continuar?`;
+        if (!window.confirm(msgConfirm)) return;
+
+        console.log(`[UserManager] Iniciando backup e deleção: ${userName} (${userId})`);
+
+        try {
             const pdfSuccess = await generatePDFHistory(userId, userName);
 
             if (!pdfSuccess) {
-                if (!window.confirm("Falha ao gerar PDF de histórico. Deseja excluir mesmo assim?")) {
+                if (!window.confirm("Não foi possível gerar o PDF automaticamente. Deseja prosseguir com a exclusão definitiva mesmo assim?")) {
                     return;
                 }
             }
 
-            try {
-                const { error } = await supabase.from('profiles').delete().eq('id', userId);
-                if (error) throw error;
-                setUsers(users.filter(u => u.id !== userId));
-            } catch (err: any) {
-                alert("Erro ao excluir: " + err.message);
+            console.log("[UserManager] Deletando no Supabase...");
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+
+            if (error) {
+                console.error("[UserManager] Erro Supabase:", error);
+                throw error;
             }
+
+            console.log("[UserManager] Sucesso!");
+            setUsers(users.filter(u => u.id !== userId));
+            alert("Usuário excluído com sucesso.");
+        } catch (err: any) {
+            console.error("[UserManager] Erro fatal:", err);
+            alert("Erro ao excluir: " + (err.message || "Verifique o console"));
         }
     };
 
