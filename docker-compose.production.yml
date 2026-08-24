@@ -18,6 +18,8 @@ services:
       - PORT=3000
       - EVOLUTION_API_URL=http://evolution-api:8080
       - EVOLUTION_API_KEY=EvolutionPandaSecret123
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT}
+      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
