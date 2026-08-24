@@ -9,8 +9,13 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         proxy: {
+          '/api/whatsapp': {
+            target: 'http://localhost:3005',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/api\/whatsapp/, '')
+          },
           '/api': {
-            target: 'http://localhost:3001', // Backend local
+            target: 'http://localhost:3001',
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api/, '')
           }

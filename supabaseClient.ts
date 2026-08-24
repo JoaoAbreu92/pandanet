@@ -10,4 +10,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase URL or Key not defined in environment variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    realtime: {
+        params: {
+            events_per_second: 10
+        }
+    },
+    auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+    }
+});

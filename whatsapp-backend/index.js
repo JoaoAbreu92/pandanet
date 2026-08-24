@@ -13,6 +13,7 @@ const { analyzeMessageForTransfer } = require('./utils/geminiService');
 dotenv.config(); // Default
 dotenv.config({ path: path.join(__dirname, '.env'), override: true });
 dotenv.config({ path: path.join(__dirname, '../.env'), override: true });
+dotenv.config({ path: path.join(__dirname, '../.env.local'), override: true });
 dotenv.config({ path: '/root/pandanet/.env', override: true });
 if (!process.env.JWT_SECRET) {
   dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: true });
