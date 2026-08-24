@@ -1292,12 +1292,77 @@ async function executeNode(node, conversation, companyId, connectionId, allNodes
     }
 }
 
-async function runChatbot(message, conversation, companyId, connectionId) {
+async function runChatbot(incomingText, conversation, companyId, connectionId) {
     try {
-        const text = (message.message?.conversation || message.message?.extendedTextMessage?.text || message.text || "").trim().toLowerCase();
+        const text = (incomingText || "").trim().toLowerCase();
         if (!text) return;
 
-        // 1. Buscar fluxo ativo
+        // 1. Verificar transferências por palavra-chave configuradas
+        try {
+            const { data: settings } = await supabase
+                .from('whatsapp_settings')
+                .select('keyword_transfers')
+                .eq('id', connectionId)
+                .maybeSingle();
+
+            if (settings && Array.isArray(settings.keyword_transfers) && settings.keyword_transfers.length > 0) {
+                // Procurar por uma palavra-chave que esteja contida na mensagem do cliente (case-insensitive)
+                const matchedRule = settings.keyword_transfers.find(rule => {
+                    const kw = (rule.keyword || "").trim().toLowerCase();
+                    return kw && text.includes(kw);
+                });
+
+                if (matchedRule) {
+                    console.log(`[PALAVRA-CHAVE] Mensagem casou com palavra-chave "${matchedRule.keyword}". Transferindo...`);
+                    
+                    if (matchedRule.target_type === 'queue') {
+                        // Transferir para Fila/Setor
+                        const { data: queue } = await supabase
+                            .from('whatsapp_queues')
+                            .select('name')
+                            .eq('id', matchedRule.target_id)
+                            .maybeSingle();
+                        
+                        const queueName = queue?.name || "Setor Responsável";
+                        const transferText = `Certo! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${queueName}*. Um momento, por favor.`;
+                        
+                        await sendBotMessage(transferText, conversation, companyId, connectionId);
+                        
+                        await supabase.from('whatsapp_conversations').update({ 
+                            queue_id: matchedRule.target_id, 
+                            chatbot_node_id: null,
+                            assigned_to: null
+                        }).eq('id', conversation.id);
+                        
+                        return; // Interrompe o chatbot
+                    } else if (matchedRule.target_type === 'agent') {
+                        // Transferir para Agente/Usuário
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('full_name')
+                            .eq('id', matchedRule.target_id)
+                            .maybeSingle();
+                        
+                        const agentName = profile?.full_name || "um atendente";
+                        const transferText = `Certo! Vou transferir seu atendimento para o consultor *${agentName}*. Um momento, por favor.`;
+                        
+                        await sendBotMessage(transferText, conversation, companyId, connectionId);
+                        
+                        await supabase.from('whatsapp_conversations').update({ 
+                            assigned_to: matchedRule.target_id, 
+                            chatbot_node_id: null,
+                            queue_id: null
+                        }).eq('id', conversation.id);
+                        
+                        return; // Interrompe o chatbot
+                    }
+                }
+            }
+        } catch (kwErr) {
+            console.error('[PALAVRA-CHAVE] Erro ao processar regras de palavra-chave:', kwErr.message);
+        }
+
+        // 2. Buscar fluxo ativo
         const { data: flow } = await supabase
             .from('whatsapp_chatbot_flows')
             .select('*')
@@ -1862,8 +1927,18 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             if (!isHistorical) {
                 // Reabrir se estiver fechada
                 let nextStatus = conv.status;
+                let extraUpdates = {};
                 if (conv.status === 'fechado') {
                     nextStatus = 'aberto';
+                    extraUpdates = {
+                        assigned_to: null,
+                        queue_id: null,
+                        chatbot_node_id: null
+                    };
+                    conv.assigned_to = null;
+                    conv.queue_id = null;
+                    conv.chatbot_node_id = null;
+                    conv.status = 'aberto';
                 }
                 
                 // Tentar obter um nome melhor se o atual for apenas o número bruto ou sem nome
@@ -1901,7 +1976,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), 
                         last_message_at: new Date().toISOString(),
                         status: nextStatus,
-                        contact_name: resolvedName
+                        contact_name: resolvedName,
+                        ...extraUpdates
                     }).eq('id', conversationId);
             }
         }
@@ -2053,7 +2129,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         }
 
                         if (!hasTransferred) {
-                            runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                            runChatbot(text, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
                         }
                     }
                 } catch (expErr) {

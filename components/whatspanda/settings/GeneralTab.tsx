@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { useAuth } from '../../../components/AuthContext';
-import { Save, Clock, MessageSquare, Sliders, VolumeX, UserCheck, Check, Loader2, RefreshCw } from 'lucide-react';
+import { Save, Clock, MessageSquare, Sliders, VolumeX, UserCheck, Check, Loader2, RefreshCw, Key } from 'lucide-react';
 
 interface WhatsAppSettingsData {
     id: string;
@@ -17,6 +17,7 @@ interface WhatsAppSettingsData {
     transfer_message_client?: string;
     transfer_message_agent?: string;
     send_transfer_message_to_client?: boolean;
+    keyword_transfers?: any[];
 }
 
 const DAYS_OF_WEEK = [
@@ -54,6 +55,13 @@ const GeneralTab: React.FC = () => {
     const [businessHours, setBusinessHours] = useState<any>({ general: {}, queues: {} });
     const [activeTarget, setActiveTarget] = useState<string>('general');
 
+    // Keyword Transfers State
+    const [keywordTransfers, setKeywordTransfers] = useState<any[]>([]);
+    const [agents, setAgents] = useState<any[]>([]);
+    const [newKeyword, setNewKeyword] = useState('');
+    const [newTargetType, setNewTargetType] = useState<'queue' | 'agent'>('queue');
+    const [newTargetId, setNewTargetId] = useState('');
+
     useEffect(() => {
         fetchConnections();
     }, [currentUser?.company_id]);
@@ -67,7 +75,7 @@ const GeneralTab: React.FC = () => {
             // Fetch WhatsApp connection settings
             const { data: settingsData, error: settingsError } = await supabase
                 .from('whatsapp_settings')
-                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
+                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers')
                 .eq('company_id', companyId);
 
             if (settingsError) throw settingsError;
@@ -79,6 +87,15 @@ const GeneralTab: React.FC = () => {
                 .eq('company_id', companyId);
             
             if (queuesData) setQueues(queuesData);
+
+            // Fetch agents
+            const { data: agentsData } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('company_id', companyId)
+                .order('full_name', { ascending: true });
+            
+            if (agentsData) setAgents(agentsData);
 
             if (settingsData && settingsData.length > 0) {
                 setConnections(settingsData);
@@ -104,6 +121,7 @@ const GeneralTab: React.FC = () => {
         setTransferMessageClient(conn.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.');
         setTransferMessageAgent(conn.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.');
         setSendTransferMessageToClient(conn.send_transfer_message_to_client !== false);
+        setKeywordTransfers(conn.keyword_transfers || []);
     };
 
     const getTargetHours = (target: string) => {
@@ -144,6 +162,32 @@ const GeneralTab: React.FC = () => {
         }
     };
 
+    const handleAddKeywordRule = () => {
+        if (!newKeyword.trim()) {
+            alert('Por favor, digite uma palavra-chave.');
+            return;
+        }
+        if (!newTargetId) {
+            alert('Por favor, selecione um destino.');
+            return;
+        }
+
+        const newRule = {
+            id: Math.random().toString(36).substring(2, 9),
+            keyword: newKeyword.trim().toLowerCase(),
+            target_type: newTargetType,
+            target_id: newTargetId
+        };
+
+        setKeywordTransfers(prev => [...prev, newRule]);
+        setNewKeyword('');
+        setNewTargetId('');
+    };
+
+    const handleRemoveKeywordRule = (id: string) => {
+        setKeywordTransfers(prev => prev.filter(r => r.id !== id));
+    };
+
     const handleSave = async () => {
         if (!selectedConnId) return;
 
@@ -159,6 +203,7 @@ const GeneralTab: React.FC = () => {
             transfer_message_client: transferMessageClient,
             transfer_message_agent: transferMessageAgent,
             send_transfer_message_to_client: sendTransferMessageToClient,
+            keyword_transfers: keywordTransfers,
             updated_at: new Date().toISOString()
         };
 
@@ -304,6 +349,142 @@ const GeneralTab: React.FC = () => {
                         </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Atribui automaticamente o atendimento ao primeiro atendente que responder à conversa na aba "Aguardando".</p>
+                </div>
+
+                {/* Keyword Transfers Configuration */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
+                    <div>
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            <Key className="w-5 h-5 text-emerald-500" /> Transferência por Palavra-Chave (IA/Regras)
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed mt-1">
+                            Defina palavras-chave que, se identificadas na mensagem do cliente, encaminharão o atendimento imediatamente para um setor ou agente específico, interrompendo o chatbot.
+                        </p>
+                    </div>
+
+                    {/* Form to add a new rule */}
+                    <div className="bg-gray-100/30 dark:bg-white/5 p-6 rounded-2xl border border-gray-100/50 dark:border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                        <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                Palavra-Chave / Frase
+                            </label>
+                            <input
+                                type="text"
+                                value={newKeyword}
+                                onChange={(e) => setNewKeyword(e.target.value)}
+                                placeholder="Ex: suporte, financeiro, boleto, vendas"
+                                className="w-full px-5 py-3.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 dark:text-white transition-all text-sm font-medium"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                Destinar Para
+                            </label>
+                            <select
+                                value={newTargetType}
+                                onChange={(e) => {
+                                    setNewTargetType(e.target.value as 'queue' | 'agent');
+                                    setNewTargetId('');
+                                }}
+                                className="w-full px-4 py-3.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 dark:text-white transition-all text-sm font-bold appearance-none cursor-pointer"
+                            >
+                                <option value="queue">Setor (Fila)</option>
+                                <option value="agent">Agente (Atendente)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                Escolha o Destino
+                            </label>
+                            {newTargetType === 'queue' ? (
+                                <select
+                                    value={newTargetId}
+                                    onChange={(e) => setNewTargetId(e.target.value)}
+                                    className="w-full px-4 py-3.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 dark:text-white transition-all text-sm font-semibold appearance-none cursor-pointer"
+                                >
+                                    <option value="">Selecione o Setor...</option>
+                                    {queues.map(q => (
+                                        <option key={q.id} value={q.id}>{q.name}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <select
+                                    value={newTargetId}
+                                    onChange={(e) => setNewTargetId(e.target.value)}
+                                    className="w-full px-4 py-3.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 dark:text-white transition-all text-sm font-semibold appearance-none cursor-pointer"
+                                >
+                                    <option value="">Selecione o Agente...</option>
+                                    {agents.map(a => (
+                                        <option key={a.id} value={a.id}>{a.full_name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <div className="sm:col-span-4 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={handleAddKeywordRule}
+                                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md"
+                            >
+                                Adicionar Regra
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Table / List of current rules */}
+                    <div className="space-y-4 pt-2">
+                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Regras de Redirecionamento Ativas</h5>
+                        {keywordTransfers.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-medium italic">Nenhuma regra de palavra-chave configurada para este canal.</p>
+                        ) : (
+                            <div className="overflow-hidden rounded-2xl border border-gray-100 dark:border-white/5">
+                                <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr className="bg-gray-150/50 dark:bg-white/3 border-b border-gray-150 dark:border-white/5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                            <th className="py-3.5 px-6">Palavra-Chave</th>
+                                            <th className="py-3.5 px-6">Tipo</th>
+                                            <th className="py-3.5 px-6">Encaminhar Para</th>
+                                            <th className="py-3.5 px-6 text-right">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5 bg-white/10">
+                                        {keywordTransfers.map((rule) => {
+                                            let targetName = 'Desconhecido';
+                                            if (rule.target_type === 'queue') {
+                                                targetName = queues.find(q => q.id === rule.target_id)?.name || 'Setor Removido';
+                                            } else {
+                                                targetName = agents.find(a => a.id === rule.target_id)?.full_name || 'Agente Removido';
+                                            }
+                                            return (
+                                                <tr key={rule.id} className="hover:bg-gray-50/50 dark:hover:bg-white/3 transition-colors font-semibold dark:text-white">
+                                                    <td className="py-3.5 px-6 font-mono text-emerald-500">{rule.keyword}</td>
+                                                    <td className="py-3.5 px-6">
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                            rule.target_type === 'queue'
+                                                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                                                                : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
+                                                        }`}>
+                                                            {rule.target_type === 'queue' ? 'Setor' : 'Agente'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3.5 px-6 text-gray-700 dark:text-gray-300">{targetName}</td>
+                                                    <td className="py-3.5 px-6 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveKeywordRule(rule.id)}
+                                                            className="text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-all font-bold"
+                                                        >
+                                                            Remover
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Transfer Message Configurations */}
