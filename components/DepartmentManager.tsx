@@ -34,6 +34,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            if (!companyId) throw new Error('Company ID is required to save department');
             if (editingDept) {
                 const { error } = await supabase
                     .from('departments')
@@ -41,18 +42,20 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
                     .eq('id', editingDept.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { error, data } = await supabase
                     .from('departments')
-                    .insert({ name, company_id: companyId });
+                    .insert({ name, company_id: companyId })
+                    .select();
                 if (error) throw error;
+                console.log('Department created:', data);
             }
             setName('');
             setEditingDept(null);
             setIsModalOpen(false);
             fetchDepartments();
-        } catch (err) {
-            console.error(err);
-            alert('Erro ao salvar departamento');
+        } catch (err: any) {
+            console.error('Error saving department:', err);
+            alert(`Erro ao salvar departamento: ${err.message || 'Erro desconhecido'}`);
         }
     };
 

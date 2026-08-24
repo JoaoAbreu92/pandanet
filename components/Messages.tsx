@@ -570,7 +570,7 @@ const Messages: React.FC<MessagesProps> = () => {
     return (
         <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
             {/* Left Sidebar: Conversations/Contacts/Teams */}
-            <div className={`w-80 lg:w-96 bg-white border-r flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-80 lg:w-96 bg-white border-r flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b">
                     <div className="flex bg-gray-100 rounded-md p-1">
                         <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors ${activeTab === 'conversations' ? 'bg-white text-brand-primary shadow' : 'text-gray-500'}`}>Chat</button>

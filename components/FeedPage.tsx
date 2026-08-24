@@ -388,7 +388,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     return (
         <div className="max-w-6xl mx-auto px-4 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-2 space-y-6">
                     <Card title="" className="text-center pb-6">
                         <div className="relative mb-4">
                             <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-10"></div>
@@ -398,17 +398,17 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
                         <hr className="mb-4" />
                         <div className="flex justify-around">
-                            <div><p className="font-bold text-brand-text">154</p><p className="text-[10px] text-brand-subtle-text uppercase">Posts</p></div>
+                            <div><p className="font-bold text-brand-text">{posts.filter(p => p.authorId === currentUser.id).length}</p><p className="text-[10px] text-brand-subtle-text uppercase">Posts</p></div>
                             <div className="border-x px-6">
-                                <p className="font-bold text-brand-text">1.2k</p><p className="text-[10px] text-brand-subtle-text uppercase">Seguidores</p>
+                                <p className="font-bold text-brand-text">{allEmployees.length}</p><p className="text-[10px] text-brand-subtle-text uppercase">Usuários</p>
                             </div>
-                            <div><p className="font-bold text-brand-text">850</p><p className="text-[10px] text-brand-subtle-text uppercase">Seguindo</p></div>
+                            <div><p className="font-bold text-brand-text">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p><p className="text-[10px] text-brand-subtle-text uppercase">Interações</p></div>
                         </div>
                     </Card>
                     <RecognitionWidget recognitions={recognitions} />
                 </div>
 
-                <div className="lg:col-span-6 space-y-6">
+                <div className="lg:col-span-8 space-y-6">
                     <Card title="" className="p-0 border-none shadow-sm overflow-visible">
                         <div className="p-4 bg-white rounded-xl shadow-sm border relative">
                             <div className="flex space-x-4 mb-4">
@@ -476,7 +476,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     )}
                 </div>
 
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-2 space-y-6">
                     <EventsCarouselMini events={events} />
                 </div>
             </div>

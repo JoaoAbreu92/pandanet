@@ -97,7 +97,7 @@ const Layout: React.FC<LayoutProps> = ({
                     onMarkAsRead={onMarkAsRead}
                     onClearAll={onClearAllNotifications}
                 />
-                <main className="flex-1 overflow-x-hidden overflow-y-auto p-8 relative">
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 relative">
                     {children}
                 </main>
             </div>

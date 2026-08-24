@@ -19,7 +19,10 @@ const TicketPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchTickets = async () => {
-        if (!currentUser?.company_id) return;
+        if (!currentUser?.company_id) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             // Fetch Tickets
