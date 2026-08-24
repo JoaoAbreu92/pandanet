@@ -55,9 +55,26 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false });
     const navRef = useRef<HTMLDivElement>(null);
 
+    const [hasSelectedProject, setHasSelectedProject] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('pixel_selected_project') !== null;
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const handleProjectChange = () => {
+            setHasSelectedProject(localStorage.getItem('pixel_selected_project') !== null);
+        };
+        window.addEventListener('pixel_selected_project_changed', handleProjectChange);
+        return () => window.removeEventListener('pixel_selected_project_changed', handleProjectChange);
+    }, []);
+
     const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects' | 'social') => {
         setOpenMenus(prev => {
-            const newState = { ...prev, [menu]: !prev[menu] };
+            const isCurrentlyOpen = prev[menu];
+            const newState = { rh: false, ti: false, portal: false, projects: false, social: false };
+            newState[menu] = !isCurrentlyOpen;
             // Se estamos abrindo o menu, vamos rolar para ele
             if (newState[menu]) {
                 setTimeout(() => {
@@ -267,10 +284,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
-                    <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />
-                    <NavItem page="projects-list" label="Lista" icon={ListBulletIcon} permission="viewProjects" featureId="projects" />
-                    <NavItem page="projects-calendar" label="Calendário" icon={CalendarIcon} permission="viewProjects" featureId="projects" />
-                    <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />
+                    {hasSelectedProject && (
+                        <>
+                            <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />
+                            <NavItem page="projects-list" label="Lista" icon={ListBulletIcon} permission="viewProjects" featureId="projects" />
+                            <NavItem page="projects-calendar" label="Calendário" icon={CalendarIcon} permission="viewProjects" featureId="projects" />
+                            <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />
+                        </>
+                    )}
                 </NavMenu>
 
                 <hr className="my-2 border-gray-100 dark:border-slate-800" />

@@ -140,6 +140,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             } else {
                 localStorage.removeItem('pixel_selected_project');
             }
+            window.dispatchEvent(new Event('pixel_selected_project_changed'));
         }
     };
     const [stages, setStages] = useState<ProjectStage[]>([]);
@@ -840,7 +841,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
         try {
             const { error } = await supabase
                 .from('project_tasks')
-                .update({ stage_id: targetStageId, updated_at: new Date().toISOString() })
+                .update({ stage_id: targetStageId })
                 .eq('id', taskId);
 
             if (error) throw error;
@@ -1328,6 +1329,26 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                                         </div>
                                                                     )}
 
+                                                                    {/* Barra de Progresso dos Setores (Fases) */}
+                                                                    {(() => {
+                                                                        const stageIdx = stages.findIndex(s => s.id === task.stage_id);
+                                                                        const progressPct = stages.length > 1 ? Math.round((stageIdx / (stages.length - 1)) * 100) : 0;
+                                                                        return (
+                                                                            <div className="mt-3 mb-2">
+                                                                                <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 dark:text-slate-500 mb-1">
+                                                                                    <span>Setores (Fases)</span>
+                                                                                    <span>{progressPct}%</span>
+                                                                                </div>
+                                                                                <div className="w-full bg-slate-100 dark:bg-slate-700/50 h-1.5 rounded-full overflow-hidden">
+                                                                                    <div 
+                                                                                        className="h-full rounded-full transition-all duration-500" 
+                                                                                        style={{ width: `${progressPct}%`, backgroundColor: selectedProject?.color || '#10B981' }}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+
                                                                     {/* Checklist Inline do Odoo */}
                                                                     {task.subtasks && task.subtasks.length > 0 && (
                                                                         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
@@ -1794,6 +1815,30 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                             <button type="button" onClick={handleAddTag} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl">Add</button>
                                         </div>
                                     </div>
+
+                                    {/* Barra de Progresso dos Setores (Fases) no Modal */}
+                                    {!isNewTaskMode && (
+                                        <div className="pt-2">
+                                            {(() => {
+                                                const stageIdx = stages.findIndex(s => s.id === selectedTask?.stage_id);
+                                                const progressPct = stages.length > 1 ? Math.round((stageIdx / (stages.length - 1)) * 100) : 0;
+                                                return (
+                                                    <>
+                                                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">
+                                                            <span>Progresso nos Setores</span>
+                                                            <span>{progressPct}%</span>
+                                                        </div>
+                                                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full rounded-full transition-all duration-500" 
+                                                                style={{ width: `${progressPct}%`, backgroundColor: selectedProject?.color || '#10B981' }}
+                                                            />
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* CHECKLIST / SUBTAREFAS */}
