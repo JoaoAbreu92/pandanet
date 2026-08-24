@@ -5,6 +5,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    zoom: 80%;
+  }
+
   :root {
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-display: 'Outfit', sans-serif;
