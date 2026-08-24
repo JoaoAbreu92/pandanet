@@ -35,8 +35,8 @@ const ChatbotSettings: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [geminiKey, setGeminiKey] = useState('');
     const activeProfile = currentUser || profile;
-    const [signature, setSignature] = useState(activeProfile?.whatsapp_signature || '');
-    const [useSignature, setUseSignature] = useState(activeProfile?.use_whatsapp_signature || false);
+    const [signature, setSignature] = useState('');
+    const [useSignature, setUseSignature] = useState(false);
 
     // Simulator State
     const [isSimulating, setIsSimulating] = useState(false);
@@ -46,6 +46,23 @@ const ChatbotSettings: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, [currentUser?.company_id]);
+
+    useEffect(() => {
+        const fetchSignature = async () => {
+            const profileId = activeProfile?.id;
+            if (!profileId) return;
+            const { data } = await supabase
+                .from('profiles')
+                .select('whatsapp_signature, use_whatsapp_signature')
+                .eq('id', profileId)
+                .single();
+            if (data) {
+                setSignature(data.whatsapp_signature || '');
+                setUseSignature(data.use_whatsapp_signature || false);
+            }
+        };
+        fetchSignature();
+    }, [activeProfile?.id]);
 
     const fetchData = async () => {
         const companyId = currentUser?.company_id || profile?.company_id;
