@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon } from './icons';
+import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon, SunIcon, MoonIcon } from './icons';
 import type { Employee, Page } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
@@ -144,6 +144,28 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         </div>
                     </div>
 
+                    {/* Botão de Tema (Sol/Lua) */}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 text-gray-500 rounded-full hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:bg-gray-700"
+                        title={theme === 'light' ? t('theme.dark') : t('theme.light')}
+                    >
+                        {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
+                    </button>
+
+                    {/* Botão de Idioma (Ciclo PT -> EN -> ES) com Bandeiras */}
+                    <button
+                        onClick={() => {
+                            const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es'];
+                            const next = langs[(langs.indexOf(language) + 1) % langs.length];
+                            setLanguage(next);
+                        }}
+                        className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-lg hover:bg-gray-200 transition-all dark:bg-gray-700 dark:hover:bg-gray-600"
+                        title={t('language.select')}
+                    >
+                        {language === 'pt' ? '🇧🇷' : language === 'en' ? '🇺🇸' : '🇪🇸'}
+                    </button>
+
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
                         {unreadNotificationsCount > 0 && (
@@ -162,22 +184,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         </button>
                         {isDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-[100] dark:bg-gray-800 dark:border dark:border-gray-700">
-
-                                <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                                    <p className="text-xs text-gray-500 mb-2 dark:text-gray-400">{t('language.select')}</p>
-                                    <div className="flex items-center justify-between bg-gray-100 rounded-lg p-1 dark:bg-gray-700 space-x-1">
-                                        {(['pt', 'en', 'es'] as const).map((lang) => (
-                                            <button
-                                                key={lang}
-                                                onClick={() => setLanguage(lang)}
-                                                className={`flex-1 text-xs py-1 rounded-md transition-colors flex items-center justify-center ${language === lang ? 'bg-white shadow-sm text-brand-primary font-medium dark:bg-gray-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                                            >
-                                                {lang.toUpperCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <button type="button" onClick={() => { onNavigate('profile'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 text-left">
+                                <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 text-left">
                                     <UserCircleIcon className="w-5 h-5 mr-2" /> {t('header.profile')}
                                 </button>
                                 {currentUser.isAdmin && !isImpersonating && (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -73,6 +74,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 // --- Components ---
 
 const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
+    const { t, language } = useLanguage();
     // --- State: Navigation & Layout ---
     const [view, setView] = useState<'inbox' | 'compose' | 'settings' | 'read'>('inbox');
     const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
@@ -726,7 +728,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                     <button onClick={() => { setView('compose'); setComposeTo(''); setComposeSubject(''); setComposeBody(''); }} className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg font-medium shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-2 mb-4">
                         <PencilSquareIcon className="w-5 h-5" />
-                        Escrever
+                        {t('email.write')}
                     </button>
 
                     <nav className="space-y-1">
@@ -738,7 +740,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all ${view === 'inbox' && currentFolder === 'INBOX' && !filterTag ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                             <InboxIcon className="w-5 h-5" />
-                            Caixa de Entrada
+                            {t('sidebar.inbox') || 'Caixa de Entrada'}
                             {unseenCount > 0 && (
                                 <span className="ml-auto bg-red-500 text-white py-0.5 px-2 rounded-full text-[10px] font-bold">
                                     {unseenCount}
@@ -777,13 +779,13 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             })}
 
                         <button onClick={createFolder} className="w-full text-left px-3 py-2 text-xs text-brand-primary hover:bg-gray-100 rounded flex items-center gap-2 mt-2 font-semibold">
-                            + Nova Pasta
+                            {t('email.new_folder')}
                         </button>
                     </nav>
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
                         <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex justify-between items-center">
-                            Tags rápidas
+                            {t('email.quick_tags')}
                             <button onClick={() => setShowTagModal(true)} className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-brand-primary" title="Gerenciar Tags">
                                 <Cog6ToothIcon className="w-3 h-3" />
                             </button>
@@ -807,8 +809,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             </div>
 
             {/* --- Middle: Email List --- */}
-            {view === 'inbox' && (
-                <div className="flex-1 flex flex-col min-w-0 md:max-w-md border-r border-gray-200 relative">
+            {(view === 'inbox' || view === 'read') && (
+                <div className={`flex flex-col min-w-0 md:max-w-md border-r border-gray-200 relative ${view === 'read' ? 'hidden md:flex' : 'flex-1 md:flex-none md:w-80'}`}>
                     {/* ... Search ... */}
 
                     {/* List */}
@@ -816,10 +818,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         {loading && emails.length === 0 ? (
                             <div className="p-10 text-center text-gray-400">
                                 <ArrowPathIcon className="w-8 h-8 mx-auto animate-spin mb-2" />
-                                Carregando...
+                                {t('email.loading')}
                             </div>
                         ) : filteredEmails.length === 0 ? (
-                            <div className="p-10 text-center text-gray-400">Nenhum e-mail encontrado.</div>
+                                <div className="p-10 text-center text-gray-400">{t('email.no_emails')}</div>
                         ) : (
                             filteredEmails.map(email => (
                                 <div
@@ -866,7 +868,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b bg-gray-50/50">
-                                Ações Rápidas
+                                {t('email.actions')}
                             </div>
 
                             <button
@@ -878,7 +880,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
                             >
                                 <EnvelopeIcon className="w-4 h-4 text-gray-400" />
-                                Marcar como {(contextMenu.email.flags || []).includes('\\Seen') ? 'Não Lido' : 'Lido'}
+                                {t('email.unread').split(' ')[0]} / {t('email.read')}
                             </button>
 
                             {/* Tags Submenu Header */}
@@ -902,7 +904,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                             {/* Move to Folder Submenu */}
                             <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
-                                Mover para
+                                {t('email.move_to')}
                             </div>
                             <div className="max-h-48 overflow-y-auto">
                                 {folders.map(f => (
@@ -921,7 +923,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             <div className="border-t mt-1 pt-1">
                                 <button onClick={() => { deleteEmail(contextMenu.email); closeContextMenu(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors">
                                     <TrashIcon className="w-4 h-4" />
-                                    Mover para Lixeira
+                                    {t('email.trash')}
                                 </button>
                             </div>
                         </div>
@@ -982,7 +984,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 setComposeSubject('Re: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <ArrowUturnLeftIcon className="w-4 h-4" /> Responder
+                                <ArrowUturnLeftIcon className="w-4 h-4" /> {t('email.reply')}
                             </button>
                             <button onClick={() => {
                                 setView('compose');
@@ -993,18 +995,18 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 setComposeSubject('Re: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <UsersIcon className="w-4 h-4" /> Todos
+                                <UsersIcon className="w-4 h-4" /> {t('email.reply_all')}
                             </button>
                             <button onClick={() => {
                                 setView('compose');
                                 setComposeSubject('Fwd: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/>---------- Forwarded message ---------<br/>From: ${selectedEmail.from}<br/>Date: ${new Date(selectedEmail.date).toLocaleString()}<br/>Subject: ${selectedEmail.subject}<br/><br/>${selectedEmail.html || selectedEmail.text}`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <ArrowRightOnRectangleIcon className="w-4 h-4" /> Encaminhar
+                                <ArrowRightOnRectangleIcon className="w-4 h-4" /> {t('email.forward')}
                             </button>
                             <div className="h-6 w-px bg-gray-300 mx-1"></div>
                             <button onClick={() => deleteEmail(selectedEmail)} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-red-50 text-xs font-medium text-red-600">
-                                <TrashIcon className="w-4 h-4" /> Excluir
+                                <TrashIcon className="w-4 h-4" /> {t('email.delete')}
                             </button>
                             <button onClick={() => {
                                 // Move to Junk/Spam
@@ -1019,7 +1021,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 toggleFlag(selectedEmail, '\\Seen', false);
                                 setView('inbox');
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <EnvelopeIcon className="w-4 h-4" /> Não lido
+                                <EnvelopeIcon className="w-4 h-4" /> {t('email.unread')}
                             </button>
                         </div>
 
@@ -1092,7 +1094,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 ) : view === 'read' && !selectedEmail ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                         <EnvelopeIcon className="w-16 h-16 mb-4 opacity-20" />
-                        <p>Selecione um e-mail para ler</p>
+                            <p>{t('email.select_to_read')}</p>
                     </div>
                 ) : view === 'compose' ? (
                     <div className="flex-1 flex flex-col h-full bg-white">
