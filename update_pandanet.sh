@@ -15,8 +15,14 @@ echo "🚀 Reiniciando apenas a PandaNet..."
 docker compose -f docker-compose.production.yml down
 docker compose -f docker-compose.production.yml up -d --build
 
+# 2.5 Rodar correção de RLS e reabertura de chats
+echo "🔧 Aplicando correções RLS no banco de dados..."
+chmod +x scratch/apply_rls.sh
+./scratch/apply_rls.sh
+
 # 3. Limpeza rápida
 docker image prune -f
 
 echo "✅ Atualização da PandaNet concluída!"
 docker ps | grep pandanet
+

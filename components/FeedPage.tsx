@@ -140,7 +140,12 @@ export const PostCard: React.FC<{
             </div>
 
             <div className="flex justify-around py-1 relative">
-                <div className="flex-1 relative" ref={reactionMenuRef}>
+                <div 
+                    className="flex-1 relative" 
+                    ref={reactionMenuRef}
+                    onMouseEnter={() => { if (!isGhostMode) setShowReactionMenu(true); }}
+                    onMouseLeave={() => { setShowReactionMenu(false); setShowFullReactions(false); }}
+                >
                     <button 
                         disabled={isGhostMode}
                         onClick={() => { if (!isGhostMode) setShowReactionMenu(!showReactionMenu); }}
@@ -148,16 +153,20 @@ export const PostCard: React.FC<{
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 z-30 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-center gap-1">
                                 {quickReactions.map(emoji => (
-                                    <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl active:scale-95 text-white">
+                                    <button 
+                                        key={emoji} 
+                                        onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} 
+                                        className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl active:scale-95 hover:scale-125 hover:-translate-y-1 transition-all duration-200 text-white"
+                                    >
                                         {emoji}
                                     </button>
                                 ))}
                                 <button
                                     onClick={() => setShowFullReactions(!showFullReactions)}
-                                    className="w-8 h-8 flex items-center justify-center text-white/60 rounded-xl transition-all text-sm font-bold"
+                                    className="w-8 h-8 flex items-center justify-center text-white/60 rounded-xl transition-all text-sm font-bold hover:bg-white/10"
                                     title="Ver todos"
                                 >
                                     {showFullReactions ? '✕' : '+'}
@@ -166,7 +175,11 @@ export const PostCard: React.FC<{
                             {showFullReactions && (
                                 <div className="grid grid-cols-6 gap-1 mt-2 pt-2 border-t border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
                                     {allReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
-                                        <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-xl w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 text-white">
+                                        <button 
+                                            key={emoji} 
+                                            onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} 
+                                            className="text-xl w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 hover:scale-125 hover:-translate-y-1 transition-all duration-200 text-white"
+                                        >
                                             {emoji}
                                         </button>
                                     ))}

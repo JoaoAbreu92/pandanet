@@ -76,8 +76,8 @@ const QuotedMessage: React.FC<{ message: Message; onClose: () => void }> = React
         <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-blue-700">{message.senderName}</p>
             <p className="text-sm text-gray-700 truncate">
-                {message.file?.url && !message.text ? 
-                    (message.file.type === 'sticker' || message.file.type?.startsWith('image/') ? '🖼️ Imagem' : '📎 Anexo') 
+                {message.file?.url && !message.text ?
+                    (message.file.type === 'sticker' || message.file.type?.startsWith('image/') ? '🖼️ Imagem' : '📎 Anexo')
                     : message.text || 'Mensagem'}
             </p>
         </div>
@@ -93,14 +93,16 @@ interface MessageBubbleProps {
     handleReact: (messageId: string, emoji: string) => void;
     setReplyingToMessage: (message: Message | null) => void;
     handleDeleteMessage: (messageId: string) => void;
+    onContextMenu: (e: React.MouseEvent, message: Message) => void;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ 
-    message, 
-    selectedConversation, 
-    handleReact, 
-    setReplyingToMessage, 
-    handleDeleteMessage 
+const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
+    message,
+    selectedConversation,
+    handleReact,
+    setReplyingToMessage,
+    handleDeleteMessage,
+    onContextMenu
 }) => {
     const isMe = message.sender === 'me';
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -151,23 +153,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 {!isMe && selectedConversation?.isGroup && (
                     <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
                 )}
-                
+
                 <div className="relative">
                     {message.replied_message && (
-                        <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${
-                            isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'
-                        }`}>
+                        <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'
+                            }`}>
                             <p className="font-semibold text-gray-700">{message.replied_message.senderName}</p>
                             <p className="truncate text-gray-600">
                                 {message.replied_message.file_url && !message.replied_message.text ?
-                                    (message.replied_message.file_type === 'sticker' || message.replied_message.file_type?.startsWith('image/') ? 
+                                    (message.replied_message.file_type === 'sticker' || message.replied_message.file_type?.startsWith('image/') ?
                                         '🖼️ Imagem' : '📎 Anexo')
                                     : message.replied_message.text || 'Mensagem'}
                             </p>
                         </div>
                     )}
-                    
-                    <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
+
+                    <div 
+                        onContextMenu={(e) => onContextMenu(e, message)}
+                        className={`p-3 rounded-lg max-w-xs sm:max-w-md cursor-context-menu select-none ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'} hover:brightness-95 transition-all`}
+                        title="Clique com o botão direito para reagir ou responder"
+                    >
                         {(() => {
                             const isImageUrl = (text: string) => {
                                 if (!text) return false;
@@ -226,48 +231,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                 </a>
                             </div>
                         ) : null}
-                    </div>
-                    <div className={`absolute top-0 -mt-8 flex items-center transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
-                        <div className="flex items-center bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-1 gap-0.5">
-                            {quickReactions.map(emoji => (
-                                <button
-                                    key={emoji}
-                                    onClick={() => handleReact(message.id as string, emoji)}
-                                    className="w-8 h-8 text-lg flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95"
-                                >
-                                    {emoji}
-                                </button>
-                            ))}
-                            <div className="relative group/expand">
-                                <button className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all text-xs font-bold">+</button>
-                                <div className="absolute bottom-full mb-2 right-0 hidden group-hover/expand:block animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 grid grid-cols-6 gap-1 min-w-[220px]">
-                                        {fullReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
-                                            <button key={emoji} onClick={() => handleReact(message.id as string, emoji)} className="text-lg w-8 h-8 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="w-px h-5 bg-white/10 mx-0.5"></div>
-                            <button
-                                onClick={() => setReplyingToMessage(message)}
-                                className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-                                title="Responder"
-                            >
-                                <ArrowUturnLeftIcon className="w-4 h-4" />
-                            </button>
-                            {isMe && (
-                                <button
-                                    onClick={() => handleDeleteMessage(message.id as string)}
-                                    className="p-1.5 text-white/50 hover:text-red-400 hover:bg-white/10 rounded-xl transition-colors"
-                                    title="Apagar para mim"
-                                >
-                                    <TrashIcon className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
                     </div>
                 </div>
                 <div className="flex justify-between items-center w-full">
@@ -349,9 +312,25 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
     const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
+
+    // States for right-click context menu on message bubbles
+    const [contextMenuMessage, setContextMenuMessage] = useState<Message | null>(null);
+    const [contextMenuCoords, setContextMenuCoords] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+    const handleMessageContextMenu = (e: React.MouseEvent, message: Message) => {
+        e.preventDefault();
+        setContextMenuMessage(message);
+        setContextMenuCoords({ x: e.clientX, y: e.clientY });
+    };
+
+    useEffect(() => {
+        const handleCloseMenu = () => setContextMenuMessage(null);
+        window.addEventListener('click', handleCloseMenu);
+        return () => window.removeEventListener('click', handleCloseMenu);
+    }, []);
     const [loading, setLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    
+
     // Paginação de mensagens
     const [messageLimit, setMessageLimit] = useState(50);
     const [hasMoreMessages, setHasMoreMessages] = useState(false);
@@ -398,7 +377,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
 
         const now = Date.now();
         const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
-        
+
         // Dynamic cooldown from profile (in seconds), fallback to 30s
         const cooldownSeconds = profile?.nudge_cooldown ?? 30;
         const cooldownMs = cooldownSeconds * 1000;
@@ -534,7 +513,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const typingTimeoutRef = useRef<any>(null);
-    
+
     // Refs para controlar scroll automático
     const isInitialLoad = useRef(true);
     const lastMessageCount = useRef(0);
@@ -613,8 +592,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const selectedConversation = conversations.find(c => c.id === selectedConversationId);
-    const isSupportConversation = selectedConversation && 
-        (currentUser.id === masterAdminId || selectedConversation.participantId === masterAdminId) && 
+    const isSupportConversation = selectedConversation &&
+        (currentUser.id === masterAdminId || selectedConversation.participantId === masterAdminId) &&
         selectedConversation.company_id !== currentUser.company_id;
 
     // Save notes to local storage
@@ -867,7 +846,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 }
 
                 fetchConversations();
-                
+
                 if (selectedConvRef.current === newMsg.conversation_id) {
                     console.log("[Realtime] Atualizando mensagens da conversa ativa");
                     // Only update the messages list, avoiding full conversation re-fetch
@@ -921,10 +900,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             // Verificar se há mais mensagens
             const hasMore = data.length > limit;
             setHasMoreMessages(hasMore);
-            
+
             // Remover a mensagem extra se houver
             const messagesToShow = hasMore ? data.slice(0, limit) : data;
-            
+
             // Reverter ordem para exibir cronologicamente
             const formattedMessages: Message[] = messagesToShow.reverse().map((m: any) => ({
                 id: m.id, // UUID
@@ -977,7 +956,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     // Função para carregar mensagens antigas
     const loadOlderMessages = async () => {
         if (!selectedConversationId || loadingOlderMessages || !hasMoreMessages) return;
-        
+
         setLoadingOlderMessages(true);
         const newLimit = messageLimit + 50;
         setMessageLimit(newLimit);
@@ -998,14 +977,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     useEffect(() => {
         const lastMsg = messages[messages.length - 1];
         const isFromMe = lastMsg?.sender === 'me';
-        
+
         // Se for mensagem minha ou se a flag ainda estiver true (fallback)
         if (isFromMe && messages.length > 0) {
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 50);
         }
-        
+
         lastMessageCount.current = messages.length;
     }, [messages]);
 
@@ -1025,68 +1004,68 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         if (!textToSend.trim() && !stickerUrl && !attachedFile) return;
         if (!selectedConversationId) return;
 
-            setIsSending(true);
-            try {
-                let uploadedFileUrl = null;
-                let fileType = null;
+        setIsSending(true);
+        try {
+            let uploadedFileUrl = null;
+            let fileType = null;
 
-                if (attachedFile) {
-                    // Lógica de Upload
-                    const fileExt = attachedFile.name.split('.').pop();
-                    const fileName = `${Date.now()}.${fileExt}`;
-                    const filePath = `${selectedConversationId}/${fileName}`;
+            if (attachedFile) {
+                // Lógica de Upload
+                const fileExt = attachedFile.name.split('.').pop();
+                const fileName = `${Date.now()}.${fileExt}`;
+                const filePath = `${selectedConversationId}/${fileName}`;
 
-                    const { data, error: uploadError } = await supabase.storage
-                        .from('chat-media')
-                        .upload(filePath, attachedFile);
+                const { data, error: uploadError } = await supabase.storage
+                    .from('chat-media')
+                    .upload(filePath, attachedFile);
 
-                    if (uploadError) {
-                        console.error('Falha no upload:', uploadError);
-                        showToast(`Erro ao subir arquivo: ${uploadError.message}`, "error");
-                        setIsSending(false);
-                        return; // ABORTA O ENVIO SE O UPLOAD FALHAR
-                    } else if (data) {
-                        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-                        uploadedFileUrl = publicUrl;
-                        fileType = attachedFile.type;
-                    }
-                }
-
-                // Use the conversation's company_id (not sender's) to support cross-company chats
-                const currentConv = conversations.find(c => c.id === selectedConversationId);
-                const compId = currentConv?.company_id || currentUser.company_id || (profile as any)?.company_id;
-                
-                if (!compId) {
-                    console.error("Missing company_id", currentUser);
-                    showToast("Erro: Empresa não identificada para esta mensagem.", "error");
+                if (uploadError) {
+                    console.error('Falha no upload:', uploadError);
+                    showToast(`Erro ao subir arquivo: ${uploadError.message}`, "error");
                     setIsSending(false);
-                    return;
+                    return; // ABORTA O ENVIO SE O UPLOAD FALHAR
+                } else if (data) {
+                    const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                    uploadedFileUrl = publicUrl;
+                    fileType = attachedFile.type;
                 }
+            }
 
-                const { error } = await supabase.from('messages').insert({
-                    conversation_id: selectedConversationId,
-                    sender_id: currentUser.id,
-                    company_id: compId,
-                    text: textToSend.trim() || (stickerUrl ? 'Figurinha' : ''),
-                    file_url: uploadedFileUrl || stickerUrl,
-                    file_type: stickerUrl ? 'sticker' : fileType,
-                    reactions: [],
-                    reply_to: replyingToMessage?.id || null
-                });
+            // Use the conversation's company_id (not sender's) to support cross-company chats
+            const currentConv = conversations.find(c => c.id === selectedConversationId);
+            const compId = currentConv?.company_id || currentUser.company_id || (profile as any)?.company_id;
 
-                if (error) throw error;
+            if (!compId) {
+                console.error("Missing company_id", currentUser);
+                showToast("Erro: Empresa não identificada para esta mensagem.", "error");
+                setIsSending(false);
+                return;
+            }
 
-                // Atualiza última mensagem da conversa e reabre se fechada
-                await supabase.from('conversations').update({
-                    last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
-                    last_message_at: new Date().toISOString(),
-                    is_closed: false
-                }).eq('id', selectedConversationId);
+            const { error } = await supabase.from('messages').insert({
+                conversation_id: selectedConversationId,
+                sender_id: currentUser.id,
+                company_id: compId,
+                text: textToSend.trim() || (stickerUrl ? 'Figurinha' : ''),
+                file_url: uploadedFileUrl || stickerUrl,
+                file_type: stickerUrl ? 'sticker' : fileType,
+                reactions: [],
+                reply_to: replyingToMessage?.id || null
+            });
 
-                setNewMessageText('');
-                setAttachedFile(null);
-                setReplyingToMessage(null);
-                fetchMessages(selectedConversationId);
+            if (error) throw error;
+
+            // Atualiza última mensagem da conversa e reabre se fechada
+            await supabase.from('conversations').update({
+                last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
+                last_message_at: new Date().toISOString(),
+                is_closed: false
+            }).eq('id', selectedConversationId);
+
+            setNewMessageText('');
+            setAttachedFile(null);
+            setReplyingToMessage(null);
+            fetchMessages(selectedConversationId);
 
             // Trigger Notification for the participants (except me)
             if (selectedConversation) {
@@ -1163,7 +1142,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             const { error: reactError } = await supabase.from('messages').update({
                 reactions: newReactions
             }).eq('id', messageId);
-            
+
             if (reactError) {
                 console.error('Supabase error ao atualizar reação:', reactError);
                 // Reverter a UI otimista se falhar (opcional, ou apenas alertar)
@@ -1226,7 +1205,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 if (commonPart && commonPart.length > 0) {
                     // Verificar se alguma dessas conversas em comum NÃO é grupo (é 1:1)
                     const sharedConvIds = commonPart.map(c => c.conversation_id);
-                    
+
                     const { data: convs, error: checkConvError } = await supabase
                         .from('conversations')
                         .select('id, is_closed')
@@ -1236,7 +1215,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                         .maybeSingle();
 
                     if (checkConvError) {
-                         console.error("Erro verificando conversas em comum:", checkConvError);
+                        console.error("Erro verificando conversas em comum:", checkConvError);
                     }
 
                     if (convs) {
@@ -1415,13 +1394,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                         )}
                     </div>
                 </div>
-                
+
                 {/* Suporte VIP para qualquer usuário - Restrito a Admins de Empresa externa (não da mesma empresa do Master Admin) */}
                 {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && currentUser.isAdmin && masterAdminId && currentUser.company_id !== masterAdminCompanyId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
                         {/* Avatar/Name hidden per user request */}
-                        <button 
+                        <button
                             onClick={async () => {
                                 const closedConv = conversations.find(c => !c.isGroup && c.participantId === masterAdminId && c.is_closed);
                                 if (closedConv) {
@@ -1461,11 +1440,18 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             )}
                             {conversations.filter(c => {
                                 if (c.isGroup) return false;
-                                // For Master Admin, hide cross-company support conversations from the main chat tab
-                                if (currentUser?.email === 'ti@grupopixel.com.br' && c.company_id !== currentUser?.company_id) return false;
+                                
+                                // Determine if this is a cross-company support conversation
+                                const isMasterAdminUser = currentUser?.email === 'ti@grupopixel.com.br' || currentUser?.id === masterAdminId;
+                                const isSupportConv = (isMasterAdminUser || c.participantId === masterAdminId) && c.company_id !== currentUser?.company_id;
 
-                                // Hide ALL closed conversations (including support, so they disappear until reopened)
-                                return c.is_closed !== true;
+                                // Hide cross-company support conversations if they are closed (they disappear until reopened)
+                                if (isSupportConv && c.is_closed) return false;
+
+                                // For Master Admin, hide cross-company support conversations from the main chat tab (they belong in the Support tab)
+                                if (isMasterAdminUser && c.company_id !== currentUser?.company_id) return false;
+
+                                return true;
                             }).map(conv => {
                                 const isSupportConv = conv.participantId === masterAdminId && conv.company_id !== currentUser?.company_id;
                                 return (
@@ -1473,7 +1459,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                         <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
                                             ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
                                             : conv.is_closed && isSupportConv ? 'bg-gray-50 dark:bg-white/3 border-gray-200 dark:border-white/10 opacity-70'
-                                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                                                : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'}`}>
                                             <div className="relative">
                                                 <img
                                                     src={conv.participantAvatarUrl}
@@ -1675,7 +1661,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                     </button>
                                 )}
                                 {isSupportConversation && !selectedConversation?.is_closed && (
-                                    <button 
+                                    <button
                                         onClick={handleCloseConversation}
                                         className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all border border-slate-200 hover:border-red-200"
                                     >
@@ -1751,7 +1737,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                 )}
                             </div>
                         </div>
-                        <div 
+                        <div
                             ref={scrollContainerRef}
                             className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar"
                             style={{ scrollbarGutter: 'stable' }}
@@ -1772,7 +1758,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             )}
                             {hasMoreMessages && !loadingOlderMessages && (
                                 <div className="text-center py-2">
-                                    <button 
+                                    <button
                                         onClick={loadOlderMessages}
                                         className="text-xs text-brand-primary hover:underline"
                                     >
@@ -1781,13 +1767,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                 </div>
                             )}
                             {messages.map(msg => (
-                                <MessageBubble 
-                                    key={msg.id} 
-                                    message={msg} 
+                                <MessageBubble
+                                    key={msg.id}
+                                    message={msg}
                                     selectedConversation={selectedConversation}
                                     handleReact={handleReact}
                                     setReplyingToMessage={setReplyingToMessage}
                                     handleDeleteMessage={handleDeleteMessage}
+                                    onContextMenu={handleMessageContextMenu}
                                 />
                             ))}
                             <div ref={messagesEndRef} />
@@ -1814,15 +1801,15 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             ) : (
                                 <>
                                     {replyingToMessage && (
-                                        <QuotedMessage 
-                                            message={replyingToMessage} 
-                                            onClose={() => setReplyingToMessage(null)} 
+                                        <QuotedMessage
+                                            message={replyingToMessage}
+                                            onClose={() => setReplyingToMessage(null)}
                                         />
                                     )}
                                     {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
-                                        <form onSubmit={handleSendMessage} className="relative flex items-center space-x-1.5 md:space-x-3">
+                                    <form onSubmit={handleSendMessage} className="relative flex items-center space-x-1.5 md:space-x-3">
                                         {showEmojiPicker && (
-                                                <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-3 flex flex-wrap w-72 max-h-64 overflow-y-auto z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-3 flex flex-wrap w-72 max-h-64 overflow-y-auto z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                                 {availableEmojis.map(emoji => (
                                                     <button key={emoji} type="button" onClick={() => setNewMessageText(prev => prev + emoji)} className="text-2xl p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors">
                                                         {emoji}
@@ -1831,57 +1818,57 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                             </div>
                                         )}
 
-                                            <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
-                                                <FaceSmileIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                        <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
+                                            <FaceSmileIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
-                                            <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary hidden md:inline-flex flex-shrink-0">
-                                                <SparklesIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                        <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary hidden md:inline-flex flex-shrink-0">
+                                            <SparklesIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
                                         <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-                                            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
-                                                <PaperClipIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
+                                            <PaperClipIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
 
-                                            {/* Nudge Button */}
-                                            {profile?.can_nudge !== false && (
-                                                <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleSendNudge}
-                                                        disabled={!!cooldownTimeouts[selectedConversationId || '']}
-                                                        className={`p-1.5 md:p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
-                                                            ? 'text-gray-400 cursor-not-allowed'
-                                                            : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
-                                                            }`}
-                                                        title="Chamar Atenção (MSN Nudge)"
-                                                    >
-                                                        <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
-                                                            }`} />
-                                                        {cooldownTimeouts[selectedConversationId || ''] && (
-                                                            <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[24px] md:min-w-[28px] text-center border border-white">
-                                                                {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )}
+                                        {/* Nudge Button */}
+                                        {profile?.can_nudge !== false && (
+                                            <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSendNudge}
+                                                    disabled={!!cooldownTimeouts[selectedConversationId || '']}
+                                                    className={`p-1.5 md:p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
+                                                        ? 'text-gray-400 cursor-not-allowed'
+                                                        : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
+                                                        }`}
+                                                    title="Chamar Atenção (MSN Nudge)"
+                                                >
+                                                    <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
+                                                        }`} />
+                                                    {cooldownTimeouts[selectedConversationId || ''] && (
+                                                        <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[24px] md:min-w-[28px] text-center border border-white">
+                                                            {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
                                         <input
                                             type="text"
                                             value={newMessageText}
                                             onChange={(e) => setNewMessageText(e.target.value)}
                                             onPaste={handlePaste}
-                                                placeholder="Mensagem"
-                                                className="flex-1 w-full px-3 md:px-5 py-2 md:py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl md:rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-10 md:h-11 text-[15px] transition-all duration-300 dark:text-white"
+                                            placeholder="Mensagem"
+                                            className="flex-1 w-full px-3 md:px-5 py-2 md:py-2.5 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl md:rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-primary h-10 md:h-11 text-[15px] transition-all duration-300 dark:text-white"
                                         />
-                                            <button type="submit" className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full flex-shrink-0 hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md md:shadow-lg shadow-brand-primary/20 ml-1 md:ml-0" disabled={(!newMessageText.trim() && !attachedFile) || isSending}>
-                                                {isSending ? (
-                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                ) : (
-                                                    <PaperAirplaneIcon className="w-5 h-5 md:w-6 md:h-6" />
-                                                )}
+                                        <button type="submit" className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full flex-shrink-0 hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md md:shadow-lg shadow-brand-primary/20 ml-1 md:ml-0" disabled={(!newMessageText.trim() && !attachedFile) || isSending}>
+                                            {isSending ? (
+                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <PaperAirplaneIcon className="w-5 h-5 md:w-6 md:h-6" />
+                                            )}
                                         </button>
                                         {showStickerPicker && (
-                                                <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-4 w-80 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="absolute bottom-16 left-0 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-2xl shadow-2xl p-4 w-80 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
                                                     <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
@@ -2032,6 +2019,58 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             <span className="text-[10px] font-bold">Suporte</span>
                         </button>
                     )}
+                </div>
+            )}
+
+            {/* Context Menu for Message Bubble */}
+            {contextMenuMessage && (
+                <div
+                    className="fixed bg-white/80 dark:bg-slate-900/90 backdrop-blur-md border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl p-2 z-50 w-56 animate-in fade-in zoom-in-95 duration-100"
+                    style={{
+                        top: Math.min(contextMenuCoords.y, window.innerHeight - 155),
+                        left: Math.min(contextMenuCoords.x, window.innerWidth - 240)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Reactions Bar */}
+                    <div className="flex justify-around items-center border-b border-gray-100 dark:border-white/5 pb-2 mb-2">
+                        {quickReactions.map(emoji => (
+                            <button
+                                key={emoji}
+                                onClick={() => {
+                                    handleReact(contextMenuMessage.id, emoji);
+                                    setContextMenuMessage(null);
+                                }}
+                                className="text-xl p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all duration-200 active:scale-125 hover:scale-115 hover:-translate-y-0.5"
+                            >
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Actions List */}
+                    <div className="space-y-0.5">
+                        <button
+                            onClick={() => {
+                                setReplyingToMessage(contextMenuMessage);
+                                setContextMenuMessage(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-brand-primary hover:text-white dark:hover:bg-brand-primary dark:hover:text-white rounded-xl transition-colors text-left font-medium"
+                        >
+                            <ArrowUturnLeftIcon className="w-4 h-4" />
+                            Responder
+                        </button>
+                        <button
+                            onClick={() => {
+                                handleDeleteMessage(contextMenuMessage.id);
+                                setContextMenuMessage(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-xl transition-colors text-left font-medium"
+                        >
+                            <TrashIcon className="w-4 h-4" />
+                            Apagar Mensagem
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
