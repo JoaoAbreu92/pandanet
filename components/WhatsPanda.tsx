@@ -196,7 +196,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     <div className="flex h-full bg-[#F4F7F6] dark:bg-[#020617] overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
 
       {/* WhatsPanda Sidebar - Izing Pro Style (Desktop) */}
-      <div className="hidden md:flex w-64 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-500">
+      <div className="hidden lg:flex w-64 bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-500">
 
         {/* Header / Logo Area */}
         <div className="flex items-center gap-3 px-2 mb-8 mt-2">
@@ -261,19 +261,21 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       </div>
 
       {/* Main Content Area */}
-      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6] dark:bg-transparent flex flex-col`}>
+      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 && !((currentView === 'privados' || currentView === 'grupos') && isChatActive) ? 'pb-[72px] lg:pb-0' : 'pb-0'} bg-[#F4F7F6] dark:bg-transparent flex flex-col`}>
         {renderView()}
       </div>
 
       {/* Mobile Menu - Shown only on small screens */}
       {menuItems.length > 0 && !((currentView === 'privados' || currentView === 'grupos') && isChatActive) && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-white/5 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setCurrentView(item.view as View)}
               className={`p-2 flex flex-col items-center justify-center transition-all min-w-[64px] rounded-xl
-                ${currentView === item.view ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'}
+                ${currentView === item.view 
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400' 
+                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
               `}
             >
               <item.icon className={`w-5 h-5 mb-1 ${currentView === item.view ? 'animate-bounce-slight' : ''}`} strokeWidth={currentView === item.view ? 2.5 : 2} />

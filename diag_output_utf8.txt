@@ -1,8 +1,0 @@
-﻿profiles!assigned_to(id): OK
-profiles(id): OK
-whatsapp_queues(id): FAIL (Could not find a relationship between 'whatsapp_conversations' and 'whatsapp_queues' in the schema cache)
-whatsapp_queues!queue_id(id): FAIL (Could not find a relationship between 'whatsapp_conversations' and 'whatsapp_queues' in the schema cache)
-departments(id): OK
-departments!queue_id(id): FAIL (Could not find a relationship between 'whatsapp_conversations' and 'departments' in the schema cache)
-whatsapp_settings!connection_id(id): OK
-whatsapp_conversation_tags(tag:whatsapp_tags(id)): OK

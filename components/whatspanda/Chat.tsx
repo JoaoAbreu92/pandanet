@@ -84,6 +84,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: string} | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
+  // Message Context Menu & Edit/Delete States
+  const [messageContextMenu, setMessageContextMenu] = useState<{ x: number, y: number, message: WhatsAppMessage } | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
   // Voice messages state & refs
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -398,6 +403,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             if (!exists) return [...prev, newMsg];
             return prev.map(m => m.id === newMsg.id ? newMsg : m);
           });
+        } else if (payload.eventType === 'DELETE') {
+          const oldMsg = payload.old as any;
+          setMessages(prev => prev.filter(m => m.id !== oldMsg.id));
         }
       })
       .subscribe((status) => {
@@ -808,6 +816,41 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setSelectedConversation(prev => prev ? { ...prev, kanban_column_id: newColumnId } : null);
     }
   };
+
+  const handleSaveEdit = async (msgId: string) => {
+    if (!editingText.trim()) return;
+    const { error } = await supabase
+      .from('whatsapp_messages')
+      .update({ message_text: editingText })
+      .eq('id', msgId);
+
+    if (error) {
+      console.error('Erro ao editar mensagem:', error);
+      alert('Erro ao editar mensagem: ' + error.message);
+    } else {
+      setEditingMessageId(null);
+      setEditingText('');
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta mensagem?')) return;
+    const { error } = await supabase
+      .from('whatsapp_messages')
+      .delete()
+      .eq('id', msgId);
+
+    if (error) {
+      console.error('Erro ao excluir mensagem:', error);
+      alert('Erro ao excluir mensagem: ' + error.message);
+    }
+  };
+
+  useEffect(() => {
+    const handleCloseMenu = () => setMessageContextMenu(null);
+    window.addEventListener('click', handleCloseMenu);
+    return () => window.removeEventListener('click', handleCloseMenu);
+  }, []);
 
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [selectedConvTags, setSelectedConvTags] = useState<string[]>([]);
@@ -1333,7 +1376,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   return (
     <div className="flex h-full bg-[#f8fafc] dark:bg-transparent overflow-hidden relative font-sans text-brand-text transition-colors duration-500">
       {/* Middle Section: Conversations List */}
-      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
+      <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10 transition-all duration-500`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
         <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-white dark:bg-transparent">
           <div className="flex justify-between items-center mb-4">
@@ -1767,7 +1810,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       ) : (
       <>
       {/* Main Chat Area */}
-      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#F3F6F8] dark:bg-[#020617] relative transition-colors duration-500`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
+      <div className={`${selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex flex-col bg-[#F3F6F8] dark:bg-[#020617] relative transition-colors duration-500`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
         <div className="absolute inset-0 bg-white/70 dark:bg-[#020617]/90 pointer-events-none" /> {/* Overlay to soften the background */}
 
         {selectedConversation ? (
@@ -1777,7 +1820,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedConversation(null)}
-                  className="p-2 -ml-2 md:hidden hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
+                  className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -1855,7 +1898,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
                 >
                   <div
-                    className={`p-3 md:p-4 rounded-2xl shadow-sm border ${
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMessageContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        message: msg
+                      });
+                    }}
+                    className={`p-3 md:p-4 rounded-2xl shadow-sm border cursor-context-menu ${
                       msg.is_from_customer
                       ? 'bg-white dark:bg-white/5 text-slate-800 dark:text-slate-100 rounded-tl-sm border-gray-100 dark:border-white/5'
                       : (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif'))
@@ -1969,14 +2020,44 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </a>
                       ) : null}
 
-                      {msg.message_text && (
-                        <p className={`text-sm font-medium leading-relaxed whitespace-pre-wrap ${
-                          (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
-                          ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
-                          : ''
-                        }`}>
-                          {renderMessageText(msg.message_text)}
-                        </p>
+                      {editingMessageId === msg.id ? (
+                        <div className="space-y-2 min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="w-full p-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 dark:text-white resize-none"
+                            rows={3}
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditingText('');
+                              }}
+                              className="px-2.5 py-1 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-lg transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => handleSaveEdit(msg.id)}
+                              className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg shadow-md shadow-emerald-500/10 transition-colors"
+                            >
+                              Salvar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {msg.message_text && (
+                            <p className={`text-sm font-medium leading-relaxed whitespace-pre-wrap ${
+                              (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                              ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
+                              : ''
+                            }`}>
+                              {renderMessageText(msg.message_text)}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className={`flex justify-end items-center gap-1.5 mt-2 opacity-60 ${
@@ -2610,6 +2691,43 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               <Download className="w-5 h-5" />
             </a>
           </div>
+        </div>
+      )}
+
+      {/* Message Context Menu */}
+      {messageContextMenu && (
+        <div 
+          className="fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 w-48 animate-in fade-in zoom-in-95 duration-100 font-sans"
+          style={{ 
+            top: `${messageContextMenu.y}px`, 
+            left: `${messageContextMenu.x}px` 
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              setEditingMessageId(messageContextMenu.message.id);
+              setEditingText(messageContextMenu.message.message_text || '');
+              setMessageContextMenu(null);
+            }}
+            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2.5 transition-colors"
+          >
+            <Edit2 className="w-4 h-4 text-slate-400" />
+            <span>Editar Mensagem</span>
+          </button>
+          
+          {isAdmin && (
+            <button
+              onClick={() => {
+                handleDeleteMessage(messageContextMenu.message.id);
+                setMessageContextMenu(null);
+              }}
+              className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2.5 border-t border-slate-100 dark:border-white/5 transition-colors"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+              <span>Deletar Mensagem</span>
+            </button>
+          )}
         </div>
       )}
     </div>
