@@ -1225,181 +1225,190 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </div>
                 ) : view === 'compose' ? (
                             <div className="flex-1 flex flex-col h-full bg-white overflow-hidden">
-                                <div className="p-6 flex-1 flex flex-col space-y-4 overflow-y-auto">
-                                    <div className="space-y-2">
-                                        <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-2">
-                                            {toTags.map(tag => (
-                                                <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-sm group">
-                                                    {tag}
-                                                    <button onClick={() => removeRecipientTag('to', tag)} className="hover:text-red-500">
-                                                        <XMarkIcon className="w-3 h-3" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                            <div className="relative flex-1 min-w-[150px]">
-                                                <input 
-                                                    className="w-full bg-transparent focus:outline-none placeholder-gray-400"
-                                                    placeholder={toTags.length === 0 ? "Para:" : ""}
-                                                    value={composeTo}
-                                                    onChange={e => setComposeTo(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter' || e.key === ',') {
-                                                            e.preventDefault();
-                                                            handleAddRecipientTag('to', composeTo);
-                                                        } else if (e.key === 'Backspace' && !composeTo && toTags.length > 0) {
-                                                            removeRecipientTag('to', toTags[toTags.length - 1]);
-                                                        }
-                                                    }}
-                                                />
-                                                {composeTo && (
-                                                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
-                                                        {contacts.filter(c => c.email.toLowerCase().includes(composeTo.toLowerCase()) || c.name.toLowerCase().includes(composeTo.toLowerCase())).slice(0, 5).map(c => (
-                                                            <button
-                                                                key={c.id}
-                                                                onClick={() => handleAddRecipientTag('to', c.email)}
-                                                                className="w-full text-left px-4 py-2 hover:bg-gray-50 flex flex-col border-b border-gray-100 last:border-0"
-                                                            >
-                                                                <span className="text-sm font-medium text-gray-800">{c.name}</span>
-                                                                <span className="text-xs text-gray-500">{c.email}</span>
-                                                            </button>
-                                                        ))}
-                                                        {!toTags.includes(composeTo) && composeTo.includes('@') && (
-                                                            <button
-                                                                onClick={() => handleAddRecipientTag('to', composeTo)}
-                                                                className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-brand-primary text-xs font-bold"
-                                                            >
-                                                                Adicionar "{composeTo}"
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <button onClick={() => setShowContactsModal(true)} className="text-gray-400 hover:text-brand-primary" title="Contatos">
-                                                <UsersIcon className="w-5 h-5" />
-                                            </button>
-                                            <button onClick={() => setShowCc(!showCc)} className="text-xs text-gray-500 hover:text-brand-primary font-medium">
-                                                CC/CCO
-                                            </button>
-                                        </div>
-                                        {showCc && (
-                                            <div className="space-y-2 bg-gray-50 p-2 rounded">
-                                                {/* CC */}
-                                                <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
-                                                    <span className="text-xs text-gray-400 min-w-[30px]">CC:</span>
-                                                    {ccTags.map(tag => (
-                                                        <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
-                                                            {tag}
-                                                            <button onClick={() => removeRecipientTag('cc', tag)} className="hover:text-red-500">
-                                                                <XMarkIcon className="w-3 h-3" />
-                                                            </button>
-                                                        </span>
-                                                    ))}
+                                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                                    {/* Edit Area */}
+                                    <div className="flex-1 p-6 flex flex-col space-y-4 overflow-y-auto border-r border-gray-100">
+                                        <div className="space-y-2">
+                                            <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-2">
+                                                {toTags.map(tag => (
+                                                    <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-sm group">
+                                                        {tag}
+                                                        <button onClick={() => removeRecipientTag('to', tag)} className="hover:text-red-500">
+                                                            <XMarkIcon className="w-3 h-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                                <div className="relative flex-1 min-w-[150px]">
                                                     <input
-                                                        className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
-                                                        value={composeCc}
-                                                        onChange={e => setComposeCc(e.target.value)}
+                                                        className="w-full bg-transparent focus:outline-none placeholder-gray-400"
+                                                        placeholder={toTags.length === 0 ? "Para:" : ""}
+                                                        value={composeTo}
+                                                        onChange={e => setComposeTo(e.target.value)}
                                                         onKeyDown={e => {
                                                             if (e.key === 'Enter' || e.key === ',') {
                                                                 e.preventDefault();
-                                                                handleAddRecipientTag('cc', composeCc);
-                                                            } else if (e.key === 'Backspace' && !composeCc && ccTags.length > 0) {
-                                                                removeRecipientTag('cc', ccTags[ccTags.length - 1]);
+                                                                handleAddRecipientTag('to', composeTo);
+                                                            } else if (e.key === 'Backspace' && !composeTo && toTags.length > 0) {
+                                                                removeRecipientTag('to', toTags[toTags.length - 1]);
                                                             }
                                                         }}
                                                     />
+                                                    {composeTo && (
+                                                        <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                                                            {contacts.filter(c => c.email.toLowerCase().includes(composeTo.toLowerCase()) || c.name.toLowerCase().includes(composeTo.toLowerCase())).slice(0, 5).map(c => (
+                                                                <button
+                                                                    key={c.id}
+                                                                    onClick={() => handleAddRecipientTag('to', c.email)}
+                                                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 flex flex-col border-b border-gray-100 last:border-0"
+                                                                >
+                                                                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                                                                    <span className="text-xs text-gray-500">{c.email}</span>
+                                                                </button>
+                                                            ))}
+                                                            {!toTags.includes(composeTo) && composeTo.includes('@') && (
+                                                                <button
+                                                                    onClick={() => handleAddRecipientTag('to', composeTo)}
+                                                                    className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-brand-primary text-xs font-bold"
+                                                                >
+                                                                    Adicionar "{composeTo}"
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {/* BCC */}
-                                                <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
-                                                    <span className="text-xs text-gray-400 min-w-[30px]">CCO:</span>
-                                                    {bccTags.map(tag => (
-                                                        <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
-                                                            {tag}
-                                                            <button onClick={() => removeRecipientTag('bcc', tag)} className="hover:text-red-500">
-                                                                <XMarkIcon className="w-3 h-3" />
-                                                            </button>
-                                                        </span>
-                                                    ))}
-                                                    <input
-                                                        className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
-                                                        value={composeBcc}
-                                                        onChange={e => setComposeBcc(e.target.value)}
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter' || e.key === ',') {
-                                                                e.preventDefault();
-                                                                handleAddRecipientTag('bcc', composeBcc);
-                                                            } else if (e.key === 'Backspace' && !composeBcc && bccTags.length > 0) {
-                                                                removeRecipientTag('bcc', bccTags[bccTags.length - 1]);
-                                                            }
-                                                        }}
-                                                    />
-                                                </div>
-                                                <input
-                                                    className="w-full border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
-                                                    placeholder="Reply-To (Opcional):"
-                                                    value={composeReplyTo}
-                                                    onChange={e => setComposeReplyTo(e.target.value)}
-                                                />
-                                            </div>
-                                        )}
-                                        <input
-                                            className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary font-medium placeholder-gray-400"
-                                            placeholder={t('email.placeholder_subject')}
-                                            value={composeSubject}
-                                            onChange={e => setComposeSubject(e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
-                                        <ReactQuill
-                                            theme="snow"
-                                            value={composeBody}
-                                            onChange={setComposeBody}
-                                            className="h-full flex-1 flex flex-col"
-                                            modules={{
-                                                toolbar: [
-                                                    [{ 'header': [1, 2, false] }],
-                                                    ['bold', 'italic', 'underline', 'strike'],
-                                                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                                                    ['link', 'image'],
-                                                    ['clean']
-                                                ],
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* --- Options and Attachments Section --- */}
-                                    <div className="bg-gray-800 text-gray-300 p-6 rounded-xl space-y-4 shadow-inner">
-                                        <div className="text-center">
-                                            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-100 mb-4">Opções e anexos</h3>
-                                            <div
-                                                className="border-2 border-dashed border-gray-600 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 bg-gray-900/50 hover:bg-gray-900 transition-colors group cursor-pointer"
-                                                onClick={() => document.getElementById('file-upload')?.click()}
-                                            >
-                                                <input id="file-upload" type="file" multiple className="hidden" onChange={handleFileChange} />
-                                                <p className="text-xs text-gray-400">Tamanho máximo permitido do arquivo é 20 MB</p>
-                                                <button className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg border border-gray-600">
-                                                    <PaperClipIcon className="w-4 h-4" />
-                                                    Anexar um arquivo
+                                                <button onClick={() => setShowContactsModal(true)} className="text-gray-400 hover:text-brand-primary" title="Contatos">
+                                                    <UsersIcon className="w-5 h-5" />
                                                 </button>
-                                                <ArrowDownTrayIcon className="w-12 h-12 text-gray-700 group-hover:text-brand-primary group-hover:scale-110 transition-all opacity-50" />
+                                                <button onClick={() => setShowCc(!showCc)} className="text-xs text-gray-500 hover:text-brand-primary font-medium">
+                                                    CC/CCO
+                                                </button>
                                             </div>
+                                            {showCc && (
+                                                <div className="space-y-2 bg-gray-50 p-2 rounded">
+                                                    {/* CC */}
+                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                        <span className="text-xs text-gray-400 min-w-[30px]">CC:</span>
+                                                        {ccTags.map(tag => (
+                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                                {tag}
+                                                                <button onClick={() => removeRecipientTag('cc', tag)} className="hover:text-red-500">
+                                                                    <XMarkIcon className="w-3 h-3" />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                        <input
+                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                            value={composeCc}
+                                                            onChange={e => setComposeCc(e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter' || e.key === ',') {
+                                                                    e.preventDefault();
+                                                                    handleAddRecipientTag('cc', composeCc);
+                                                                } else if (e.key === 'Backspace' && !composeCc && ccTags.length > 0) {
+                                                                    removeRecipientTag('cc', ccTags[ccTags.length - 1]);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    {/* BCC */}
+                                                    <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                        <span className="text-xs text-gray-400 min-w-[30px]">CCO:</span>
+                                                        {bccTags.map(tag => (
+                                                            <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                                {tag}
+                                                                <button onClick={() => removeRecipientTag('bcc', tag)} className="hover:text-red-500">
+                                                                    <XMarkIcon className="w-3 h-3" />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                        <input
+                                                            className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                            value={composeBcc}
+                                                            onChange={e => setComposeBcc(e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter' || e.key === ',') {
+                                                                    e.preventDefault();
+                                                                    handleAddRecipientTag('bcc', composeBcc);
+                                                                } else if (e.key === 'Backspace' && !composeBcc && bccTags.length > 0) {
+                                                                    removeRecipientTag('bcc', bccTags[bccTags.length - 1]);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <input
+                                                        className="w-full border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                        placeholder="Reply-To (Opcional):"
+                                                        value={composeReplyTo}
+                                                        onChange={e => setComposeReplyTo(e.target.value)}
+                                                    />
+                                                </div>
+                                            )}
+                                            <input
+                                                className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary font-medium placeholder-gray-400"
+                                                placeholder={t('email.placeholder_subject')}
+                                                value={composeSubject}
+                                                onChange={e => setComposeSubject(e.target.value)}
+                                            />
                                         </div>
+
+                                        <div className="flex-1 border rounded-lg overflow-hidden flex flex-col min-h-[300px]">
+                                            <ReactQuill
+                                                theme="snow"
+                                                value={composeBody}
+                                                onChange={setComposeBody}
+                                                className="h-full flex-1 flex flex-col"
+                                                modules={{
+                                                    toolbar: [
+                                                        [{ 'header': [1, 2, false] }],
+                                                        ['bold', 'italic', 'underline', 'strike'],
+                                                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                                        ['link', 'image'],
+                                                        ['clean']
+                                                    ],
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* --- Attachments Sidebar --- */}
+                                    <div className="w-full lg:w-80 bg-gray-50 p-6 flex flex-col overflow-y-auto shrink-0 border-l border-gray-100">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400">Anexos</h3>
+                                            <span className="text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-500 font-bold">LIMITE 20MB</span>
+                                        </div>
+
+                                        <button
+                                            className="w-full flex flex-col items-center justify-center gap-2 bg-white border-2 border-dashed border-gray-200 hover:border-brand-primary hover:bg-emerald-50 text-gray-400 hover:text-brand-primary p-8 rounded-2xl transition-all group shadow-sm"
+                                            onClick={() => document.getElementById('file-upload')?.click()}
+                                        >
+                                            <input id="file-upload" type="file" multiple className="hidden" onChange={handleFileChange} />
+                                            <div className="p-3 bg-gray-50 rounded-full group-hover:bg-brand-primary/10 transition-colors">
+                                                <PaperClipIcon className="w-6 h-6" />
+                                            </div>
+                                            <span className="text-sm font-bold">Anexar Arquivo</span>
+                                            <span className="text-[10px] text-gray-400">Clique ou arraste</span>
+                                        </button>
 
                                         {/* Attachment List */}
                                         {attachments.length > 0 && (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                                            <div className="space-y-3 mt-8">
+                                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-2">Arquivos Carregados ({attachments.length})</div>
                                                 {attachments.map((file, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-lg border border-gray-600 group">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <div className="bg-brand-primary/20 p-2 rounded">
+                                                    <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="bg-brand-primary/10 p-2 rounded-lg">
                                                                 <PaperClipIcon className="w-4 h-4 text-brand-primary" />
                                                             </div>
-                                                            <div className="truncate">
-                                                                <div className="text-xs font-bold text-gray-100 truncate">{file.filename}</div>
-                                                                <div className="text-[10px] text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                                                            <div className="truncate pr-2">
+                                                                <div className="text-xs font-bold text-gray-700 truncate">{file.filename}</div>
+                                                                <div className="text-[10px] font-medium text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
                                                             </div>
                                                         </div>
-                                                        <button onClick={() => removeAttachment(idx)} className="p-1 hover:text-red-400 transition-colors">
+                                                        <button
+                                                            onClick={() => removeAttachment(idx)}
+                                                            className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-lg transition-all"
+                                                            title="Remover"
+                                                        >
                                                             <XMarkIcon className="w-4 h-4" />
                                                         </button>
                                                     </div>
@@ -1407,17 +1416,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                             </div>
                                         )}
 
-                                        {/* Other options (Placeholders based on print) */}
-                                        <div className="space-y-3 pt-4 border-t border-gray-700 opacity-60 pointer-events-none">
-                                            {['Confirmação de recebimento', 'Recibo de entrega', 'Manter formatação'].map(label => (
-                                                <div key={label} className="flex items-center justify-between text-xs">
-                                                    <span>{label}</span>
-                                                    <div className="w-8 h-4 bg-gray-600 rounded-full relative">
-                                                        <div className="absolute left-1 top-1 w-2 h-2 bg-gray-400 rounded-full"></div>
-                                                    </div>
+                                        {!attachments.length && (
+                                            <div className="mt-8 flex flex-col items-center justify-center text-center opacity-30 select-none">
+                                                <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 flex items-center justify-center">
+                                                    <ArrowDownTrayIcon className="w-8 h-8 text-gray-400" />
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <p className="text-xs font-medium text-gray-600">Nenhum arquivo<br />adicionado ainda</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1426,11 +1432,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
                                     </span>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">{t('generic.cancel')}</button>
+                                        <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-400 hover:text-gray-600 rounded-md font-bold text-sm transition-colors">{t('generic.cancel')}</button>
                                         <button
                                             onClick={sendEmail}
                                             disabled={loading}
-                                            className="px-6 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 shadow-lg flex items-center gap-2"
+                                            className="px-8 py-2.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-emerald-600 shadow-lg hover:shadow-emerald-200 active:scale-95 transition-all flex items-center gap-2"
                                         >
                                             <PaperAirplaneIcon className="w-4 h-4" />
                                             {loading ? t('email.sending') : t('email.send')}
