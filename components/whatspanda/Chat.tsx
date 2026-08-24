@@ -1710,8 +1710,39 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         return;
       }
 
-      // No PC (Navegador), abrir o proxy diretamente em uma nova aba
-      window.open(proxyUrl, '_blank');
+      // Fazer fetch do arquivo através do proxy
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`Falha no download (Status: ${response.status})`);
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Tentar obter o nome correto do arquivo
+      let filename = defaultFilename || 'arquivo';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+        const matches = filenameRegex.exec(disposition);
+        if (matches != null && matches[1]) { 
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      } else {
+        const cleanUrl = rawUrl.split('?')[0];
+        const extracted = cleanUrl.split('/').pop();
+        if (extracted && extracted.includes('.')) {
+          filename = extracted;
+        }
+      }
+
+      // Criar link invisível e clicar para disparar download nativo
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
     } catch (err: any) {
       console.warn('Download falhou:', err);
       alert('Não foi possível baixar o arquivo no momento. Verifique sua conexão e tente novamente.');
