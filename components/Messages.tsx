@@ -1844,7 +1844,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                         <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary flex-shrink-0">
                                             <FaceSmileIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
-                                        <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary hidden md:inline-flex flex-shrink-0">
+                                        <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary inline-flex flex-shrink-0">
                                             <SparklesIcon className="w-5 h-5 md:w-6 md:h-6" />
                                         </button>
                                         <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />

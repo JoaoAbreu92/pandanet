@@ -42,6 +42,10 @@ const HRManager: React.FC = () => {
   const [uploadingPs, setUploadingPs] = useState(false);
   const psInputRef = useRef<HTMLInputElement>(null);
 
+  // Viewer state
+  const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
+  const [viewingDocName, setViewingDocName] = useState<string | null>(null);
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3000);
   };
@@ -345,10 +349,10 @@ const HRManager: React.FC = () => {
                     <p className="text-xs text-gray-400">{catLabels[doc.category] || doc.category} {doc.is_public ? '· Público' : '· Privado'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <a href={doc.file_url} target="_blank" rel="noreferrer"
+                    <button onClick={() => { setViewingDocUrl(doc.file_url); setViewingDocName(doc.name); }}
                       className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-all">
                       Ver
-                    </a>
+                    </button>
                     <button onClick={() => deleteDocument(doc.id)}
                       className="px-3 py-1 bg-red-50 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
                       Excluir
@@ -410,13 +414,44 @@ const HRManager: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    {ps.file_url && <a href={ps.file_url} target="_blank" rel="noreferrer"
-                      className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-all">Ver</a>}
+                    {ps.file_url && (
+                      <button onClick={() => { setViewingDocUrl(ps.file_url); setViewingDocName(`${ps.profiles?.full_name} — ${ps.month}`); }}
+                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition-all">
+                        Ver
+                      </button>
+                    )}
                     <button onClick={() => deletePayslip(ps.id)}
                       className="px-3 py-1 bg-red-50 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">Excluir</button>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingDocUrl && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </span>
+                <h4 className="font-bold text-gray-800 text-sm md:text-base">{viewingDocName || 'Visualizar Documento'}</h4>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={viewingDocUrl} download target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Baixar Arquivo
+                </a>
+                <button onClick={() => { setViewingDocUrl(null); setViewingDocName(null); }} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-gray-100 relative">
+              <iframe src={viewingDocUrl} className="w-full h-full border-0" title="Visualizador de Documento" />
             </div>
           </div>
         </div>

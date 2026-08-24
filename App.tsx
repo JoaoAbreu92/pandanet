@@ -341,7 +341,11 @@ const AppContent: React.FC = () => {
                                         company_id: p.company_id,
                                         performance: p.performance,
                                         following: p.following || [],
-                                        permissions: p.permissions || {}
+                                        permissions: p.permissions || {},
+                                        is_manager: p.is_manager || false,
+                                        reports_to: p.reports_to || null,
+                                        sector_manager_id: p.sector_manager_id || null,
+                                        department_id: p.department_id || null
                                     };
                                 }) : [],
                                 announcements: baseData.announcements || [],

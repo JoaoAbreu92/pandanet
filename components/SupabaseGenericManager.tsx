@@ -123,7 +123,16 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
                     payload[dbCol] = publicUrl;
                 } else {
-                    payload[dbCol] = formData[key];
+                    const isArrayField = Array.isArray(newItemTemplate[key as keyof T]);
+                    if (isArrayField) {
+                        if (typeof formData[key] === 'string') {
+                            payload[dbCol] = formData[key].split('\n').map((s: string) => s.trim()).filter(Boolean);
+                        } else {
+                            payload[dbCol] = formData[key] || [];
+                        }
+                    } else {
+                        payload[dbCol] = formData[key];
+                    }
                 }
             }
 
@@ -218,7 +227,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                         <textarea
                                             className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
                                             rows={4}
-                                            value={formData[field.key] || ''}
+                                            value={Array.isArray(formData[field.key]) ? formData[field.key].join('\n') : (formData[field.key] || '')}
                                             onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
                                             required
                                         />

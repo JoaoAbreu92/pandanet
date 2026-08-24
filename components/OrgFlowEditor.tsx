@@ -175,6 +175,9 @@ export const OrgFlowEditor: React.FC<OrgFlowEditorProps> = ({ employees, onUpdat
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium">{emp.role}</span>
                                             <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full">{emp.team}</span>
+                                            {emp.is_manager && (
+                                                <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Gestor</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

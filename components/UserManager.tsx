@@ -205,16 +205,13 @@ const UserFormModal: React.FC<{
                         <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.role')}</label><input type="text" name="role" value={formData.role} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                         <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.team')}</label><input type="text" name="team" value={formData.team} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
 
-                        <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.sector_manager')}</label><input type="text" name="sectorManager" value={formData.sectorManager} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                        <div><label className="block text-sm font-medium text-brand-subtle-text">{t('users.employee_manager')}</label><input type="text" name="employeeManager" value={formData.employeeManager} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text">Departamento</label>
                             <select
                                 name="department_id"
                                 value={formData.department_id}
                                 onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))}
-                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                                className="mt-1 w-full border border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2"
                             >
                                 <option value="">Sem Departamento</option>
                                 {departments.map(d => (
@@ -224,30 +221,30 @@ const UserFormModal: React.FC<{
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text">Gestor Direto (Hierarquia)</label>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('users.employee_manager')}</label>
                             <select 
                                 name="reports_to"
                                 value={formData.reports_to || ''} 
                                 onChange={(e) => setFormData(p => ({ ...p, reports_to: e.target.value || '' }))} 
-                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                                className="mt-1 w-full border border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2"
                             >
-                                <option value="">Sem Gestor Direto</option>
-                                {users.filter(u => u.id !== user?.id).map(u => (
+                                <option value="">Sem Gerente do Funcionário</option>
+                                {users.filter(u => u.id !== user?.id && (u.is_manager || u.isAdmin || u.id === formData.reports_to)).map(u => (
                                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                 ))}
                             </select>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text">Gestor do Setor (Hierarquia)</label>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('users.sector_manager')}</label>
                             <select 
                                 name="sector_manager_id"
                                 value={formData.sector_manager_id || ''} 
                                 onChange={(e) => setFormData(p => ({ ...p, sector_manager_id: e.target.value || '' }))} 
-                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                                className="mt-1 w-full border border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2"
                             >
-                                <option value="">Sem Gestor de Setor</option>
-                                {users.filter(u => u.id !== user?.id).map(u => (
+                                <option value="">Sem Gestor do Setor</option>
+                                {users.filter(u => u.id !== user?.id && (u.is_manager || u.isAdmin || u.id === formData.sector_manager_id)).map(u => (
                                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                 ))}
                             </select>

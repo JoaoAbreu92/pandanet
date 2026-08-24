@@ -31,6 +31,13 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
     const { language, setLanguage, t } = useLanguage();
     const { testNotifications, availableSounds, selectedSound, changeSound } = useNotifications();
     const [profiles, setProfiles] = useState<any[]>([]);
+    const [isMobileSoundSelectorOpen, setIsMobileSoundSelectorOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isDropdownOpen) {
+            setIsMobileSoundSelectorOpen(false);
+        }
+    }, [isDropdownOpen]);
 
     useEffect(() => {
         const fetchProfiles = async () => {
@@ -295,57 +302,85 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             </div>
                         </button>
                         {isDropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[100] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
-                                <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 lg:hidden">
-                                    <p className="font-semibold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
-                                    <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">{currentUser.role}</p>
-                                </div>
-                                
-                                <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                    <UserCircleIcon className="w-5 h-5 mr-3 text-emerald-500" /> {t('header.profile')}
-                                </button>
-                                
-                                <button type="button" onClick={() => { onNavigate('personal-notes' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 lg:border-t-0">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-amber-500">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                                    </svg>
-                                    {language === 'pt' ? 'Notas Pessoais' : language === 'en' ? 'Personal Notes' : 'Notas Personales'}
-                                </button>
-                                
-                                <button type="button" onClick={() => { onNavigate('manual-usuario' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-blue-500">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                                    </svg>
-                                    {language === 'pt' ? 'Manual do Usuário' : language === 'en' ? 'User Manual' : 'Manual del Usuario'}
-                                </button>
-                                
-                                {/* Mobile Only Items */}
-                                <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
-                                    <button onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        {theme === 'light' ? <MoonIcon className="w-5 h-5 mr-3 text-slate-500" /> : <SunIcon className="w-5 h-5 mr-3 text-yellow-500" />} {theme === 'light' ? t('theme.mode_dark') : t('theme.mode_light')}
-                                    </button>
-                                    <button onClick={() => { const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es']; setLanguage(langs[(langs.indexOf(language) + 1) % langs.length]); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        <SparklesIcon className="w-5 h-5 mr-3 text-blue-500" /> {t('language.label')}: {language.toUpperCase()}
-                                    </button>
-                                    <button onClick={() => { window.dispatchEvent(new CustomEvent('toggle-panda-ai')); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        <SparklesIcon className="w-5 h-5 mr-3 text-brand-primary" /> Panda IA
-                                    </button>
-                                    <button onClick={() => { testNotifications(); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
-                                        <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> {t('header.notifications_sound')}
-                                    </button>
-                                </div>
-
-                                {currentUser.isAdmin && !isImpersonating && (
-                                    <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
-                                        <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
-                                    </button>
-                                )}
-                                
-                                <button type="button" onClick={() => { onLogout(); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 text-left border-t border-gray-50 dark:border-white/5 mt-1">
-                                    <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" /> {t('header.logout')}
-                                </button>
-                            </div>
-                        )}
+                             <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[100] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                                 {isMobileSoundSelectorOpen ? (
+                                     <div className="px-2 py-1 space-y-1">
+                                         <button
+                                             type="button"
+                                             onClick={() => setIsMobileSoundSelectorOpen(false)}
+                                             className="w-full flex items-center px-2 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                         >
+                                             ← Voltar
+                                         </button>
+                                         <div className="p-1.5 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                                             {t('header.notifications_choose_sound')}
+                                         </div>
+                                         {availableSounds?.map((sound) => (
+                                             <button
+                                                 key={sound.id}
+                                                 type="button"
+                                                 onClick={() => { changeSound(sound.id); }}
+                                                 className={`w-full text-left px-3 py-1.5 rounded-xl text-xs flex items-center justify-between transition-all ${selectedSound === sound.id ? 'text-emerald-600 font-semibold bg-emerald-50/50' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5'}`}
+                                             >
+                                                 <span>{sound.name}</span>
+                                                 {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
+                                             </button>
+                                         ))}
+                                     </div>
+                                 ) : (
+                                     <>
+                                         <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 lg:hidden">
+                                             <p className="font-semibold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
+                                             <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">{currentUser.role}</p>
+                                         </div>
+                                         
+                                         <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                             <UserCircleIcon className="w-5 h-5 mr-3 text-emerald-500" /> {t('header.profile')}
+                                         </button>
+                                         
+                                         <button type="button" onClick={() => { onNavigate('personal-notes' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 lg:border-t-0">
+                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-amber-500">
+                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                             </svg>
+                                             {language === 'pt' ? 'Notas Pessoais' : language === 'en' ? 'Personal Notes' : 'Notas Personales'}
+                                         </button>
+                                         
+                                         <button type="button" onClick={() => { onNavigate('manual-usuario' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-blue-500">
+                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                                             </svg>
+                                             {language === 'pt' ? 'Manual do Usuário' : language === 'en' ? 'User Manual' : 'Manual del Usuario'}
+                                         </button>
+                                         
+                                         {/* Mobile Only Items */}
+                                         <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
+                                             <button type="button" onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                                 {theme === 'light' ? <MoonIcon className="w-5 h-5 mr-3 text-slate-500" /> : <SunIcon className="w-5 h-5 mr-3 text-yellow-500" />} {theme === 'light' ? t('theme.mode_dark') : t('theme.mode_light')}
+                                             </button>
+                                             <button type="button" onClick={() => { const langs: ('pt' | 'en' | 'es')[] = ['pt', 'en', 'es']; setLanguage(langs[(langs.indexOf(language) + 1) % langs.length]); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                                 <SparklesIcon className="w-5 h-5 mr-3 text-blue-500" /> {t('language.label')}: {language.toUpperCase()}
+                                             </button>
+                                             <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('toggle-panda-ai')); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                                 <SparklesIcon className="w-5 h-5 mr-3 text-brand-primary" /> Panda IA
+                                             </button>
+                                             <button type="button" onClick={() => setIsMobileSoundSelectorOpen(true)} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                                 <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> {t('header.notifications_choose_sound')}
+                                             </button>
+                                         </div>
+                                         
+                                         {currentUser.isAdmin && !isImpersonating && (
+                                             <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
+                                                 <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
+                                             </button>
+                                         )}
+                                         
+                                         <button type="button" onClick={() => { onLogout(); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 text-left border-t border-gray-50 dark:border-white/5 mt-1">
+                                             <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" /> {t('header.logout')}
+                                         </button>
+                                     </>
+                                 )}
+                             </div>
+                         )}
                     </div>
                 </div>
             </div>
