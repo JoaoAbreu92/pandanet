@@ -49,7 +49,7 @@ async function scanCommonPorts(host: string) {
   return results;
 }
 
-console.log("Edge Function 'email-handler' V27 (High Compatibility) iniciada.");
+console.log("Edge Function 'email-handler' V28 (Hostinger & Global Timeout) iniciada.");
 
 Deno.serve(async (req) => {
   // 1. CORS Preflight
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V24] Ação: ${action}`);
+    console.log(`[V28] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
@@ -92,10 +92,14 @@ Deno.serve(async (req) => {
       const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
       const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
 
-      console.log(`[V27] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}, SSL:${useSmtpSsl}) | IMAP(${settings.imap_host}:${settings.imap_port}, SSL:${useImapSsl})`);
+      console.log(`[V28] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}, SSL:${useSmtpSsl}) | IMAP(${settings.imap_host}:${settings.imap_port}, SSL:${useImapSsl})`);
 
-      // 2. RODAR TESTES EM PARALELO (Timeouts aumentados)
-      const results = await Promise.allSettled([
+      // 2. RODAR TESTES COM TIMEOUT GLOBAL (Segurança extra contra hangs)
+      const globalTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout Global (35s) atingido - servidor não respondeu a tempo.")), 35000)
+      );
+
+      const resultsPromise = Promise.allSettled([
         // Teste SMTP
         (async () => {
           const transporter = nodemailer.createTransport({
@@ -105,7 +109,7 @@ Deno.serve(async (req) => {
             auth: { user: settings.user, pass: settings.pass },
             tls: { 
               rejectUnauthorized: false, 
-              minVersion: 'TLSv1',
+              minVersion: 'TLSv1.2', // Aumentado para v1.2 por segurança/Hostinger
               checkServerIdentity: () => undefined 
             },
             connectionTimeout: 15000,
@@ -124,9 +128,9 @@ Deno.serve(async (req) => {
             logger: false,
             tls: { 
               rejectUnauthorized: false, 
-              servername: settings.imap_host,
+              // Removido servername fixo para deixar o ImapFlow decidir ou usar o host
               checkServerIdentity: () => undefined,
-              minVersion: 'TLSv1'
+              minVersion: 'TLSv1.2' // Aumentado para v1.2
             },
             connectionTimeout: 25000,
             greetingTimeout: 25000
@@ -137,8 +141,11 @@ Deno.serve(async (req) => {
         })()
       ]);
 
+      // Corrida contra o timeout global
+      const results: any = await Promise.race([resultsPromise, globalTimeoutPromise]);
+
       const [smtpRes, imapRes] = results;
-      const duration = ((Date.now() - start) / 1000).toFixed(1);
+      const duration = Number(((Date.now() - start) / 1000).toFixed(1));
 
       // 3. ANALISAR RESULTADOS
       if (smtpRes.status === 'fulfilled' && imapRes.status === 'fulfilled') {
@@ -150,34 +157,47 @@ Deno.serve(async (req) => {
 
       // 4. DIAGNÓSTICO EM CASO DE FALHA
       let errorMsg = "";
+      let debugInfo: any = {};
+
       if (smtpRes.status === 'rejected') {
         const err = smtpRes.reason;
-        console.error("[V27 SMTP ERROR]", err);
-        let rs = err.message || "Erro desconhecido.";
-        if (rs.includes("invalid peer certificate")) rs = "Certificado inválido ou incompatível.";
+        console.error("[V28 SMTP ERROR]", err);
+        let rs = err.message || "Erro SMTP desconhecido.";
+        debugInfo.smtp = { code: err.code, name: err.name, stack: err.stack?.substring(0, 150) };
+        if (rs.includes("invalid peer certificate")) rs = "Certificado SMTP inválido ou incompatível.";
         errorMsg += `SMTP: ${rs}. `;
       }
 
       if (imapRes.status === 'rejected') {
         const err = imapRes.reason;
-        console.error("[V27 IMAP ERROR]", err);
-        let imapMsg = err.message || "Erro desconhecido.";
-        if (imapMsg.includes('Unexpected close')) imapMsg = "Conexão fechada pelo servidor (verifique porta/SSL/Timeouts).";
+        console.error("[V28 IMAP ERROR]", err);
+        let imapMsg = err.message || "Erro IMAP desconhecido.";
+        debugInfo.imap = { code: err.code, name: err.name, stack: err.stack?.substring(0, 150) };
+        if (imapMsg.includes('Unexpected close')) imapMsg = "Conexão IMAP fechada pelo servidor (verifique porta/SSL/Timeouts).";
         if (imapMsg.includes('ENOTFOUND')) imapMsg = "Host IMAP não encontrado.";
-        if (imapMsg.includes('ETIMEDOUT')) imapMsg = "Tempo de conexão esgotado.";
+        if (imapMsg.includes('ETIMEDOUT')) imapMsg = "Tempo de conexão IMAP esgotado.";
         errorMsg += `IMAP: ${imapMsg}. `;
       }
 
-      // Scan opcional
+      // Scan opcional (Somente se não gastamos muito tempo)
       let openPorts: number[] = [];
-      if (smtpRes.status === 'rejected' && imapRes.status === 'rejected' && (Date.now() - start < 30000)) {
+      if (duration < 20 && smtpRes.status === 'rejected' && imapRes.status === 'rejected') {
         openPorts = await scanCommonPorts(settings.imap_host);
       }
 
-      throw new Error(`${errorMsg}${openPorts.length ? `Portas abertas no host: ${openPorts.join(', ')}` : ''}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: errorMsg.trim(),
+        debug: debugInfo,
+        duration: duration,
+        ports: openPorts.length ? openPorts : undefined
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V24.' }), { 
+    return new Response(JSON.stringify({ success: true, message: 'Função Online V28.' }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
