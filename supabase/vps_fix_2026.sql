@@ -50,69 +50,55 @@ DECLARE
     v_new_user_id UUID;
     v_encrypted_pw TEXT;
 BEGIN
-    -- 1. Create user in auth.users
     v_new_user_id := gen_random_uuid();
-    v_encrypted_pw := crypt(COALESCE(p_password, 'PandaNet123!'), gen_salt('bf'));
+    v_encrypted_pw := extensions.crypt(COALESCE(p_password, 'PandaNet123!'), extensions.gen_salt('bf'));
 
+    -- 1. Create user in auth.users
     INSERT INTO auth.users (
         id, instance_id, aud, role, email, encrypted_password, 
         email_confirmed_at, raw_app_meta_data, raw_user_meta_data, 
         created_at, updated_at, confirmation_token, recovery_token
     )
     VALUES (
-        v_new_user_id,
-        '00000000-0000-0000-0000-000000000000',
-        'authenticated',
-        'authenticated',
-        p_email,
-        v_encrypted_pw,
-        now(),
-        '{"provider":"email","providers":["email"]}'::jsonb,
-        jsonb_build_object('full_name', p_full_name),
-        now(),
-        now(),
-        encode(gen_random_bytes(32), 'hex'),
-        encode(gen_random_bytes(32), 'hex')
+        v_new_user_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', p_email, v_encrypted_pw, now(),
+        '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('full_name', p_full_name), now(), now(), 
+        encode(extensions.gen_random_bytes(32), 'hex'), encode(extensions.gen_random_bytes(32), 'hex')
     );
 
     -- 2. Create entry in auth.identities
     INSERT INTO auth.identities (
         id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at, provider_id
     ) VALUES (
-        gen_random_uuid(),
-        v_new_user_id,
-        jsonb_build_object('sub', v_new_user_id::text, 'email', p_email),
-        'email',
-        now(),
-        now(),
-        now(),
-        v_new_user_id::text
+        gen_random_uuid(), v_new_user_id, jsonb_build_object('sub', v_new_user_id::text, 'email', p_email),
+        'email', now(), now(), now(), v_new_user_id::text
     );
 
-    -- 3. Create entry in public.profiles
+    -- 3. Create entry in public.profiles 
     INSERT INTO public.profiles (
         id, email, full_name, role, team, company_id, 
         is_admin, is_company_admin, permissions, avatar_url, 
-        department_id, rg, cpf, status, created_at, updated_at
+        department_id, rg, cpf, status, updated_at
     )
     VALUES (
-        v_new_user_id,
-        p_email, 
-        p_full_name, 
-        p_role,
-        p_team,
-        p_company_id, 
-        p_is_admin, 
-        p_is_company_admin, 
-        p_permissions,
-        p_avatar_url,
-        p_department_id,
-        p_rg,
-        p_cpf,
-        'active',
-        now(),
-        now()
-    );
+        v_new_user_id, p_email, p_full_name, p_role, p_team, p_company_id, 
+        p_is_admin, p_is_company_admin, p_permissions, p_avatar_url,
+        p_department_id, p_rg, p_cpf, 'active', now()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
+        team = EXCLUDED.team,
+        company_id = EXCLUDED.company_id,
+        is_admin = EXCLUDED.is_admin,
+        is_company_admin = EXCLUDED.is_company_admin,
+        permissions = EXCLUDED.permissions,
+        avatar_url = EXCLUDED.avatar_url,
+        department_id = EXCLUDED.department_id,
+        rg = EXCLUDED.rg,
+        cpf = EXCLUDED.cpf,
+        status = 'active',
+        updated_at = now();
 
     RETURN v_new_user_id;
 END;
