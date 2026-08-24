@@ -1,21 +1,6 @@
 version: '3.8'
 
 services:
-  whatsapp-backend:
-    container_name: pandanet_backend
-    build:
-      context: ./whatsapp-backend
-      dockerfile: Dockerfile
-    restart: always
-    environment:
-      - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - COMPANY_ID=${COMPANY_ID:-1}
-      - PORT=3000
-    networks:
-      - pandanet_network
-      - supabase_default
-
   pandanet-frontend:
     container_name: pandanet_frontend
     build:
@@ -30,8 +15,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    depends_on:
-      - whatsapp-backend
     networks:
       - supabase_default
       - pandanet_network
