@@ -451,6 +451,7 @@ export interface MarketplaceItem {
   listedAt: string; // YYYY-MM-DD
   status: MarketplaceItemStatus;
   reservedBy?: string;
+  reservedAt?: string;
   seller: string;
 }
 

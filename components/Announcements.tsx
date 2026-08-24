@@ -185,7 +185,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
                             {/* Same UI as before */}
                             {item.imageUrl && (
                                 <div className="w-full h-auto max-h-[400px] bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-700">
-                                    <img src={item.imageUrl} alt={item.title} className="max-w-full max-h-[400px] object-contain" />
+                                    <img src={item.imageUrl} alt={item.title} className="w-full aspect-[3/1] object-cover rounded-lg" />
                                 </div>
                             )}
                             {item.videoUrl && (

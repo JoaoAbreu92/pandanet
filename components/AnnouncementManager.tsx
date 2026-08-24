@@ -126,6 +126,9 @@ const AnnouncementFormModal: React.FC<{
                     <div>
                         <label className="block text-sm font-medium text-brand-subtle-text">Upload Imagem</label>
                         <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100" />
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                            💡 Dimensão recomendada: <strong>1200x400 pixels (proporção 3:1)</strong>. Para se adaptar ao tamanho do banner da empresa, a imagem será recortada e ajustada automaticamente.
+                        </p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-brand-subtle-text">Upload Vídeo (ou URL externa abaixo)</label>

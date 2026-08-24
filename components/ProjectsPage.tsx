@@ -9,6 +9,7 @@ import {
     TrashIcon,
     PencilIcon,
     CheckCircleIcon,
+    CheckIcon,
     CalendarIcon,
     UsersIcon,
     ChatBubbleLeftRightIcon,
@@ -1250,6 +1251,21 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
         }
     };
 
+    const isToday = (date: Date) => {
+        const today = new Date();
+        return date.getDate() === today.getDate() &&
+               date.getMonth() === today.getMonth() &&
+               date.getFullYear() === today.getFullYear();
+    };
+
+    const isTaskCompleted = (task: ProjectTask) => {
+        const taskStage = stages.find(s => s.id === task.stage_id);
+        if (!taskStage) return false;
+        const sortedStages = [...stages].sort((a, b) => a.position - b.position);
+        const finalStage = sortedStages[sortedStages.length - 1];
+        return taskStage.id === finalStage?.id || taskStage.name.toLowerCase() === 'concluído' || taskStage.name.toLowerCase() === 'done';
+    };
+
     // --- HELPERS PARA FLUXO E PERMISSÕES DE SETOR ---
     const canUserModifyTaskInStage = (task: ProjectTask | null, stage: ProjectStage | null | undefined) => {
         if (!task || !stage) return false;
@@ -1794,18 +1810,24 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                             }
                                                             
                                                             const weekDayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-                                                            return days.map((d, i) => (
-                                                                <th key={i} className="px-3 py-4 text-center border-r dark:border-slate-800 last:border-r-0">
-                                                                    <div className="font-bold text-slate-700 dark:text-slate-200">{weekDayNames[i]}</div>
-                                                                    <div className="text-[9px] text-slate-400 font-medium mt-0.5">{d.getDate()} / {d.getMonth() + 1}</div>
-                                                                </th>
-                                                            ));
+                                                            return days.map((d, i) => {
+                                                                const todayFlag = isToday(d);
+                                                                return (
+                                                                    <th key={i} className={`px-3 py-4 text-center border-r dark:border-slate-800 last:border-r-0 ${todayFlag ? 'bg-emerald-500/10 border-x border-emerald-500/30' : ''}`}>
+                                                                        <div className={`font-bold ${todayFlag ? 'text-brand-primary' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                                            {weekDayNames[i]} {todayFlag && <span className="text-[8px] bg-brand-primary text-white font-black px-1 py-0.5 rounded ml-1 uppercase">Hoje</span>}
+                                                                        </div>
+                                                                        <div className={`text-[9px] font-medium mt-0.5 ${todayFlag ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                                                                            {d.getDate()} / {d.getMonth() + 1}
+                                                                        </div>
+                                                                    </th>
+                                                                );
+                                                            });
                                                         })()}
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                                                     {employees.map(emp => {
-                                                        // Obter a data inicial da semana
                                                         const start = new Date(currentCalendarDate);
                                                         const day = start.getDay();
                                                         const diff = start.getDate() - day + (day === 0 ? -6 : 1);
@@ -1829,40 +1851,42 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                                 </td>
                                                                 
                                                                 {days.map((d, i) => {
-                                                                    // Filtra tarefas ativas neste dia para o colaborador
                                                                     const dayTasks = tasks.filter(task => {
                                                                         if (task.assigned_to !== emp.id) return false;
-                                                                        
                                                                         const dayTime = new Date(d);
                                                                         dayTime.setHours(0,0,0,0);
-                                                                        
                                                                         const taskStart = new Date(task.start_date || task.created_at);
                                                                         taskStart.setHours(0,0,0,0);
-                                                                        
                                                                         const taskEnd = task.due_date ? new Date(task.due_date) : taskStart;
                                                                         taskEnd.setHours(0,0,0,0);
-                                                                        
                                                                         return dayTime >= taskStart && dayTime <= taskEnd;
                                                                     });
 
+                                                                    const todayFlag = isToday(d);
                                                                     return (
-                                                                        <td key={i} className="p-2 border-r dark:border-slate-800 last:border-r-0 text-center min-h-[80px] align-top bg-slate-50/10 dark:bg-slate-950/5">
+                                                                        <td key={i} className={`p-2 border-r dark:border-slate-800 last:border-r-0 text-center min-h-[80px] align-top transition-colors ${todayFlag ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-x border-emerald-500/20' : 'bg-slate-50/10 dark:bg-slate-950/5'}`}>
                                                                             <div className="flex flex-col gap-1.5 h-full justify-start items-stretch">
-                                                                                {dayTasks.map(t => (
-                                                                                    <div
-                                                                                        key={t.id}
-                                                                                        onClick={() => openEditTaskModal(t)}
-                                                                                        style={{ borderLeft: `3px solid ${selectedProject?.color || '#10B981'}` }}
-                                                                                        className="text-left p-2 rounded-xl bg-white dark:bg-slate-850 border border-slate-100 dark:border-slate-800 text-[10px] font-bold shadow-sm cursor-pointer hover:shadow-md hover:bg-slate-50/50 dark:hover:bg-slate-750 transition-all select-none truncate"
-                                                                                        title={`${t.title} - Clique para ver/editar`}
-                                                                                    >
-                                                                                        <div className="truncate text-slate-750 dark:text-slate-200">{t.title}</div>
-                                                                                        <div className="flex items-center gap-1.5 mt-1 text-[8px] text-slate-400 font-medium">
-                                                                                            {t.priority > 0 && <StarIcon className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />}
-                                                                                            <span>{t.subtasks?.filter(s => s.is_completed).length || 0}/{t.subtasks?.length || 0} sub</span>
+                                                                                {dayTasks.map(t => {
+                                                                                    const completed = isTaskCompleted(t);
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={t.id}
+                                                                                            onClick={() => openEditTaskModal(t)}
+                                                                                            style={{ borderLeft: `3px solid ${completed ? '#10B981' : (selectedProject?.color || '#10B981')}` }}
+                                                                                            className={`text-left p-2 rounded-xl bg-white dark:bg-slate-850 border border-slate-100 dark:border-slate-800 text-[10px] font-bold shadow-sm cursor-pointer hover:shadow-md hover:bg-slate-50/50 dark:hover:bg-slate-750 transition-all select-none truncate ${completed ? 'opacity-60 bg-emerald-50/20 dark:bg-emerald-950/20' : ''}`}
+                                                                                            title={`${t.title} - Clique para ver/editar`}
+                                                                                        >
+                                                                                            <div className={`truncate flex items-center gap-1 ${completed ? 'line-through text-slate-450 dark:text-slate-500' : 'text-slate-750 dark:text-slate-200'}`}>
+                                                                                                {completed && <CheckIcon className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
+                                                                                                <span className="truncate">{t.title}</span>
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1.5 mt-1 text-[8px] text-slate-400 font-medium">
+                                                                                                {t.priority > 0 && !completed && <StarIcon className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />}
+                                                                                                <span>{t.subtasks?.filter(s => s.is_completed).length || 0}/{t.subtasks?.length || 0} sub</span>
+                                                                                            </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                ))}
+                                                                                    );
+                                                                                })}
                                                                                 {dayTasks.length === 0 && (
                                                                                     <span className="text-[10px] text-slate-300 dark:text-slate-700 italic block py-4">-</span>
                                                                                 )}
@@ -2155,6 +2179,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                         <th className="px-6 py-4">Estágio</th>
                                                         <th className="px-6 py-4">Responsável</th>
                                                         <th className="px-6 py-4">Prioridade</th>
+                                                        <th className="px-6 py-4">Horas Apontadas</th>
                                                         <th className="px-6 py-4">Data Limite</th>
                                                         <th className="px-6 py-4">Tags</th>
                                                     </tr>
@@ -2162,18 +2187,43 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                 <tbody className="text-xs divide-y divide-slate-100 dark:divide-slate-800/50">
                                                     {filteredTasks.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={6} className="text-center py-10 text-slate-400 italic">Nenhuma tarefa encontrada.</td>
+                                                            <td colSpan={7} className="text-center py-10 text-slate-400 italic">Nenhuma tarefa encontrada.</td>
                                                         </tr>
                                                     ) : (
                                                         filteredTasks.map(task => {
                                                             const stageName = stages.find(s => s.id === task.stage_id)?.name || 'Sem estágio';
+                                                            const isCompleted = isTaskCompleted(task);
+                                                            const subtasks = task.subtasks || [];
+                                                            const completedSubtasks = subtasks.filter(s => s.is_completed).length;
+                                                            const subtasksPct = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
+                                                            
+                                                            const isOverdue = task.due_date && !isCompleted && new Date(task.due_date) < new Date();
+                                                            const taskHours = task.timesheets?.reduce((acc, curr) => acc + curr.hours, 0) || 0;
+                                                            
                                                             return (
                                                                 <tr
                                                                     key={task.id}
                                                                     onClick={() => openEditTaskModal(task)}
                                                                     className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
                                                                 >
-                                                                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{task.title}</td>
+                                                                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <span className={`font-bold ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-750 dark:text-slate-200'}`}>
+                                                                                {task.title}
+                                                                            </span>
+                                                                            {subtasks.length > 0 && (
+                                                                                <div className="w-40 mt-1">
+                                                                                    <div className="flex justify-between text-[9px] text-slate-400 font-bold uppercase mb-0.5">
+                                                                                        <span>Checklist</span>
+                                                                                        <span>{subtasksPct}%</span>
+                                                                                    </div>
+                                                                                    <div className="w-full bg-gray-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                                                                                        <div className="bg-brand-primary h-full rounded-full" style={{ width: `${subtasksPct}%` }}></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
                                                                     <td className="px-6 py-4">
                                                                         <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold uppercase">
                                                                             {stageName}
@@ -2182,12 +2232,22 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-semibold">{task.assignee?.full_name || '-'}</td>
                                                                     <td className="px-6 py-4">
                                                                         {task.priority === 1 ? (
-                                                                            <span className="text-amber-500 font-bold flex items-center gap-1">⭐ Alta</span>
+                                                                            <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 text-[10px] font-bold border border-red-100 dark:border-red-900/30">
+                                                                                ⭐ Alta
+                                                                            </span>
                                                                         ) : (
-                                                                            <span className="text-slate-400">Normal</span>
+                                                                            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 text-[10px] font-medium border border-transparent">
+                                                                                Normal
+                                                                            </span>
                                                                         )}
                                                                     </td>
-                                                                    <td className="px-6 py-4 text-slate-500">{task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}</td>
+                                                                    <td className="px-6 py-4 font-bold text-slate-600 dark:text-slate-350">
+                                                                        {taskHours > 0 ? `${taskHours.toFixed(2)}h` : '-'}
+                                                                    </td>
+                                                                    <td className={`px-6 py-4 font-semibold ${isOverdue ? 'text-red-500 font-bold flex items-center gap-1' : 'text-slate-500'}`}>
+                                                                        {isOverdue && <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                                                                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
+                                                                    </td>
                                                                     <td className="px-6 py-4">
                                                                         <div className="flex flex-wrap gap-1">
                                                                             {task.tags.map((t, i) => (
@@ -2227,25 +2287,43 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                             {/* Dias do calendário */}
                                             {calendarDays.map((day, idx) => {
                                                 const dayTasks = day ? tasks.filter(t => t.due_date && new Date(t.due_date).toDateString() === day.toDateString()) : [];
+                                                const todayFlag = day ? isToday(day) : false;
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        className={`min-h-[100px] border border-slate-100 dark:border-slate-800 p-2 rounded-xl flex flex-col justify-between ${day ? 'bg-slate-50/20 dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-950/20 opacity-30'}`}
+                                                        className={`min-h-[100px] border p-2 rounded-xl flex flex-col justify-between transition-all ${
+                                                            todayFlag 
+                                                                ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-brand-primary ring-1 ring-brand-primary shadow-sm' 
+                                                                : day 
+                                                                    ? 'bg-slate-50/20 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
+                                                                    : 'bg-slate-50/50 dark:bg-slate-950/20 opacity-30 border-transparent'
+                                                        }`}
                                                     >
                                                         {day && (
                                                             <>
-                                                                <span className="text-xs font-black text-slate-400 dark:text-slate-500">{day.getDate()}</span>
-                                                                <div className="space-y-1 mt-2 overflow-y-auto max-h-[70px]">
-                                                                    {dayTasks.map(t => (
-                                                                        <button
-                                                                            key={t.id}
-                                                                            onClick={() => openEditTaskModal(t)}
-                                                                            style={{ borderLeft: `3px solid ${selectedProject.color}` }}
-                                                                            className="w-full text-left p-1 rounded bg-white dark:bg-slate-800 border dark:border-slate-700 text-[8px] font-bold truncate hover:bg-slate-50"
-                                                                        >
-                                                                            {t.title}
-                                                                        </button>
-                                                                    ))}
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className={`text-xs font-black ${todayFlag ? 'text-brand-primary' : 'text-slate-400 dark:text-slate-500'}`}>{day.getDate()}</span>
+                                                                    {todayFlag && <span className="text-[8px] bg-brand-primary text-white font-black px-1 py-0.2 rounded uppercase">Hoje</span>}
+                                                                </div>
+                                                                <div className="space-y-1 mt-2 overflow-y-auto max-h-[75px] no-scrollbar">
+                                                                    {dayTasks.map(t => {
+                                                                        const completed = isTaskCompleted(t);
+                                                                        return (
+                                                                            <button
+                                                                                key={t.id}
+                                                                                onClick={() => openEditTaskModal(t)}
+                                                                                style={{ borderLeft: `3px solid ${completed ? '#10B981' : selectedProject.color}` }}
+                                                                                className={`w-full text-left p-1 rounded border dark:border-slate-700 text-[8px] font-bold truncate transition-colors flex items-center gap-1 ${
+                                                                                    completed 
+                                                                                        ? 'bg-emerald-50/30 dark:bg-emerald-950/20 line-through text-slate-400 dark:text-slate-500 hover:bg-emerald-100/30' 
+                                                                                        : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750'
+                                                                                }`}
+                                                                            >
+                                                                                {completed && <CheckIcon className="w-2.5 h-2.5 text-emerald-500 flex-shrink-0" />}
+                                                                                <span className="truncate">{t.title}</span>
+                                                                            </button>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </>
                                                         )}
@@ -2305,22 +2383,37 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                         }).filter(t => t.horas > 0);
                                     })();
 
+                                    const completedTasksCount = tasks.filter(t => isTaskCompleted(t)).length;
+                                    const completionRate = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : 0;
+                                    const overdueTasksCount = tasks.filter(t => t.due_date && !isTaskCompleted(t) && new Date(t.due_date) < new Date()).length;
+                                    const activeCollaboratorsCount = projectMembers.length;
+
                                     return (
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                             {/* Cartões Estatísticos e Distribuição */}
                                             <div className="lg:col-span-2 space-y-6">
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Total de Tarefas</p>
-                                                        <p className="text-4xl font-black text-slate-800 dark:text-slate-100">{tasks.length}</p>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/10 flex flex-col justify-between">
+                                                        <p className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mb-2">Total de Tarefas</p>
+                                                        <p className="text-3xl font-black text-slate-800 dark:text-slate-100">{tasks.length}</p>
                                                     </div>
-                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Tarefas Concluídas</p>
-                                                        <p className="text-4xl font-black text-emerald-500">
-                                                            {tasks.filter(t => {
-                                                                const stageName = stages.find(s => s.id === t.stage_id)?.name;
-                                                                return stageName === 'Concluído' || stageName === 'Done';
-                                                            }).length}
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/10 flex flex-col justify-between">
+                                                        <p className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mb-2">Concluídas</p>
+                                                        <p className="text-3xl font-black text-emerald-500">{completedTasksCount}</p>
+                                                    </div>
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/10 flex flex-col justify-between">
+                                                        <p className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mb-2">Taxa Conclusão</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-3xl font-black text-indigo-500">{completionRate}%</p>
+                                                            <div className="w-10 bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden shrink-0">
+                                                                <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${completionRate}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/10 flex flex-col justify-between">
+                                                        <p className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mb-2">Atrasadas</p>
+                                                        <p className={`text-3xl font-black ${overdueTasksCount > 0 ? 'text-red-500 animate-pulse' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                            {overdueTasksCount}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -2401,7 +2494,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                     </div>
 
                                                     <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border dark:border-slate-800 text-xs">
-                                                        <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Equipe Dedicada</p>
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <p className="font-bold text-slate-700 dark:text-slate-300">Equipe Dedicada</p>
+                                                            <span className="text-[10px] bg-brand-primary/10 text-brand-primary font-bold px-2 py-0.5 rounded-full border border-brand-primary/20">{activeCollaboratorsCount} ativos</span>
+                                                        </div>
                                                         <div className="flex flex-wrap gap-2">
                                                             {projectMembers.slice(0, 5).map(e => (
                                                                 <div key={e.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-850 px-2.5 py-1 rounded-full border dark:border-slate-800">

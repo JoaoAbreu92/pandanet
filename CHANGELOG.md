@@ -7,11 +7,11 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 Versão 1.1.3 beta
 01/06/2026
 🗞️ Nota de Atualização - PandaNet v1.1.3 Beta
-Esta atualização traz o novo e revolucionário módulo de Agendamentos, inspirado no Cal.com, além de melhorias no gerenciamento de projetos e correções essenciais de usabilidade e segurança.
+Esta atualização traz o novo e revolucionário módulo de Agendamentos, além de melhorias no gerenciamento de projetos e correções essenciais de usabilidade e segurança.
 
 🚀 O que há de novo?
 
-📅 Módulo de Agendamentos (Cal.com clone)
+📅 Módulo de Agendamentos
 Integramos um sistema profissional de agendamento de horários:
 - Configuração de Agendas: Crie links para reuniões ou eventos definindo duração, descrição e disponibilidade.
 - Agendamento Pago: Suporte a agendamentos pagos com simulação integrada de checkout via Pix (QR Code e Copia e Cola).

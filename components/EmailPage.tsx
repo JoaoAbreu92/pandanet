@@ -124,6 +124,57 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768); // Auto-hide on mobile
     const [isFullScreen, setIsFullScreen] = useState(false); // New Full Screen Mode
 
+    // --- State: View Preferences ---
+    const [openMode, setOpenMode] = useState<'split' | 'modal' | 'window'>(() => {
+        return (localStorage.getItem('pandamail_open_mode') as 'split' | 'modal' | 'window') || 'split';
+    });
+    const [previewMode, setPreviewMode] = useState<'full' | 'sender_subject' | 'sender'>(() => {
+        return (localStorage.getItem('pandamail_preview_mode') as 'full' | 'sender_subject' | 'sender') || 'full';
+    });
+    const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'from_asc' | 'from_desc'>(() => {
+        return (localStorage.getItem('pandamail_sort_by') as any) || 'date_desc';
+    });
+    const [filterDateRange, setFilterDateRange] = useState<'all' | '24h' | 'week' | 'month'>('all');
+
+    // --- State: Dragging for window mode ---
+    const [windowPosition, setWindowPosition] = useState({ x: 100, y: 80 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStart = useRef({ x: 0, y: 0 });
+    const positionStart = useRef({ x: 0, y: 0 });
+
+    const handleWindowMouseDown = (e: React.MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.window-title-bar')) {
+            setIsDragging(true);
+            dragStart.current = { x: e.clientX, y: e.clientY };
+            positionStart.current = { x: windowPosition.x, y: windowPosition.y };
+            e.preventDefault();
+        }
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+            const dx = e.clientX - dragStart.current.x;
+            const dy = e.clientY - dragStart.current.y;
+            setWindowPosition({
+                x: positionStart.current.x + dx,
+                y: positionStart.current.y + dy
+            });
+        };
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
     // --- State: Data ---
     const [settings, setSettings] = useState<EmailSettings>({
         imap_host: 'imap.gmail.com',
@@ -1483,7 +1534,33 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
             from.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesTag = filterTag ? (email.metadata?.tags || []).some(t => t.label?.toLowerCase() === filterTag?.toLowerCase()) : true;
-        return matchesSearch && matchesTag;
+        
+        let matchesDate = true;
+        if (filterDateRange !== 'all') {
+            const emailDate = new Date(email.date);
+            const now = new Date();
+            const diffMs = now.getTime() - emailDate.getTime();
+            if (filterDateRange === '24h') {
+                matchesDate = diffMs <= 24 * 60 * 60 * 1000;
+            } else if (filterDateRange === 'week') {
+                matchesDate = diffMs <= 7 * 24 * 60 * 60 * 1000;
+            } else if (filterDateRange === 'month') {
+                matchesDate = diffMs <= 30 * 24 * 60 * 60 * 1000;
+            }
+        }
+
+        return matchesSearch && matchesTag && matchesDate;
+    }).sort((a, b) => {
+        if (sortBy === 'date_desc') {
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        } else if (sortBy === 'date_asc') {
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+        } else if (sortBy === 'from_asc') {
+            return (a.from || '').localeCompare(b.from || '');
+        } else if (sortBy === 'from_desc') {
+            return (b.from || '').localeCompare(a.from || '');
+        }
+        return 0;
     });
 
     // --- Render ---
@@ -1819,7 +1896,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             {/* --- Middle: Email List --- */}
             {(view === 'inbox' || view === 'read') && (
-                <div className={`flex flex-col min-w-0 md:max-w-md border-r border-gray-200 relative ${(view === 'read' && isFullScreen) ? 'hidden' : view === 'read' ? 'hidden md:flex' : 'flex-1 md:flex-none md:w-80'}`}>
+                <div className={`flex flex-col min-w-0 border-r border-gray-200 relative ${
+                    openMode === 'split' 
+                        ? ((view === 'read' && isFullScreen) ? 'hidden' : view === 'read' ? 'hidden md:flex md:max-w-md md:w-80' : 'flex-1 md:flex-none md:w-80 md:max-w-md')
+                        : 'flex-1'
+                }`}>
                     {/* Toolbar for List */}
                     <div className="p-4 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-white/50 dark:bg-[#020617]/60 backdrop-blur-xl z-20 sticky top-0">
                         <div className="flex items-center justify-between">
@@ -1893,6 +1974,33 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white"
                             />
                         </div>
+                        <div className="flex gap-2">
+                            <select
+                                value={sortBy}
+                                onChange={e => {
+                                    const val = e.target.value as any;
+                                    setSortBy(val);
+                                    localStorage.setItem('pandamail_sort_by', val);
+                                }}
+                                className="flex-1 text-[10px] font-bold uppercase tracking-wider py-1.5 px-2 bg-gray-100 dark:bg-white/5 rounded-lg border border-transparent dark:border-white/5 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                            >
+                                <option value="date_desc">Data: Recentes</option>
+                                <option value="date_asc">Data: Antigos</option>
+                                <option value="from_asc">Remetente: A-Z</option>
+                                <option value="from_desc">Remetente: Z-A</option>
+                            </select>
+                            
+                            <select
+                                value={filterDateRange}
+                                onChange={e => setFilterDateRange(e.target.value as any)}
+                                className="flex-1 text-[10px] font-bold uppercase tracking-wider py-1.5 px-2 bg-gray-100 dark:bg-white/5 rounded-lg border border-transparent dark:border-white/5 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                            >
+                                <option value="all">Todas as Datas</option>
+                                <option value="24h">Últimas 24h</option>
+                                <option value="week">Última Semana</option>
+                                <option value="month">Último Mês</option>
+                            </select>
+                        </div>
                     </div>
 
                     {/* List */}
@@ -1908,7 +2016,17 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             filteredEmails.map(email => (
                                 <div
                                     key={email.uid}
-                                    onClick={() => { setSelectedEmail(email); setView('read'); fetchEmailBody(email.uid, currentFolder); }}
+                                    onClick={() => {
+                                        if (isSelectionMode) {
+                                            toggleEmailSelection(email.uid);
+                                        } else {
+                                            setSelectedEmail(email);
+                                            fetchEmailBody(email.uid, currentFolder);
+                                            if (openMode === 'split') {
+                                                setView('read');
+                                            }
+                                        }
+                                    }}
                                     onContextMenu={(e) => handleContextMenu(e, email)}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, email)}
@@ -1938,12 +2056,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 )}
                                             </div>
                                         </div>
-                                        <div className={`text-sm line-clamp-1 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
-                                            {email.subject}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 opacity-70 group-hover:opacity-100 transition-opacity">
-                                            {email.snippet || t('email.no_preview')}
-                                        </div>
+                                        {previewMode !== 'sender' && (
+                                            <div className={`text-sm line-clamp-1 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                {email.subject}
+                                            </div>
+                                        )}
+                                        {previewMode === 'full' && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 opacity-70 group-hover:opacity-100 transition-opacity">
+                                                {email.snippet || t('email.no_preview')}
+                                            </div>
+                                        )}
                                         {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
                                             <div className="flex flex-wrap gap-1 mt-2">
                                                 {email.metadata.tags.map(t => (
@@ -2063,7 +2185,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             {/* ... Rest of component ... */}
 
             {/* --- Right: Detail View OR Compose OR Settings --- */}
-            <div className={`flex-1 bg-white/50 dark:bg-transparent flex flex-col overflow-hidden ${view === 'inbox' ? 'hidden md:flex' : 'flex z-20 absolute inset-0 md:static'}`}>
+            {((openMode === 'split') || (view === 'settings' || view === 'compose' || view === 'read')) && (
+                <div className={`flex-1 bg-white/50 dark:bg-transparent flex flex-col overflow-hidden ${view === 'inbox' ? (openMode !== 'split' ? 'hidden' : 'hidden md:flex') : 'flex z-20 absolute inset-0 md:static'}`}>
 
                 {/* Mobile Header for Full Views */}
                 <div className="md:hidden p-3 border-b flex items-center gap-3">
@@ -2603,6 +2726,54 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 />
                                             </div>
                                         </div>
+ 
+                                        <div className="bg-white dark:bg-slate-900/60 p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-2 text-xl tracking-tight flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-brand-primary">
+                                                    <Cog6ToothIcon className="w-5 h-5" />
+                                                </div>
+                                                Preferências do PandaMail
+                                            </h3>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Personalize como as mensagens de e-mail são exibidas e abertas no seu PandaMail.</p>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Forma de Abrir Mensagens</label>
+                                                    <select
+                                                        value={openMode}
+                                                        onChange={e => {
+                                                            const val = e.target.value as any;
+                                                            setOpenMode(val);
+                                                            localStorage.setItem('pandamail_open_mode', val);
+                                                            showToast('Preferência de abertura salva!', 'success');
+                                                        }}
+                                                        className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white"
+                                                    >
+                                                        <option value="split">Lado a Lado (Split Screen)</option>
+                                                        <option value="modal">Modal (Popup de Tela Inteira)</option>
+                                                        <option value="window">Janela Flutuante (Arrastável)</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div>
+                                                    <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pré-visualização na Listagem</label>
+                                                    <select
+                                                        value={previewMode}
+                                                        onChange={e => {
+                                                            const val = e.target.value as any;
+                                                            setPreviewMode(val);
+                                                            localStorage.setItem('pandamail_preview_mode', val);
+                                                            showToast('Preferência de visualização salva!', 'success');
+                                                        }}
+                                                        className="w-full mt-2 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-white/5 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-white"
+                                                    >
+                                                        <option value="full">Completo (Remetente, Assunto e Snippet)</option>
+                                                        <option value="sender_subject">Apenas Remetente e Assunto</option>
+                                                        <option value="sender">Apenas Remetente</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         <div className="flex justify-end gap-4 p-8 bg-white dark:bg-slate-900/60 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
                                             <button onClick={() => setView('inbox')} className="px-6 py-3 text-gray-500 dark:text-gray-400 font-bold hover:text-gray-700 dark:hover:text-gray-200 transition-colors">{t('generic.cancel')}</button>
@@ -2613,6 +2784,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             </div>
                 ) : null}
             </div>
+            )}
 
             {/* --- Create Folder Modal --- */}
             {showFolderModal && (
@@ -2847,6 +3019,117 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     <EnvelopeIcon className="w-4 h-4" />
                                     Criar Msg em Cópia
                                 </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* === Modal View Mode === */}
+            {openMode === 'modal' && selectedEmail && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4" onClick={() => setSelectedEmail(null)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl border dark:border-white/5 overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
+                        {/* Title bar */}
+                        <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/40">
+                            <h3 className="font-bold text-gray-900 dark:text-white truncate pr-4 text-base">{selectedEmail.subject}</h3>
+                            <button onClick={() => setSelectedEmail(null)} className="p-1 hover:bg-gray-250 dark:hover:bg-slate-850 rounded-full transition-colors">
+                                <XMarkIcon className="w-6 h-6 text-gray-500" />
+                            </button>
+                        </div>
+                        {/* Details and content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {/* Metadata */}
+                            <div className="flex justify-between items-start border-b dark:border-slate-800 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold">
+                                        {selectedEmail.from.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-900 dark:text-white text-sm">{selectedEmail.from}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Para: {selectedEmail.to || 'mim'}</div>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full">
+                                    {new Date(selectedEmail.date).toLocaleString()}
+                                </div>
+                            </div>
+                            {/* Body html */}
+                            {loadingBody ? (
+                                <div className="flex items-center justify-center h-40">
+                                    <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
+                                    <span className="ml-2 text-gray-400">{t('email.loading_content')}</span>
+                                </div>
+                            ) : bodyError ? (
+                                <div className="text-center py-10 text-red-500">{bodyError}</div>
+                            ) : (
+                                <div className="bg-white dark:bg-slate-950/20 rounded-xl p-4 sm:p-6 shadow-inner min-h-[300px] overflow-x-auto">
+                                    <div
+                                        className="prose dark:prose-invert max-w-none text-gray-800 dark:text-gray-200"
+                                        dangerouslySetInnerHTML={{
+                                            __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`, {
+                                                RETURN_TRUSTED_TYPE: true,
+                                                ADD_TAGS: ['iframe', 'style'],
+                                                ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling']
+                                            }).toString().replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* === Window View Mode === */}
+            {openMode === 'window' && selectedEmail && (
+                <div 
+                    style={{ top: windowPosition.y, left: windowPosition.x }}
+                    className="fixed z-[100] w-full max-w-2xl h-[500px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 flex flex-col overflow-hidden animate-scale-in"
+                    onMouseDown={handleWindowMouseDown}
+                >
+                    {/* Window title bar / Drag handle */}
+                    <div className="window-title-bar p-3 bg-gray-105 dark:bg-slate-800 flex justify-between items-center cursor-move select-none border-b dark:border-slate-700">
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-red-500 cursor-pointer" onClick={() => setSelectedEmail(null)}></span>
+                            <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
+                            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300 ml-2 truncate max-w-[400px]" title={selectedEmail.subject}>
+                                {selectedEmail.subject}
+                            </span>
+                        </div>
+                        <button onClick={() => setSelectedEmail(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors">
+                            <XMarkIcon className="w-4 h-4 text-gray-500" />
+                        </button>
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {/* Header details */}
+                        <div className="flex justify-between items-center text-xs border-b dark:border-slate-800 pb-2">
+                            <div className="min-w-0">
+                                <span className="font-bold text-gray-700 dark:text-gray-300">De: </span>
+                                <span className="text-gray-500 truncate" title={selectedEmail.from}>{selectedEmail.from}</span>
+                            </div>
+                            <span className="text-gray-400 flex-shrink-0">{new Date(selectedEmail.date).toLocaleDateString()}</span>
+                        </div>
+                        {/* Body content */}
+                        {loadingBody ? (
+                            <div className="flex items-center justify-center h-32">
+                                <ArrowPathIcon className="w-6 h-6 text-gray-400 animate-spin" />
+                            </div>
+                        ) : bodyError ? (
+                            <div className="text-center py-10 text-red-500 text-xs">{bodyError}</div>
+                        ) : (
+                            <div className="bg-white dark:bg-slate-950/20 rounded-xl p-4 shadow-inner min-h-[250px] overflow-x-auto text-xs">
+                                <div
+                                    className="prose dark:prose-invert max-w-none text-gray-800 dark:text-gray-200"
+                                    dangerouslySetInnerHTML={{
+                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`, {
+                                            RETURN_TRUSTED_TYPE: true,
+                                            ADD_TAGS: ['iframe', 'style'],
+                                            ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling']
+                                        }).toString().replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
+                                    }}
+                                />
                             </div>
                         )}
                     </div>

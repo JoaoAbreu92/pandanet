@@ -193,8 +193,29 @@ const ItemDetailModal: React.FC<{
     onClose: () => void;
     onReserve: (itemId: number | string) => void;
     currentUserId: string;
-}> = ({ item, onClose, onReserve, currentUserId }) => {
+    onCancelReserve: (itemId: number | string) => void;
+}> = ({ item, onClose, onReserve, currentUserId, onCancelReserve }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [timeLeft, setTimeLeft] = useState<string>('');
+
+    useEffect(() => {
+        if (item.status !== 'Reservado' || !item.reservedAt) return;
+        const updateTimer = () => {
+            const expiryTime = new Date(item.reservedAt!).getTime() + 24 * 60 * 60 * 1000;
+            const diff = expiryTime - Date.now();
+            if (diff > 0) {
+                const hrs = Math.floor(diff / (1000 * 60 * 60));
+                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const secs = Math.floor((diff % (1000 * 60)) / 1000);
+                setTimeLeft(`${hrs}h ${mins}m ${secs}s`);
+            } else {
+                setTimeLeft('Expirado');
+            }
+        };
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [item]);
 
     const nextImage = () => setCurrentImageIndex(prev => (prev + 1) % item.imageUrls.length);
     const prevImage = () => setCurrentImageIndex(prev => (prev - 1 + item.imageUrls.length) % item.imageUrls.length);
@@ -240,12 +261,23 @@ const ItemDetailModal: React.FC<{
                         <p className="whitespace-pre-wrap">{item.description}</p>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">Anunciado por: {item.seller} em {item.listedAt}</p>
                     </div>
-                    <div className="mt-auto pt-4 border-t dark:border-slate-700">
+                    <div className="mt-auto pt-4 border-t dark:border-slate-700 space-y-3">
+                        {item.status === 'Reservado' && item.reservedAt && (
+                            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-250/30 rounded-xl p-3 text-center">
+                                <p className="text-xs font-bold text-yellow-800 dark:text-yellow-400">TEMPO RESTANTE DE RESERVA</p>
+                                <p className="text-lg font-black text-yellow-600 dark:text-yellow-500 mt-1">{timeLeft || 'Calculando...'}</p>
+                                <p className="text-[10px] text-gray-500 mt-1">Tempo limite de 24h para fechar com o vendedor.</p>
+                            </div>
+                        )}
                         {item.status === 'Disponível' ? (
                             <button onClick={() => onReserve(item.id)} className="w-full py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Tenho Interesse!</button>
+                        ) : item.status === 'Reservado' && item.listedBy === currentUserId ? (
+                            <button onClick={() => { if (window.confirm('Deseja realmente cancelar a reserva e liberar o anúncio imediatamente?')) onCancelReserve(item.id); }} className="w-full py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
+                                Reativar Anúncio (Cancelar Reserva)
+                            </button>
                         ) : (
                             <button className="w-full py-3 bg-gray-300 text-gray-600 font-semibold rounded-lg cursor-not-allowed" disabled>
-                                {item.status === 'Reservado' ? `Reservado por ${item.reservedBy || 'alguém'}` : 'Item Indisponível'}
+                                Reservado por {item.reservedBy || 'alguém'}
                             </button>
                         )}
                     </div>
@@ -494,6 +526,32 @@ const MarketplacePage: React.FC = () => {
     // Estados do Menu de Contexto e Edição
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: MarketplaceItem } | null>(null);
     const [editingItem, setEditingItem] = useState<MarketplaceItem | null>(null);
+    
+    // Tempo restante de reserva para os cards
+    const [timeLefts, setTimeLefts] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const newTimeLefts: Record<string, string> = {};
+            items.forEach(item => {
+                if (item.status === 'Reservado' && item.reservedAt) {
+                    const expiryTime = new Date(item.reservedAt).getTime() + 24 * 60 * 60 * 1000;
+                    const diff = expiryTime - Date.now();
+                    if (diff > 0) {
+                        const hrs = Math.floor(diff / (1000 * 60 * 60));
+                        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+                        newTimeLefts[item.id] = `${hrs}h ${mins}m ${secs}s`;
+                    } else {
+                        newTimeLefts[item.id] = 'Expirado';
+                    }
+                }
+            });
+            setTimeLefts(newTimeLefts);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [items]);
 
     const fetchItems = async () => {
         if (!currentUser?.company_id) {
@@ -516,20 +574,51 @@ const MarketplacePage: React.FC = () => {
             if (error) throw error;
 
             if (data) {
-                const formattedItems: MarketplaceItem[] = data.map((item: any) => ({
-                    id: item.id, // Keep as string (UUID)
-                    title: item.title,
-                    price: item.price,
-                    imageUrls: item.image_urls || [], // Default to empty array if null
-                    category: item.category,
-                    condition: item.condition,
-                    description: item.description,
-                    status: item.status,
-                    reservedBy: item.reserver?.full_name,
-                    seller: item.profiles?.full_name || 'Usuário Excluído',
-                    listedBy: item.listed_by,
-                    listedAt: new Date(item.created_at).toLocaleDateString('pt-BR')
-                }));
+                const now = new Date();
+                const formattedItems: MarketplaceItem[] = [];
+
+                for (const item of data) {
+                    // Verificação de expiração automática (24 horas)
+                    if (item.status === 'Reservado' && item.reserved_at) {
+                        const reservedDate = new Date(item.reserved_at);
+                        const diffHours = (now.getTime() - reservedDate.getTime()) / (1000 * 60 * 60);
+                        if (diffHours >= 24) {
+                            try {
+                                await supabase
+                                    .from('marketplace_items')
+                                    .update({
+                                        status: 'Disponível',
+                                        reserved_by: null,
+                                        reserved_at: null
+                                    })
+                                    .eq('id', item.id);
+                                
+                                item.status = 'Disponível';
+                                item.reserved_by = null;
+                                item.reserved_at = null;
+                                item.reserver = null;
+                            } catch (err) {
+                                console.error('Erro ao liberar item expirado automaticamente:', err);
+                            }
+                        }
+                    }
+
+                    formattedItems.push({
+                        id: item.id,
+                        title: item.title,
+                        price: item.price,
+                        imageUrls: item.image_urls || [],
+                        category: item.category,
+                        condition: item.condition,
+                        description: item.description,
+                        status: item.status,
+                        reservedBy: item.reserver?.full_name,
+                        reservedAt: item.reserved_at,
+                        seller: item.profiles?.full_name || 'Usuário Excluído',
+                        listedBy: item.listed_by,
+                        listedAt: new Date(item.created_at).toLocaleDateString('pt-BR')
+                    });
+                }
                 setItems(formattedItems);
             }
         } catch (error) {
@@ -562,11 +651,13 @@ const MarketplacePage: React.FC = () => {
     const handleReserveItem = async (itemId: number | string) => {
         if (!currentUser) return;
         try {
+            const nowIso = new Date().toISOString();
             const { error } = await supabase
                 .from('marketplace_items')
                 .update({
                     status: 'Reservado',
-                    reserved_by: currentUser.id
+                    reserved_by: currentUser.id,
+                    reserved_at: nowIso
                 })
                 .eq('id', itemId);
 
@@ -575,7 +666,7 @@ const MarketplacePage: React.FC = () => {
             // Optimistic update
             setItems(items.map(item =>
                 item.id === itemId
-                    ? { ...item, status: 'Reservado', reservedBy: currentUser.name }
+                    ? { ...item, status: 'Reservado', reservedBy: currentUser.full_name || currentUser.name, reservedAt: nowIso }
                     : item
             ));
             setSelectedItem(null);
@@ -583,6 +674,33 @@ const MarketplacePage: React.FC = () => {
         } catch (error) {
             console.error('Error reserving item:', error);
             alert('Erro ao reservar item.');
+        }
+    };
+
+    const handleCancelReserveItem = async (itemId: number | string) => {
+        try {
+            const { error } = await supabase
+                .from('marketplace_items')
+                .update({
+                    status: 'Disponível',
+                    reserved_by: null,
+                    reserved_at: null
+                })
+                .eq('id', itemId);
+
+            if (error) throw error;
+
+            // Optimistic update
+            setItems(items.map(item =>
+                item.id === itemId
+                    ? { ...item, status: 'Disponível', reservedBy: undefined, reservedAt: undefined }
+                    : item
+            ));
+            setSelectedItem(null);
+            alert('Reserva cancelada e anúncio reativado com sucesso!');
+        } catch (error) {
+            console.error('Error cancelling reservation:', error);
+            alert('Erro ao cancelar reserva.');
         }
     };
 
@@ -671,7 +789,15 @@ const MarketplacePage: React.FC = () => {
                         </div>
                         <div className="p-4 flex flex-col flex-grow">
                             <h3 className="font-bold text-brand-text dark:text-gray-100 truncate">{item.title}</h3>
-                            <p className="text-sm text-brand-subtle-text dark:text-gray-400">{item.condition}</p>
+                            <p className="text-sm text-brand-subtle-text dark:text-gray-400 mb-1">{item.condition}</p>
+                            
+                            {item.status === 'Reservado' && item.reservedAt && (
+                                <div className="mt-2 text-xs font-bold text-yellow-650 bg-yellow-50 dark:bg-yellow-950/20 dark:text-yellow-400 py-1 px-2 rounded-lg flex justify-between items-center mb-2">
+                                    <span>Tempo rest.:</span>
+                                    <span className="font-black">{timeLefts[item.id] || 'Calculando...'}</span>
+                                </div>
+                            )}
+
                             <p className="mt-2 text-xl font-bold text-brand-primary flex-grow">R$ {item.price.toFixed(2)}</p>
                             <button onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }} className="mt-4 w-full text-center px-4 py-2 text-sm font-medium text-brand-primary bg-emerald-50 dark:bg-emerald-900/20 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
                                 Ver Detalhes
@@ -710,7 +836,15 @@ const MarketplacePage: React.FC = () => {
                 </div>
             )}
 
-            {selectedItem && currentUser && <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onReserve={handleReserveItem} currentUserId={currentUser.id} />}
+            {selectedItem && currentUser && (
+                <ItemDetailModal 
+                    item={selectedItem} 
+                    onClose={() => setSelectedItem(null)} 
+                    onReserve={handleReserveItem} 
+                    currentUserId={currentUser.id} 
+                    onCancelReserve={handleCancelReserveItem}
+                />
+            )}
 
             {isSellModalOpen && <SellItemModal onClose={() => setSellModalOpen(false)} onAddItem={fetchItems} currentUser={currentUser} />}
 

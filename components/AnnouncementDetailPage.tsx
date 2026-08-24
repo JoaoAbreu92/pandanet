@@ -39,7 +39,7 @@ const AnnouncementDetailPage: React.FC<AnnouncementDetailProps> = ({ announcemen
             <Card title="">
                 {announcement.imageUrl && (
                     <div className="w-full max-h-[600px] bg-gray-50 rounded-t-lg mb-6 flex items-center justify-center overflow-hidden">
-                        <img src={announcement.imageUrl} alt={announcement.title} className="max-w-full max-h-[600px] object-contain" />
+                        <img src={announcement.imageUrl} alt={announcement.title} className="w-full aspect-[3/1] object-cover rounded-t-lg" />
                     </div>
                 )}
                 <div className="p-2">

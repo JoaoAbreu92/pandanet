@@ -910,7 +910,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                         {mode === 'events' ? 'Aluguel de Salas & Espaços' : 'Agendamentos'}
                         <span className="text-xs bg-brand-primary/10 text-brand-primary font-bold px-2.5 py-1 rounded-full border border-brand-primary/20 flex items-center gap-1">
                             <SparklesIcon className="w-3.5 h-3.5" />
-                            Premium Cal.com
+                            Premium
                         </span>
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">
