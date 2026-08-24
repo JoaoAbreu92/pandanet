@@ -554,13 +554,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      // Buscar grupos: is_group = true OU JID contendo '-' que é marca registrada de grupo do Evolution
-      query = query.or('is_group.eq.true,contact_phone.ilike.%-%');
+      // Buscar grupos: apenas is_group = true (mais seguro que query strings)
+      query = query.eq('is_group', true);
     } else if (chatTypeFilter === 'private') {
       // Remover grupos
-      query = query
-        .neq('is_group', true)
-        .not('contact_phone', 'ilike', '%-%');
+      query = query.neq('is_group', true);
     }
     // Se for 'all', não aplica filtro e mostra ambos
 

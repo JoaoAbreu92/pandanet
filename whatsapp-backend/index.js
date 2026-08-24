@@ -552,14 +552,14 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         // 2. Buscar TODOS os Grupos (Lógica Resiliente)
         try {
             console.log(`[SYNC] Buscando grupos via fetchAllGroups para ${instanceName}...`);
-            const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
+            const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, { headers });
             let groupList = [];
 
             if (respG.ok) {
                 const groups = await respG.json();
                 groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
-            } else if (respG.status === 400) {
-                console.warn(`[SYNC] Erro 400 em fetchAllGroups. Tentando fallback para findChats...`);
+            } else if (respG.status === 400 || respG.status === 500) {
+                console.warn(`[SYNC] Erro ${respG.status} em fetchAllGroups. Tentando fallback para findChats...`);
             }
 
             // FALLBACK: Se fetchAllGroups falhar ou vier vazio, tenta buscar via chats recentes
@@ -1058,16 +1058,17 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             .eq('contact_phone', fromPhone)
             .maybeSingle();
 
-        let conversationId;
+        let conversationId = conv?.id;
         if (!conv) {
             // Se for grupo, abre direto como "aberto" (sem pendente individual)
             const initialStatus = 'aberto';
+            const resolvedGroupName = message?.subject || 'Grupo (Sem Nome)';
             const { data: newConv, error: createErr } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
                     company_id: companyId,
                     contact_phone: fromPhone,
-                    contact_name: pushName || (isGroup ? (message.subject || 'Grupo') : formatPhoneDisplay(fromPhone)),
+                    contact_name: isGroup ? resolvedGroupName : (pushName || formatPhoneDisplay(fromPhone)),
                     status: initialStatus,
                     unread_count: isHistorical ? 0 : 1,
                     connection_id: connectionId,
