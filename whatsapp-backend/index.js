@@ -1221,26 +1221,52 @@ function formatMenuText(node) {
     return text;
 }
 
-async function sendBotMessage(text, conversation, companyId, connectionId) {
-    if (!text) return;
-    const instanceName = `conn_${connectionId}`;
+async function dispatchTextEvolution(instanceName, phoneNumber, text) {
+    const cleanNumber = (phoneNumber || "").replace(/\D/g, "");
+    let sendOk = false;
+    let sendRes = {};
     try {
-        const cleanNumber = (conversation.contact_phone || "").replace(/\D/g, "");
-        const res = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        // Tenta formato v1 PRIMEIRO (textMessage)
+        const resV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 number: cleanNumber,
-                text: text
+                textMessage: { text: text }
             })
         });
-        if (!res.ok) {
-            const errText = await res.text();
-            console.error(`[CHATBOT] Falha ao enviar msg via Evolution API para ${conversation.contact_phone} (Instância: ${instanceName}). Status: ${res.status}. Resposta: ${errText}`);
+        try { sendRes = await resV1.json(); } catch(e) { sendRes = {}; }
+        if (resV1.ok && !sendRes?.error) {
+            sendOk = true;
+        } else {
+            console.warn(`[EVO DISPATCH] Formato v1 falhou para ${cleanNumber} (Status: ${resV1.status}). Tentando formato v2...`);
+            // Fallback para formato v2
+            const resV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                method: 'POST',
+                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    number: cleanNumber,
+                    text: text
+                })
+            });
+            try { sendRes = await resV2.json(); } catch(e) { sendRes = {}; }
+            if (resV2.ok && !sendRes?.error) sendOk = true;
+        }
+
+        if (!sendOk) {
+            console.error(`[EVO DISPATCH] FALHA TOTAL ao enviar para ${cleanNumber}. Resposta:`, JSON.stringify(sendRes));
         }
     } catch (e) {
-        console.error('[CHATBOT] Erro ao enviar msg:', e.message);
+        console.error('[EVO DISPATCH] Erro de rede/conexão:', e.message);
     }
+    return sendOk;
+}
+
+async function sendBotMessage(text, conversation, companyId, connectionId) {
+    if (!text) return;
+    const instanceName = `conn_${connectionId}`;
+    
+    await dispatchTextEvolution(instanceName, conversation.contact_phone, text);
 
     try {
         await supabase.from('whatsapp_messages').insert({
@@ -2049,14 +2075,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
                             // Enviar mensagem via Evolution API
                             const instanceName = `conn_${connectionId}`;
-                            fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                                method: 'POST',
-                                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    number: fromPhone,
-                                    text: awayMessage
-                                })
-                            }).catch(e => console.error('[EXPEDIENTE] Erro ao enviar mensagem de ausência:', e.message));
+                            dispatchTextEvolution(instanceName, fromPhone, awayMessage)
+                                .catch(e => console.error('[EXPEDIENTE] Erro ao enviar mensagem de ausência:', e.message));
 
                             // Inserir registro no chat
                             await supabase.from('whatsapp_messages').insert({
@@ -2118,14 +2138,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                             const notifyText = `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
                                             
                                             const instanceName = `conn_${connectionId}`;
-                                            await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                                                method: 'POST',
-                                                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    number: fromPhone,
-                                                    text: notifyText
-                                                })
-                                            }).catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+                                            await dispatchTextEvolution(instanceName, fromPhone, notifyText)
+                                                .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
 
                                             await supabase.from('whatsapp_messages').insert({
                                                 company_id: companyId,
