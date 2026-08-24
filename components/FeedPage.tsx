@@ -698,19 +698,19 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 </div>
                             )}
 
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                <div className="flex space-x-2">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 gap-4">
+                                <div className="flex justify-around sm:justify-start space-x-2">
                                     <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">Foto</span></button>
                                     <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">Reconhecer</span></button>
                                 </div>
-                                <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center space-x-2 px-6 py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
+                                <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
                             </div>
-                            <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3">
-                                <div className="flex items-center space-x-1">
-                                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
-                                    <span className="text-orange-600 font-bold">Importante: Postagens expiram automaticamente em 60 dias para otimização de espaço.</span>
+                            <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3 gap-2">
+                                <div className="flex items-start space-x-2">
+                                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
+                                    <span className="text-orange-600 font-bold leading-tight">Importante: Postagens expiram automaticamente em 60 dias para otimização de espaço.</span>
                                 </div>
-                                <span className="italic whitespace-nowrap hidden sm:inline">Acervo organizado e eficiente</span>
+                                <span className="italic whitespace-nowrap hidden sm:inline text-right">Acervo organizado e eficiente</span>
                             </div>
 
                             <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />

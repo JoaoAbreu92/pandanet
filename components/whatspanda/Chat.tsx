@@ -14,7 +14,8 @@ import {
   Paperclip, 
   CheckCheck,
   User,
-  Clock
+  Clock,
+  ArrowLeft
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -149,9 +150,9 @@ const Chat: React.FC = () => {
   const filteredConversations = conversations.filter(c => c.status === activeTab);
 
   return (
-    <div className="flex h-full bg-gray-100 overflow-hidden">
+    <div className="flex h-full bg-gray-100 overflow-hidden relative">
       {/* Sidebar: Conversations List */}
-      <div className="w-1/4 bg-white border-r border-gray-200 flex flex-col">
+      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-1/4 bg-white border-r border-gray-200 flex-col`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex justify-between items-center mb-4">
@@ -226,18 +227,24 @@ const Chat: React.FC = () => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#efeae2]">
+      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#efeae2]`}>
         {selectedConversation ? (
           <>
             {/* Chat Header */}
             <div className="p-3 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600">
+                <button
+                  onClick={() => setSelectedConversation(null)}
+                  className="p-2 md:hidden hover:bg-gray-100 rounded-full text-gray-600 mr-1"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 shrink-0">
                   <User className="w-6 h-6" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{selectedConversation.contact_name}</h3>
-                  <p className="text-xs text-gray-500">{selectedConversation.contact_phone}</p>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-gray-900 truncate">{selectedConversation.contact_name}</h3>
+                  <p className="text-xs text-gray-500 truncate">{selectedConversation.contact_phone}</p>
                 </div>
               </div>
               <div className="flex gap-2">
