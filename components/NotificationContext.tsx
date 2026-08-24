@@ -483,7 +483,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'notifications'
+                    table: 'notifications',
+                    filter: `user_id=eq.${currentUser.id}`
                 }, (payload) => {
                     console.log('--- REALTIME EVENTO RECEBIDO ---', payload);
                     const newNotif = payload.new as any;
@@ -513,7 +514,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .on('postgres_changes', {
                     event: 'INSERT',
                     schema: 'public',
-                    table: 'messages'
+                    table: 'messages',
+                    filter: `company_id=eq.${currentUser.company_id}`
                 }, async (payload) => {
                     const newMsg = payload.new as any;
                     if (newMsg && newMsg.sender_id !== currentUser.id) {
@@ -564,7 +566,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     .on('postgres_changes', {
                         event: '*',
                         schema: 'public',
-                        table: 'whatsapp_conversations'
+                        table: 'whatsapp_conversations',
+                        filter: `company_id=eq.${currentUser.company_id}`
                     }, () => {
                         fetchNotifications();
                     })
@@ -576,7 +579,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
-                        table: 'whatsapp_messages'
+                        table: 'whatsapp_messages',
+                        filter: `company_id=eq.${currentUser.company_id}`
                     }, async (payload) => {
                         const newMsg = payload.new as any;
                         if (newMsg && newMsg.is_from_customer) {

@@ -375,11 +375,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     fetchSettings();
     fetchConversations();
     loadFiltersData();
-    
+  }, []); // Run once on mount
+
+  useEffect(() => {
+    const companyId = currentUser?.company_id || profile?.company_id;
+    if (!companyId) return;
+
     // Conversation list subscription com debounce para evitar spam de refetch
     const convSubscription = supabase
-      .channel('whatsapp_conversations_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
+      .channel(`whatsapp_conversations_changes_${companyId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'whatsapp_conversations',
+        filter: `company_id=eq.${companyId}`
+      }, payload => {
         // Se for um novo registro (INSERT), atualiza na hora para nao ter delay
         if (payload.eventType === 'INSERT') {
           fetchConversationsRef.current?.();
@@ -398,7 +408,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       supabase.removeChannel(convSubscription);
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     };
-  }, []); // Run once on mount
+  }, [currentUser?.company_id, profile?.company_id]); // Run when companyId is available
 
   useEffect(() => {
     // Message subscription - depends on selectedConversation
