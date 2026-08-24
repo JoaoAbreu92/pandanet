@@ -1034,8 +1034,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ID: {plan.id.slice(0, 8)}</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => openModal('editPlan', null, plan.id)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar"><PencilIcon className="w-4 h-4" /></button>
-                                            <button onClick={() => openModal('deletePlan', null, plan.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><TrashIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => openModal('editPlan', null, parseInt(plan.id))} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar"><PencilIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => openModal('deletePlan', null, parseInt(plan.id))} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><TrashIcon className="w-4 h-4" /></button>
                                         </div>
                                     </div>
 
@@ -1471,10 +1471,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 <td className="px-4 py-3 text-gray-500">{user.role || '-'}</td>
                                                 <td className="px-4 py-3 text-center">
                                                     <button
-                                                        onClick={() => toggleCompanyAdmin(user.id, !!user.is_company_admin)}
-                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.is_company_admin ? 'bg-purple-600' : 'bg-gray-200'}`}
+                                                        onClick={() => toggleCompanyAdmin(user.id, !!user.isCompanyAdmin)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.isCompanyAdmin ? 'bg-purple-600' : 'bg-gray-200'}`}
                                                     >
-                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user.is_company_admin ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user.isCompanyAdmin ? 'translate-x-6' : 'translate-x-1'}`} />
                                                     </button>
                                                 </td>
                                             </tr>
