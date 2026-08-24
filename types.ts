@@ -173,6 +173,13 @@ export interface EmployeePermissions {
   viewServiceStatus: boolean;
   viewInfoSec: boolean;
 
+  // RH Management
+  viewEmployeeDetails: boolean;
+  editEmployeeProfile: boolean;
+  deleteEmployeeProfile: boolean;
+  viewVacationRequests: boolean;
+  manageVacationRequests: boolean;
+
   // New Global Permissions
   createEvents: boolean;
   manageMarketplace: boolean;
@@ -203,6 +210,15 @@ export interface Employee {
   department_id?: string;
   department_name?: string;
   address?: string; // Localização para previsão do tempo
+  // Personal Data (RH only)
+  rg?: string;
+  cpf?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  health_insurance?: string;
+  blood_type?: string;
+  marital_status?: string;
+  education_level?: string;
 }
 
 export interface Task {

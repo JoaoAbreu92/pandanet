@@ -46,7 +46,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         bio: data.bio,
                         phone: data.phone,
                         officeLocation: data.office_location,
-                        joinDate: data.created_at, // Use created_at as join date equivalent
+                        joinDate: data.join_date || data.created_at, // Use real join_date if exists
                         birthDate: data.birth_date,
                         company_id: data.company_id,
                         permissions: data.permissions || {},
@@ -83,7 +83,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             bio: data.bio,
                             phone: data.phone,
                             officeLocation: data.office_location,
-                            joinDate: data.created_at,
+                            joinDate: data.join_date || data.created_at,
                             birthDate: data.birth_date,
                             isAdmin: data.is_admin,
                             company_id: data.company_id,
@@ -280,7 +280,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     role: freshProfile.role,
                     team: freshProfile.team,
                     avatarUrl: freshProfile.avatar_url,
-                    joinDate: freshProfile.join_date,
+                    joinDate: freshProfile.join_date || freshProfile.created_at,
                     birthDate: freshProfile.birth_date,
                     isAdmin: freshProfile.is_admin,
                     isOnline: false,
@@ -675,13 +675,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Data de Nascimento</h4>
-                                        <p className="text-brand-text">{userData.birthDate ? new Date(userData.birthDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'Não informada'}</p>
+                                            <p className="text-brand-text">
+                                                {userData.birthDate ? new Date(userData.birthDate.substring(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR') : 'Não informada'}
+                                            </p>
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Data de Início</h4>
                                         <p className="text-brand-text">
                                             {userData.joinDate && !isNaN(new Date(userData.joinDate).getTime())
-                                                ? new Date(userData.joinDate + 'T12:00:00').toLocaleDateString('pt-BR')
+                                                    ? new Date(userData.joinDate.substring(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')
                                                 : 'Não informada'}
                                         </p>
                                     </div>

@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>
             <div className={`flex items-center justify-center h-20 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'md:flex-col md:space-y-0'}`}>
-                <Logo showText={isOpen} companyLogo={companyLogo} />
+                <Logo showText={isOpen} />
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
@@ -114,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <hr className="my-4 border-gray-200 dark:border-gray-700" />
 
                 <NavMenu label="RH" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
-                    <NavItem page="directory" label={t('sidebar.directory')} icon={UsersIcon} permission="viewDirectory" />
+                    <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" />
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
                     <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
@@ -165,10 +165,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             </nav>
             <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
-                    <img src={companyLogo} alt={companyName} className="h-10 mx-auto mb-2 object-contain" />
+                    <img src={companyLogo} alt={companyName} className="h-10 mx-auto object-contain" />
                 )}
-                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{companyName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{t('sidebar.corporate_intranet')}</p>
+                <p className="text-sm font-bold text-gray-800 dark:text-white truncate mt-2">{companyName}</p>
             </div>
         </aside>
     );

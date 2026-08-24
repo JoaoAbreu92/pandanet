@@ -1,17 +1,120 @@
 import React, { useState } from 'react';
 import Card from './Card';
-// FIX: Correcting the import path for types.
 import type { Employee } from '../types';
-import { SearchIcon } from './icons';
+import { SearchIcon, XCircleIcon } from './icons';
 import { usePresence } from './PresenceContext';
+import { useAuth } from './AuthContext';
 
 interface TeamDirectoryProps {
   employees: Employee[];
+    onNavigate?: (page: any, context?: any) => void;
 }
 
-const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
+const EmployeeDetailsModal: React.FC<{ employee: Employee; onClose: () => void }> = ({ employee, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
+
+                <div className="flex items-center space-x-4 mb-6">
+                    <img src={employee.avatarUrl} alt={employee.name} className="w-20 h-20 rounded-full border-2 border-brand-primary object-cover" />
+                    <div>
+                        <h3 className="text-xl font-bold text-brand-text">{employee.name}</h3>
+                        <p className="text-brand-subtle-text">{employee.role}</p>
+                        <p className="text-sm text-gray-400">{employee.team}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Email</p>
+                            <p className="text-sm text-brand-text">{employee.email}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Telefone</p>
+                            <p className="text-sm text-brand-text">{employee.phone || 'Não informado'}</p>
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="font-bold text-brand-text mb-3">Dados Confidenciais</h4>
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                            <div>
+                                <p className="text-xs font-bold text-red-400 uppercase">RG</p>
+                                <p className="text-sm font-medium text-brand-text">{employee.rg || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-red-400 uppercase">CPF</p>
+                                <p className="text-sm font-medium text-brand-text">{employee.cpf || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-red-400 uppercase">Estado Civil</p>
+                                <p className="text-sm font-medium text-brand-text">{employee.marital_status || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-red-400 uppercase">Escolaridade</p>
+                                <p className="text-sm font-medium text-brand-text">{employee.education_level || 'Não informado'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <h4 className="font-bold text-gray-700 text-sm">Contato de Emergência</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase">Nome</p>
+                                <p className="text-sm text-brand-text">{employee.emergency_contact_name || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase">Telefone</p>
+                                <p className="text-sm text-brand-text">{employee.emergency_contact_phone || 'Não informado'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Plano de Saúde</p>
+                            <p className="text-sm text-brand-text">{employee.health_insurance || 'Não informado'}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Tipo Sanguíneo</p>
+                            <p className="text-sm font-bold text-red-600">{employee.blood_type || 'Não informado'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                    <button onClick={onClose} className="px-6 py-2 bg-gray-100 text-gray-700 rounded-md font-bold hover:bg-gray-200 transition-colors">Fechar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const { onlineUsers } = usePresence();
+    const { profile } = useAuth();
+
+    const canViewDetails = profile?.is_admin || profile?.permissions?.viewEmployeeDetails;
+
+    const handleAction = (page: string, context: any) => {
+        if (page === 'profile-details') {
+            setSelectedEmployee(context.employee);
+            return;
+        }
+
+        if (onNavigate) {
+            onNavigate(page as any, context);
+        } else {
+            // Fallback if onNavigate not provided
+            const query = context.conversationId ? `?conversation=${context.conversationId}` : '';
+            window.location.href = `/${page}${query}`;
+        }
+    };
 
   const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -19,7 +122,8 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
   );
 
   return (
-    <Card title="Diretório da Equipe">
+      <>
+          <Card title="Funcionários">
         <div className="relative mb-4">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -59,7 +163,7 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
                         {/* Botões de ação */}
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                                onClick={() => window.location.href = `/messages?conversation=${employee.id}`}
+                                onClick={() => handleAction('messages', { conversationId: employee.id })}
                                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                                 title="Enviar mensagem"
                             >
@@ -68,9 +172,15 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
                                 </svg>
                             </button>
                             <button
-                                onClick={() => window.location.href = `/profile/${employee.id}`}
+                                onClick={() => {
+                                    if (canViewDetails) {
+                                        handleAction('profile-details', { employee });
+                                    } else {
+                                        handleAction('profile', { id: employee.id });
+                                    }
+                                }}
                                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                                title="Ver perfil"
+                                title={canViewDetails ? "Ver detalhes" : "Ver perfil"}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -93,6 +203,11 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
             )}
         </div>
     </Card>
+
+          {selectedEmployee && (
+              <EmployeeDetailsModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} />
+          )}
+      </>
   );
 };
 

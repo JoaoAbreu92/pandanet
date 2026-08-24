@@ -209,8 +209,24 @@ const LoginPage: React.FC = () => {
             </div>
 
 
-            <div className="mt-8 text-center text-xs text-gray-500">
-                &copy; 2026 Pixel Intranet. All rights reserved.
+            <div className="mt-8 text-center space-y-2">
+                <p className="text-xs text-gray-500">
+                    &copy; 2026 Pixel Intranet. All rights reserved.
+                </p>
+                <a
+                    href="https://grupopixel.com.br/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex flex-col items-center gap-1 group transition-all"
+                >
+                    <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold group-hover:text-brand-primary">Sistema criado por</span>
+                    <span className="text-xs font-black text-gray-600 dark:text-gray-400 group-hover:text-brand-primary flex items-center gap-1">
+                        Grupo Pixel
+                        <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </span>
+                </a>
             </div>
         </div>
     );

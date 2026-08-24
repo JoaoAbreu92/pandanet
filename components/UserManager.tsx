@@ -40,14 +40,41 @@ const UserFormModal: React.FC<{
             viewMessages: true,
             openTickets: true,
             viewCalendar: true,
-            viewResources: true,
-            useMarketplace: true,
+            viewDirectory: true,
+            viewForms: true,
+            viewBenefits: true,
+            viewOnboarding: true,
+            viewRecognition: true,
+            viewDocuments: true,
+            viewTraining: true,
+            viewSurveys: true,
+            viewPolicies: true,
+            viewWellbeing: true,
+            viewTiDashboard: false,
+            openTiRequests: true,
+            viewKnowledgeBase: true,
+            viewServiceStatus: true,
+            viewInfoSec: true,
+            createEvents: false,
+            manageMarketplace: false,
+            viewEmployeeDetails: false,
+            editEmployeeProfile: false,
+            deleteEmployeeProfile: false,
+            viewVacationRequests: false,
+            manageVacationRequests: false,
             canPostText: true,
             canPostImage: true,
             canPostVideo: true,
-            createEvents: false,
-            manageMarketplace: false,
         },
+        // Personal Data
+        rg: user?.rg || '',
+        cpf: user?.cpf || '',
+        emergency_contact_name: user?.emergency_contact_name || '',
+        emergency_contact_phone: user?.emergency_contact_phone || '',
+        health_insurance: user?.health_insurance || '',
+        blood_type: user?.blood_type || '',
+        marital_status: user?.marital_status || '',
+        education_level: user?.education_level || '',
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,6 +127,20 @@ const UserFormModal: React.FC<{
                         </div>
 
                         <div><label className="flex items-center space-x-2 mt-6 text-brand-text"><input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary" /><span>{t('users.admin')}</span></label></div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="font-bold text-gray-800 mb-4">Dados de Funcionário (Confidencial)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">RG</label><input type="text" name="rg" value={formData.rg} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">CPF</label><input type="text" name="cpf" value={formData.cpf} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Contato de Emergência (Nome)</label><input type="text" name="emergency_contact_name" value={formData.emergency_contact_name} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Contato de Emergência (Telefone)</label><input type="text" name="emergency_contact_phone" value={formData.emergency_contact_phone} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Plano de Saúde</label><input type="text" name="health_insurance" value={formData.health_insurance} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Tipo Sanguíneo</label><input type="text" name="blood_type" value={formData.blood_type} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Estado Civil</label><input type="text" name="marital_status" value={formData.marital_status} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Escolaridade</label><input type="text" name="education_level" value={formData.education_level} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                        </div>
                     </div>
                     <div>
                         <div className="space-y-4">
@@ -219,6 +260,33 @@ const UserFormModal: React.FC<{
                                 </div>
                             </div>
 
+                            {/* Restricted Management Permissions */}
+                            <div>
+                                <h4 className="font-semibold text-sm text-red-600 mb-2 border-b border-red-100 pb-1">Administração de RH</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewEmployeeDetails" checked={formData.permissions.viewEmployeeDetails} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Ver Dados Confidenciais</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Editar Funcionários</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Excluir Funcionários</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="viewVacationRequests" checked={formData.permissions.viewVacationRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Ver Pedidos de Férias</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 text-brand-text">
+                                        <input type="checkbox" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
+                                        <span className="text-sm">Aprovar/Rejeitar Férias</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             {/* New Permissions */}
                             <div>
                                 <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Permissões Especiais</h4>
@@ -273,8 +341,16 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         is_admin: userData.isAdmin,
                         is_company_admin: userData.isAdmin,
                         permissions: userData.permissions,
-                        avatar_url: userData.avatarUrl,
-                        department_id: (userData as any).department_id || null
+                        avatar_url: userData.avatarUrl || null,
+                        department_id: (userData as any).department_id || null,
+                        rg: (userData as any).rg || null,
+                        cpf: (userData as any).cpf || null,
+                        emergency_contact_name: (userData as any).emergency_contact_name || null,
+                        emergency_contact_phone: (userData as any).emergency_contact_phone || null,
+                        health_insurance: (userData as any).health_insurance || null,
+                        blood_type: (userData as any).blood_type || null,
+                        marital_status: (userData as any).marital_status || null,
+                        education_level: (userData as any).education_level || null
                     })
                     .eq('id', userData.id);
 
@@ -303,7 +379,15 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         avatar_url: userData.avatarUrl,
                         join_date: userData.joinDate,
                         birth_date: userData.birthDate,
-                        department_id: (userData as any).department_id || null
+                        department_id: (userData as any).department_id || null,
+                        rg: (userData as any).rg || null,
+                        cpf: (userData as any).cpf || null,
+                        emergency_contact_name: (userData as any).emergency_contact_name || null,
+                        emergency_contact_phone: (userData as any).emergency_contact_phone || null,
+                        health_insurance: (userData as any).health_insurance || null,
+                        blood_type: (userData as any).blood_type || null,
+                        marital_status: (userData as any).marital_status || null,
+                        education_level: (userData as any).education_level || null
                     }])
                     .select();
 

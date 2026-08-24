@@ -140,9 +140,16 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'settings', label: 'Geral' },
         { id: 'mural', label: 'Mural' },
     ].filter(tab => {
-        if (!tab.featureId) return true;
-        if (!customFeatures) return true;
-        return customFeatures[tab.featureId] !== false;
+        if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
+
+        // Permissões granulares para não-Super Admins
+        if (useAuth().profile?.role !== 'Super Admin') {
+            const permissions = useAuth().profile?.permissions;
+            if (tab.id === 'users' && !permissions?.viewEmployeeDetails && !useAuth().profile?.isAdmin) return false;
+            if (tab.id === 'forms' && !permissions?.viewVacationRequests && !useAuth().profile?.isAdmin) return false;
+        }
+
+        return true;
     });
 
     const renderContent = () => {

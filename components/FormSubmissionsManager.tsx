@@ -9,8 +9,11 @@ const FormSubmissionsManager: React.FC = () => {
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const canView = currentUser?.is_admin || currentUser?.permissions?.viewVacationRequests;
+    const canManage = currentUser?.is_admin || currentUser?.permissions?.manageVacationRequests;
+
     const fetchSubmissions = async () => {
-        if (!currentUser?.company_id) return;
+        if (!currentUser?.company_id || !canView) return;
         setLoading(true);
         try {
             const { data, error } = await supabase
@@ -69,6 +72,8 @@ const FormSubmissionsManager: React.FC = () => {
         }
     };
 
+    if (!canView) return <div className="p-8 text-center text-red-500 font-bold bg-red-50 rounded-lg border border-red-100">Acesso Negado: Você não tem permissão para visualizar solicitações de RH.</div>;
+
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando solicitações...</div>;
 
     return (
@@ -107,7 +112,7 @@ const FormSubmissionsManager: React.FC = () => {
                                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${getStatusColor(sub.status)}`}>{sub.status}</span>
                                     </td>
                                     <td className="px-6 py-4 text-right space-x-2">
-                                        {sub.status === 'Pendente' && (
+                                        {canManage && sub.status === 'Pendente' && (
                                             <>
                                                 <button onClick={() => handleUpdateStatus(sub.id, 'Aprovado')} className="px-3 py-1 text-xs font-bold text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors">Aprovar</button>
                                                 <button onClick={() => handleUpdateStatus(sub.id, 'Rejeitado')} className="px-3 py-1 text-xs font-bold text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors">Rejeitar</button>
