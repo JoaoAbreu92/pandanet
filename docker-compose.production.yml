@@ -22,6 +22,7 @@ services:
       - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "pandanet.grupopixel.com.br:host-gateway"
     networks:
       - pandanet_network
       - supabase_default
