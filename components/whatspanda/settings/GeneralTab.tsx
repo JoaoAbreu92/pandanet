@@ -11,6 +11,7 @@ interface WhatsAppSettingsData {
     business_hours_end?: string;
     business_hours?: any;
     away_message?: string;
+    enable_away_message?: boolean;
     reject_calls?: boolean;
     rejection_message?: string;
     auto_assign?: boolean;
@@ -19,6 +20,7 @@ interface WhatsAppSettingsData {
     send_transfer_message_to_client?: boolean;
     keyword_transfers?: any[];
     close_message?: string;
+    enable_close_message?: boolean;
     isolate_chat_history?: boolean;
     chatbot_delay?: number;
 }
@@ -44,7 +46,9 @@ const GeneralTab: React.FC = () => {
     const [businessHoursStart, setBusinessHoursStart] = useState('08:00');
     const [businessHoursEnd, setBusinessHoursEnd] = useState('18:00');
     const [awayMessage, setAwayMessage] = useState('');
+    const [enableAwayMessage, setEnableAwayMessage] = useState(true);
     const [closeMessage, setCloseMessage] = useState('');
+    const [enableCloseMessage, setEnableCloseMessage] = useState(true);
     const [rejectCalls, setRejectCalls] = useState(false);
     const [rejectionMessage, setRejectionMessage] = useState('');
     const [autoAssign, setAutoAssign] = useState(false);
@@ -81,7 +85,7 @@ const GeneralTab: React.FC = () => {
             // Fetch WhatsApp connection settings
             const { data: settingsData, error: settingsError } = await supabase
                 .from('whatsapp_settings')
-                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers, close_message, isolate_chat_history, chatbot_delay')
+                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, enable_away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers, close_message, enable_close_message, isolate_chat_history, chatbot_delay')
                 .eq('company_id', companyId);
 
             if (settingsError) throw settingsError;
@@ -121,7 +125,9 @@ const GeneralTab: React.FC = () => {
         setBusinessHoursEnd(conn.business_hours_end?.slice(0, 5) || '18:00');
         setBusinessHours(conn.business_hours || { general: {}, queues: {} });
         setAwayMessage(conn.away_message || '');
+        setEnableAwayMessage(conn.enable_away_message !== false);
         setCloseMessage(conn.close_message || '');
+        setEnableCloseMessage(conn.enable_close_message !== false);
         setRejectCalls(!!conn.reject_calls);
         setRejectionMessage(conn.rejection_message || '');
         setAutoAssign(!!conn.auto_assign);
@@ -206,7 +212,9 @@ const GeneralTab: React.FC = () => {
             business_hours_end: businessHoursEnd ? `${businessHoursEnd}:00` : null,
             business_hours: businessHours,
             away_message: awayMessage,
+            enable_away_message: enableAwayMessage,
             close_message: closeMessage,
+            enable_close_message: enableCloseMessage,
             reject_calls: rejectCalls,
             rejection_message: rejectionMessage,
             auto_assign: autoAssign,
@@ -296,36 +304,62 @@ const GeneralTab: React.FC = () => {
 
                 {/* Away Message */}
                 <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-amber-500" /> Mensagem de Ausência
-                    </h4>
+                    <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5 text-amber-500" /> Mensagem de Ausência
+                        </h4>
+                        <label htmlFor="enable-away-toggle" className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="enable-away-toggle"
+                                checked={enableAwayMessage}
+                                onChange={(e) => setEnableAwayMessage(e.target.checked)}
+                                className="sr-only peer cursor-pointer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
+                        </label>
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes que entrarem em contato fora do horário de atendimento.</p>
 
                     <div>
                         <textarea
                             value={awayMessage}
                             onChange={(e) => setAwayMessage(e.target.value)}
+                            disabled={!enableAwayMessage}
                             rows={3}
                             placeholder="Olá! Nosso expediente se encerrou. Retornaremos o contato assim que possível."
-                            className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400"
+                            className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed"
                         />
                     </div>
                 </div>
 
                 {/* Close Message */}
                 <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-emerald-500" /> Mensagem de Encerramento
-                    </h4>
+                    <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5 text-emerald-500" /> Mensagem de Encerramento
+                        </h4>
+                        <label htmlFor="enable-close-toggle" className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="enable-close-toggle"
+                                checked={enableCloseMessage}
+                                onChange={(e) => setEnableCloseMessage(e.target.checked)}
+                                className="sr-only peer cursor-pointer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
+                        </label>
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes no WhatsApp assim que o atendimento for encerrado pelo atendente.</p>
 
                     <div>
                         <textarea
                             value={closeMessage}
                             onChange={(e) => setCloseMessage(e.target.value)}
+                            disabled={!enableCloseMessage}
                             rows={3}
                             placeholder="Seu atendimento foi concluído. Obrigado pelo contato!"
-                            className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400"
+                            className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed"
                         />
                     </div>
                 </div>

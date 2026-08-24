@@ -189,13 +189,15 @@ async function runAutoMigration() {
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna shared_with:', e));
 
-        console.log('[MIGRATION] Verificando e criando colunas de gerenciamento de acesso a grupos...');
+        console.log('[MIGRATION] Verificando e criando colunas de gerenciamento de acesso a grupos e toggles de mensagem...');
         await supabase.rpc('exec_sql', {
             sql: `
                 ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS allow_all_groups_access BOOLEAN DEFAULT TRUE;
+                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS enable_away_message BOOLEAN DEFAULT TRUE;
+                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS enable_close_message BOOLEAN DEFAULT TRUE;
                 ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS allowed_users UUID[] DEFAULT '{}';
             `
-        }).catch(e => console.error('[MIGRATION] Erro ao adicionar colunas de acesso a grupos:', e));
+        }).catch(e => console.error('[MIGRATION] Erro ao adicionar colunas de acesso a grupos e toggles:', e));
 
         console.log('[MIGRATION] Verificando e aplicando correção de segurança RLS para whatsapp_conversations...');
         await supabase.rpc('exec_sql', {
@@ -1658,7 +1660,8 @@ async function executeNode(node, conversation, companyId, connectionId, allNodes
             chatbot_node_id: null 
         }).eq('id', conversation.id);
         
-        await sendBotMessage("Encaminhando seu atendimento para o setor responsável...", conversation, companyId, connectionId);
+        const customText = (node.content?.text && node.content.text.trim()) ? node.content.text.trim() : "Encaminhando seu atendimento para o setor responsável...";
+        await sendBotMessage(customText, conversation, companyId, connectionId);
     } else if (node.type === 'transfer_user') {
         const userId = node.content?.user_id;
         await supabase.from('whatsapp_conversations').update({ 
@@ -1666,7 +1669,8 @@ async function executeNode(node, conversation, companyId, connectionId, allNodes
             chatbot_node_id: null 
         }).eq('id', conversation.id);
 
-        await sendBotMessage("Encaminhando seu atendimento para um atendente...", conversation, companyId, connectionId);
+        const customText = (node.content?.text && node.content.text.trim()) ? node.content.text.trim() : "Encaminhando seu atendimento para um atendente...";
+        await sendBotMessage(customText, conversation, companyId, connectionId);
     } else if (node.type === 'menu') {
         const menuText = formatMenuText(node);
         await sendBotMessage(menuText, conversation, companyId, connectionId);
@@ -2083,11 +2087,11 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
     // 1. Buscar configurações da conexão do WhatsApp
     const { data: settings } = await supabase
         .from('whatsapp_settings')
-        .select('business_hours, business_hours_start, business_hours_end, away_message')
+        .select('business_hours, business_hours_start, business_hours_end, away_message, enable_away_message')
         .eq('id', connectionId)
         .maybeSingle();
 
-    if (!settings) {
+    if (!settings || settings.enable_away_message === false) {
         return { inHours: true, awayMessage: null };
     }
 

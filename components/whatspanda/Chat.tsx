@@ -1127,7 +1127,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       // 2. Enviar mensagem de encerramento se configurado no canal
       const targetConv = conversations.find(c => c.id === conversationId) || selectedConversation;
       const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
-      const closeMsg = conn?.close_message;
+      const closeMsg = conn?.enable_close_message !== false ? conn?.close_message : null;
 
       if (newStatus === 'fechado' && closeMsg && closeMsg.trim()) {
         const { data: sessionData } = await supabase.auth.getSession();
