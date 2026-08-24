@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAuth } from '../AuthContext';
 import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -64,50 +65,39 @@ const Channels: React.FC = () => {
         setLoading(false);
     };
 
+    const { user, profile } = useAuth(); // Assuming useAuth is available or we import it.
+    // Actually, we must import useAuth correctly.
+    // Based on previous files, it's exported from '../AuthContext'. 
+    // But this file `Channels.tsx` is in `components/whatspanda/`.
+    // So import path is `../../AuthContext`.
+
     const handleSaveConfig = async () => {
         if (!connectionName || !phoneNumber) {
             alert('Por favor, preencha o Nome e o Número.');
             return;
         }
 
+        const companyId = profile?.company_id || user?.user_metadata?.company_id || '15d38706-59a6-43b8-9366-2371904d90ce'; 
+        // Fallback for dev/demo if profile not loaded yet, or strictly require it.
+
         const updates = {
+            company_id: companyId,
             connection_name: connectionName,
             phone_number: phoneNumber,
             reject_calls: rejectCalls,
             rejection_message: rejectionMessage,
-            // company_id is handled by RLS or backend usually, but here we might need a stored proc or just rely on RLS with 'current_setting'
-            // For MVP we assume single tenant or RLS handles it.
-            // We need to ensure the row exists.
+            updated_at: new Date().toISOString()
         };
 
-        // Upsert logic helper (since we might not have an ID easily or RLS allows user to see only their row)
-        // We actually need to know if we are inserting or updating.
-        // For this simple MVP, lets assume 1 row per company.
-        
-        const { data: existing } = await supabase.from('whatsapp_settings').select('id').single();
-
-        let error;
-        if (existing) {
-             const { error: upError } = await supabase
-                .from('whatsapp_settings')
-                .update(updates)
-                .eq('id', existing.id);
-             error = upError;
-        } else {
-             const { error: inError } = await supabase
-                .from('whatsapp_settings')
-                .insert({ ...updates, company_id: '15d38706-59a6-43b8-9366-2371904d90ce' }); // Fallback hardcoded if needed
-             error = inError;
-        }
+        const { error } = await supabase
+            .from('whatsapp_settings')
+            .upsert(updates, { onConflict: 'company_id' });
 
         if (error) {
-            console.error(error);
-            alert('Erro ao salvar configurações.');
+            console.error('Error saving settings:', error);
+            alert(`Erro ao salvar configurações: ${error.message}`);
         } else {
             setStep('qr');
-            // Trigger backend (optional, but backend usually waits for DB changes or runs loop)
-            // Backend `whatsapp.js` should probably pick up these changes or we just wait for it to generate QR.
-            // If backend is already running, it might generate QR automatically.
         }
     };
 
