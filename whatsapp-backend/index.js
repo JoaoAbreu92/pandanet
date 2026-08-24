@@ -1225,14 +1225,19 @@ async function sendBotMessage(text, conversation, companyId, connectionId) {
     if (!text) return;
     const instanceName = `conn_${connectionId}`;
     try {
-        await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        const cleanNumber = (conversation.contact_phone || "").replace(/\D/g, "");
+        const res = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                number: conversation.contact_phone,
+                number: cleanNumber,
                 text: text
             })
         });
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[CHATBOT] Falha ao enviar msg via Evolution API para ${conversation.contact_phone} (Instância: ${instanceName}). Status: ${res.status}. Resposta: ${errText}`);
+        }
     } catch (e) {
         console.error('[CHATBOT] Erro ao enviar msg:', e.message);
     }
@@ -1294,6 +1299,17 @@ async function executeNode(node, conversation, companyId, connectionId, allNodes
 
 async function runChatbot(incomingText, conversation, companyId, connectionId) {
     try {
+        const { data: dbConv } = await supabase
+            .from('whatsapp_conversations')
+            .select('queue_id, assigned_to')
+            .eq('id', conversation.id)
+            .maybeSingle();
+
+        if (dbConv && (dbConv.queue_id || dbConv.assigned_to)) {
+            console.log(`[CHATBOT] Ignorando chatbot para conversa ${conversation.id} porque já está em fila (${dbConv.queue_id}) ou atribuída a um atendente (${dbConv.assigned_to}).`);
+            return;
+        }
+
         const text = (incomingText || "").trim().toLowerCase();
         if (!text) return;
 

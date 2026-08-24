@@ -151,28 +151,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 viewVacationRequests: true, manageVacationRequests: true,
                 viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
                 viewScheduling: true, viewAgenda: true, viewReservations: true,
-                viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
+                viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true,
+                admin_view_dp: true, admin_view_gestao_rh: true, admin_view_administrativo: true
             };
 
-                const planEmailLimit = data.company?.plan?.email_limit;
-                const planWhatsappLimit = data.company?.plan?.whatsapp_limit;
+            const defaultEmployeePermissions = {
+                viewMessages: true, viewCalendar: true, useMarketplace: true,
+                canPostText: true, canPostImage: true, canPostVideo: true,
+                viewDirectory: true, viewForms: true, viewBenefits: true,
+                viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
+                viewTiDashboard: false, openTickets: true, openTiRequests: true,
+                viewTraining: true, viewSurveys: true, viewPolicies: true,
+                viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
+                createEvents: false, manageMarketplace: false, viewEmail: true, viewWhatsPanda: false, viewProjects: true,
+                viewEmployeeDetails: false, editEmployeeProfile: false, deleteEmployeeProfile: false,
+                viewVacationRequests: false, manageVacationRequests: false,
+                viewJobs: true, manageJobs: false, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: false,
+                viewScheduling: true, viewAgenda: true, viewReservations: true,
+                viewTimeBank: true, manageTimeBank: false, viewEmployeeBenefitsAdmin: false, viewPerformance: true, managePerformance: false,
+                admin_view_dp: false, admin_view_gestao_rh: false, admin_view_administrativo: false
+            };
 
-                const employee: Employee = {
-                    id: data.id,
-                    name: isMasterAdmin ? 'Master Admin' : (data.full_name || 'Usuário'),
-                    email: email || '',
-                    role: isMasterAdmin ? 'Super Admin' : (data.role || 'Visitante'),
-                    team: isMasterAdmin ? 'Admin' : (data.team || 'Geral'),
-                    avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name || 'User')}`,
-                    coverUrl: data.cover_url,
-                    joinDate: data.join_date || new Date().toISOString(),
-                    birthDate: data.birth_date || new Date().toISOString(),
-                    isAdmin: isMasterAdmin ? true : (data.is_admin || false),
-                    isOnline: true,
-                    permissions: (isMasterAdmin || data.is_company_admin || data.is_admin) ? {
-                        ...defaultAdminPermissions,
-                        ...(data.permissions || {})
-                    } : (data.permissions || {}),
+            const planEmailLimit = data.company?.plan?.email_limit;
+            const planWhatsappLimit = data.company?.plan?.whatsapp_limit;
+
+            const employee: Employee = {
+                id: data.id,
+                name: isMasterAdmin ? 'Master Admin' : (data.full_name || 'Usuário'),
+                email: email || '',
+                role: isMasterAdmin ? 'Super Admin' : (data.role || 'Visitante'),
+                team: isMasterAdmin ? 'Admin' : (data.team || 'Geral'),
+                avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name || 'User')}`,
+                coverUrl: data.cover_url,
+                joinDate: data.join_date || new Date().toISOString(),
+                birthDate: data.birth_date || new Date().toISOString(),
+                isAdmin: isMasterAdmin ? true : (data.is_admin || false),
+                isOnline: true,
+                permissions: (isMasterAdmin || data.is_company_admin || data.is_admin) ? {
+                    ...defaultAdminPermissions,
+                    ...(data.permissions || {})
+                } : {
+                    ...defaultEmployeePermissions,
+                    ...(data.permissions || {})
+                },
                     following: data.following || [],
                     phone: data.phone || '',
                     officeLocation: data.office_location || '',

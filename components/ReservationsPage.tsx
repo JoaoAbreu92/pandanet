@@ -8,9 +8,10 @@ import {
     CalendarIcon, 
     ClockIcon, 
     UsersIcon, 
-    SparklesIcon,
-    CheckIcon,
-    PlusIcon
+    SparklesIcon, 
+    CheckIcon, 
+    PlusIcon, 
+    TrashIcon 
 } from './icons';
 
 interface ReservationItem {
@@ -77,6 +78,23 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
             setReservations(data || []);
         } catch (err) {
             console.error('Erro ao carregar reservas:', err);
+        }
+    };
+
+    const handleDeleteReservation = async (reservationId: string) => {
+        if (!window.confirm('Tem certeza que deseja excluir esta reserva?')) return;
+        try {
+            const { error } = await supabase
+                .from('reservations')
+                .delete()
+                .eq('id', reservationId);
+
+            if (error) throw error;
+            showToast('Reserva excluída com sucesso!', 'success');
+            fetchReservations();
+        } catch (err: any) {
+            console.error('Erro ao excluir reserva:', err);
+            showToast('Erro ao excluir reserva: ' + err.message, 'error');
         }
     };
 
@@ -510,102 +528,140 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
                     </div>
 
                     {/* Colunas do Layout (Coluna 2, 3, 4) */}
-                    <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Coluna 1: Reservas feitas (Aprovadas ativas hoje/futuro) */}
-                        <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
-                            <h3 className="text-sm font-black text-emerald-600 dark:text-emerald-450 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Reservas Feitas ({reservations.filter(r => r.status === 'approved' && r.start_date >= new Date().toISOString().split('T')[0]).length})
-                            </h3>
-                            <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
-                                {reservations.filter(r => r.status === 'approved' && r.start_date >= new Date().toISOString().split('T')[0]).length === 0 ? (
-                                    <p className="text-xs text-slate-400 italic py-4 text-center">Nenhuma reserva ativa para hoje ou próximos dias.</p>
-                                ) : (
-                                    reservations.filter(r => r.status === 'approved' && r.start_date >= new Date().toISOString().split('T')[0]).map(res => {
-                                        const endObj = getEndTime(res.start_date, res.start_time, res.duration);
-                                        const endStr = endObj ? endObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-                                        return (
-                                            <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-emerald-200 transition-colors">
-                                                <p className="font-extrabold text-slate-800 dark:text-white text-xs">{res.reservation_items?.name || 'Recurso'}</p>
-                                                <p className="text-[10px] text-slate-500 mt-1">
-                                                    📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
-                                                </p>
-                                                {endStr && (
-                                                    <p className="text-[10px] text-emerald-650 font-bold">
-                                                        ⏱️ Término estimado: {endStr} ({res.duration})
+                    {(() => {
+                        const currentType = activeTab === 'rooms' ? 'room' : 'vehicle';
+                        const tabReservations = reservations.filter(r => (r.type || r.reservation_items?.type) === currentType);
+                        
+                        const approvedActive = tabReservations.filter(r => r.status === 'approved' && r.start_date >= new Date().toISOString().split('T')[0]);
+                        const pendingActive = tabReservations.filter(r => r.status === 'pending');
+                        const historyActive = tabReservations.filter(r => r.status === 'rejected' || (r.status === 'approved' && r.start_date < new Date().toISOString().split('T')[0]));
+
+                        return (
+                            <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Coluna 1: Reservas feitas */}
+                                <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
+                                    <h3 className="text-sm font-black text-emerald-600 dark:text-emerald-450 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Reservas Feitas ({approvedActive.length})
+                                    </h3>
+                                    <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
+                                        {approvedActive.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic py-4 text-center">Nenhuma reserva ativa para hoje ou próximos dias.</p>
+                                        ) : (
+                                            approvedActive.map(res => {
+                                                const endObj = getEndTime(res.start_date, res.start_time, res.duration);
+                                                const endStr = endObj ? endObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                                return (
+                                                    <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-emerald-200 transition-colors relative">
+                                                        <p className="font-extrabold text-slate-800 dark:text-white text-xs pr-6">{res.reservation_items?.name || 'Recurso'}</p>
+                                                        <p className="text-[10px] text-slate-500 mt-1">
+                                                            📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
+                                                        </p>
+                                                        {endStr && (
+                                                            <p className="text-[10px] text-emerald-650 font-bold">
+                                                                ⏱️ Término estimado: {endStr} ({res.duration})
+                                                            </p>
+                                                        )}
+                                                        <p className="text-[9px] text-slate-400 mt-1 italic">Por: {res.solicitante}</p>
+                                                        {currentUser?.isAdmin && (
+                                                            <button
+                                                                onClick={() => handleDeleteReservation(res.id)}
+                                                                className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                                title="Excluir Reserva"
+                                                            >
+                                                                <TrashIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Coluna 2: Pendentes de aprovação */}
+                                <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
+                                    <h3 className="text-sm font-black text-amber-600 dark:text-amber-500 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                        Aguardando Aprovação ({pendingActive.length})
+                                    </h3>
+                                    <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
+                                        {pendingActive.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic py-4 text-center">Nenhuma solicitação pendente.</p>
+                                        ) : (
+                                            pendingActive.map(res => (
+                                                <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-amber-250 transition-colors relative">
+                                                    <p className="font-extrabold text-slate-800 dark:text-white text-xs pr-6">{res.reservation_items?.name || 'Recurso'}</p>
+                                                    <p className="text-[10px] text-slate-500 mt-1">
+                                                        📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
                                                     </p>
-                                                )}
-                                                <p className="text-[9px] text-slate-400 mt-1 italic">Por: {res.solicitante}</p>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Coluna 2: Pendentes de aprovação */}
-                        <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
-                            <h3 className="text-sm font-black text-amber-600 dark:text-amber-500 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                Aguardando Aprovação ({reservations.filter(r => r.status === 'pending').length})
-                            </h3>
-                            <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
-                                {reservations.filter(r => r.status === 'pending').length === 0 ? (
-                                    <p className="text-xs text-slate-400 italic py-4 text-center">Nenhuma solicitação pendente.</p>
-                                ) : (
-                                    reservations.filter(r => r.status === 'pending').map(res => (
-                                        <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-amber-250 transition-colors">
-                                            <p className="font-extrabold text-slate-800 dark:text-white text-xs">{res.reservation_items?.name || 'Recurso'}</p>
-                                            <p className="text-[10px] text-slate-500 mt-1">
-                                                📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
-                                            </p>
-                                            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Duração: {res.duration}</p>
-                                            <p className="text-[9px] text-slate-400 mt-1 italic">Solicitado por: {res.solicitante}</p>
-                                            {res.motivo && <p className="text-[9px] text-slate-500 mt-1 bg-slate-50 dark:bg-slate-850 p-1 rounded font-medium">📝 "{res.motivo}"</p>}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Coluna 3: Histórico */}
-                        <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
-                            <h3 className="text-sm font-black text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
-                                <ClockIcon className="w-4 h-4 text-slate-400" />
-                                Histórico ({reservations.filter(r => r.status === 'rejected' || (r.status === 'approved' && r.start_date < new Date().toISOString().split('T')[0])).length})
-                            </h3>
-                            <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
-                                {reservations.filter(r => r.status === 'rejected' || (r.status === 'approved' && r.start_date < new Date().toISOString().split('T')[0])).length === 0 ? (
-                                    <p className="text-xs text-slate-400 italic py-4 text-center">Nenhum histórico registrado.</p>
-                                ) : (
-                                    reservations.filter(r => r.status === 'rejected' || (r.status === 'approved' && r.start_date < new Date().toISOString().split('T')[0])).map(res => {
-                                        const isRejected = res.status === 'rejected';
-                                        return (
-                                            <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-slate-300 transition-colors">
-                                                <div className="flex justify-between items-start">
-                                                    <p className="font-extrabold text-slate-850 dark:text-white text-xs">{res.reservation_items?.name || 'Recurso'}</p>
-                                                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                                        isRejected ? 'bg-red-50 text-red-650 dark:bg-red-950/20' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-350'
-                                                    }`}>
-                                                        {isRejected ? 'Recusado' : 'Concluído'}
-                                                    </span>
+                                                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Duração: {res.duration}</p>
+                                                    <p className="text-[9px] text-slate-400 mt-1 italic">Solicitado por: {res.solicitante}</p>
+                                                    {res.motivo && <p className="text-[9px] text-slate-500 mt-1 bg-slate-50 dark:bg-slate-850 p-1 rounded font-medium">📝 "{res.motivo}"</p>}
+                                                    {currentUser?.isAdmin && (
+                                                        <button
+                                                            onClick={() => handleDeleteReservation(res.id)}
+                                                            className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                            title="Excluir Reserva"
+                                                        >
+                                                            <TrashIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 mt-1">
-                                                    📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
-                                                </p>
-                                                <p className="text-[9px] text-slate-400 mt-1">Colaborador: {res.solicitante}</p>
-                                                {isRejected && res.rejection_reason && (
-                                                    <p className="text-[9px] text-red-650 bg-red-50 dark:bg-red-950/10 p-1.5 rounded mt-1.5 border border-red-100 dark:border-red-950/30">
-                                                        ❌ Motivo: "{res.rejection_reason}"
-                                                    </p>
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                )}
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Coluna 3: Histórico */}
+                                <div className="bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 space-y-4">
+                                    <h3 className="text-sm font-black text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center gap-1.5">
+                                        <ClockIcon className="w-4 h-4 text-slate-400" />
+                                        Histórico ({historyActive.length})
+                                    </h3>
+                                    <div className="space-y-3 overflow-y-auto max-h-[70vh] pr-1">
+                                        {historyActive.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic py-4 text-center">Nenhum histórico registrado.</p>
+                                        ) : (
+                                            historyActive.map(res => {
+                                                const isRejected = res.status === 'rejected';
+                                                return (
+                                                    <div key={res.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-105 dark:border-slate-800 rounded-2xl shadow-sm hover:border-slate-300 transition-colors relative">
+                                                        <div className="flex justify-between items-start pr-6">
+                                                            <p className="font-extrabold text-slate-850 dark:text-white text-xs">{res.reservation_items?.name || 'Recurso'}</p>
+                                                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                                isRejected ? 'bg-red-50 text-red-650 dark:bg-red-950/20' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-350'
+                                                            }`}>
+                                                                {isRejected ? 'Recusado' : 'Concluído'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-500 mt-1">
+                                                            📅 {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time}
+                                                        </p>
+                                                        <p className="text-[9px] text-slate-400 mt-1">Colaborador: {res.solicitante}</p>
+                                                        {isRejected && res.rejection_reason && (
+                                                            <p className="text-[9px] text-red-650 bg-red-50 dark:bg-red-950/10 p-1.5 rounded mt-1.5 border border-red-100 dark:border-red-950/30">
+                                                                ❌ Motivo: "{res.rejection_reason}"
+                                                            </p>
+                                                        )}
+                                                        {currentUser?.isAdmin && (
+                                                            <button
+                                                                onClick={() => handleDeleteReservation(res.id)}
+                                                                className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                                title="Excluir Reserva"
+                                                            >
+                                                                <TrashIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
                 </div>
             )}
         </div>
