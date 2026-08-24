@@ -637,13 +637,36 @@ export interface WhatsAppContact {
   phone: string;
   email?: string;
   notes?: string;
-  tags?: string[];
+  tags?: string[]; // Array of Tag IDs or Names
+  queue_id?: string;
 }
 
 export interface WhatsAppSettings {
   id: string;
   company_id: string;
   phone_number?: string;
+  connection_name?: string;
+  reject_calls?: boolean;
+  rejection_message?: string;
   is_connected: boolean;
   qr_code?: string;
+}
+
+export interface WhatsAppQueue {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface WhatsAppTag {
+  id: string;
+  company_id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
+  created_at: string;
 }

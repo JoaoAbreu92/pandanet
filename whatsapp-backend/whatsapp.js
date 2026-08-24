@@ -14,9 +14,13 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Use Service Key for bac
 if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase URL or Service Key missing in .env');
     // process.exit(1);
+} else {
+    console.log('--- DB CONNECTION DEBUG ---');
+    console.log('Supabase URL:', supabaseUrl);
+    console.log('Key (first 10 chars):', supabaseKey ? supabaseKey.trim().substring(0, 10) + '...' : 'MISSING');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey.trim());
 
 // Map to store socket connections for multiple companies (if needed in future, current implementation for single instance/company)
 // For MVP, we assume one backend instance per company or handle single session.
@@ -39,28 +43,35 @@ async function connectToWhatsApp() {
         // markOnlineOnConnect: false,
     });
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
             console.log('QR Code received. Please scan!');
-            // Save QR status to DB?
-            // await updateCompanySettings({ qr_code: qr, is_connected: false });
+            qrcode.generate(qr, { small: true });
+            // Save QR status to DB
+            await updateCompanySettings({ qr_code: qr, is_connected: false });
         }
 
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            // await updateCompanySettings({ is_connected: false });
+            await updateCompanySettings({ is_connected: false });
             if (shouldReconnect) {
+                // connectToWhatsApp(); // Recursive call might be dangerous if not handled carefully, but standard in Baileys examples
+                // For this structure, we might need a better reconnection strategy or let the main loop handle it.
+                // But since we are inside the function, we can just call it? 
+                // Better to let the process restart in docker or handle it cleanly.
+                // For now, let's try calling it again.
                 connectToWhatsApp();
             } else {
                 console.log('Connection closed. You are logged out.');
                 // delete auth info if needed
+                await updateCompanySettings({ is_connected: false, qr_code: null });
             }
         } else if (connection === 'open') {
             console.log('opened connection');
-            // await updateCompanySettings({ is_connected: true, qr_code: null });
+            await updateCompanySettings({ is_connected: true, qr_code: null });
         }
     });
 
@@ -80,9 +91,7 @@ async function connectToWhatsApp() {
 
         console.log(`Received message from ${from}: ${text}`);
 
-        // TODO: Save to Supabase
-        // 1. Find or create conversation
-        // 2. Insert message
+        // Save to Supabase
         try {
            await handleIncomingMessage(sock, msg, from, contactName, text);
         } catch (e) {
@@ -90,24 +99,185 @@ async function connectToWhatsApp() {
         }
     });
     
+    // --- NEW: Call Handling ---
+    sock.ev.on('call', async (node) => {
+        const { id, from, status } = node[0];
+        if (status === 'offer') {
+            // Fetch settings
+            const { data: settings } = await supabase
+                .from('whatsapp_settings')
+                .select('reject_calls, rejection_message')
+                .eq('company_id', COMPANY_ID)
+                .single();
+
+            if (settings?.reject_calls) {
+                console.log(`Rejecting call from ${from}`);
+                await sock.rejectCall(id, from);
+                if (settings.rejection_message) {
+                    await sock.sendMessage(from, { text: settings.rejection_message });
+                }
+            }
+        }
+    });
+
+    // --- NEW: History & Contact Sync ---
+    sock.ev.on('messaging-history.set', async ({ contacts, messages, isLatest }) => {
+        console.log(`Syncing history: ${contacts.length} contacts, ${messages.length} chats`);
+        
+        // 1. Sync Contacts
+        const contactsToUpsert = contacts.map(c => ({
+            company_id: COMPANY_ID,
+            id: c.id, // we might need to map this to our internal ID or use phone as ID. 
+                      // Wait, our 'whatsapp_contacts' uses uuid as ID? 
+                      // actually, checking schema... we likely use uuid. 
+                      // For sync, we need to match by phone.
+            name: c.name || c.notify || c.id.split('@')[0],
+            phone: c.id.split('@')[0],
+            // ... other fields
+        }));
+
+        // We need a helper to Upsert contacts by Phone
+        for (const c of contactsToUpsert) {
+             await upsertContact(c);
+        }
+
+        // 2. Sync Messages (Last 30 Days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        for (const chat of messages) {
+            // chat is the conversation object, messages are inside? 
+            // Baileys structure: messages is usually an array of { ... } linked to a chat?
+            // Actually 'messages' in history.set is: { chatId: messages[] } ? No, checking docs..
+            // It's usually `chats` and `messages`.
+            // The signature is `{ chats, contacts, messages, isLatest }`
+            // Wait, I used destructuring `{ contacts, messages }` above.
+            // `messages` is an array of WAProto.IWebMessageInfo (raw messages)
+            
+            // Filter by date
+            // const msgDate = new Date(msg.messageTimestamp * 1000);
+            // if (msgDate < thirtyDaysAgo) continue;
+            
+            // To be safe and simple for this snippet, let's process them.
+            // But `messages` is an array of messages.
+        }
+        
+        // Since iterating thousands of messages might be slow here, let's just log for now?
+        // User requested import. I will implement a simplified version.
+        
+        // Actually, let's use a helper function for clarity
+        await syncHistory(contacts, messages);
+    });
+
+    sock.ev.on('contacts.upsert', async (contacts) => {
+        for (const c of contacts) {
+            await upsertContact({
+                name: c.name || c.notify,
+                phone: c.id.split('@')[0]
+            });
+        }
+    });
+
     return sock;
 }
 
-// Helper to update settings in DB (mockup for now as we don't have company_id easily)
-// We might need to fetch company_id from a config or env
+// --- Helpers ---
+
+async function upsertContact(contact) {
+    if (!contact.phone) return;
+    
+    // Check if exists
+    const { data: existing } = await supabase
+        .from('whatsapp_contacts')
+        .select('id')
+        .eq('company_id', COMPANY_ID)
+        .eq('phone', contact.phone)
+        .single();
+
+    if (!existing) {
+        await supabase.from('whatsapp_contacts').insert({
+            company_id: COMPANY_ID,
+            name: contact.name || contact.phone,
+            phone: contact.phone
+        });
+    } else if (contact.name) {
+        // Optional: Update name if changed?
+        await supabase.from('whatsapp_contacts').update({ name: contact.name }).eq('id', existing.id);
+    }
+}
+
+async function syncHistory(contacts, messages) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // 1. Sync Contacts first
+    for (const c of contacts) {
+        await upsertContact({
+            name: c.name || c.notify,
+            phone: c.id.split('@')[0]
+        });
+    }
+
+    // 2. Sync Messages
+    console.log('Starting Message Sync...');
+    let count = 0;
+    
+    // messages is array of { ...message details... }
+    for (const msg of messages) {
+        if (!msg.messageTimestamp) continue;
+        const ts = (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : msg.messageTimestamp.low) * 1000;
+        if (new Date(ts) < thirtyDaysAgo) continue;
+
+        const from = msg.key.remoteJid;
+        const isFromMe = msg.key.fromMe;
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+
+        if (!text) continue; // Skip media for MVP
+
+        const contactName = msg.pushName || 'Desconhecido';
+        
+        // reuse handleIncomingMessage? 
+        // We modify handleIncomingMessage to accept timestamp and 'isFromMe'
+        await handleIncomingMessage(null, msg, from, contactName, text, new Date(ts), isFromMe);
+        count++;
+    }
+    console.log(`Synced ${count} messages from last 30 days.`);
+}
+
+// Helper to update settings in DB
 const COMPANY_ID = process.env.COMPANY_ID;
 
 async function updateCompanySettings(updates) {
     if (!COMPANY_ID) return;
-    const { error } = await supabase
-        .from('whatsapp_settings')
-        .update(updates)
-        .eq('company_id', COMPANY_ID);
     
-    if (error) console.error('Error updating settings:', error);
+    // Upsert equivalent logic
+    const { data, error } = await supabase
+        .from('whatsapp_settings')
+        .select('id')
+        .eq('company_id', COMPANY_ID)
+        .single();
+    
+    if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching settings:', error);
+        return;
+    }
+
+    if (!data) {
+        // Insert
+        await supabase.from('whatsapp_settings').insert({
+            company_id: COMPANY_ID,
+            ...updates
+        });
+    } else {
+        // Update
+        await supabase
+            .from('whatsapp_settings')
+            .update(updates)
+            .eq('company_id', COMPANY_ID);
+    }
 }
 
-async function handleIncomingMessage(sock, msg, from, contactName, text) {
+async function handleIncomingMessage(sock, msg, from, contactName, text, timestamp = new Date(), isFromMe = false) {
     if (!COMPANY_ID) {
         console.log('Skipping DB save: COMPANY_ID not set');
         return;
@@ -170,9 +340,9 @@ async function handleIncomingMessage(sock, msg, from, contactName, text) {
         .insert({
             conversation_id: conversationId,
             message_text: text,
-            is_from_customer: true,
+            is_from_customer: !isFromMe,
             whatsapp_message_id: msg.key.id,
-            // sent_by: null // system/customer
+            created_at: timestamp.toISOString()
         });
 
     if (msgError) console.error('Error saving message:', msgError);
