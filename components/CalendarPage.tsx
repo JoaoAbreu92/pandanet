@@ -17,6 +17,7 @@ import {
     CheckIcon,
     XMarkIcon,
     UserPlusIcon,
+    UserGroupIcon as HeroUserGroupIcon,
     ArrowUturnLeftIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
