@@ -882,11 +882,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
         // Atualização no BD
         try {
-            await supabase.from('messages').update({
+            const { error: reactError } = await supabase.from('messages').update({
                 reactions: newReactions
             }).eq('id', messageId);
+            
+            if (reactError) {
+                console.error('Supabase error ao atualizar reação:', reactError);
+                // Reverter a UI otimista se falhar (opcional, ou apenas alertar)
+            }
         } catch (err) {
-            console.error('Erro ao atualizar reação:', err);
+            console.error('Erro de rede ao atualizar reação:', err);
         }
     };
 
@@ -973,8 +978,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     company_id: currentUser.company_id,
                     is_group: false,
                     last_message: 'Conversa iniciada',
-                    last_message_at: new Date().toISOString(),
-                    created_by: currentUser.id
+                    last_message_at: new Date().toISOString()
                 })
                 .select()
                 .single();
