@@ -333,7 +333,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     // --- Gerenciamento de Estado de Modais ---
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-    const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+    const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
     const [modalOpen, setModalOpen] = useState<Record<string, boolean>>({});
 
     // Forms State
@@ -341,7 +341,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [featuresState, setFeaturesState] = useState<Record<string, boolean>>({});
 
     // Helpers
-    const openModal = (type: string, company: Company | null = null, planId: number | null = null) => {
+    const openModal = (type: string, company: Company | null = null, planId: string | null = null) => {
         setSelectedCompany(company);
         setSelectedPlanId(planId);
         setModalOpen({ [type]: true });
@@ -1034,8 +1034,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ID: {plan.id.slice(0, 8)}</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => openModal('editPlan', null, parseInt(plan.id))} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar"><PencilIcon className="w-4 h-4" /></button>
-                                            <button onClick={() => openModal('deletePlan', null, parseInt(plan.id))} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><TrashIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => openModal('editPlan', null, plan.id)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar"><PencilIcon className="w-4 h-4" /></button>
+                                            <button onClick={() => openModal('deletePlan', null, plan.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><TrashIcon className="w-4 h-4" /></button>
                                         </div>
                                     </div>
 
