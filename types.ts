@@ -38,6 +38,7 @@ export type Page =
   | 'org-chart'
   | 'kpi-dashboard'
   | 'job-manager'
+  | 'whatspanda'
   | 'manual-usuario';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
@@ -604,4 +605,45 @@ export interface Company {
   settings: CompanySettings;
   data: AppData;
   employees?: Employee[];
+}
+
+// WhatsApp Types
+export interface WhatsAppConversation {
+  id: string;
+  company_id: string;
+  contact_name: string;
+  contact_phone: string;
+  status: 'aberto' | 'pendente' | 'fechado';
+  assigned_to?: string; // profile_id
+  department_id?: string;
+  last_message_at: string;
+  unread_count: number;
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  conversation_id: string;
+  message_text: string | null;
+  media_url?: string;
+  media_type?: string;
+  is_from_customer: boolean;
+  sent_by?: string; // profile_id (null if customer)
+  created_at: string;
+}
+
+export interface WhatsAppContact {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface WhatsAppSettings {
+  id: string;
+  company_id: string;
+  phone_number?: string;
+  is_connected: boolean;
+  qr_code?: string;
 }

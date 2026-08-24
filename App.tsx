@@ -43,6 +43,7 @@ import EmployeePortal from './components/EmployeePortal.tsx';
 import OrgChartPage from './components/OrgChartPage.tsx';
 import KPIDashboard from './components/KPIDashboard.tsx';
 import ManualPage from './components/ManualPage.tsx';
+import WhatsPanda from './components/WhatsPanda.tsx';
 
 
 const AppContent: React.FC = () => {
@@ -565,6 +566,7 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
+            case 'whatspanda': return <WhatsPanda />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };

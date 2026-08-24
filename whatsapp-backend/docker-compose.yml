@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  whatspanda-backend:
+    build: .
+    container_name: whatspanda_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - COMPANY_ID=${COMPANY_ID}
+      - PORT=3000
+    volumes:
+      - ./auth_info_baileys:/usr/src/app/auth_info_baileys # Persist WhatsApp session
