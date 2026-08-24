@@ -20,6 +20,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
     const previousScrollHeight = useRef<number>(0);
     const shouldScrollToBottom = useRef<boolean>(true);
+    const [pandaIaIcon, setPandaIaIcon] = useState<string | null>(null);
 
     // Only render if User has an API key AND the Company has AI allowed.
     const hasAIEnabled = isAIEnabled && currentUser.ai_api_key;
@@ -111,8 +112,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
         if (hasAIEnabled) {
             fetchMessages();
             fetchAgents();
+            fetchSystemSettings();
         }
     }, [hasAIEnabled, currentUser.id]);
+
+    const fetchSystemSettings = async () => {
+        const { data } = await supabase.from('system_settings').select('key, value').eq('key', 'panda_ia_icon').single();
+        if (data?.value) setPandaIaIcon(data.value);
+    };
 
     useEffect(() => {
         if (!isOpen && !tooltipDismissed) {
@@ -388,7 +395,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             <div className="flex justify-between items-center p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setShowAgentManager(!showAgentManager)}>
                     <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden border-2 border-emerald-500 group-hover:scale-110 transition-transform">
-                        <img src={currentAgent?.avatar_url || "/logo.png"} alt="Panda AI" className="w-8 h-8 object-contain" />
+                        <img src={currentAgent?.avatar_url || pandaIaIcon || "/logo.png"} alt="Panda AI" className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-1">
@@ -594,9 +601,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 >
                     <div className="w-full h-full flex items-center justify-center bg-white rounded-full">
                         <img
-                            src="/logo.png"
+                            src={pandaIaIcon || "/logo.png"}
                             alt="Panda IA" 
-                            className="w-11 h-11 object-contain group-hover:scale-110 transition-transform duration-500"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                     </div>
                     <span className="absolute -top-1 -right-1 flex h-4 w-4">

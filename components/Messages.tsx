@@ -1002,10 +1002,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
                 // Use the conversation's company_id (not sender's) to support cross-company chats
                 const currentConv = conversations.find(c => c.id === selectedConversationId);
-                const compId = currentConv?.company_id || currentUser.company_id;
+                const compId = currentConv?.company_id || currentUser.company_id || (profile as any)?.company_id;
+                
                 if (!compId) {
                     console.error("Missing company_id", currentUser);
-                    showToast("Erro: Empresa não identificada.", "error");
+                    showToast("Erro: Empresa não identificada para esta mensagem.", "error");
                     setIsSending(false);
                     return;
                 }
@@ -1014,11 +1015,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     conversation_id: selectedConversationId,
                     sender_id: currentUser.id,
                     company_id: compId,
-                    text: stickerUrl || textToSend,
+                    text: textToSend.trim() || (stickerUrl ? 'Figurinha' : ''),
                     file_url: uploadedFileUrl || stickerUrl,
                     file_type: stickerUrl ? 'sticker' : fileType,
                     reactions: [],
-                    reply_to: replyingToMessage?.id || null  // Adicionar referência à mensagem respondida
+                    reply_to: replyingToMessage?.id || null
                 });
 
                 if (error) throw error;

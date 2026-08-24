@@ -1048,8 +1048,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         // Strategy: Upsert into email_metadata finding by (user_id, message_id)
         // For now let's hope the Edge Function returns 'messageId'
 
-        // Assuming 'uid' is unique enough for this session or we have messageId
-        const messageId = (email as any).messageId || email.uid;
+        // Prefer messageId for persistence as UID can change
+        const messageId = email.messageId || (email as any).messageId || email.uid;
 
         await supabase.from('email_metadata').upsert({
             user_id: currentUser.id,
@@ -1484,9 +1484,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             <button onClick={() => {
                                 setView('compose');
                                 const from = selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from;
-                                const ccs = (selectedEmail.to || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user);
-                                setToTags([from]);
-                                setCcTags(ccs);
+                                // Combine To and CC for Reply All, excluding self
+                                const originalTo = (selectedEmail.to || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user && e !== from);
+                                const originalCc = (selectedEmail.cc || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user && e !== from);
+                                
+                                setToTags([from, ...originalTo]);
+                                setCcTags(originalCc);
                                 setBccTags([]);
                                 setComposeSubject('Re: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);

@@ -175,6 +175,8 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                             messageId: message.envelope.messageId,
                             subject: message.envelope.subject || '(Sem Assunto)',
                             from: message.envelope.from?.[0]?.address || 'Desconhecido',
+                            to: message.envelope.to || [],
+                            cc: message.envelope.cc || [],
                             date: message.envelope.date,
                             flags: message.flags,
                             snippet: snippet + (snippet.length === 100 ? '...' : ''),
@@ -264,6 +266,8 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
                     messageId: message.envelope.messageId,
                     subject: message.envelope.subject || '(Sem Assunto)',
                     from: message.envelope.from?.[0]?.address || 'Desconhecido',
+                    to: message.envelope.to || [],
+                    cc: message.envelope.cc || [],
                     date: message.envelope.date,
                     flags: message.flags,
                     snippet: snippet + (snippet.length === 100 ? '...' : '')
@@ -323,7 +327,13 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
             return res.json({
                 text: parsed.text,
                 html: parsed.html || parsed.textAsHtml,
-                attachments
+                attachments,
+                cc: parsed.cc?.value || [],
+                to: parsed.to?.value || [],
+                from: parsed.from?.value || [],
+                subject: parsed.subject,
+                messageId: parsed.messageId,
+                date: parsed.date
             });
         } finally {
             lock.release();

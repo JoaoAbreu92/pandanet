@@ -107,6 +107,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [systemLogo, setSystemLogo] = useState<string | null>(null);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [pandaIaIcon, setPandaIaIcon] = useState<string | null>(null);
+    const [iaIconFile, setIaIconFile] = useState<File | null>(null);
     const [updateDuration, setUpdateDuration] = useState(15);
     const [updateDurationUnit, setUpdateDurationUnit] = useState<'hours' | 'days'>('hours');
     const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -183,6 +185,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 if (promo) {
                     try { setManualPromo(JSON.parse(promo)); } catch (e) { }
                 }
+
+                const iaIcon = settingsData.find(s => s.key === 'panda_ia_icon')?.value;
+                if (iaIcon) setPandaIaIcon(iaIcon);
             }
 
             // NEW: Fetch WhatsApp Status
@@ -257,9 +262,28 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 setSystemLogo(publicUrl);
                 setLogoFile(null);
             } else if (systemLogo) {
-                // If we have a logo in state but no new file, keep it
-                // Note: Optional, but good to ensure it stays in DB if upserting whole list
                 updates.push({ key: 'main_logo', value: systemLogo });
+            }
+
+            // Handle Panda IA Icon Upload
+            if (iaIconFile) {
+                console.log("[SaaS] Novo ícone da IA detectado. Fazendo upload...", iaIconFile.name);
+                const fileExt = iaIconFile.name.split('.').pop();
+                const fileName = `panda_ia_icon_${Date.now()}.${fileExt}`;
+                const filePath = `system/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('announcements-media')
+                    .upload(filePath, iaIconFile, { cacheControl: '3600', upsert: true });
+
+                if (uploadError) throw new Error("Falha ao enviar ícone da IA: " + uploadError.message);
+
+                const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(filePath);
+                updates.push({ key: 'panda_ia_icon', value: publicUrl });
+                setPandaIaIcon(publicUrl);
+                setIaIconFile(null);
+            } else if (pandaIaIcon) {
+                updates.push({ key: 'panda_ia_icon', value: pandaIaIcon });
             }
 
             console.log("[SaaS] Executando UPSERT no banco:", updates);
@@ -1264,6 +1288,26 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         <p className="text-[10px] text-gray-400 text-center mt-2 italic">
                                             {t('dashboard.logo_hint')}
                                         </p>
+                                    </div>
+
+                                    {/* PANDA IA ICON */}
+                                    <div className="w-full pt-6 border-t border-gray-100 dark:border-gray-700 mt-6 space-y-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <SparklesIcon className="w-4 h-4 text-emerald-500" />
+                                            <h4 className="text-xs font-bold text-gray-700 dark:text-white uppercase tracking-widest">Ícone da Panda IA</h4>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-16 h-16 rounded-full border-2 border-emerald-500 overflow-hidden flex-shrink-0 bg-white dark:bg-gray-900 shadow-inner">
+                                                {pandaIaIcon ? <img src={pandaIaIcon} className="w-full h-full object-cover" /> : <img src="/logo.png" className="w-full h-full object-contain p-2" />}
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block w-full text-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all uppercase">
+                                                    {iaIconFile ? 'Selecionado' : 'Mudar Ícone'}
+                                                    <input type="file" className="hidden" accept="image/*,video/*" onChange={(e) => e.target.files && setIaIconFile(e.target.files[0])} disabled={isSavingSettings} />
+                                                </label>
+                                                <p className="text-[9px] text-gray-400 mt-1 italic leading-tight">PNG, GIF ou Vídeo Curto.</p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* UPDATE DURATION SETTING */}
