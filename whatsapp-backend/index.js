@@ -127,12 +127,18 @@ function setupPushNotificationsListener() {
                 // Buscar token push do usuário destinatário
                 const { data: profile, error } = await supabase
                     .from('profiles')
-                    .select('push_token')
+                    .select('push_token, role, email')
                     .eq('id', notif.user_id)
                     .single();
 
                 if (error || !profile?.push_token) {
                     if (error) console.error('[FCM] Erro ao buscar token push do perfil:', error.message);
+                    return;
+                }
+
+                const isMaster = profile.role === 'Super Admin' || profile.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                if (!isMaster) {
+                    console.log(`[FCM] Ignorando notificação push para usuário não master: ${profile.email}`);
                     return;
                 }
 
@@ -195,11 +201,14 @@ function setupPushNotificationsListener() {
                     // Buscar o token push de cada participante
                     const { data: prof } = await supabase
                         .from('profiles')
-                        .select('push_token')
+                        .select('push_token, role, email')
                         .eq('id', p.user_id)
                         .maybeSingle();
 
                     if (prof?.push_token) {
+                        const isMaster = prof.role === 'Super Admin' || prof.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                        if (!isMaster) continue;
+
                         await pushService.sendPushNotification(
                             prof.push_token,
                             senderName,
@@ -254,33 +263,39 @@ function setupPushNotificationsListener() {
                     // Se estiver atribuído a um atendente específico, notifica ele
                     const { data: agent } = await supabase
                         .from('profiles')
-                        .select('push_token')
+                        .select('push_token, role, email')
                         .eq('id', convInfo.assigned_to)
                         .maybeSingle();
 
                     if (agent?.push_token) {
-                        await pushService.sendPushNotification(
-                            agent.push_token,
-                            `WhatsPanda: ${contactName}`,
-                            bodyText,
-                            {
-                                type: 'whatsapp',
-                                conversationId: newMsg.conversation_id,
-                                link: `/whatspanda`
-                            }
-                        );
+                        const isMaster = agent.role === 'Super Admin' || agent.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                        if (isMaster) {
+                            await pushService.sendPushNotification(
+                                agent.push_token,
+                                `WhatsPanda: ${contactName}`,
+                                bodyText,
+                                {
+                                    type: 'whatsapp',
+                                    conversationId: newMsg.conversation_id,
+                                    link: `/whatspanda`
+                                }
+                            );
+                        }
                     }
                 } else if (convInfo?.company_id) {
                     // Se não estiver atribuído, notifica administradores da mesma empresa
                     const { data: admins } = await supabase
                         .from('profiles')
-                        .select('push_token')
+                        .select('push_token, role, email')
                         .eq('company_id', convInfo.company_id)
                         .or('role.eq.Super Admin,is_admin.eq.true,is_company_admin.eq.true');
 
                     if (admins && admins.length > 0) {
                         for (const adminProf of admins) {
                             if (adminProf.push_token) {
+                                const isMaster = adminProf.role === 'Super Admin' || adminProf.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                                if (!isMaster) continue;
+
                                 await pushService.sendPushNotification(
                                     adminProf.push_token,
                                     `WhatsPanda (Não Atribuído): ${contactName}`,
