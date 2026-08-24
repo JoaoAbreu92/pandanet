@@ -54,4 +54,4 @@ networks:
     driver: bridge
   supabase_network:
     external: true
-    name: supabase_default # Nome padrão da rede do Supabase Docker
+    name: docker_default # Nome padrão da rede do Supabase Docker na VPS
