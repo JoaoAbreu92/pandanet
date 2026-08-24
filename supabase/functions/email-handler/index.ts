@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Edge Function 'email-handler' V15 (IP & Blank SNI) iniciada.");
+console.log("Edge Function 'email-handler' V16 (Explicit SNI) iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function email-handler Online (V15). IP Resolution & SNI Bypass active.' 
+      message: 'Edge Function Online (V16). Explicit SNI support active.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       throw new Error("Ação (action) não informada no corpo da requisição.");
     }
 
-    console.log(`[V15] Executando ação: ${action}`);
+    console.log(`[V16] Executando ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações (settings) não fornecidas.");
@@ -39,31 +39,11 @@ Deno.serve(async (req) => {
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
-      // Tenta resolver o IP para contornar problemas de DNS/Hostname Mismatch no Deno
-      let smtpIp = settings.smtp_host;
-      let imapIp = settings.imap_host;
-
+      // Teste SMTP - Versão 16 com SNI Explícito
       try {
-        const ipsSmtp = await Deno.resolveDns(settings.smtp_host, "A").catch(() => []);
-        if (ipsSmtp.length > 0) {
-          smtpIp = ipsSmtp[0];
-          console.log(`[V15] SMTP: ${settings.smtp_host} -> ${smtpIp}`);
-        }
-
-        const ipsImap = await Deno.resolveDns(settings.imap_host, "A").catch(() => []);
-        if (ipsImap.length > 0) {
-          imapIp = ipsImap[0];
-          console.log(`[V15] IMAP: ${settings.imap_host} -> ${imapIp}`);
-        }
-      } catch (dnsErr) {
-        console.warn("[V15] Falha ao resolver DNS (usando hostnames originais):", dnsErr.message);
-      }
-
-      // Teste SMTP
-      try {
-        console.log(`[SMTP] Conectando a ${smtpIp}:${settings.smtp_port}`);
+        console.log(`[SMTP] Conectando a ${settings.smtp_host}:${settings.smtp_port}`);
         const transporter = nodemailer.default.createTransport({
-          host: smtpIp, // Usando IP se resolvido
+          host: settings.smtp_host,
           port: settings.smtp_port,
           secure: settings.smtp_port === 465,
           auth: {
@@ -72,25 +52,33 @@ Deno.serve(async (req) => {
           },
           tls: { 
             rejectUnauthorized: false,
-            servername: "",
+            // Explicitamente define o servername como o host original
+            // Isso costuma resolver o NotValidForName no Deno
+            servername: settings.smtp_host,
             checkServerIdentity: () => {
-              console.log("[TLS] checkServerIdentity ignorado (V15)");
+              console.log("[TLS] Bypassing Server Identity (V16)");
               return undefined;
             }
-          }
+          },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000
         })
         await transporter.verify();
-        console.log("[SMTP] OK");
+        console.log("[SMTP] OK na V16");
       } catch (e: any) {
-        console.error("[SMTP ERROR]", e);
-        throw new Error(`Erro no Servidor de Envio (SMTP): ${e.message}`);
+        console.error("[SMTP ERROR V16]", e);
+        let errorMsg = e.message;
+        if (errorMsg.includes('NotValidForName')) {
+          errorMsg = `Erro de Certificado (NotValidForName): O servidor SMTP responde com um nome que não bate com o host. No Deno, isso é fatal na porta 465. Sugestão: Tente usar a porta 587 (STARTTLS) se disponível, ou verifique se o Hostname está correto.`;
+        }
+        throw new Error(`Erro no Servidor de Envio (SMTP): ${errorMsg}`);
       }
 
-      // Teste IMAP
+      // Teste IMAP - Versão 16
       try {
-        console.log(`[IMAP] Conectando a ${imapIp}:${settings.imap_port}`);
+        console.log(`[IMAP] Conectando a ${settings.imap_host}:${settings.imap_port}`);
         const client = new ImapFlow({
-          host: imapIp,
+          host: settings.imap_host,
           port: settings.imap_port,
           secure: true,
           auth: {
@@ -100,21 +88,21 @@ Deno.serve(async (req) => {
           logger: false,
           tls: { 
             rejectUnauthorized: false,
-            servername: "",
+            servername: settings.imap_host,
             checkServerIdentity: () => undefined
           }
         })
         await client.connect();
         await client.logout();
-        console.log("[IMAP] OK");
+        console.log("[IMAP] OK na V16");
       } catch (e: any) {
-        console.error("[IMAP ERROR]", e);
+        console.error("[IMAP ERROR V16]", e);
         throw new Error(`Erro no Servidor de Recebimento (IMAP): ${e.message}`);
       }
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conexão estabelecida com sucesso na V15!'
+        message: 'Conexão estabelecida com sucesso na V16 (SNI Explícito)!'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -122,13 +110,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Ação '${action}' recebida na V15.`
+      message: `Ação '${action}' na V16.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error: any) {
-    console.error("[RUNTIME ERROR V15]", error.message);
+    console.error(`[RUNTIME ERROR V16]`, error.message);
     return new Response(JSON.stringify({
       success: false,
       error: error.message
