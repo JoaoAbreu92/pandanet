@@ -540,8 +540,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     };
 
     const handleDelete = async (userId: string, userName: string) => {
-        const msgConfirm = `AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente. \n\nUm PDF com o histórico será gerado agora. Continuar?`;
-        if (!window.confirm(msgConfirm)) return;
+        if (!window.confirm(`Tem certeza que deseja excluir permanentemente o usuário ${userName}? Esta ação não pode ser desfeita.`)) return;
 
         console.log(`[UserManager] Iniciando backup e deleção: ${userName} (${userId})`);
 
