@@ -573,20 +573,20 @@ const ChatbotSettings: React.FC = () => {
                             Necessária para transferências inteligentes e análise de sentimentos.
                         </p>
                     </div>
-                    <div className="flex items-center gap-3 bg-gray-100/50 dark:bg-black/20 p-2 rounded-2xl border border-transparent dark:border-white/5 min-w-[340px]">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-gray-100/50 dark:bg-black/20 p-2 rounded-2xl border border-transparent dark:border-white/5 w-full sm:w-auto sm:min-w-[340px] max-w-full">
                         <input 
                             type="password" 
                             placeholder="Insira sua Gemini API Key..."
                             value={geminiKey}
                             onChange={(e) => setGeminiKey(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm px-3 flex-1 dark:text-white"
+                            className="bg-transparent border-none outline-none text-sm px-3 py-2 sm:py-0 flex-1 dark:text-white min-w-0"
                         />
                         <button 
                             onClick={handleSaveGeminiKey} 
                             disabled={loading}
-                            className="flex items-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50"
+                            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50 shrink-0"
                         >
-                            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {loading ? <RefreshCw className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
                             Salvar Chave
                         </button>
                     </div>
@@ -669,13 +669,13 @@ const ChatbotSettings: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-end self-end shrink-0">
+                    <div className="flex items-end self-end shrink-0 w-full sm:w-auto">
                         <button 
                             onClick={handleSaveSignature} 
                             disabled={loading}
-                            className="flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl hover:opacity-90 transition-all text-xs font-bold shadow-xl"
+                            className="w-full sm:w-auto justify-center flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl hover:opacity-90 transition-all text-xs font-bold shadow-xl"
                         >
-                            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {loading ? <RefreshCw className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
                             Salvar Assinatura
                         </button>
                     </div>

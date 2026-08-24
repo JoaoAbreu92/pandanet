@@ -374,6 +374,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           setChannelAccess([]);
           setAccessibleChannelIds(null); // No connection restrictions, show all
         }
+      })
+      .catch((err) => {
+        console.error('Erro ao buscar whatsapp_channel_users:', err);
+        setChannelAccess([]);
+        setAccessibleChannelIds(null);
       });
   }, [activeProfile?.id, profile?.id, isAdmin, permissions?.allowed_connections]);
 

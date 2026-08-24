@@ -298,4 +298,47 @@
 .dark .ql-editor.ql-blank::before {
   color: #64748b !important;
 }
+
+/* WhatsPanda - Estilos para Fontes Simples e Limpas (Arial/sans-serif) sem negritos excessivos */
+.whatspanda-container,
+.whatspanda-container h1,
+.whatspanda-container h2,
+.whatspanda-container h3,
+.whatspanda-container h4,
+.whatspanda-container h5,
+.whatspanda-container h6,
+.whatspanda-container p,
+.whatspanda-container span,
+.whatspanda-container button,
+.whatspanda-container label,
+.whatspanda-container select,
+.whatspanda-container input,
+.whatspanda-container textarea,
+.whatspanda-container th,
+.whatspanda-container td,
+.whatspanda-container table {
+  font-family: Arial, var(--font-sans), sans-serif !important;
+}
+
+/* Tirar o bold pesado de todo o menu e subcomponentes */
+.whatspanda-container h1,
+.whatspanda-container h2,
+.whatspanda-container h3,
+.whatspanda-container h4,
+.whatspanda-container h5,
+.whatspanda-container h6,
+.whatspanda-container th,
+.whatspanda-container .font-bold,
+.whatspanda-container .font-semibold,
+.whatspanda-container font-bold,
+.whatspanda-container font-semibold {
+  font-weight: 500 !important;
+}
+
+.whatspanda-container .font-extrabold,
+.whatspanda-container .font-black,
+.whatspanda-container font-black {
+  font-weight: 600 !important;
+}
+
 

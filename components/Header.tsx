@@ -118,7 +118,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
     };
 
     return (
-        <header className={`sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300 ${isDropdownOpen || isSoundMenuOpen || showSearchResults ? 'z-[60]' : 'z-30'}`}>
+        <header className={`sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300 ${isDropdownOpen || isSoundMenuOpen || showSearchResults ? 'z-[9999]' : 'z-30'}`}>
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -302,7 +302,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             </div>
                         </button>
                         {isDropdownOpen && (
-                             <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[100] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                             <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[10000] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
                                  {isMobileSoundSelectorOpen ? (
                                      <div className="px-2 py-1 space-y-1">
                                          <button

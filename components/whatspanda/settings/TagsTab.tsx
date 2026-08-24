@@ -114,7 +114,7 @@ const TagsTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                 <div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Etiquetas (Tags)</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Organize seus contatos e atendimentos com etiquetas personalizadas.</p>
@@ -212,18 +212,18 @@ const TagsTab: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
+                                className="w-full sm:w-auto justify-center px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em] flex items-center"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
+                                className="w-full sm:w-auto justify-center px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
-                                <Check className="w-5 h-5 mr-3" />
+                                <Check className="w-5 h-5 mr-3 shrink-0" />
                                 Salvar Tag
                             </button>
                         </div>

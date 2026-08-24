@@ -145,6 +145,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         setSelectedSound(data.notification_sound);
                         localStorage.setItem('pixel_notification_sound', data.notification_sound);
                     }
+                })
+                .catch((err) => {
+                    console.error('Erro ao buscar som de notificação do banco:', err);
                 });
         }
     }, [currentUser?.id]);

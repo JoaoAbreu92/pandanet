@@ -163,7 +163,7 @@ const UsersTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                 <div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Usuários e Permissões</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
@@ -180,7 +180,7 @@ const UsersTab: React.FC = () => {
             {loading ? (
                 <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando usuários...</div>
             ) : (
-                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-2xl">
+                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-x-auto custom-scrollbar shadow-2xl">
                         <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                             <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
@@ -378,19 +378,19 @@ const UsersTab: React.FC = () => {
                              </div>
                         </div>
 
-                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
+                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
+                                className="w-full sm:w-auto justify-center px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em] flex items-center"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={!selectedEmployeeId}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full sm:w-auto justify-center px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Check className="w-5 h-5 mr-3" />
+                                <Check className="w-5 h-5 mr-3 shrink-0" />
                                 Salvar Permissões
                             </button>
                         </div>
