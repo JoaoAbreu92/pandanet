@@ -77,16 +77,21 @@ export function getCleanImageUrl(url: string | null | undefined): string {
     if (!url) return '';
     if (url.startsWith('blob:')) return url;
     if (url.includes('/storage/v1/object/public/')) {
-        // Se estivermos em ambiente local/desenvolvimento (localhost ou IP local),
-        // não reescrevemos para o origin do Vite dev server que não tem o proxy.
         if (typeof window !== 'undefined') {
             const hostname = window.location.hostname;
-            const isLocal = hostname === 'localhost' || 
-                            hostname === '127.0.0.1' || 
-                            hostname.startsWith('192.168.') || 
-                            hostname.startsWith('10.') || 
-                            hostname.startsWith('172.');
-            if (isLocal) {
+            const port = window.location.port;
+            
+            // Se estivermos rodando no Vite Dev Server (porta 3000, 5173, etc.) ou se for localhost,
+            // não reescrevemos o host original do banco de dados (que aponta para a porta 8000 da VPS),
+            // pois o Vite Dev Server local não tem proxy para a rota /storage.
+            const isDevServer = port === '3000' || port === '5173' || port === '3001' ||
+                                hostname === 'localhost' || 
+                                hostname === '127.0.0.1' || 
+                                hostname.startsWith('192.168.') || 
+                                hostname.startsWith('10.') || 
+                                hostname.startsWith('172.');
+            
+            if (isDevServer) {
                 return url;
             }
         }
