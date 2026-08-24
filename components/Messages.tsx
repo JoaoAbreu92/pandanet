@@ -59,14 +59,15 @@ interface Note {
     colorId: string;
 }
 
+import { useAuth } from './AuthContext';
+
 interface MessagesProps {
-    conversations?: Conversation[]; // Kept for compatibility but ignored
-    setConversations?: React.Dispatch<React.SetStateAction<Conversation[]>>;
-    currentUser: Employee;
-    allEmployees: Employee[];
+    // No props needed now
 }
 
-const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyEmployees }) => {
+const Messages: React.FC<MessagesProps> = () => {
+    const { profile: currentUser } = useAuth();
+    const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null); // Changed to string (UUID)
     const [messages, setMessages] = useState<Message[]>([]);
@@ -100,8 +101,48 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyE
         localStorage.setItem('sticky_notes', JSON.stringify(notes));
     }, [notes]);
 
+    // Fetch Employees (Contacts)
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            if (!currentUser?.company_id) return;
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('company_id', currentUser.company_id); // Filter by company
+
+            if (data) {
+                // Map Supabase profile to Employee type
+                const employees: Employee[] = data.map(p => ({
+                    id: p.id,
+                    name: p.full_name,
+                    email: p.email || '',
+                    role: p.role,
+                    team: p.team,
+                    avatarUrl: p.avatar_url,
+                    joinDate: p.join_date,
+                    birthDate: p.birth_date,
+                    isAdmin: p.is_admin,
+                    isOnline: false,
+                    permissions: p.permissions || {},
+                    following: p.following || [],
+                    phone: p.phone,
+                    officeLocation: p.office_location,
+                    bio: p.bio,
+                    company_id: p.company_id
+                }));
+                setCompanyEmployees(employees);
+            }
+        };
+
+        if (currentUser) {
+            fetchEmployees();
+        }
+    }, [currentUser]);
+
     // Fetch Conversations
     const fetchConversations = async () => {
+        if (!currentUser) return;
         try {
             // 1. Get all conversation IDs for current user
             const { data: myParticipations, error: partError } = await supabase
@@ -469,6 +510,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyE
             </div>
         );
     };
+
+    if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
 
     return (
         <div className="flex h-[calc(100vh-5rem)] bg-white">
