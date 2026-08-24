@@ -220,9 +220,13 @@ const Channels: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Deseja realmente remover esta conexão?')) return;
+        if (!confirm('Deseja realmente remover esta conexão? ATENÇÃO: Se houverem contatos e conversas vinculadas, a exclusão será bloqueada.')) return;
         const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
-        if (!error) fetchSettings();
+        if (error) {
+            alert('Não foi possível excluir a conexão.\n\nMotivo: Existem contatos/conversas atrelados a ela.\nVá na aba "Contatos", selecione todos e clique em "Excluir Selecionados" para limpar o histórico, depois tente novamente.');
+        } else {
+            fetchSettings();
+        }
     };
 
     const handleEdit = (channel: WhatsAppSettings) => {

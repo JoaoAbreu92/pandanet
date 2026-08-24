@@ -22,6 +22,9 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     const [editingContact, setEditingContact] = useState<WhatsAppContact | null>(null);
     const [activeTab, setActiveTab] = useState<'dados' | 'kanban' | 'etiqueta' | 'anotacoes'>('dados');
     
+    // Bulk Select State
+    const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+    
     // Form fields
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -219,6 +222,53 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
         if (!error) fetchContacts();
     };
 
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Tem certeza que deseja apagar os ${selectedContacts.length} contatos selecionados?`)) return;
+        
+        setLoading(true);
+        // Exclusão em lote no Supabase
+        const { error } = await supabase
+            .from('whatsapp_contacts')
+            .delete()
+            .in('id', selectedContacts);
+            
+        if (error) {
+            alert('Erro ao excluir contatos em massa: ' + error.message);
+        } else {
+            // Tenta forçar limpeza de conversas fantasmas que não têm dono para limpar a aba "Aberto".
+            // Isso ajuda quem teve o bug das conversas importadas no sync
+            const companyId = currentUser?.company_id;
+            if (companyId) {
+                await supabase
+                    .from('whatsapp_conversations')
+                    .delete()
+                    .eq('company_id', companyId)
+                    .eq('unread_count', 0)
+                    .in('status', ['aberto', 'pendente'])
+                    .is('assigned_to', null);
+            }
+        }
+        
+        setSelectedContacts([]);
+        fetchContacts();
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedContacts.length === filteredContacts.length) {
+            setSelectedContacts([]);
+        } else {
+            setSelectedContacts(filteredContacts.map(c => c.id));
+        }
+    };
+
+    const toggleSelectContact = (id: string) => {
+        if (selectedContacts.includes(id)) {
+            setSelectedContacts(selectedContacts.filter(cId => cId !== id));
+        } else {
+            setSelectedContacts([...selectedContacts, id]);
+        }
+    };
+
     const filteredContacts = contacts.filter(c => 
         (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
         (c.phone || '').includes(searchTerm) ||
@@ -244,6 +294,21 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 </button>
             </div>
 
+            {/* Bulk Action Bar */}
+            {selectedContacts.length > 0 && (
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-500/20 px-4 py-3 flex items-center justify-between animate-in slide-in-from-top-2">
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                        {selectedContacts.length} {selectedContacts.length === 1 ? 'contato selecionado' : 'contatos selecionados'}
+                    </span>
+                    <button 
+                        onClick={handleBulkDelete}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold uppercase shadow-sm transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir Selecionados
+                    </button>
+                </div>
+            )}
+
             {/* Filtros */}
             <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-[#0f111a]">
                 <div className="relative col-span-2">
@@ -263,7 +328,14 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 <table className="w-full text-left border-collapse min-w-[1000px]">
                     <thead className="sticky top-0 bg-gray-50 dark:bg-[#0f111a] border-b border-gray-200 dark:border-gray-800 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-500 z-10">
                         <tr>
-                            <th className="p-4 w-12"><input type="checkbox" className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700" /></th>
+                            <th className="p-4 w-12">
+                                <input 
+                                    type="checkbox" 
+                                    checked={filteredContacts.length > 0 && selectedContacts.length === filteredContacts.length}
+                                    onChange={toggleSelectAll}
+                                    className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700 w-4 h-4 text-emerald-500 focus:ring-emerald-500" 
+                                />
+                            </th>
                             <th className="p-4">Nome</th>
                             <th className="p-4">WhatsApp</th>
                             <th className="p-4">Etiquetas</th>
@@ -274,8 +346,15 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
                         {filteredContacts.map(contact => (
-                            <tr key={contact.id} className="hover:bg-gray-50 dark:hover:bg-[#161925] transition-colors group">
-                                <td className="p-4"><input type="checkbox" className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700" /></td>
+                            <tr key={contact.id} className={`hover:bg-gray-50 dark:hover:bg-[#161925] transition-colors group ${selectedContacts.includes(contact.id) ? 'bg-emerald-50/50 dark:bg-emerald-500/5' : ''}`}>
+                                <td className="p-4">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedContacts.includes(contact.id)}
+                                        onChange={() => toggleSelectContact(contact.id)}
+                                        className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700 w-4 h-4 text-emerald-500 focus:ring-emerald-500" 
+                                    />
+                                </td>
                                 <td className="p-4 flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
                                         {contact.name?.charAt(0) || <User className="w-4 h-4" />}
