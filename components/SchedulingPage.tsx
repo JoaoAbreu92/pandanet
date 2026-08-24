@@ -51,6 +51,8 @@ const SchedulingPage: React.FC = () => {
         slug: '',
         description: '',
         duration: 30,
+        duration_unit: 'minutes' as 'minutes' | 'hours' | 'days',
+        disable_time_slots: false,
         is_paid: false,
         price: 0.00,
         requirements: {
@@ -477,6 +479,8 @@ const SchedulingPage: React.FC = () => {
                 slug: eventForm.slug.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-'),
                 description: eventForm.description,
                 duration: Number(eventForm.duration),
+                duration_unit: eventForm.duration_unit,
+                disable_time_slots: eventForm.disable_time_slots,
                 is_paid: eventForm.is_paid,
                 price: eventForm.is_paid ? Number(eventForm.price) : 0,
                 requirements: eventForm.requirements,
@@ -510,7 +514,7 @@ const SchedulingPage: React.FC = () => {
             setEditingEvent(null);
             fetchEventTypes();
             setEventForm({
-                name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
+                name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
                 requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
                 availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
                 is_active: true,
@@ -535,6 +539,8 @@ const SchedulingPage: React.FC = () => {
             slug: event.slug,
             description: event.description || '',
             duration: event.duration,
+            duration_unit: event.duration_unit ?? 'minutes',
+            disable_time_slots: event.disable_time_slots ?? false,
             is_paid: event.is_paid,
             price: event.price,
             requirements: {
@@ -824,7 +830,7 @@ const SchedulingPage: React.FC = () => {
                             onClick={() => {
                                 setEditingEvent(null);
                                 setEventForm({
-                                    name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
+                                    name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
                                     requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
                                     availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
                                     is_active: true,
@@ -943,7 +949,7 @@ const SchedulingPage: React.FC = () => {
                                         <div>
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold px-2 py-1 rounded-md">
-                                                    {event.duration} min
+                                                    {event.duration} {event.duration_unit === 'days' ? (event.duration === 1 ? 'dia' : 'dias') : event.duration_unit === 'hours' ? (event.duration === 1 ? 'hora' : 'horas') : 'min'}
                                                 </span>
                                                 <span className={`text-xs px-2 py-1 rounded-md font-bold ${event.is_paid ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
                                                     {event.is_paid ? `R$ ${event.price.toFixed(2)}` : 'Grátis'}
@@ -1346,14 +1352,26 @@ const SchedulingPage: React.FC = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Duração (Minutos) *</label>
-                                    <input 
-                                        type="number" 
-                                        required 
-                                        value={eventForm.duration}
-                                        onChange={e => setEventForm({ ...eventForm, duration: Number(e.target.value) })}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
-                                    />
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block">Duração *</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="number" 
+                                            required 
+                                            min="1"
+                                            value={eventForm.duration}
+                                            onChange={e => setEventForm({ ...eventForm, duration: Number(e.target.value) })}
+                                            className="w-1/2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                        />
+                                        <select
+                                            value={eventForm.duration_unit}
+                                            onChange={e => setEventForm({ ...eventForm, duration_unit: e.target.value as any })}
+                                            className="w-1/2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-primary font-bold text-slate-700 dark:text-slate-300"
+                                        >
+                                            <option value="minutes">Minutos</option>
+                                            <option value="hours">Horas</option>
+                                            <option value="days">Dias</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">É pago? *</label>
@@ -1377,6 +1395,23 @@ const SchedulingPage: React.FC = () => {
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary disabled:opacity-50"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Option to disable time slots (hourly booking) */}
+                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Reserva por Dia Inteiro / Múltiplos Dias</label>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Desativa a seleção de horários no calendário. O convidado reserva o dia todo (ou dias inteiros).</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={eventForm.disable_time_slots}
+                                        onChange={e => setEventForm({ ...eventForm, disable_time_slots: e.target.checked })}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                                </label>
                             </div>
 
                             {/* Requirements Checklist */}

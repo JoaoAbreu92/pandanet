@@ -851,7 +851,9 @@ export interface SchedulingEventType {
   name: string;
   slug: string;
   description?: string;
-  duration: number; // em minutos
+  duration: number;
+  duration_unit?: 'minutes' | 'hours' | 'days';
+  disable_time_slots?: boolean;
   is_paid: boolean;
   price: number;
   requirements: {

@@ -376,6 +376,10 @@ CREATE POLICY "Acesso completo de configurações por empresa" ON public.schedul
 DROP POLICY IF EXISTS "Leitura pública de configurações por empresa" ON public.scheduling_settings;
 CREATE POLICY "Leitura pública de configurações por empresa" ON public.scheduling_settings
     FOR SELECT USING (true);
+
+-- Adicionar colunas de unidade de duração e desativação de horários se não existirem
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS duration_unit TEXT DEFAULT 'minutes';
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS disable_time_slots BOOLEAN DEFAULT FALSE;
 "
 
 

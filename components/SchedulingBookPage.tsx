@@ -122,7 +122,18 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         // Day of week check
         const dayOfWeek = date.getDay(); // 0: Sunday, 1: Monday...
         const allowedDays = eventType.availability?.days || [1, 2, 3, 4, 5];
-        return allowedDays.includes(dayOfWeek);
+        if (!allowedDays.includes(dayOfWeek)) return false;
+
+        // If time slots are disabled (full-day rental), check if already booked
+        if (eventType.disable_time_slots) {
+            const dateStr = date.toISOString().split('T')[0];
+            const isBooked = existingBookings.some(
+                b => b.booking_date === dateStr && b.status !== 'rejected' && b.status !== 'cancelled'
+            );
+            if (isBooked) return false;
+        }
+
+        return true;
     };
 
     // Generate time slots based on start/end hour and duration, respecting lunch breaks
@@ -177,7 +188,11 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
     const handleDateSelect = (date: Date) => {
         const dateStr = date.toISOString().split('T')[0];
         setSelectedDate(dateStr);
-        setSelectedTime(''); // Reset time on date change
+        if (eventType?.disable_time_slots) {
+            setSelectedTime('Dia Inteiro');
+        } else {
+            setSelectedTime(''); // Reset time on date change
+        }
     };
 
     const handleSubmitDetails = (e: React.FormEvent) => {
@@ -336,7 +351,15 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                         </h2>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                             <ClockIcon className="w-4 h-4 text-brand-primary" />
-                            <span>{eventType.duration} minutos</span>
+                            <span>
+                                {eventType.duration} {
+                                    eventType.duration_unit === 'days' 
+                                        ? (eventType.duration === 1 ? 'dia' : 'dias') 
+                                        : eventType.duration_unit === 'hours' 
+                                            ? (eventType.duration === 1 ? 'hora' : 'horas') 
+                                            : (eventType.duration === 1 ? 'minuto' : 'minutos')
+                                }
+                            </span>
                         </div>
                         {eventType.is_paid && (
                             <div className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40 rounded-lg px-2.5 py-1 text-xs font-black">
@@ -429,34 +452,51 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                             </div>
 
                             {/* Time Slots Column */}
-                            <div className="border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-850 lg:pl-6 pt-4 lg:pt-0 flex flex-col">
-                                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
-                                    {selectedDate ? `Horários para ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}` : 'Selecione uma data'}
-                                </h4>
-                                {selectedDate ? (
-                                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                                        {generateTimeSlots().length === 0 ? (
-                                            <p className="text-slate-400 text-xs py-8 text-center">Nenhum horário livre nesta data.</p>
-                                        ) : (
-                                            generateTimeSlots().map(time => (
-                                                <button
-                                                    key={time}
-                                                    onClick={() => setSelectedTime(time)}
-                                                    className={`w-full py-2.5 rounded-xl border text-sm font-bold transition-all ${
-                                                        selectedTime === time
-                                                            ? 'bg-brand-primary border-brand-primary text-white shadow-md shadow-brand-primary/10'
-                                                            : 'border-slate-200 dark:border-slate-800 hover:border-brand-primary text-slate-800 dark:text-slate-200 hover:bg-brand-primary/5'
-                                                    }`}
-                                                >
-                                                    {time}
-                                                </button>
-                                            ))
+                            <div className="border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-850 lg:pl-6 pt-4 lg:pt-0 flex flex-col justify-center">
+                                {eventType.disable_time_slots ? (
+                                    <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800 rounded-2xl p-5 text-center space-y-4 my-auto">
+                                        <CalendarIcon className="w-10 h-10 text-brand-primary mx-auto" />
+                                        <div>
+                                            <h4 className="font-extrabold text-slate-800 dark:text-white text-sm">Reserva por Dia Inteiro</h4>
+                                            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">Este aluguel/reserva é feito por dia inteiro. Não é necessária a seleção de horários específicos.</p>
+                                        </div>
+                                        {selectedDate && (
+                                            <div className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold py-2 px-4 rounded-xl inline-block">
+                                                Data Selecionada: {new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                            </div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="flex-1 flex items-center justify-center py-10 bg-slate-50 dark:bg-slate-950/20 border border-dashed rounded-2xl border-slate-200 dark:border-slate-850">
-                                        <p className="text-slate-400 text-xs text-center px-4">Selecione uma data no calendário para ver a disponibilidade de horários.</p>
-                                    </div>
+                                    <>
+                                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
+                                            {selectedDate ? `Horários para ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}` : 'Selecione uma data'}
+                                        </h4>
+                                        {selectedDate ? (
+                                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                                {generateTimeSlots().length === 0 ? (
+                                                    <p className="text-slate-400 text-xs py-8 text-center">Nenhum horário livre nesta data.</p>
+                                                ) : (
+                                                    generateTimeSlots().map(time => (
+                                                        <button
+                                                            key={time}
+                                                            onClick={() => setSelectedTime(time)}
+                                                            className={`w-full py-2.5 rounded-xl border text-sm font-bold transition-all ${
+                                                                selectedTime === time
+                                                                    ? 'bg-brand-primary border-brand-primary text-white shadow-md shadow-brand-primary/10'
+                                                                    : 'border-slate-200 dark:border-slate-800 hover:border-brand-primary text-slate-800 dark:text-slate-200 hover:bg-brand-primary/5'
+                                                            }`}
+                                                        >
+                                                            {time}
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1 flex items-center justify-center py-10 bg-slate-50 dark:bg-slate-950/20 border border-dashed rounded-2xl border-slate-200 dark:border-slate-850">
+                                                <p className="text-slate-400 text-xs text-center px-4">Selecione uma data no calendário para ver a disponibilidade de horários.</p>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
