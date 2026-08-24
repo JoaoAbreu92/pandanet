@@ -75,16 +75,18 @@ const BeneficiosPage: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="pt-2 border-t dark:border-white/5">
-                                    <a
-                                        href={benefit.link}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center text-sm font-semibold text-brand-primary hover:text-emerald-600 transition-colors"
-                                    >
-                                        Saiba mais &rarr;
-                                    </a>
-                                </div>
+                                {benefit.link && benefit.link !== '#' && benefit.link !== '' && (
+                                    <div className="pt-2 border-t dark:border-white/5">
+                                        <a
+                                            href={benefit.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center text-sm font-semibold text-brand-primary hover:text-emerald-600 transition-colors"
+                                        >
+                                            Saiba mais &rarr;
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         </Card>
                     ))

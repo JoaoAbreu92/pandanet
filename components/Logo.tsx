@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SYSTEM_VERSION } from '../version';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 
 const defaultLogo = '/logo.png';
 
@@ -41,7 +41,7 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
         fetchSystemLogo();
     }, []);
 
-    const logoSrc = (companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo);
+    const logoSrc = getCleanImageUrl((companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo));
 
     return (
         <div className={`flex flex-col items-center justify-center ${className}`}>

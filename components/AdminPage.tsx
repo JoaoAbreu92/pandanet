@@ -518,12 +518,13 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     tableName="benefits"
                     storageBucket="feed-media"
                     companyId={company.id}
-                    newItemTemplate={{ title: '', description: '', features: [], link: '#', image_url: '' }}
+                    newItemTemplate={{ title: '', description: '', features: [], hasLink: true, link: '', image_url: '' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição', type: 'textarea' },
                         { key: 'features', label: 'Características (um por linha)', type: 'textarea' },
-                        { key: 'link', label: 'Link (Saiba Mais)' },
+                        { key: 'hasLink', label: 'Possui Link (Saiba Mais)?', type: 'checkbox', excludeFromDb: true },
+                        { key: 'link', label: 'Link (Saiba Mais)', condition: (formData) => formData.hasLink },
                         { key: 'image_url', label: 'Imagem do Benefício (Upload)', type: 'file', dbColumn: 'image_url', optional: true }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
