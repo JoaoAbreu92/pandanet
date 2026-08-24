@@ -130,6 +130,166 @@ const LeaveRequestModal: React.FC<{
     );
 };
 
+const EpiRequestModal: React.FC<{
+    onClose: () => void;
+    onSubmit: (data: { items: string, size: string, reason: string }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
+    const [items, setItems] = useState('');
+    const [size, setSize] = useState('');
+    const [reason, setReason] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ items, size, reason });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de EPI</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Equipamentos Necessários</label>
+                        <input type="text" value={items} onChange={e => setItems(e.target.value)} required placeholder="Ex: Bota de Segurança, Luvas Térmicas, Óculos" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Tamanho / Especificação (se aplicável)</label>
+                        <input type="text" value={size} onChange={e => setSize(e.target.value)} placeholder="Ex: Tamanho 40, CA específico" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Motivo / Justificativa</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} required placeholder="Ex: Desgaste do equipamento anterior, novo setor" className="mt-1 w-full border-gray-355 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2"></textarea>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const UniformRequestModal: React.FC<{
+    onClose: () => void;
+    onSubmit: (data: { items: string, size: string, quantity: number, reason: string }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
+    const [items, setItems] = useState('');
+    const [size, setSize] = useState('M');
+    const [quantity, setQuantity] = useState(1);
+    const [reason, setReason] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ items, size, quantity, reason });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Uniforme</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Peça de Uniforme</label>
+                            <select value={items} onChange={e => setItems(e.target.value)} required className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2">
+                                <option value="">Selecione...</option>
+                                <option value="Camiseta Polo">Camiseta Polo</option>
+                                <option value="Camisa Social">Camisa Social</option>
+                                <option value="Calça Jeans">Calça Jeans</option>
+                                <option value="Calça Brim">Calça Brim</option>
+                                <option value="Jaqueta / Casaco">Jaqueta / Casaco</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Tamanho</label>
+                            <select value={size} onChange={e => setSize(e.target.value)} required className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2">
+                                <option value="PP">PP</option>
+                                <option value="P">P</option>
+                                <option value="M">M</option>
+                                <option value="G">G</option>
+                                <option value="GG">GG</option>
+                                <option value="XG">XG</option>
+                                <option value="38">38</option>
+                                <option value="40">40</option>
+                                <option value="42">42</option>
+                                <option value="44">44</option>
+                                <option value="46">46</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Quantidade</label>
+                        <input type="number" min="1" max="5" value={quantity} onChange={e => setQuantity(Number(e.target.value))} required className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Motivo da Solicitação</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} required placeholder="Ex: Substituição por desgaste, nova contratação" className="mt-1 w-full border-gray-355 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2"></textarea>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const DocRequestModal: React.FC<{
+    onClose: () => void;
+    onSubmit: (data: { docType: string, reason: string }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
+    const [docType, setDocType] = useState('');
+    const [reason, setReason] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ docType, reason });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Documento</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Tipo de Documento</label>
+                        <select value={docType} onChange={e => setDocType(e.target.value)} required className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2">
+                            <option value="">Selecione...</option>
+                            <option value="Declaração de Trabalho">Declaração de Trabalho</option>
+                            <option value="Carta de Apresentação">Carta de Apresentação</option>
+                            <option value="Histórico de Rendimentos">Histórico de Rendimentos</option>
+                            <option value="Cópia de Contrato de Trabalho">Cópia de Contrato de Trabalho</option>
+                            <option value="Outros">Outros (especificar nas observações)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Finalidade / Observações</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} required placeholder="Ex: Apresentar na faculdade, abertura de conta bancária, etc." className="mt-1 w-full border-gray-355 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2"></textarea>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const FormsPage: React.FC = () => {
     const { t } = useLanguage();
     const { currentUser } = useAuth();
@@ -137,6 +297,9 @@ const FormsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isVacationModalOpen, setVacationModalOpen] = useState(false);
     const [isLeaveModalOpen, setLeaveModalOpen] = useState(false);
+    const [isEpiModalOpen, setEpiModalOpen] = useState(false);
+    const [isUniformModalOpen, setUniformModalOpen] = useState(false);
+    const [isDocModalOpen, setDocModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const fetchSubmissions = async () => {
@@ -270,6 +433,87 @@ const FormsPage: React.FC = () => {
         }
     };
 
+    const handleEpiRequest = async (data: { items: string, size: string, reason: string }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Solicitação de EPI',
+                    status: 'Pendente',
+                    reason: `Itens: ${data.items}${data.size ? ` | Tam: ${data.size}` : ''} | Justificativa: ${data.reason}`
+                }]);
+
+            if (error) throw error;
+
+            setEpiModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting EPI request:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleUniformRequest = async (data: { items: string, size: string, quantity: number, reason: string }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Solicitação de Uniforme',
+                    status: 'Pendente',
+                    reason: `Peça: ${data.items} | Tam: ${data.size} | Qtd: ${data.quantity} | Justificativa: ${data.reason}`
+                }]);
+
+            if (error) throw error;
+
+            setUniformModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting Uniform request:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDocRequest = async (data: { docType: string, reason: string }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Solicitação de Documento',
+                    status: 'Pendente',
+                    reason: `Tipo: ${data.docType} | Finalidade: ${data.reason}`
+                }]);
+
+            if (error) throw error;
+
+            setDocModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting Document request:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const getStatusColor = (status: FormStatus) => {
         switch (status) {
             case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400';
@@ -309,12 +553,45 @@ const FormsPage: React.FC = () => {
                             </button>
                         </div>
 
+                        <div onClick={() => setEpiModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                            <div>
+                                <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de EPI</h3>
+                                <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite Equipamentos de Proteção Individual necessários para sua função.</p>
+                            </div>
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Solicitar EPI</span>
+                            </button>
+                        </div>
+
+                        <div onClick={() => setUniformModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                            <div>
+                                <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de Uniforme</h3>
+                                <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite novas peças de uniforme ou substituições por tamanho/desgaste.</p>
+                            </div>
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Solicitar Uniforme</span>
+                            </button>
+                        </div>
+
+                        <div onClick={() => setDocModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                            <div>
+                                <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de Documentos</h3>
+                                <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite declarações de trabalho, cópias de contratos ou outros documentos ao RH.</p>
+                            </div>
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Solicitar Documentos</span>
+                            </button>
+                        </div>
+
                         <div onClick={() => alert('Em breve')} className="p-6 bg-gray-50 dark:bg-slate-900 rounded-2xl opacity-60 border dark:border-white/5 cursor-not-allowed text-center flex flex-col justify-between h-48">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white">{t('forms.data_change')}</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">{t('forms.data_change_desc')}</p>
                             </div>
-                            <button disabled className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-gray-300 dark:bg-gray-800 text-white dark:text-gray-500 rounded-xl cursor-not-allowed font-bold">
+                            <button disabled className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-300 dark:bg-gray-800 text-white dark:text-gray-500 rounded-xl cursor-not-allowed font-bold">
                                 <PlusIcon className="w-4 h-4" />
                                 <span>{t('forms.start_request')}</span>
                             </button>
@@ -365,6 +642,9 @@ const FormsPage: React.FC = () => {
             </div>
             {isVacationModalOpen && <VacationRequestModal onClose={() => setVacationModalOpen(false)} onSubmit={handleVacationRequest} submitting={submitting} />}
             {isLeaveModalOpen && <LeaveRequestModal onClose={() => setLeaveModalOpen(false)} onSubmit={handleLeaveRequest} submitting={submitting} />}
+            {isEpiModalOpen && <EpiRequestModal onClose={() => setEpiModalOpen(false)} onSubmit={handleEpiRequest} submitting={submitting} />}
+            {isUniformModalOpen && <UniformRequestModal onClose={() => setUniformModalOpen(false)} onSubmit={handleUniformRequest} submitting={submitting} />}
+            {isDocModalOpen && <DocRequestModal onClose={() => setDocModalOpen(false)} onSubmit={handleDocRequest} submitting={submitting} />}
         </>
     );
 };
