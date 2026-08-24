@@ -229,23 +229,25 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
     return (
         <>
             <Card title="Gerenciar Equipes" headerAction={
-                <button
-                    onClick={() => { setEditingTeamName(null); setModalOpen(true); }}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600"
-                >
-                    <PlusIcon className="w-4 h-4" />
-                    <span>Criar Equipe</span>
-                </button>
-                {onNavigate && (
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={() => onNavigate('org-chart')}
-                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                        onClick={() => { setEditingTeamName(null); setModalOpen(true); }}
+                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600"
                     >
-                        <UsersIcon className="w-4 h-4" />
-                        <span>Ver Organograma</span>
+                        <PlusIcon className="w-4 h-4" />
+                        <span>Criar Equipe</span>
                     </button>
-                )}
-            </div>
+                    {onNavigate && (
+                        <button
+                            onClick={() => onNavigate('org-chart')}
+                            className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                        >
+                            <UsersIcon className="w-4 h-4" />
+                            <span>Ver Organograma</span>
+                        </button>
+                    )}
+                </div>
+            }>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {teams.map(({ name, members }) => (
                         <div key={name} className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
