@@ -9,6 +9,7 @@ import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon, ShieldCheckIcon as ShieldCheck } from './icons';
 import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page, CompanyBadge, UserBadge } from '../types';
+import BadgeDetailModal from './BadgeDetailModal';
 
 export const PostCard: React.FC<{
     post: Post;
@@ -393,6 +394,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [allCompanyBadges, setAllCompanyBadges] = useState<CompanyBadge[]>([]);
     const [earnedBadges, setEarnedBadges] = useState<UserBadge[]>([]);
     const [equippedBadges, setEquippedBadges] = useState<UserBadge[]>([]);
+    const [selectedBadgeForComments, setSelectedBadgeForComments] = useState<UserBadge | null>(null);
 
     const recentBadgeAwards = posts.filter(post => {
         if (!post.content.startsWith('[BADGE_AWARD]')) return false;
@@ -926,6 +928,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             return (
                                                 <div 
                                                     key={userBadge.id} 
+                                                    onClick={() => setSelectedBadgeForComments(userBadge)}
                                                     className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}
                                                     title={`${badge.name}: ${badge.description || ''}`}
                                                 >
@@ -1191,6 +1194,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         </div>
                     </div>
                 </div>
+            )}
+            {selectedBadgeForComments && (
+                <BadgeDetailModal 
+                    userBadge={selectedBadgeForComments}
+                    onClose={() => setSelectedBadgeForComments(null)}
+                />
             )}
         </div>
     );

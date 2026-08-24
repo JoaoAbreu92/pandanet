@@ -5,6 +5,7 @@ import type { Employee, Post, CompanyBadge, UserBadge } from '../types';
 import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import BadgeDetailModal from './BadgeDetailModal';
 
 interface ProfilePageProps {
     userId?: string;
@@ -25,6 +26,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [loading, setLoading] = useState(false);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     const [isFollowLoading, setIsFollowLoading] = useState(false);
+    const [selectedBadgeForComments, setSelectedBadgeForComments] = useState<UserBadge | null>(null);
     const { refreshProfile } = useAuth();
 
     // Password change state
@@ -631,7 +633,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         return (
                             <div 
                                 key={ub.id} 
-                                className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 transition-transform duration-300 cursor-pointer animate-float overflow-hidden`}
+                                onClick={() => setSelectedBadgeForComments(ub)}
+                                className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}
                                 title={`${badge.name}: ${badge.description || ''}`}
                             >
                                 {isUrl ? (
@@ -979,7 +982,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     return (
                                         <div 
                                             key={ub.id}
-                                            className="flex items-start space-x-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30 shadow-sm hover:shadow transition-shadow"
+                                            onClick={() => setSelectedBadgeForComments(ub)}
+                                            className="flex items-start space-x-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30 shadow-sm hover:shadow hover:bg-slate-100/30 dark:hover:bg-slate-800/50 transition-all cursor-pointer"
                                         >
                                             <div className={`w-14 h-14 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-sm shrink-0 select-none transform hover:scale-105 transition-transform animate-float overflow-hidden`}>
                                                 {isUrl ? (
@@ -1028,6 +1032,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     </div>
                 )}
             </div>
+            {selectedBadgeForComments && (
+                <BadgeDetailModal 
+                    userBadge={selectedBadgeForComments}
+                    onClose={() => setSelectedBadgeForComments(null)}
+                />
+            )}
         </div>
     );
 };
