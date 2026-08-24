@@ -3,11 +3,15 @@ import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
 import { Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check, RefreshCw } from 'lucide-react';
 import { useAuth } from '../AuthContext';
-const Contacts: React.FC = () => {
+interface ContactsProps {
+    initialSearch?: string;
+}
+
+const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialSearch);
     
     // Modal & Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,6 +33,13 @@ const Contacts: React.FC = () => {
 
     const { profile, user } = useAuth();
     
+    // Update searchTerm if initialSearch changes
+    useEffect(() => {
+        if (initialSearch !== undefined) {
+            setSearchTerm(initialSearch);
+        }
+    }, [initialSearch]);
+
     const fetchContacts = async () => {
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
         if (!companyId) return;
@@ -58,15 +69,37 @@ const Contacts: React.FC = () => {
     };
 
     const handleSyncContacts = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
         setSyncing(true);
-        // Refresh list from Supabase
-        await fetchContacts();
+        try {
+            // 1. Get connection ID
+            const { data: settings } = await supabase
+                .from('whatsapp_settings')
+                .select('id')
+                .eq('company_id', companyId)
+                .limit(1)
+                .single();
+            
+            if (settings?.id) {
+                // 2. Trigger backend sync (assuming backend runs on same host/port or discovery)
+                // We'll use the relative path or window.location.origin if it's the same
+                // But since it's a proxy, let's assume it's at /api/whatsapp/sync or similar
+                // Actually, looking at previous turns, backend might be at :3001 or similar.
+                // Let's use a standard fetch to the backend proxy
+                await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { method: 'POST' });
+            }
 
-        // Simulate a short delay for visual feedback
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        setSyncing(false);
-        alert('Sincronização concluída com sucesso!');
+            // 3. Refresh list from Supabase
+            await fetchContacts();
+            alert('Sincronização iniciada em segundo plano! Os contatos aparecerão em instantes.');
+        } catch (error) {
+            console.error('Error syncing:', error);
+            alert('Erro ao iniciar sincronização.');
+        } finally {
+            setSyncing(false);
+        }
     };
 
     const handleOpenModal = (contact?: WhatsAppContact) => {

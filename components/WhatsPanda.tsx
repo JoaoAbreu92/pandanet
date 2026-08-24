@@ -17,7 +17,11 @@ import { useAuth } from './AuthContext';
 
 type View = 'chat' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
 
-const WhatsPanda: React.FC = () => {
+interface WhatsPandaProps {
+  initialSearch?: string;
+}
+
+const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   const { profile } = useAuth();
   const [currentView, setCurrentView] = useState<View>('chat');
   const [isChatActive, setIsChatActive] = useState(false);
@@ -67,9 +71,20 @@ const WhatsPanda: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} /> : null;
-      case 'contacts': return permissions.can_view_contacts ? <Contacts /> : null;
-      case 'new-ticket': return permissions.can_view_chats ? <NewTicket onBack={() => setCurrentView('chat')} /> : null;
+      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={initialSearch} /> : null;
+      case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={initialSearch} /> : null;
+      case 'new-ticket': return permissions.can_view_chats ? (
+        <NewTicket 
+          onBack={() => setCurrentView('chat')} 
+          onConversationSelect={(conv) => {
+            // This is tricky because WhatsPanda doesn't hold the selectedConversation state, Chat does.
+            // But we can tell Chat to open it via a prop if we refactor.
+            // OR we just go back to chat and let the Realtime handle the new entry.
+            // The user said: "nao acha o usuário".
+            setCurrentView('chat');
+          }}
+        />
+      ) : null;
       case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
       case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
       default: return null;

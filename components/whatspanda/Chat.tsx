@@ -32,9 +32,10 @@ import KanbanBoard from './KanbanBoard';
 
 interface ChatProps {
   onConversationSelect?: (isActive: boolean) => void;
+  initialSearch?: string;
 }
 
-const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
+const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' }) => {
   const { user, profile } = useAuth();
   const permissions = (profile?.whatspanda_permissions as any) || {};
   const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
@@ -51,6 +52,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
   const [conversations, setConversations] = useState<WhatsAppConversationWithDetails[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversationWithDetails | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
@@ -124,6 +126,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
     if (data && data.length > 0) setSettings(data[0]);
   };
 
+  // Update searchTerm if initialSearch changes
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearchTerm(initialSearch);
+    }
+  }, [initialSearch]);
+
   const fetchConversations = async () => {
     const companyId = profile?.company_id || user?.user_metadata?.company_id;
     if (!companyId) return;
@@ -162,6 +171,61 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
       .order('created_at', { ascending: true });
     
     if (data) setMessages(data);
+  };
+
+  const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
+    setConversations(prev => prev.map(conv => 
+      conv.id === conversationId ? { ...conv, kanban_column_id: newColumnId } : conv
+    ));
+    // Also update selectedConversation if matched
+    if (selectedConversation?.id === conversationId) {
+      setSelectedConversation(prev => prev ? { ...prev, kanban_column_id: newColumnId } : null);
+    }
+  };
+
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [selectedConvTags, setSelectedConvTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchConvTags(selectedConversation.id);
+    }
+    fetchAvailableTags();
+  }, [selectedConversation]);
+
+  const fetchAvailableTags = async () => {
+    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    if (!companyId) return;
+    const { data } = await supabase.from('whatsapp_tags').select('*').eq('company_id', companyId);
+    if (data) setAvailableTags(data);
+  };
+
+  const fetchConvTags = async (conversationId: string) => {
+    const { data } = await supabase
+      .from('whatsapp_conversation_tags')
+      .select('tag_id')
+      .eq('conversation_id', conversationId);
+    if (data) setSelectedConvTags(data.map(d => d.tag_id));
+  };
+
+  const handleToggleTag = async (tagId: string) => {
+    if (!selectedConversation) return;
+
+    if (selectedConvTags.includes(tagId)) {
+      // Remove
+      await supabase
+        .from('whatsapp_conversation_tags')
+        .delete()
+        .eq('conversation_id', selectedConversation.id)
+        .eq('tag_id', tagId);
+      setSelectedConvTags(prev => prev.filter(id => id !== tagId));
+    } else {
+      // Add
+      await supabase
+        .from('whatsapp_conversation_tags')
+        .insert({ conversation_id: selectedConversation.id, tag_id: tagId });
+      setSelectedConvTags(prev => [...prev, tagId]);
+    }
   };
 
   const markAsRead = async (conversationId: string) => {
@@ -250,22 +314,32 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
             <input
               type="text" 
               placeholder="Buscar atendimento..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 dark:text-white"
             />
           </div>
           {isAdmin && (
             <button
               onClick={async () => {
-                if (window.confirm('Tem certeza? Isso irá apagar todo o histórico de conversas do WhatsPanda!')) {
                   try {
-                    const { error } = await supabase.from('whatsapp_conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                    if (!companyId) return;
+
+                    const { error } = await supabase
+                      .from('whatsapp_conversations')
+                      .delete()
+                      .eq('company_id', companyId);
+                    
                     if (error) throw error;
+                    setConversations([]);
+                    setSelectedConversation(null);
                     alert('Atendimentos limpos com sucesso.');
                   } catch (err: any) {
                     alert('Erro ao limpar: ' + err.message);
                   }
                 }
-              }}
+              }
               className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
             >
               LIMPAR ATENDIMENTOS
@@ -350,6 +424,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
             setSelectedConversation(conv);
             setViewMode('list');
           }}
+          onMoveConversation={handleMoveConversation}
         />
       ) : (
       <>
@@ -525,6 +600,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
             </div>
 
           <div className="p-8 flex-1 overflow-y-auto space-y-8 custom-scrollbar">
+            <div>
+              <h4 className="text-[11px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">Tags</h4>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleToggleTag(tag.id)}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                      selectedConvTags.includes(tag.id)
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                      : 'bg-white dark:bg-white/5 text-slate-500 dark:text-gray-400 border-slate-200 dark:border-white/10 hover:border-emerald-300'
+                    }`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+                {availableTags.length === 0 && (
+                  <span className="text-[10px] text-slate-400 italic">Nenhuma tag cadastrada</span>
+                )}
+              </div>
+            </div>
+
             <div>
               <h4 className="text-[11px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">Informações do Ticket</h4>
               <div className="bg-gray-100/50 dark:bg-white/5 rounded-2xl p-5 border border-transparent dark:border-white/5 space-y-4">

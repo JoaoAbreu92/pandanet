@@ -6,9 +6,10 @@ import { Search, MessageCircle, User, ArrowRight, Smartphone, Send, Instagram, X
 
 interface NewTicketProps {
     onBack?: () => void;
+    onConversationSelect?: (conversation: any) => void;
 }
 
-const NewTicket: React.FC<NewTicketProps> = ({ onBack }) => {
+const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) => {
     const { profile, user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
@@ -76,12 +77,18 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack }) => {
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
         if (!companyId) return;
 
-        const { data } = await supabase
+        let query = supabase
             .from('whatsapp_contacts')
             .select('*')
-            .eq('company_id', companyId)
-            .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
-            .limit(5);
+            .eq('company_id', companyId);
+        
+        if (searchTerm) {
+            query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+        }
+
+        const { data } = await query
+            .order('name', { ascending: true })
+            .limit(20);
         
         if (data) setContacts(data);
     };
@@ -172,6 +179,20 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack }) => {
 
         // 4. Redirect
         alert(`Conversa iniciada com ${contactName}!`);
+        if (onConversationSelect && conversationId) {
+            // Fetch the full conversation object to select it
+            const { data } = await supabase
+                .from('whatsapp_conversations')
+                .select(`
+                    *,
+                    assigned_user:profiles!assigned_to(id, full_name, avatar_url),
+                    department:departments(id, name),
+                    channel:whatsapp_settings!connection_id(channel_type, connection_name)
+                `)
+                .eq('id', conversationId)
+                .single();
+            if (data) onConversationSelect(data);
+        }
         if (onBack) onBack();
     };
 

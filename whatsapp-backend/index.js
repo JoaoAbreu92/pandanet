@@ -282,6 +282,120 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
     }
 }
 
+async function runChatbot(message, conversation, companyId, connectionId) {
+    try {
+        const text = (message.message?.conversation || message.message?.extendedTextMessage?.text || message.text || "").trim().toLowerCase();
+        if (!text) return;
+
+        // 1. Buscar fluxo ativo
+        const { data: flow } = await supabase
+            .from('whatsapp_chatbot_flows')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (!flow) return;
+
+        let currentNodeId = conversation.chatbot_node_id;
+        let node;
+
+        if (!currentNodeId) {
+            // Iniciar com o node de saudação (tipo 'greeting')
+            const { data: greetingNode } = await supabase
+                .from('whatsapp_chatbot_nodes')
+                .select('*')
+                .eq('flow_id', flow.id)
+                .eq('type', 'greeting')
+                .maybeSingle();
+            node = greetingNode;
+        } else {
+            // Verificar resposta para o node atual (se for menu)
+            const { data: currentNode } = await supabase
+                .from('whatsapp_chatbot_nodes')
+                .select('*')
+                .eq('id', currentNodeId)
+                .single();
+            
+            if (currentNode?.type === 'menu') {
+                const options = currentNode.content?.options || [];
+                // Tenta achar opção por número ou texto
+                const selectedOption = options.find(opt => 
+                    text === opt.label.toLowerCase() || 
+                    text === (options.indexOf(opt) + 1).toString()
+                );
+
+                if (selectedOption) {
+                    const { data: nextNode } = await supabase
+                        .from('whatsapp_chatbot_nodes')
+                        .select('*')
+                        .eq('id', selectedOption.next_node)
+                        .maybeSingle();
+                    node = nextNode;
+                } else {
+                    // Repetir menu se opção inválida
+                    node = currentNode;
+                }
+            } else {
+                // Se não for menu, talvez apenas avançar ou reiniciar? 
+                // Para simplificar: se não for menu e estiver preso num node, reiniciar no greeting se mandou algo novo
+                const { data: greetingNode } = await supabase
+                    .from('whatsapp_chatbot_nodes')
+                    .select('*')
+                    .eq('flow_id', flow.id)
+                    .eq('type', 'greeting')
+                    .maybeSingle();
+                node = greetingNode;
+            }
+        }
+
+        if (node) {
+            // Processar ações do node
+            if (node.type === 'transfer_queue') {
+                const queueId = node.content?.queue_id;
+                await supabase.from('whatsapp_conversations').update({ 
+                    queue_id: queueId, 
+                    chatbot_node_id: null 
+                }).eq('id', conversation.id);
+            } else if (node.type === 'transfer_user') {
+                const userId = node.content?.user_id;
+                await supabase.from('whatsapp_conversations').update({ 
+                    assigned_to: userId, 
+                    chatbot_node_id: null 
+                }).eq('id', conversation.id);
+            } else {
+                // Node de mensagem ou menu: Enviar resposta e salvar estado
+                const replyText = node.content?.text || "";
+                if (replyText) {
+                    // Buscar settings para pegar a URL da Evolution
+                    const { data: settings } = await supabase.from('whatsapp_settings').select('instance_name').eq('id', connectionId).single();
+                    if (settings) {
+                        await fetch(`${evoUrl}/message/sendText/${settings.instance_name}`, {
+                            method: 'POST',
+                            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                number: conversation.contact_phone,
+                                text: replyText
+                            })
+                        }).catch(e => console.error('[CHATBOT] Erro ao enviar msg:', e.message));
+
+                        // Salvar msg enviada pelo bot no banco
+                        await supabase.from('whatsapp_messages').insert({
+                            company_id: companyId,
+                            conversation_id: conversation.id,
+                            message_text: replyText,
+                            is_from_customer: false,
+                            sent_by: null // 'null' indica que foi o bot
+                        });
+                    }
+                }
+                await supabase.from('whatsapp_conversations').update({ chatbot_node_id: node.id }).eq('id', conversation.id);
+            }
+        }
+    } catch (err) {
+        console.error('[CHATBOT] Erro fatal:', err.message);
+    }
+}
+
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
     try {
         const isFromMe = message.key?.fromMe;
@@ -367,7 +481,13 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             if (insErr) {
                 console.error(`[MSG] Erro ao inserir msg ${msgId}:`, insErr.message);
             } else {
-                if (!isHistorical) console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
+                if (!isHistorical) {
+                    console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
+                    // Disparar Chatbot se for do cliente e não for histórico
+                    if (!isFromMe) {
+                        runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                    }
+                }
             }
         }
     } catch (err) {
@@ -417,6 +537,26 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
 
         await processInboundMessage(message, companyId, connectionId);
     }
+});
+
+app.post('/sync/:companyId/:connectionId', async (req, res) => {
+    const { companyId, connectionId } = req.params;
+    
+    // Buscar as configurações para obter o nome da instância
+    const { data: settings, error } = await supabase
+        .from('whatsapp_settings')
+        .select('instance_name')
+        .eq('id', connectionId)
+        .single();
+    
+    if (error || !settings) {
+        return res.status(404).json({ error: 'Conexão não encontrada' });
+    }
+
+    // Disparar sincronização
+    syncEvolutionData(settings.instance_name, companyId, connectionId);
+    
+    res.json({ status: 'Sync started' });
 });
 
 app.listen(port, () => {

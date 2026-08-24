@@ -237,6 +237,18 @@ const AppContent: React.FC = () => {
     // Trigger to reload CRMSales data when modals close
     const [crmRefreshTrigger, setCrmRefreshTrigger] = useState(0);
 
+    // Global Search State
+    const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+
+    const handleSearch = (term: string) => {
+        setGlobalSearchTerm(term);
+        // Se estiver em uma página que suporta busca, ela usará o term.
+        // Se não, podemos navegar para o diretório ou Whatspanda dependendo do termo.
+        if (currentPage !== 'directory' && currentPage !== 'whatspanda' && currentPage !== 'messages') {
+            handleNavigate('directory');
+        }
+    };
+
     const { notifications, markAsRead, markAllAsRead, playNotificationSound } = useNotifications();
 
     // Robust Initialization Logic
@@ -732,7 +744,7 @@ const AppContent: React.FC = () => {
 
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} />;
-            case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} onImpersonateUser={handleImpersonateUserStart} />;
+            case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} onImpersonateUser={handleImpersonateUserStart} initialSearch={globalSearchTerm} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;
@@ -760,7 +772,7 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda /> : null;
+            case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda initialSearch={globalSearchTerm} /> : null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
@@ -868,6 +880,7 @@ const AppContent: React.FC = () => {
                 theme={theme}
                 toggleTheme={toggleTheme}
                 isShaking={isShaking}
+                onSearch={handleSearch}
             >
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />

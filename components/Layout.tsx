@@ -31,6 +31,9 @@ interface LayoutProps {
 
     // Nudge
     isShaking?: boolean;
+
+    // Search
+    onSearch?: (term: string) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -50,7 +53,8 @@ const Layout: React.FC<LayoutProps> = ({
     onClearAllNotifications,
     theme,
     toggleTheme,
-    isShaking
+    isShaking,
+    onSearch
 }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
@@ -128,6 +132,7 @@ const Layout: React.FC<LayoutProps> = ({
                     unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
                     theme={theme}
                     toggleTheme={toggleTheme}
+                    onSearch={onSearch}
                 />
                 <NotificationsPanel
                     isOpen={isNotificationsOpen}

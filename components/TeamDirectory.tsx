@@ -9,6 +9,7 @@ interface TeamDirectoryProps {
   employees: Employee[];
     onNavigate?: (page: any, context?: any) => void;
     onImpersonateUser?: (employee: Employee) => void;
+    initialSearch?: string;
 }
 
 const EmployeeDetailsModal: React.FC<{ employee: Employee; onClose: () => void }> = ({ employee, onClose }) => {
@@ -94,11 +95,18 @@ const EmployeeDetailsModal: React.FC<{ employee: Employee; onClose: () => void }
     );
 };
 
-const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate, onImpersonateUser }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees, onNavigate, onImpersonateUser, initialSearch = '' }) => {
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const { onlineUsers } = usePresence();
     const { profile } = useAuth();
+
+    // Sincronizar busca global se mudar
+    React.useEffect(() => {
+        if (initialSearch !== undefined) {
+            setSearchTerm(initialSearch);
+        }
+    }, [initialSearch]);
 
     const canViewDetails = profile?.isAdmin || profile?.permissions?.viewEmployeeDetails;
 

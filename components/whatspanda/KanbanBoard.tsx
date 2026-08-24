@@ -14,10 +14,11 @@ interface KanbanColumn {
 interface KanbanBoardProps {
   conversations: WhatsAppConversationWithDetails[];
   onOpenChat: (conversation: WhatsAppConversationWithDetails) => void;
+  onMoveConversation: (conversationId: string, newColumnId: string | null) => void;
   companyId: string;
 }
 
-const KanbanBoard: React.FC<KanbanBoardProps> = ({ conversations, onOpenChat, companyId }) => {
+const KanbanBoard: React.FC<KanbanBoardProps> = ({ conversations, onOpenChat, onMoveConversation, companyId }) => {
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,12 +61,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ conversations, onOpenChat, co
 
     const newColumnId = destination.droppableId === 'unassigned' ? null : destination.droppableId;
     
-    // Optimistic UI update could be handled by parent, but since we rely on Realtime mostly,
-    // we'll just fire the Supabase query. The real-time update in Chat.tsx will refresh the props.
-    await supabase
+    // Call parent for optimistic UI update
+    onMoveConversation(draggableId, newColumnId);
+
+    // Update DB
+    const { error } = await supabase
       .from('whatsapp_conversations')
       .update({ kanban_column_id: newColumnId })
       .eq('id', draggableId);
+
+    if (error) {
+      console.error('Error moving conversation:', error);
+      // Re-trigger global fetch on error to sync back
+      // fetchConversations() in parent will handle this if we trigger it,
+      // but Realtime should also help if we didn't have optimistic.
+    }
   };
 
   // Group conversations

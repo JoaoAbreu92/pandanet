@@ -17,12 +17,14 @@ interface HeaderProps {
     unreadNotificationsCount: number;
     theme: 'light' | 'dark';
     toggleTheme: () => void;
+    onSearch?: (term: string) => void;
 }
 
 import { useLanguage } from './LanguageContext';
 
-const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme }) => {
+const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme, onSearch }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const { language, setLanguage, t } = useLanguage();
     const { testNotifications, availableSounds, selectedSound, changeSound } = useNotifications();
 
@@ -41,8 +43,15 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
         }, 500); // 0.5s delay
     };
 
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (onSearch && searchTerm.trim()) {
+            onSearch(searchTerm);
+        }
+    };
+
     return (
-        <header className="fixed md:sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 relative z-[60] dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300">
+        <header className="sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 z-[60] dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -59,14 +68,16 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
                         <Bars3Icon className="w-6 h-6" />
                     </button>
-                    <div className="relative ml-6 hidden md:block group">
+                    <form onSubmit={handleSearch} className="relative ml-6 hidden md:block group">
                         <MagnifyingGlassIcon className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-300 ${theme === 'dark' ? 'text-gray-500 group-focus-within:text-brand-primary' : 'text-gray-400'}`} />
                         <input
                             type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder={t('header.search_placeholder')}
                             className="pl-11 pr-6 py-2.5 w-64 md:w-80 border-0 rounded-2xl bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 dark:bg-white/5 dark:text-white transition-all duration-300 hover:bg-gray-200 dark:hover:bg-white/10"
                         />
-                    </div>
+                    </form>
                 </div>
 
 

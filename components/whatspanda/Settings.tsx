@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import UsersTab from './settings/UsersTab';
 import QueuesTab from './settings/QueuesTab';
 import TagsTab from './settings/TagsTab';
+import ChatbotSettings from './ChatbotSettings';
 import { useAuth } from '../AuthContext';
 
 const Settings: React.FC = () => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags' | 'chatbot'>('users');
 
     const canAccess = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin' || profile?.whatspanda_permissions?.can_manage_settings;
 
@@ -34,6 +35,7 @@ const Settings: React.FC = () => {
                     { id: 'users', label: 'Usuários' },
                     { id: 'queues', label: 'Filas' },
                     { id: 'tags', label: 'Etiquetas' },
+                    { id: 'chatbot', label: 'Chatbot' },
                 ].map((tab) => (
                     <button 
                         key={tab.id}
@@ -57,6 +59,7 @@ const Settings: React.FC = () => {
                     {activeTab === 'users' && <UsersTab />}
                     {activeTab === 'queues' && <QueuesTab />}
                     {activeTab === 'tags' && <TagsTab />}
+                    {activeTab === 'chatbot' && <ChatbotSettings />}
                 </div>
             </div>
         </div>
