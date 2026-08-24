@@ -49,7 +49,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             .from('whatsapp_contacts')
             .select('*')
             .eq('company_id', companyId)
-            .order('name', { ascending: true })
+            .order('updated_at', { ascending: false })
             .limit(100);
         
         if (error) {

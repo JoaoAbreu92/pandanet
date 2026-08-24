@@ -166,10 +166,13 @@ router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (re
 router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) => {
     const { companyId, connectionId } = req.params;
     
-    // Buscar as configurações para obter o nome da instância
+    // We standardise the instance name for Evolution based on connectionId
+    const instanceName = `conn_${connectionId}`;
+    
+    // Just verify the connection exists
     const { data: settings, error } = await supabase
         .from('whatsapp_settings')
-        .select('instance_name')
+        .select('id')
         .eq('id', connectionId)
         .single();
     
@@ -178,7 +181,7 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
     }
 
     // Disparar sincronização
-    syncEvolutionData(settings.instance_name, companyId, connectionId);
+    syncEvolutionData(instanceName, companyId, connectionId);
     
     res.json({ status: 'Sync started' });
 });
@@ -197,7 +200,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         // 1. Get conversation details (contact phone, connection id, company id)
         const { data: conv, error: convErr } = await supabase
             .from('whatsapp_conversations')
-            .select('*, connection:whatsapp_settings!connection_id(instance_name)')
+            .select('*')
             .eq('id', conversationId)
             .single();
 
@@ -205,8 +208,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             return res.status(404).json({ error: 'Conversation not found' });
         }
 
-        const instanceName = conv.connection?.instance_name;
-        if (!instanceName) {
+        const instanceName = `conn_${conv.connection_id}`;
+        if (!conv.connection_id) {
             return res.status(400).json({ error: 'WhatsApp instance not found for this conversation' });
         }
 
