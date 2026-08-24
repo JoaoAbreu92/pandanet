@@ -1172,11 +1172,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     {/* Context Menu */}
                     {contextMenu && (
                         <div
-                            className="fixed bg-white shadow-2xl rounded-xl border border-gray-200 z-[100] w-56 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
+                            className="fixed bg-white dark:bg-slate-800 shadow-2xl rounded-xl border border-gray-200 dark:border-slate-700 z-[100] w-56 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
                             style={{ top: contextMenu.y, left: contextMenu.x }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b bg-gray-50/50">
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800">
                                 {t('email.actions')}
                             </div>
 
@@ -1186,14 +1186,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     toggleFlag(contextMenu.email, '\\Seen', !isSeen);
                                     closeContextMenu();
                                 }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
                             >
                                 <EnvelopeIcon className="w-4 h-4 text-gray-400" />
                                 {t('email.unread').split(' ')[0]} / {t('email.read')}
                             </button>
 
                             {/* Tags Submenu Header */}
-                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t dark:border-slate-700 mt-1 bg-gray-50/50 dark:bg-slate-800">
                                 {t('email.add_tag')}
                             </div>
                             <div className="max-h-32 overflow-y-auto">
@@ -1201,7 +1201,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     <button
                                         key={tag.id}
                                         onClick={() => { handleAddTag(contextMenu.email, tag.label, tag.color); closeContextMenu(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3 transition-colors"
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
                                     >
                                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
                                         {tag.label}
@@ -1212,7 +1212,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             </div>
 
                             {/* Move to Folder Submenu */}
-                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t dark:border-slate-700 mt-1 bg-gray-50/50 dark:bg-slate-800">
                                 {t('email.move_to')}
                             </div>
                             <div className="max-h-48 overflow-y-auto">
@@ -1221,7 +1221,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         key={f.path}
                                         disabled={f.path === currentFolder}
                                         onClick={() => { moveEmail([contextMenu.email.uid], f.path); closeContextMenu(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent flex items-center gap-3 transition-colors"
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent flex items-center gap-3 transition-colors"
                                     >
                                         <FolderIcon className="w-4 h-4 text-gray-400" />
                                         <span className="truncate">{getFolderName(f.path)}</span>
@@ -1317,13 +1317,13 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 callEmailServer('move', { config: settings, uids: [selectedEmail.uid], path: spamFolder });
                                 showToast('Movido para Spam', 'success');
                                 setView('inbox');
-                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                            }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 transition-all">
                                 <ExclamationTriangleIcon className="w-4 h-4" /> Spam
                             </button>
                             <button onClick={() => {
                                 toggleFlag(selectedEmail, '\\Seen', false);
                                 setView('inbox');
-                            }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
+                            }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 transition-all">
                                 <EnvelopeIcon className="w-4 h-4" /> {t('email.unread')}
                             </button>
                         </div>
@@ -1364,12 +1364,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 </div>
                             ) : (
                                     <>
-                                        <div
-                                            className="prose max-w-none text-gray-800"
-                                            dangerouslySetInnerHTML={{
-                                                __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`)
-                                        }}
-                                    />
+                                            <div className="bg-white dark:bg-gray-50 rounded-xl p-6 shadow-inner min-h-[300px] overflow-hidden">
+                                                <div
+                                                    className="prose max-w-none text-gray-800"
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`)
+                                                    }}
+                                                />
+                                            </div>
 
                                         {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
                                             <div className="mt-8 border-t pt-6">

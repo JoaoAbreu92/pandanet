@@ -33,12 +33,12 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser }) => {
             key={link.label}
             type="button"
             onClick={() => onNavigate(link.page)}
-            className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg hover:bg-emerald-50 transition-colors duration-200 group"
+            className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-600 transition-colors duration-200 group"
           >
-            <div className="text-brand-primary group-hover:text-emerald-600 mb-2">
+            <div className="text-brand-primary group-hover:text-emerald-600 dark:group-hover:text-emerald-400 mb-2">
               {link.icon}
             </div>
-            <span className="text-sm font-semibold text-brand-subtle-text group-hover:text-emerald-800 text-center">{link.label}</span>
+            <span className="text-sm font-semibold text-brand-subtle-text dark:text-gray-200 group-hover:text-emerald-800 dark:group-hover:text-emerald-300 text-center">{link.label}</span>
           </button>
         ))}
       </div>
