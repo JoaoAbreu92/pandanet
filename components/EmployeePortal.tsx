@@ -304,13 +304,27 @@ const EmployeePortal: React.FC = () => {
     };
 
     const navItems = [
-        { key: 'payroll', label: 'Holerites', icon: BanknotesIcon },
-        { key: 'vacation', label: 'Férias', icon: CalendarIcon },
-        { key: 'documents', label: 'Documentos', icon: DocumentIcon },
-        { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon },
-        { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon },
-        { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon },
-    ] as const;
+        { key: 'payroll', label: 'Holerites', icon: BanknotesIcon, perm: 'action_view_holerite' },
+        { key: 'vacation', label: 'Férias', icon: CalendarIcon, perm: null },
+        { key: 'documents', label: 'Documentos', icon: DocumentIcon, perm: null },
+        { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon, perm: 'action_register_hours' },
+        { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon, perm: null },
+        { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon, perm: null },
+    ].filter(item => {
+        if (item.perm) {
+            return (profile?.permissions as any)?.[item.perm] !== false;
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        if (navItems.length > 0) {
+            const isCurrentSectionVisible = navItems.some(item => item.key === activeSection);
+            if (!isCurrentSectionVisible) {
+                setActiveSection(navItems[0].key as any);
+            }
+        }
+    }, [profile, activeSection]);
 
     const pendingDays = vacationRequests
         .filter(r => r.status === 'pending')
@@ -356,7 +370,7 @@ const EmployeePortal: React.FC = () => {
                     {navItems.map(({ key, label, icon: Icon }) => (
                         <button
                             key={key}
-                            onClick={() => setActiveSection(key)}
+                            onClick={() => setActiveSection(key as any)}
                             className={`w-full flex items-center p-4 rounded-2xl transition-all ${
                                 activeSection === key
                                     ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20'

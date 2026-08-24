@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee, Recognition, TIRequest } from '../types';
+import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, ResourceDocument, WellnessItem, Employee, Recognition, TIRequest } from '../types';
 import Dashboard from './Dashboard';
 import UserManager from './UserManager';
 import { DepartmentManager } from './DepartmentManager';
@@ -17,6 +17,9 @@ import { useAuth } from './AuthContext';
 import type { Department } from '../types';
 import BadgesManager from './BadgesManager';
 import ReservationsManager from './ReservationsManager';
+import TrainingAdminManager from './TrainingAdminManager';
+import JobsAdminManager from './JobsAdminManager';
+import SchedulingPage from './SchedulingPage';
 
 interface AdminPageProps {
     company: Company;
@@ -28,8 +31,8 @@ interface AdminPageProps {
 
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate }) => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState('dashboard');
-    const [activeCategory, setActiveCategory] = useState('Social');
+    const [activeTab, setActiveTab] = useState('users');
+    const [activeCategory, setActiveCategory] = useState('DP (Departamento Pessoal)');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
 
@@ -134,6 +137,27 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     };
 
     const allTabs = [
+        // DP (Departamento Pessoal)
+        { id: 'users', label: 'Usuários', category: 'DP (Departamento Pessoal)' },
+        { id: 'departments', label: 'Departamentos', category: 'DP (Departamento Pessoal)' },
+        { id: 'teams', label: 'Equipes', category: 'DP (Departamento Pessoal)' },
+        { id: 'training', label: 'Treinamentos', category: 'DP (Departamento Pessoal)' },
+        { id: 'hr', label: 'Gestão RH', category: 'DP (Departamento Pessoal)' },
+        { id: 'forms', label: 'Formulários', category: 'DP (Departamento Pessoal)' },
+        { id: 'policies', label: 'Políticas', category: 'DP (Departamento Pessoal)', featureId: 'policies' },
+        { id: 'onboarding', label: 'Onboarding (Integração)', category: 'DP (Departamento Pessoal)' },
+        { id: 'documentos', label: 'Biblioteca Corporativa', category: 'DP (Departamento Pessoal)' },
+        { id: 'benefits', label: 'Benefícios', category: 'DP (Departamento Pessoal)' },
+
+        // Gestão de RH
+        { id: 'jobs', label: 'Gestão de Vagas', category: 'Gestão de RH', featureId: 'jobs' },
+        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Gestão de RH' },
+
+        // Administrativo
+        { id: 'badges', label: 'Selos, Elos & Gamificação', category: 'Administrativo' },
+        { id: 'reservas_admin', label: 'Reservas', category: 'Administrativo' },
+
+        // Social
         { id: 'dashboard', label: 'Feed/Mural', category: 'Social', featureId: 'feed' },
         { id: 'mural', label: 'Reconhecimentos', category: 'Social' },
         { id: 'polls', label: 'Enquetes', category: 'Social' },
@@ -141,30 +165,36 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'marketplace', label: 'Marketplace', category: 'Social', featureId: 'marketplace' },
         { id: 'bem-estar', label: 'Bem Estar', category: 'Social', featureId: 'wellness' },
 
-        { id: 'users', label: 'Usuários', category: 'Recursos Humanos (RH)' },
-        { id: 'badges', label: 'Selos, Elos & Gamificação', category: 'Recursos Humanos (RH)' },
-        { id: 'departments', label: 'Departamentos', category: 'Recursos Humanos (RH)' },
-        { id: 'teams', label: 'Equipes', category: 'Recursos Humanos (RH)' },
-        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Recursos Humanos (RH)' },
-        { id: 'training', label: 'Treinamentos', category: 'Recursos Humanos (RH)' },
-        { id: 'jobs', label: 'Gestão de Vagas', category: 'Recursos Humanos (RH)', featureId: 'jobs' },
-        { id: 'hr', label: 'Gestão RH', category: 'Recursos Humanos (RH)' },
-        { id: 'forms', label: 'Formulários', category: 'Recursos Humanos (RH)' },
-        { id: 'reservas_admin', label: 'Reservas', category: 'Recursos Humanos (RH)' },
-
+        // Tecnologia & TI
         { id: 'ti-requests', label: 'Chamados T.I.', category: 'Tecnologia & TI' },
         { id: 'status', label: 'Status TI', category: 'Tecnologia & TI' },
         { id: 'kb', label: 'Base de Con.', category: 'Tecnologia & TI', featureId: 'kb' },
         { id: 'infosec', label: 'Segurança', category: 'Tecnologia & TI' },
-        { id: 'policies', label: 'Políticas', category: 'Tecnologia & TI', featureId: 'policies' },
 
-        { id: 'crm_settings', label: 'CRM / Vendas', category: 'Operações & Vendas', featureId: 'crm' },
-        { id: 'kpis', label: 'Metas/KPIs', category: 'Operações & Vendas', featureId: 'kpis' },
+        // Comercial
+        { id: 'scheduling', label: 'Agendamentos', category: 'Comercial', featureId: 'scheduling' },
+        { id: 'scheduling-events', label: 'Espaços', category: 'Comercial', featureId: 'scheduling' },
 
+        // Configurações
         { id: 'settings', label: 'Geral', category: 'Configurações' },
     ];
 
-    const categories = ['Social', 'Recursos Humanos (RH)', 'Tecnologia & TI', 'Operações & Vendas', 'Configurações'];
+    const categories = ['DP (Departamento Pessoal)', 'Gestão de RH', 'Administrativo', 'Social', 'Tecnologia & TI', 'Comercial', 'Configurações'].filter(cat => {
+        if (profile?.role === 'Super Admin') return true;
+        const permissions = profile?.permissions || {};
+        const catMap: Record<string, string> = {
+            'DP (Departamento Pessoal)': 'admin_view_dp',
+            'Gestão de RH': 'admin_view_gestao_rh',
+            'Administrativo': 'admin_view_administrativo',
+            'Social': 'admin_view_social',
+            'Tecnologia & TI': 'admin_view_ti',
+            'Comercial': 'admin_view_comercial',
+            'Configurações': 'admin_view_configuracoes'
+        };
+        const catKey = catMap[cat];
+        if (!catKey) return true;
+        return profile?.isAdmin ? permissions[catKey] !== false : !!permissions[catKey];
+    });
 
     const tabs = allTabs.filter(tab => {
         if (tab.category !== activeCategory) return false;
@@ -172,13 +202,113 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
 
         // Permissões granulares para não-Super Admins
         if (profile?.role !== 'Super Admin') {
-            const permissions = profile?.permissions;
-            if (tab.id === 'users' && !permissions?.viewEmployeeDetails && !profile?.isAdmin) return false;
-            if (tab.id === 'forms' && !permissions?.viewVacationRequests && !profile?.isAdmin) return false;
+            const permissions = profile?.permissions || {};
+            const catMap: Record<string, string> = {
+                'DP (Departamento Pessoal)': 'admin_view_dp',
+                'Gestão de RH': 'admin_view_gestao_rh',
+                'Administrativo': 'admin_view_administrativo',
+                'Social': 'admin_view_social',
+                'Tecnologia & TI': 'admin_view_ti',
+                'Comercial': 'admin_view_comercial',
+                'Configurações': 'admin_view_configuracoes'
+            };
+            const catKey = catMap[tab.category];
+
+            const tabMap: Record<string, string> = {
+                'users': 'admin_tab_users',
+                'departments': 'admin_tab_departments',
+                'teams': 'admin_tab_teams',
+                'training': 'admin_tab_training',
+                'hr': 'admin_tab_hr',
+                'forms': 'admin_tab_forms',
+                'policies': 'admin_tab_policies',
+                'onboarding': 'admin_tab_onboarding',
+                'documentos': 'admin_tab_documentos',
+                'benefits': 'admin_tab_benefits',
+                'jobs': 'admin_tab_jobs',
+                'org-flow': 'admin_tab_org_flow',
+                'badges': 'admin_tab_badges',
+                'reservas_admin': 'admin_tab_reservas_admin',
+                'dashboard': 'admin_tab_dashboard',
+                'mural': 'admin_tab_mural',
+                'polls': 'admin_tab_polls',
+                'events': 'admin_tab_events',
+                'marketplace': 'admin_tab_marketplace',
+                'bem-estar': 'admin_tab_wellbeing',
+                'ti-requests': 'admin_tab_ti_requests',
+                'status': 'admin_tab_status',
+                'kb': 'admin_tab_kb',
+                'infosec': 'admin_tab_infosec',
+                'scheduling': 'admin_tab_scheduling',
+                'scheduling-events': 'admin_tab_scheduling_events',
+                'settings': 'admin_tab_settings'
+            };
+            const tabKey = tabMap[tab.id];
+
+            const hasCatAccess = catKey ? (profile?.isAdmin ? permissions[catKey] !== false : !!permissions[catKey]) : true;
+            const hasTabAccess = tabKey ? (profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey]) : true;
+
+            if (!hasCatAccess || !hasTabAccess) {
+                return false;
+            }
         }
 
         return true;
     });
+
+    // Auto-select first authorized category and tab on mount or profile load
+    useEffect(() => {
+        if (categories.length > 0) {
+            const firstCat = categories[0];
+            setActiveCategory(firstCat);
+            
+            const firstTab = allTabs.find(t => {
+                if (t.category !== firstCat) return false;
+                if (t.featureId && customFeatures && customFeatures[t.featureId] === false) return false;
+                if (profile?.role !== 'Super Admin') {
+                    const permissions = profile?.permissions || {};
+                    const tabMap: Record<string, string> = {
+                        'users': 'admin_tab_users',
+                        'departments': 'admin_tab_departments',
+                        'teams': 'admin_tab_teams',
+                        'training': 'admin_tab_training',
+                        'hr': 'admin_tab_hr',
+                        'forms': 'admin_tab_forms',
+                        'policies': 'admin_tab_policies',
+                        'onboarding': 'admin_tab_onboarding',
+                        'documentos': 'admin_tab_documentos',
+                        'benefits': 'admin_tab_benefits',
+                        'jobs': 'admin_tab_jobs',
+                        'org-flow': 'admin_tab_org_flow',
+                        'badges': 'admin_tab_badges',
+                        'reservas_admin': 'admin_tab_reservas_admin',
+                        'dashboard': 'admin_tab_dashboard',
+                        'mural': 'admin_tab_mural',
+                        'polls': 'admin_tab_polls',
+                        'events': 'admin_tab_events',
+                        'marketplace': 'admin_tab_marketplace',
+                        'bem-estar': 'admin_tab_wellbeing',
+                        'ti-requests': 'admin_tab_ti_requests',
+                        'status': 'admin_tab_status',
+                        'kb': 'admin_tab_kb',
+                        'infosec': 'admin_tab_infosec',
+                        'scheduling': 'admin_tab_scheduling',
+                        'scheduling-events': 'admin_tab_scheduling_events',
+                        'settings': 'admin_tab_settings'
+                    };
+                    const tabKey = tabMap[t.id];
+                    if (tabKey) {
+                        return profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey];
+                    }
+                }
+                return true;
+            });
+            
+            if (firstTab) {
+                setActiveTab(firstTab.id);
+            }
+        }
+    }, [profile, company?.id]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -204,21 +334,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'events':
                 return <EventsManager employees={employees} />;
             case 'training':
-                return <SupabaseGenericManager<TrainingModule>
-                    title="Módulos de Treinamento"
-                    tableName="training_modules"
-                    companyId={company.id}
-                    newItemTemplate={{ title: '', duration: '', category: '', thumbnail: '', participants: [] }}
-                    users={employees}
-                    fields={[
-                        { key: 'title', label: 'Título' },
-                        { key: 'duration', label: 'Duração' },
-                        { key: 'category', label: 'Categoria' },
-                        { key: 'thumbnail', label: 'Capa (Imagem)', type: 'file' },
-                        { key: 'participants', label: 'Participantes / Convocados', type: 'user_list' }
-                    ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.duration} • {(i as any).participants?.length || 0} inscritos</p></div>}
-                />;
+                return <TrainingAdminManager employees={employees} />;
             case 'kb':
                 return <SupabaseGenericManager<KBArticle>
                     title="Base de Conhecimento"
@@ -284,6 +400,23 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
                 />;
+            case 'onboarding':
+                return <SupabaseGenericManager<any>
+                    title="Passos do Onboarding"
+                    tableName="onboarding_steps"
+                    companyId={company.id}
+                    orderBy="order"
+                    orderAscending={true}
+                    newItemTemplate={{ title: '', description: '', link_url: '', link_text: '', order: 0 }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'description', label: 'Descrição/Instruções', type: 'textarea' },
+                        { key: 'link_url', label: 'Link de Destino (Opcional)' },
+                        { key: 'link_text', label: 'Texto do Link (Opcional)' },
+                        { key: 'order', label: 'Ordem de Exibição', type: 'text' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
+                />;
             case 'polls':
                 return <PollManager />;
             case 'bem-estar':
@@ -296,9 +429,9 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição', type: 'textarea' },
                         { key: 'category', label: 'Categoria', type: 'select', options: ['Saúde Mental', 'Atividade Física', 'Nutrição', 'Outro'] },
-                        { key: 'videoUrl', label: 'Vídeo (URL)', type: 'text', dbColumn: 'video_url' },
-                        { key: 'linkUrl', label: 'Link (URL)', type: 'text', dbColumn: 'link_url' },
-                        { key: 'linkText', label: 'Texto do Link', type: 'text', dbColumn: 'link_text' }
+                        { key: 'videoUrl', label: 'Vídeo (URL)', type: 'text', dbColumn: 'video_url', optional: true },
+                        { key: 'linkUrl', label: 'Link (URL)', type: 'text', dbColumn: 'link_url', optional: true },
+                        { key: 'linkText', label: 'Texto do Link', type: 'text', dbColumn: 'link_text', optional: true }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;
@@ -339,60 +472,46 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     )}
                 />;
             case 'jobs':
-                return <SupabaseGenericManager<any>
-                    title="Gestão de Vagas Internas"
-                    tableName="jobs"
-                    companyId={company.id}
-                    storageBucket="feed-media"
-                    newItemTemplate={{ title: '', description: '', requirements: [], location: '', type: 'Tempo Integral', status: 'open', salary_range: '', cover_url: '', description_image: '' }}
-                    fields={[
-                        { key: 'title', label: 'Título da Vaga' },
-                        { key: 'status', label: 'Status', type: 'select', options: ['open', 'closed'] },
-                        { key: 'type', label: 'Tipo de Vaga (ex: Tempo Integral, Meio Período)' },
-                        { key: 'location', label: 'Localização' },
-                        { key: 'salary_range', label: 'Faixa Salarial', optional: true },
-                        { key: 'cover_url', label: 'Imagem de Capa (Upload)', type: 'file', dbColumn: 'cover_url' },
-                        { key: 'description_image', label: 'Imagem da Descrição (Opcional)', type: 'file', dbColumn: 'description_image' },
-                        { key: 'description', label: 'Descrição (Texto)', type: 'textarea', optional: true },
-                        { key: 'requirements', label: 'Requisitos (um por linha)', type: 'textarea', optional: true }
-                    ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-xs">{i.location} • {i.status} • {i.type}</p></div>}
-                />;
-            case 'kpis':
-                return <SupabaseGenericManager<any>
-                    title="Gestão de Metas e KPIs"
-                    tableName="kpis"
-                    companyId={company.id}
-                    newItemTemplate={{ name: '', target: 100, current: 0, unit: '%', category: 'Geral', period: 'Mensal', powerbi_url: '' }}
-                    fields={[
-                        { key: 'name', label: 'Nome do Indicador' },
-                        { key: 'category', label: 'Categoria' },
-                        { key: 'unit', label: 'Unidade (ex: %, R$, un)' },
-                        { key: 'target', label: 'Meta (Valor)', type: 'text' },
-                        { key: 'current', label: 'Valor Atual', type: 'text' },
-                        { key: 'period', label: 'Período', type: 'select', options: ['Mensal', 'Trimestral', 'Anual'] },
-                        { key: 'powerbi_url', label: 'Power BI URL (Opcional)', type: 'text' }
-                    ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.current} / {i.target} {i.unit}</p></div>}
-                />;
+                return <JobsAdminManager employees={employees} />;
             case 'hr':
                 return <HRManager />;
-            case 'crm_settings':
-                return <SupabaseGenericManager<any>
-                    title="Configurações CRM / Vendas"
-                    tableName="crm_settings"
-                    companyId={company.id}
-                    newItemTemplate={{ name: 'Perfex CRM', url: '', api_key: '', active: true }}
-                    fields={[
-                        { key: 'name', label: 'Nome da Integração' },
-                        { key: 'url', label: 'URL do CRM (ex: https://crm.dominio.com)' },
-                        { key: 'api_key', label: 'Token/Chave API' },
-                        { key: 'active', label: 'Ativo', type: 'select', options: ['true', 'false'] as any }
-                    ]}
-                    renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.url}</p></div>}
-                />;
             case 'reservas_admin':
                 return <ReservationsManager />;
+            case 'documentos':
+                return <SupabaseGenericManager<any>
+                    title="Biblioteca Corporativa"
+                    tableName="documents"
+                    storageBucket="documents"
+                    companyId={company.id}
+                    newItemTemplate={{ title: '', category: 'RH & Cultura', file_type: 'PDF', url: '' }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'category', label: 'Categoria' },
+                        { key: 'file_type', label: 'Tipo de Arquivo', type: 'select', options: ['PDF', 'DOCX', 'PPTX', 'XLSX', 'OUTRO'], dbColumn: 'file_type' },
+                        { key: 'url', label: 'Arquivo (Upload)', type: 'file' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.file_type}</p></div>}
+                />;
+            case 'benefits':
+                return <SupabaseGenericManager<any>
+                    title="Gestão de Benefícios"
+                    tableName="benefits"
+                    storageBucket="feed-media"
+                    companyId={company.id}
+                    newItemTemplate={{ title: '', description: '', features: [], link: '#', image_url: '' }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'description', label: 'Descrição', type: 'textarea' },
+                        { key: 'features', label: 'Características (um por linha)', type: 'textarea' },
+                        { key: 'link', label: 'Link (Saiba Mais)' },
+                        { key: 'image_url', label: 'Imagem do Benefício (Upload)', type: 'file', dbColumn: 'image_url', optional: true }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
+                />;
+            case 'scheduling':
+                return <SchedulingPage customFeatures={company.custom_features} mode="appointments" />;
+            case 'scheduling-events':
+                return <SchedulingPage customFeatures={company.custom_features} mode="events" />;
             default:
                 return null;
         }
@@ -409,8 +528,52 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                             key={cat}
                             onClick={() => {
                                 setActiveCategory(cat);
-                                const firstTabOfCat = allTabs.find(t => t.category === cat);
-                                if (firstTabOfCat) setActiveTab(firstTabOfCat.id);
+                                const firstAllowedTab = allTabs.find(t => {
+                                    if (t.category !== cat) return false;
+                                    if (t.featureId && customFeatures && customFeatures[t.featureId] === false) return false;
+                                    if (profile?.role !== 'Super Admin') {
+                                        const permissions = profile?.permissions || {};
+                                        const tabMap: Record<string, string> = {
+                                            'users': 'admin_tab_users',
+                                            'departments': 'admin_tab_departments',
+                                            'teams': 'admin_tab_teams',
+                                            'training': 'admin_tab_training',
+                                            'hr': 'admin_tab_hr',
+                                            'forms': 'admin_tab_forms',
+                                            'policies': 'admin_tab_policies',
+                                            'onboarding': 'admin_tab_onboarding',
+                                            'documentos': 'admin_tab_documentos',
+                                            'benefits': 'admin_tab_benefits',
+                                            'jobs': 'admin_tab_jobs',
+                                            'org-flow': 'admin_tab_org_flow',
+                                            'badges': 'admin_tab_badges',
+                                            'reservas_admin': 'admin_tab_reservas_admin',
+                                            'dashboard': 'admin_tab_dashboard',
+                                            'mural': 'admin_tab_mural',
+                                            'polls': 'admin_tab_polls',
+                                            'events': 'admin_tab_events',
+                                            'marketplace': 'admin_tab_marketplace',
+                                            'bem-estar': 'admin_tab_wellbeing',
+                                            'ti-requests': 'admin_tab_ti_requests',
+                                            'status': 'admin_tab_status',
+                                            'kb': 'admin_tab_kb',
+                                            'infosec': 'admin_tab_infosec',
+                                            'scheduling': 'admin_tab_scheduling',
+                                            'scheduling-events': 'admin_tab_scheduling_events',
+                                            'settings': 'admin_tab_settings'
+                                        };
+                                        const tabKey = tabMap[t.id];
+                                        if (tabKey) {
+                                            return profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey];
+                                        }
+                                    }
+                                    return true;
+                                });
+                                if (firstAllowedTab) {
+                                    setActiveTab(firstAllowedTab.id);
+                                } else {
+                                    setActiveTab('');
+                                }
                             }}
                             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${
                                 activeCategory === cat 

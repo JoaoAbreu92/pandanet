@@ -102,6 +102,7 @@ export interface Banner {
   title: string;
   subtitle: string;
   link: string;
+  showButton?: boolean;
 }
 
 export interface UpcomingEvent {
@@ -122,7 +123,7 @@ export interface Event {
   meeting_url?: string;
   is_specific_audience?: boolean;
   imageUrl?: string;
-  category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro';
+  category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro' | 'Comemorativo' | 'Evento da Empresa';
   imageType?: 'url' | 'upload';
   invited_ids?: string[]; // IDs de usuários especificamente convidados/convocados
   attendees: string[]; // IDs de usuários que CONFIRMARAM
@@ -137,6 +138,10 @@ export interface TrainingModule {
   videoUrl?: string;
   category?: string;
   participants?: string[];
+  startDate?: string;
+  endDate?: string;
+  pdfUrl?: string;
+  quiz?: any;
 }
 
 export interface KBArticle {
@@ -236,6 +241,49 @@ export interface EmployeePermissions {
   viewEmployeeBenefitsAdmin: boolean;
   viewPerformance: boolean;
   managePerformance: boolean;
+
+  // Admin View Permissions (Submenus)
+  admin_view_dp?: boolean;
+  admin_view_gestao_rh?: boolean;
+  admin_view_administrativo?: boolean;
+  admin_view_social?: boolean;
+  admin_view_ti?: boolean;
+  admin_view_comercial?: boolean;
+  admin_view_configuracoes?: boolean;
+
+  // Admin Tab Permissions
+  admin_tab_users?: boolean;
+  admin_tab_departments?: boolean;
+  admin_tab_teams?: boolean;
+  admin_tab_training?: boolean;
+  admin_tab_hr?: boolean;
+  admin_tab_forms?: boolean;
+  admin_tab_policies?: boolean;
+  admin_tab_onboarding?: boolean;
+  admin_tab_documentos?: boolean;
+  admin_tab_benefits?: boolean;
+  admin_tab_jobs?: boolean;
+  admin_tab_org_flow?: boolean;
+  admin_tab_badges?: boolean;
+  admin_tab_reservas_admin?: boolean;
+  admin_tab_dashboard?: boolean;
+  admin_tab_mural?: boolean;
+  admin_tab_polls?: boolean;
+  admin_tab_events?: boolean;
+  admin_tab_marketplace?: boolean;
+  admin_tab_wellbeing?: boolean;
+  admin_tab_ti_requests?: boolean;
+  admin_tab_status?: boolean;
+  admin_tab_kb?: boolean;
+  admin_tab_infosec?: boolean;
+  admin_tab_scheduling?: boolean;
+  admin_tab_scheduling_events?: boolean;
+  admin_tab_settings?: boolean;
+
+  // Admin Actions
+  action_view_holerite?: boolean;
+  action_register_hours?: boolean;
+  action_approve_reservations?: boolean;
 }
 
 // WhatsApp Permissions
@@ -347,6 +395,10 @@ export interface Poll {
   id: string;
   question: string;
   options: { id: string; text: string; votes: number }[];
+  cover_url?: string;
+  show_button?: boolean;
+  link?: string;
+  button_style?: any;
 }
 
 export interface Message {
@@ -361,6 +413,7 @@ export interface Message {
   replyingTo?: Message;
   replied_message?: Message | any;
   sender_deleted_at?: string;
+  payload?: any;
 }
 
 export interface Reaction {
@@ -538,6 +591,7 @@ export interface Benefit {
   description: string;
   features: string[];
   link: string;
+  imageUrl?: string;
 }
 
 // Feed Types

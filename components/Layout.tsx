@@ -121,20 +121,18 @@ const Layout: React.FC<LayoutProps> = ({
                 )}
 
                 {/* Área invisível na extrema esquerda para acionar hover no desktop */}
-                {currentPage !== 'messages' && (
-                    <div
-                        className="hidden md:block fixed left-0 top-0 bottom-0 w-3 z-40 bg-transparent"
-                        onMouseEnter={() => {
-                            if (window.innerWidth >= 768) {
-                                setSidebarOpen(true);
-                            }
-                        }}
-                    />
-                )}
+                <div
+                    className="hidden md:block fixed left-0 top-0 bottom-0 w-3 z-40 bg-transparent"
+                    onMouseEnter={() => {
+                        if (window.innerWidth >= 768) {
+                            setSidebarOpen(true);
+                        }
+                    }}
+                />
 
                 <div
                     onMouseEnter={() => {
-                        if (window.innerWidth >= 768 && currentPage !== 'messages') {
+                        if (window.innerWidth >= 768) {
                             setSidebarOpen(true);
                         }
                     }}
@@ -194,7 +192,7 @@ const Layout: React.FC<LayoutProps> = ({
                 </div>
 
                 {/* Área invisível na extrema direita para acionar hover no desktop */}
-                {currentPage !== 'messages' && onStartDirectChat && (
+                {onStartDirectChat && (
                     <div
                         className="hidden md:block fixed right-0 top-0 bottom-0 w-3 z-40 bg-transparent"
                         onMouseEnter={() => {
@@ -205,7 +203,7 @@ const Layout: React.FC<LayoutProps> = ({
                     />
                 )}
 
-                {currentPage !== 'messages' && onStartDirectChat && (
+                {onStartDirectChat && (
                     <div 
                         className="hidden md:block h-full z-45"
                         onMouseEnter={() => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { BriefcaseIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { useToast } from './ToastContext';
 
 interface Job {
   id: string;
@@ -18,6 +19,7 @@ interface Job {
 
 const JobsPage: React.FC = () => {
     const { profile } = useAuth();
+    const { showToast } = useToast();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -48,10 +50,53 @@ const JobsPage: React.FC = () => {
                 status: 'pending'
             });
             if (error) throw error;
-            alert('Candidatura enviada com sucesso!');
+
+            // Fetch company admins to send them notification
+            const { data: admins } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('company_id', profile.company_id)
+                .or('is_admin.eq.true,is_company_admin.eq.true,role.eq.Super Admin');
+
+            const notificationsToInsert = [];
+
+            // 1. Notify admins
+            if (admins && admins.length > 0) {
+                admins.forEach(admin => {
+                    // Don't duplicate if admin is the applicant
+                    if (admin.id !== profile.id) {
+                        notificationsToInsert.push({
+                            user_id: admin.id,
+                            type: 'system',
+                            title: 'Nova Candidatura Interna',
+                            description: `${profile.full_name} se candidatou para a vaga: ${selectedJob?.title || 'Vaga Interna'}`,
+                            is_read: false,
+                            link: '/admin',
+                            avatar_url: profile.avatarUrl
+                        });
+                    }
+                });
+            }
+
+            // 2. Notify the employee themselves
+            notificationsToInsert.push({
+                user_id: profile.id,
+                type: 'system',
+                title: 'Candidatura Enviada',
+                description: `Sua candidatura para a vaga ${selectedJob?.title || 'Vaga Interna'} foi enviada com sucesso!`,
+                is_read: false,
+                link: '/jobs',
+                avatar_url: profile.avatarUrl
+            });
+
+            if (notificationsToInsert.length > 0) {
+                await supabase.from('notifications').insert(notificationsToInsert);
+            }
+
+            showToast('Candidatura enviada com sucesso!', 'success');
             setSelectedJob(null);
         } catch (err: any) {
-            alert('Erro ao candidatar: ' + err.message);
+            showToast('Erro ao candidatar: ' + err.message, 'error');
         } finally {
             setApplying(false);
         }

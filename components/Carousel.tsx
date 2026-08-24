@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Banner } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 // Local fallbacks if no banners are configured
@@ -15,21 +15,24 @@ const fallbackBanners: Banner[] = [
         imageUrl: bannerPersonalDev,
         title: 'Desenvolvimento Pessoal & Carreira',
         subtitle: 'Invista no seu futuro com nossos programas de mentoria e cursos exclusivos.',
-        link: '/training'
+        link: '/training',
+        showButton: true
     },
     {
         id: '2',
         imageUrl: bannerSecurity,
         title: 'Segurança na Internet',
         subtitle: 'Proteja seus dados e navegue com confiança.',
-        link: '/infosec'
+        link: '/infosec',
+        showButton: true
     },
     {
         id: '3',
         imageUrl: bannerWellbeing,
         title: 'Bem-Estar & Equilíbrio',
         subtitle: 'Priorize sua saúde mental e física.',
-        link: '/bem-estar'
+        link: '/bem-estar',
+        showButton: true
     },
 ];
 
@@ -57,10 +60,11 @@ const Carousel: React.FC = () => {
             if (data && data.length > 0) {
                 setBanners(data.map(b => ({
                     id: b.id,
-                    imageUrl: b.image_url,
+                    imageUrl: getCleanImageUrl(b.image_url),
                     title: b.title,
                     subtitle: b.subtitle,
-                    link: b.link
+                    link: b.link,
+                    showButton: b.show_button !== false
                 })));
             } else {
                 setBanners(fallbackBanners);
@@ -118,7 +122,7 @@ const Carousel: React.FC = () => {
                         <p className="text-gray-100 text-xs sm:text-base md:text-xl font-light drop-shadow-md mb-3 sm:mb-6 md:mb-8 leading-relaxed border-l-4 border-brand-primary pl-4">
                             {banners[currentIndex].subtitle}
                         </p>
-                        {banners[currentIndex].link && (
+                        {banners[currentIndex].link && banners[currentIndex].showButton !== false && (
                             <a href={banners[currentIndex].link} className="inline-block px-3 py-1.5 sm:px-6 sm:py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors shadow-lg text-xs sm:text-base">
                                 Saiba Mais
                             </a>

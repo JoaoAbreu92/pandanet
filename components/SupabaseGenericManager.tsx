@@ -9,6 +9,8 @@ interface SupabaseGenericManagerProps<T> {
     tableName: string;
     storageBucket?: string;
     companyId?: string;
+    orderBy?: string;
+    orderAscending?: boolean;
     fields: {
         key: string;
         label: string;
@@ -27,6 +29,8 @@ export function SupabaseGenericManager<T extends { id: string }>({
     tableName,
     storageBucket = 'announcements-media',
     companyId,
+    orderBy = 'created_at',
+    orderAscending = false,
     fields,
     renderItem,
     newItemTemplate,
@@ -50,7 +54,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
                 .from(tableName)
                 .select('*')
                 .eq('company_id', activeCompanyId)
-                .order('created_at', { ascending: false });
+                .order(orderBy, { ascending: orderAscending });
 
             if (error) throw error;
             if (data) {

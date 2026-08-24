@@ -297,6 +297,7 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                                     <label className="block text-sm font-medium text-gray-700">Categoria</label>
                                     <select value={formData.category || 'Social'} onChange={e => setFormData({ ...formData, category: e.target.value as any })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border">
                                         <option value="Social">Social</option>
+                                        <option value="Comemorativo">Comemorativo</option>
                                         <option value="Corporativo">Corporativo</option>
                                         <option value="Treinamento">Treinamento</option>
                                         <option value="Evento da Empresa">Evento da Empresa</option>

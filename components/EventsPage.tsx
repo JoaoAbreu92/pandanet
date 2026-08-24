@@ -313,6 +313,8 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
     };
 
     const accessibleEvents = [...events].filter(event => {
+        if (event.category !== 'Comemorativo') return false;
+
         const isInvited = (event.invited_ids || []).includes(currentUser?.id || '');
         const isAttending = (event.attendees || []).includes(currentUser?.id || '');
         const isDeclined = (event.declined || []).some((d: any) => d.userId === currentUser?.id);
@@ -323,10 +325,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
             return (isInvited || isAttending || isSuperAdmin) && !isDeclined;
         }
 
-        const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invited_ids || event.invited_ids.length === 0;
-
-        // Don't show declined events in the main list unless explicitly asked
-        return (isSocialOrPublic || isInvited || isAttending || isSuperAdmin) && !isDeclined;
+        return !isDeclined;
     });
 
     const localToday = new Date();
@@ -641,6 +640,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                                     >
                                         <option value="Corporativo">Corporativo</option>
                                         <option value="Social">Social</option>
+                                        <option value="Comemorativo">Comemorativo</option>
                                         <option value="Treinamento">Treinamento</option>
                                         <option value="Evento da Empresa">Evento da Empresa</option>
                                         <option value="Outro">Outro</option>

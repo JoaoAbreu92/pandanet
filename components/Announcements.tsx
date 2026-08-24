@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Card from './Card';
 import type { Announcement } from '../types';
 import { CalendarDaysIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 interface AnnouncementsProps {
@@ -59,8 +59,8 @@ const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
                 category: a.category,
                 // Ensure date string is compatible or formatted
                 date: new Date(a.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
-                imageUrl: a.image_url,
-                videoUrl: a.video_url,
+                imageUrl: getCleanImageUrl(a.image_url),
+                videoUrl: getCleanImageUrl(a.video_url),
                 reactions: a.reactions || []
             }));
 

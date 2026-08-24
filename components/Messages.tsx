@@ -94,6 +94,7 @@ interface MessageBubbleProps {
     setReplyingToMessage: (message: Message | null) => void;
     handleDeleteMessage: (messageId: string) => void;
     onContextMenu: (e: React.MouseEvent, message: Message) => void;
+    onConfirmReceipt?: (msgId: string, visitId: string, creatorId: string) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
@@ -102,7 +103,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
     handleReact,
     setReplyingToMessage,
     handleDeleteMessage,
-    onContextMenu
+    onContextMenu,
+    onConfirmReceipt
 }) => {
     const isMe = message.sender === 'me';
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -174,6 +176,49 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                         title="Clique com o botão direito para reagir ou responder"
                     >
                         {(() => {
+                            if (message.payload && message.payload.type === 'visit_invite') {
+                                const isConfirmed = message.payload.confirmed;
+                                const clientName = message.payload.client_name;
+                                const visitDate = message.payload.visit_date;
+                                const visitTime = message.payload.visit_time;
+                                const visitId = message.payload.visit_id;
+                                const creatorId = message.payload.creator_id;
+                                
+                                return (
+                                    <div className="flex flex-col gap-3 p-1 text-slate-800 dark:text-white">
+                                        <div className="flex items-center gap-2 border-b border-gray-150 dark:border-slate-800 pb-2">
+                                            <span className="text-lg">📅</span>
+                                            <div className="text-left">
+                                                <h5 className="font-extrabold text-sm text-brand-primary dark:text-emerald-450">Agendamento de Visita</h5>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">Nova visita externa agendada</p>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1 text-xs text-left">
+                                            <p><strong>Cliente:</strong> {clientName}</p>
+                                            <p><strong>Data:</strong> {visitDate} às {visitTime}</p>
+                                            <p className="italic text-gray-500 dark:text-gray-400">{message.text}</p>
+                                        </div>
+                                        {isConfirmed ? (
+                                            <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-bold bg-green-50 dark:bg-green-950/20 px-2.5 py-1.5 rounded-lg border border-green-150 dark:border-green-800/30 w-fit">
+                                                <span>✓</span> Recebimento Confirmado
+                                            </div>
+                                        ) : message.sender !== 'me' ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => onConfirmReceipt && onConfirmReceipt(message.id, visitId, creatorId)}
+                                                className="w-full bg-brand-primary hover:bg-emerald-600 text-white text-xs font-bold py-2 px-3 rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-1"
+                                            >
+                                                Confirmar Recebimento
+                                            </button>
+                                        ) : (
+                                            <div className="text-xs text-orange-605 dark:text-orange-400 font-semibold italic text-left">
+                                                Aguardando confirmação de leitura...
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+
                             const isImageUrl = (text: string) => {
                                 if (!text) return false;
                                 try {
@@ -895,7 +940,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             const { data, error } = await supabase
                 .from('messages')
                 .select(`
-                    id, text, created_at, sender_id, file_url, file_type, reactions, sender_deleted_at, reply_to,
+                    id, text, created_at, sender_id, file_url, file_type, reactions, sender_deleted_at, reply_to, payload,
                     profiles:sender_id(full_name, avatar_url),
                     replied_message:reply_to(id, text, sender_id, file_url, file_type, profiles:sender_id(full_name))
                 `)
@@ -945,7 +990,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     senderName: m.replied_message.profiles?.full_name || 'Usuário',
                     file_url: m.replied_message.file_url,
                     file_type: m.replied_message.file_type
-                } : undefined
+                } : undefined,
+                payload: m.payload
             }));
 
             // Filter out messages that I deleted from MY view
@@ -1175,6 +1221,41 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             }
         } catch (err) {
             console.error('Erro de rede ao atualizar reação:', err);
+        }
+    };
+
+    const handleConfirmReceipt = async (msgId: string, visitId: string, creatorId: string) => {
+        if (isGhostMode) return;
+        try {
+            const msg = messages.find(m => m.id === msgId);
+            if (!msg) return;
+            
+            const updatedPayload = { ...msg.payload, confirmed: true, confirmed_at: new Date().toISOString() };
+            
+            const { error } = await supabase
+                .from('messages')
+                .update({ payload: updatedPayload })
+                .eq('id', msgId);
+                
+            if (error) throw error;
+            
+            await supabase
+                .from('notifications')
+                .insert({
+                    user_id: creatorId,
+                    company_id: currentUser.company_id,
+                    type: 'visit_confirmation',
+                    title: 'Confirmação de Leitura',
+                    description: `${currentUser.full_name || currentUser.name} confirmou a leitura do compromisso da visita.`,
+                    is_read: false
+                });
+                
+            showToast('Confirmação de recebimento enviada!', 'success');
+            
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, payload: updatedPayload } : m));
+        } catch (err: any) {
+            console.error('Erro ao confirmar recebimento:', err);
+            showToast('Erro ao confirmar recebimento: ' + err.message, 'error');
         }
     };
 
@@ -1801,6 +1882,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                     setReplyingToMessage={setReplyingToMessage}
                                     handleDeleteMessage={handleDeleteMessage}
                                     onContextMenu={handleMessageContextMenu}
+                                    onConfirmReceipt={handleConfirmReceipt}
                                 />
                             ))}
                             <div ref={messagesEndRef} />

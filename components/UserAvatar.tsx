@@ -1,4 +1,5 @@
 import React from 'react';
+import { getCleanImageUrl } from '../supabaseClient';
 
 const parseHashParams = (url: string) => {
   const params: { [key: string]: string } = {};
@@ -134,7 +135,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     name
   )}&background=random&color=fff`;
 
-  const avatarSrc = src || defaultAvatar;
+  const avatarSrc = src ? getCleanImageUrl(src) : defaultAvatar;
 
   const renderInnerAvatar = () => (
     <div className={`w-full h-full rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200`}>

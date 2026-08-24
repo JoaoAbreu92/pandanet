@@ -23,7 +23,8 @@ import {
     FolderIcon,
     LifebuoyIcon,
     TicketIcon,
-    Cog6ToothIcon
+    Cog6ToothIcon,
+    ClockIcon
 } from './icons';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
@@ -94,7 +95,7 @@ const UserFormModal: React.FC<{
     const planEmailLimit = plan?.emailLimit || 1;
     const remainingLimit = Math.max(0, planEmailLimit - totalAllocatedOtherUsers);
 
-    const [permissionTab, setPermissionTab] = useState<'social' | 'rh' | 'ti' | 'rh_admin' | 'whatspanda'>('social');
+    const [permissionTab, setPermissionTab] = useState<'social' | 'rh' | 'ti' | 'rh_admin' | 'whatspanda' | 'admin_panel'>('social');
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -112,44 +113,81 @@ const UserFormModal: React.FC<{
         birthDate: user?.birthDate || '1990-01-01',
         joinDate: user?.joinDate || new Date().toISOString().split('T')[0],
         department_id: user?.department_id || '',
-        permissions: user?.permissions || {
-            viewMessages: true,
-            viewCalendar: true,
-            useMarketplace: true,
-            viewEmail: true,
-            viewScheduling: true,
-            viewDirectory: true,
-            viewForms: true,
-            viewBenefits: true,
-            viewOnboarding: true,
-            viewRecognition: true,
-            viewDocuments: true,
-            viewTraining: true,
-            viewSurveys: true,
-            viewPolicies: true,
-            viewWellbeing: true,
-            viewTiDashboard: false,
-            openTickets: true,
-            openTiRequests: true,
-            viewKnowledgeBase: true,
-            viewServiceStatus: true,
-            viewInfoSec: true,
-            createEvents: false,
-            manageMarketplace: false,
-            viewEmployeeDetails: false,
-            editEmployeeProfile: false,
-            deleteEmployeeProfile: false,
-            viewVacationRequests: false,
-            manageVacationRequests: false,
-            canPostText: true,
-            canPostImage: true,
-            canPostVideo: true,
-            viewProjects: true,
-            viewTimeBank: true,
-            manageTimeBank: false,
-            viewEmployeeBenefitsAdmin: false,
-            viewPerformance: true,
-            managePerformance: false,
+        permissions: {
+            viewMessages: user?.permissions?.viewMessages ?? true,
+            viewCalendar: user?.permissions?.viewCalendar ?? true,
+            useMarketplace: user?.permissions?.useMarketplace ?? true,
+            viewEmail: user?.permissions?.viewEmail ?? true,
+            viewScheduling: user?.permissions?.viewScheduling ?? true,
+            viewDirectory: user?.permissions?.viewDirectory ?? true,
+            viewForms: user?.permissions?.viewForms ?? true,
+            viewBenefits: user?.permissions?.viewBenefits ?? true,
+            viewOnboarding: user?.permissions?.viewOnboarding ?? true,
+            viewRecognition: user?.permissions?.viewRecognition ?? true,
+            viewDocuments: user?.permissions?.viewDocuments ?? true,
+            viewTraining: user?.permissions?.viewTraining ?? true,
+            viewSurveys: user?.permissions?.viewSurveys ?? true,
+            viewPolicies: user?.permissions?.viewPolicies ?? true,
+            viewWellbeing: user?.permissions?.viewWellbeing ?? true,
+            viewTiDashboard: user?.permissions?.viewTiDashboard ?? false,
+            openTickets: user?.permissions?.openTickets ?? true,
+            openTiRequests: user?.permissions?.openTiRequests ?? true,
+            viewKnowledgeBase: user?.permissions?.viewKnowledgeBase ?? true,
+            viewServiceStatus: user?.permissions?.viewServiceStatus ?? true,
+            viewInfoSec: user?.permissions?.viewInfoSec ?? true,
+            createEvents: user?.permissions?.createEvents ?? false,
+            manageMarketplace: user?.permissions?.manageMarketplace ?? false,
+            viewEmployeeDetails: user?.permissions?.viewEmployeeDetails ?? false,
+            editEmployeeProfile: user?.permissions?.editEmployeeProfile ?? false,
+            deleteEmployeeProfile: user?.permissions?.deleteEmployeeProfile ?? false,
+            viewVacationRequests: user?.permissions?.viewVacationRequests ?? false,
+            manageVacationRequests: user?.permissions?.manageVacationRequests ?? false,
+            canPostText: user?.permissions?.canPostText ?? true,
+            canPostImage: user?.permissions?.canPostImage ?? true,
+            canPostVideo: user?.permissions?.canPostVideo ?? true,
+            viewProjects: user?.permissions?.viewProjects ?? true,
+            viewTimeBank: user?.permissions?.viewTimeBank ?? true,
+            manageTimeBank: user?.permissions?.manageTimeBank ?? false,
+            viewEmployeeBenefitsAdmin: user?.permissions?.viewEmployeeBenefitsAdmin ?? false,
+            viewPerformance: user?.permissions?.viewPerformance ?? true,
+            managePerformance: user?.permissions?.managePerformance ?? false,
+            admin_view_dp: user?.permissions?.admin_view_dp ?? false,
+            admin_view_gestao_rh: user?.permissions?.admin_view_gestao_rh ?? false,
+            admin_view_administrativo: user?.permissions?.admin_view_administrativo ?? false,
+            admin_view_social: user?.permissions?.admin_view_social ?? false,
+            admin_view_ti: user?.permissions?.admin_view_ti ?? false,
+            admin_view_comercial: user?.permissions?.admin_view_comercial ?? false,
+            admin_view_configuracoes: user?.permissions?.admin_view_configuracoes ?? false,
+            admin_tab_users: user?.permissions?.admin_tab_users ?? false,
+            admin_tab_departments: user?.permissions?.admin_tab_departments ?? false,
+            admin_tab_teams: user?.permissions?.admin_tab_teams ?? false,
+            admin_tab_training: user?.permissions?.admin_tab_training ?? false,
+            admin_tab_hr: user?.permissions?.admin_tab_hr ?? false,
+            admin_tab_forms: user?.permissions?.admin_tab_forms ?? false,
+            admin_tab_policies: user?.permissions?.admin_tab_policies ?? false,
+            admin_tab_onboarding: user?.permissions?.admin_tab_onboarding ?? false,
+            admin_tab_documentos: user?.permissions?.admin_tab_documentos ?? false,
+            admin_tab_benefits: user?.permissions?.admin_tab_benefits ?? false,
+            admin_tab_jobs: user?.permissions?.admin_tab_jobs ?? false,
+            admin_tab_org_flow: user?.permissions?.admin_tab_org_flow ?? false,
+            admin_tab_badges: user?.permissions?.admin_tab_badges ?? false,
+            admin_tab_reservas_admin: user?.permissions?.admin_tab_reservas_admin ?? false,
+            admin_tab_dashboard: user?.permissions?.admin_tab_dashboard ?? false,
+            admin_tab_mural: user?.permissions?.admin_tab_mural ?? false,
+            admin_tab_polls: user?.permissions?.admin_tab_polls ?? false,
+            admin_tab_events: user?.permissions?.admin_tab_events ?? false,
+            admin_tab_marketplace: user?.permissions?.admin_tab_marketplace ?? false,
+            admin_tab_wellbeing: user?.permissions?.admin_tab_wellbeing ?? false,
+            admin_tab_ti_requests: user?.permissions?.admin_tab_ti_requests ?? false,
+            admin_tab_status: user?.permissions?.admin_tab_status ?? false,
+            admin_tab_kb: user?.permissions?.admin_tab_kb ?? false,
+            admin_tab_infosec: user?.permissions?.admin_tab_infosec ?? false,
+            admin_tab_scheduling: user?.permissions?.admin_tab_scheduling ?? false,
+            admin_tab_scheduling_events: user?.permissions?.admin_tab_scheduling_events ?? false,
+            admin_tab_settings: user?.permissions?.admin_tab_settings ?? false,
+            action_view_holerite: user?.permissions?.action_view_holerite ?? true,
+            action_register_hours: user?.permissions?.action_register_hours ?? true,
+            action_approve_reservations: user?.permissions?.action_approve_reservations ?? false,
         },
         // Personal Data
         rg: user?.rg || '',
@@ -292,7 +330,8 @@ const UserFormModal: React.FC<{
                                 { id: 'rh', label: 'RH', icon: BuildingOfficeIcon },
                                 { id: 'ti', label: 'Suporte & T.I.', icon: LifebuoyIcon },
                                 { id: 'rh_admin', label: 'RH Admin Sensível', icon: ShieldCheckIcon },
-                                { id: 'whatspanda', label: 'WhatsPanda & E-mail', icon: ChatBubbleLeftRightIcon }
+                                { id: 'whatspanda', label: 'WhatsPanda & E-mail', icon: ChatBubbleLeftRightIcon },
+                                { id: 'admin_panel', label: 'Painel Admin', icon: ShieldCheckIcon }
                             ].map(tab => {
                                 const Icon = tab.icon;
                                 const active = permissionTab === tab.id;
@@ -316,6 +355,114 @@ const UserFormModal: React.FC<{
 
                         <div className="space-y-6">
                             {/* Grupo: Social */}
+                            {permissionTab === 'admin_panel' && (
+                                <div className="space-y-6 animate-fade-in-up max-h-[50vh] overflow-y-auto pr-2">
+                                    {/* Categorias Principais */}
+                                    <section className="bg-slate-50/50 dark:bg-gray-800/10 p-4 rounded-2xl border border-slate-200 dark:border-gray-700">
+                                        <h5 className="text-[10px] font-bold text-slate-650 dark:text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <ShieldCheckIcon className="w-3 h-3 text-brand-primary" /> Categorias do Painel Admin
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Categoria: DP" name="admin_view_dp" checked={!!formData.permissions.admin_view_dp} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Categoria: Gestão de RH" name="admin_view_gestao_rh" checked={!!formData.permissions.admin_view_gestao_rh} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Categoria: Administrativo" name="admin_view_administrativo" checked={!!formData.permissions.admin_view_administrativo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<SparklesIcon className="w-4 h-4" />} label="Categoria: Social" name="admin_view_social" checked={!!formData.permissions.admin_view_social} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<LifebuoyIcon className="w-4 h-4" />} label="Categoria: Tecnologia & TI" name="admin_view_ti" checked={!!formData.permissions.admin_view_ti} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Categoria: Comercial" name="admin_view_comercial" checked={!!formData.permissions.admin_view_comercial} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Categoria: Configurações" name="admin_view_configuracoes" checked={!!formData.permissions.admin_view_configuracoes} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        </div>
+                                    </section>
+
+                                    {/* Abas / Submenus */}
+                                    <section className="bg-slate-50/50 dark:bg-gray-800/10 p-4 rounded-2xl border border-slate-200 dark:border-gray-700">
+                                        <h5 className="text-[10px] font-bold text-slate-650 dark:text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <FolderIcon className="w-3 h-3 text-brand-primary" /> Submenus / Abas do Painel
+                                        </h5>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-450 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de DP (Departamento Pessoal)</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Aba: Usuários" name="admin_tab_users" checked={!!formData.permissions.admin_tab_users} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Departamentos" name="admin_tab_departments" checked={!!formData.permissions.admin_tab_departments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Aba: Equipes" name="admin_tab_teams" checked={!!formData.permissions.admin_tab_teams} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<SparklesIcon className="w-4 h-4" />} label="Aba: Treinamentos" name="admin_tab_training" checked={!!formData.permissions.admin_tab_training} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Gestão RH" name="admin_tab_hr" checked={!!formData.permissions.admin_tab_hr} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Aba: Formulários" name="admin_tab_forms" checked={!!formData.permissions.admin_tab_forms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Aba: Políticas" name="admin_tab_policies" checked={!!formData.permissions.admin_tab_policies} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Aba: Onboarding" name="admin_tab_onboarding" checked={!!formData.permissions.admin_tab_onboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Aba: Biblioteca Corp." name="admin_tab_documentos" checked={!!formData.permissions.admin_tab_documentos} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Aba: Benefícios" name="admin_tab_benefits" checked={!!formData.permissions.admin_tab_benefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Gestão de RH</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Gestão de Vagas" name="admin_tab_jobs" checked={!!formData.permissions.admin_tab_jobs} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Organograma" name="admin_tab_org_flow" checked={!!formData.permissions.admin_tab_org_flow} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Administrativo</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Aba: Selos & Gamificação" name="admin_tab_badges" checked={!!formData.permissions.admin_tab_badges} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Reservas (Admin)" name="admin_tab_reservas_admin" checked={!!formData.permissions.admin_tab_reservas_admin} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Social</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<SparklesIcon className="w-4 h-4" />} label="Aba: Feed/Mural" name="admin_tab_dashboard" checked={!!formData.permissions.admin_tab_dashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Aba: Reconhecimentos" name="admin_tab_mural" checked={!!formData.permissions.admin_tab_mural} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Aba: Enquetes" name="admin_tab_polls" checked={!!formData.permissions.admin_tab_polls} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aba: Eventos" name="admin_tab_events" checked={!!formData.permissions.admin_tab_events} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aba: Marketplace" name="admin_tab_marketplace" checked={!!formData.permissions.admin_tab_marketplace} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Aba: Bem Estar" name="admin_tab_wellbeing" checked={!!formData.permissions.admin_tab_wellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Tecnologia & TI</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<LifebuoyIcon className="w-4 h-4" />} label="Aba: Chamados TI" name="admin_tab_ti_requests" checked={!!formData.permissions.admin_tab_ti_requests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<LifebuoyIcon className="w-4 h-4" />} label="Aba: Status TI" name="admin_tab_status" checked={!!formData.permissions.admin_tab_status} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Aba: Base de Conhecimento" name="admin_tab_kb" checked={!!formData.permissions.admin_tab_kb} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<ShieldCheckIcon className="w-4 h-4" />} label="Aba: Segurança" name="admin_tab_infosec" checked={!!formData.permissions.admin_tab_infosec} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Comercial</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aba: Agendamentos" name="admin_tab_scheduling" checked={!!formData.permissions.admin_tab_scheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aba: Espaços" name="admin_tab_scheduling_events" checked={!!formData.permissions.admin_tab_scheduling_events} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-455 dark:text-gray-500 uppercase tracking-wider mb-2">Abas de Configurações</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Aba: Geral" name="admin_tab_settings" checked={!!formData.permissions.admin_tab_settings} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Ações Específicas / Funcionário */}
+                                    <section className="bg-emerald-50/20 dark:bg-emerald-950/10 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <h5 className="text-[10px] font-bold text-emerald-650 dark:text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <SparklesIcon className="w-3 h-3 text-emerald-500" /> Ações do Colaborador
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <PermissionToggle icon={<IdentificationIcon className="w-4 h-4" />} label="Visualizar Holerite" name="action_view_holerite" checked={formData.permissions.action_view_holerite !== false} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<ClockIcon className="w-4 h-4" />} label="Lançar/Ver Banco de Horas" name="action_register_hours" checked={formData.permissions.action_register_hours !== false} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Aprovar/Recusar Reservas" name="action_approve_reservations" checked={!!formData.permissions.action_approve_reservations} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
                             {permissionTab === 'social' && (
                                 <div className="space-y-6 animate-fade-in-up">
                                     <section>

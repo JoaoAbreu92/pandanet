@@ -97,6 +97,13 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     const [editingTraining, setEditingTraining] = useState<EventItem | null>(null);
 
     // Visit Form States
+    const [selectedVisitors, setSelectedVisitors] = useState<{id: string, full_name: string}[]>(
+        currentUser ? [{ id: currentUser.id, full_name: currentUser.full_name || currentUser.name || '' }] : []
+    );
+    const [visitorSearch, setVisitorSearch] = useState('');
+    const [showVisitorDropdown, setShowVisitorDropdown] = useState(false);
+    const [companyProfiles, setCompanyProfiles] = useState<{id: string, full_name: string, avatar_url?: string}[]>([]);
+    
     const [visitorName, setVisitorName] = useState(currentUser?.full_name || currentUser?.name || '');
     const [clientName, setClientName] = useState('');
     const [visitDescription, setVisitDescription] = useState('');
@@ -108,6 +115,32 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     const [considerations, setConsiderations] = useState('');
     const [visitStatus, setVisitStatus] = useState<'completed' | 'problem'>('completed');
     const [needsReturn, setNeedsReturn] = useState(false);
+    const [returnData, setReturnData] = useState('');
+    const [returnTime, setReturnTime] = useState('');
+
+    useEffect(() => {
+        if (currentUser?.company_id) {
+            const fetchCompanyProfiles = async () => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url')
+                    .eq('company_id', currentUser.company_id)
+                    .order('full_name', { ascending: true });
+                if (!error && data) {
+                    setCompanyProfiles(data);
+                }
+            };
+            fetchCompanyProfiles();
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (currentUser?.company_id) {
+            if (activeTab === 'visits') fetchVisits();
+            if (activeTab === 'meetings') fetchMeetings();
+            if (activeTab === 'trainings') fetchTrainings();
+        }
+    }, [currentUser, activeTab]);
 
     // Meeting Form States
     const [meetingTitle, setMeetingTitle] = useState('');
@@ -251,6 +284,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     // Cancel edit helpers
     const cancelEditVisit = () => {
         setEditingVisit(null);
+        setSelectedVisitors(currentUser ? [{ id: currentUser.id, full_name: currentUser.full_name || currentUser.name || '' }] : []);
         setVisitorName(currentUser?.full_name || currentUser?.name || '');
         setClientName('');
         setVisitDescription('');
@@ -280,15 +314,103 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
         setTrainingNotes('');
     };
 
+    const parseVisitorNames = (visitorNameStr: string | null | undefined): string => {
+        if (!visitorNameStr) return '';
+        try {
+            if (visitorNameStr.startsWith('[') || visitorNameStr.startsWith('{')) {
+                const parsed = JSON.parse(visitorNameStr);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((u: any) => u.full_name).join(', ');
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+        return visitorNameStr;
+    };
+
+    const parseVisitorIds = (visitorNameStr: string | null | undefined): string[] => {
+        if (!visitorNameStr) return [];
+        try {
+            if (visitorNameStr.startsWith('[') || visitorNameStr.startsWith('{')) {
+                const parsed = JSON.parse(visitorNameStr);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((u: any) => u.id);
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+        return [];
+    };
+
+    const getOrCreateConversation = async (userId1: string, userId2: string) => {
+        const { data: part1 } = await supabase
+            .from('conversation_participants')
+            .select('conversation_id')
+            .eq('user_id', userId1);
+            
+        const convIds1 = (part1 || []).map(p => p.conversation_id);
+        
+        if (convIds1.length > 0) {
+            const { data: common } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id')
+                .in('conversation_id', convIds1)
+                .eq('user_id', userId2);
+                
+            if (common && common.length > 0) {
+                const sharedIds = common.map(c => c.conversation_id);
+                const { data: conv } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .in('id', sharedIds)
+                    .eq('is_group', false)
+                    .limit(1)
+                    .maybeSingle();
+                    
+                if (conv) return conv.id;
+            }
+        }
+        
+        const { data: newConv, error: createError } = await supabase
+            .from('conversations')
+            .insert({
+                company_id: currentUser.company_id,
+                is_group: false,
+                last_message: 'Visita Agendada',
+                last_message_at: new Date().toISOString(),
+                created_by: userId1
+            })
+            .select()
+            .single();
+            
+        if (createError) throw createError;
+        
+        await supabase.from('conversation_participants').insert([
+            { conversation_id: newConv.id, user_id: userId1, company_id: currentUser.company_id },
+            { conversation_id: newConv.id, user_id: userId2, company_id: currentUser.company_id }
+        ]);
+        
+        return newConv.id;
+    };
+
     // Save Visit (Create or Edit)
     const handleSaveVisit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (selectedVisitors.length === 0) {
+            showToast('Selecione pelo menos um visitante.', 'warning');
+            return;
+        }
         setSubmitting(true);
         try {
+            const visitorNameSerialized = JSON.stringify(selectedVisitors);
+            const visitorNamesList = selectedVisitors.map(v => v.full_name).join(', ');
+
             const visitPayload = {
                 company_id: currentUser.company_id,
                 user_id: currentUser.id,
-                visitor_name: visitorName,
+                visitor_name: visitorNameSerialized,
                 client_name: clientName,
                 description: visitDescription,
                 visit_date: visitDate,
@@ -325,14 +447,15 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
             const eventPayload = {
                 company_id: currentUser.company_id,
                 creator_id: currentUser.id,
-                title: `Visita: ${visitorName} em ${clientName}`,
-                description: `${visitDescription || 'Visita comercial agendada.'}\n\nVisitante: ${visitorName}\nCliente: ${clientName}\n\n[VisitID: ${visitId}]`,
+                title: `Visita: ${visitorNamesList} em ${clientName}`,
+                description: `${visitDescription || 'Visita comercial agendada.'}\n\nVisitantes: ${visitorNamesList}\nCliente: ${clientName}\n\n[VisitID: ${visitId}]`,
                 date: visitDate,
                 start_time: combinedStartTime,
                 end_time: combinedEndTime,
                 category: 'Visita',
                 location: clientName,
-                is_private: false
+                is_private: false,
+                invited_ids: selectedVisitors.map(v => v.id)
             };
 
             if (editingVisit) {
@@ -367,6 +490,50 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
             } else {
                 // Create new event
                 await supabase.from('events').insert(eventPayload);
+
+                // Enviar notificação e mensagem na caixa de entrada de cada visitante envolvido (menos o criador)
+                for (const visitor of selectedVisitors) {
+                    if (visitor.id !== currentUser.id) {
+                        try {
+                            const conversationId = await getOrCreateConversation(currentUser.id, visitor.id);
+                            const textMsg = `Olá! Nova visita externa agendada conosco em ${clientName} no dia ${new Date(visitDate + 'T12:00:00').toLocaleDateString('pt-BR')} às ${visitTime}.`;
+                            
+                            await supabase.from('messages').insert({
+                                conversation_id: conversationId,
+                                sender_id: currentUser.id,
+                                company_id: currentUser.company_id,
+                                text: textMsg,
+                                payload: {
+                                    type: 'visit_invite',
+                                    visit_id: visitId,
+                                    client_name: clientName,
+                                    visit_date: new Date(visitDate + 'T12:00:00').toLocaleDateString('pt-BR'),
+                                    visit_time: visitTime,
+                                    creator_id: currentUser.id,
+                                    confirmed: false
+                                }
+                            });
+
+                            await supabase.from('conversations').update({
+                                last_message: 'Nova visita agendada',
+                                last_message_at: new Date().toISOString()
+                            }).eq('id', conversationId);
+
+                            await supabase.from('notifications').insert({
+                                user_id: visitor.id,
+                                company_id: currentUser.company_id,
+                                type: 'visit_invite',
+                                title: 'Nova Visita Agendada',
+                                description: `Você foi agendado para uma visita na empresa ${clientName} em ${new Date(visitDate + 'T12:00:00').toLocaleDateString('pt-BR')}.`,
+                                link: '/messages',
+                                is_read: false
+                            });
+                        } catch (msgErr) {
+                            console.error('Erro ao notificar visitante:', visitor.full_name, msgErr);
+                        }
+                    }
+                }
+
                 showToast('Visita agendada com sucesso!', 'success');
                 setClientName('');
                 setVisitDescription('');
@@ -424,6 +591,10 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     const handleSaveConsiderations = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!showConsiderationsModal) return;
+        if (needsReturn && (!returnData || !returnTime)) {
+            showToast('Por favor, informe a data e hora do retorno.', 'warning');
+            return;
+        }
         setSubmitting(true);
 
         try {
@@ -438,10 +609,84 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
 
             if (error) throw error;
 
+            if (needsReturn) {
+                // 1. Criar novo evento no calendário para o retorno
+                const combinedStartTime = new Date(`${returnData}T${returnTime}:00Z`).toISOString();
+                const combinedEndTime = calculateEndTime(returnData, returnTime, '1 hora');
+                const visitorIds = parseVisitorIds(showConsiderationsModal.visitor_name);
+
+                const eventPayload = {
+                    company_id: currentUser.company_id,
+                    creator_id: currentUser.id,
+                    title: `Retorno de Visita: ${showConsiderationsModal.client_name}`,
+                    description: `Retorno de visita programado devido a pendências/problemas.\nMotivo: ${considerations}`,
+                    date: returnData,
+                    start_time: combinedStartTime,
+                    end_time: combinedEndTime,
+                    category: 'Visita',
+                    location: showConsiderationsModal.client_name,
+                    is_private: false,
+                    invited_ids: visitorIds
+                };
+
+                await supabase.from('events').insert(eventPayload);
+
+                // 2. Notificar todos os envolvidos (visitantes e criador da visita)
+                const recipients = [...visitorIds];
+                if (showConsiderationsModal.user_id && !recipients.includes(showConsiderationsModal.user_id)) {
+                    recipients.push(showConsiderationsModal.user_id);
+                }
+
+                for (const recipientId of recipients) {
+                    await supabase.from('notifications').insert({
+                        user_id: recipientId,
+                        company_id: currentUser.company_id,
+                        type: 'visit_return',
+                        title: 'Retorno de Visita Agendado',
+                        description: `Retorno de visita para ${showConsiderationsModal.client_name} agendado para ${new Date(returnData + 'T12:00:00').toLocaleDateString('pt-BR')} às ${returnTime}.`,
+                        link: '/messages',
+                        is_read: false
+                    });
+                }
+
+                // 3. Enviar mensagem detalhada na caixa de entrada do criador
+                if (showConsiderationsModal.user_id) {
+                    try {
+                        const conversationId = await getOrCreateConversation(currentUser.id, showConsiderationsModal.user_id);
+                        const textMsg = `Olá! A visita em ${showConsiderationsModal.client_name} precisa de retorno agendado para ${new Date(returnData + 'T12:00:00').toLocaleDateString('pt-BR')} às ${returnTime} pelo seguinte motivo:\n\n${considerations}`;
+                        
+                        await supabase.from('messages').insert({
+                            conversation_id: conversationId,
+                            sender_id: currentUser.id,
+                            company_id: currentUser.company_id,
+                            text: textMsg,
+                            payload: {
+                                type: 'visit_invite',
+                                visit_id: showConsiderationsModal.id,
+                                client_name: `${showConsiderationsModal.client_name} (Retorno)`,
+                                visit_date: new Date(returnData + 'T12:00:00').toLocaleDateString('pt-BR'),
+                                visit_time: returnTime,
+                                creator_id: currentUser.id,
+                                confirmed: false
+                            }
+                        });
+
+                        await supabase.from('conversations').update({
+                            last_message: 'Retorno de visita agendado',
+                            last_message_at: new Date().toISOString()
+                        }).eq('id', conversationId);
+                    } catch (msgErr) {
+                        console.error('Erro ao enviar mensagem de retorno ao criador:', msgErr);
+                    }
+                }
+            }
+
             showToast('Considerações registradas com sucesso!', 'success');
             setShowConsiderationsModal(null);
             setConsiderations('');
             setNeedsReturn(false);
+            setReturnData('');
+            setReturnTime('');
             fetchVisits();
         } catch (err: any) {
             console.error('Erro ao registrar considerações:', err);
@@ -571,6 +816,20 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
     // Edit button click handlers
     const startEditVisit = (visit: Visit) => {
         setEditingVisit(visit);
+        try {
+            if (visit.visitor_name.startsWith('[') || visit.visitor_name.startsWith('{')) {
+                const parsed = JSON.parse(visit.visitor_name);
+                if (Array.isArray(parsed)) {
+                    setSelectedVisitors(parsed);
+                } else {
+                    setSelectedVisitors([{ id: visit.user_id, full_name: visit.visitor_name }]);
+                }
+            } else {
+                setSelectedVisitors([{ id: visit.user_id, full_name: visit.visitor_name }]);
+            }
+        } catch (e) {
+            setSelectedVisitors([{ id: visit.user_id, full_name: visit.visitor_name }]);
+        }
         setVisitorName(visit.visitor_name);
         setClientName(visit.client_name);
         setVisitDescription(visit.description);
@@ -619,6 +878,10 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
         setShowHistoryModal(null);
     };
 
+    const filteredProfiles = companyProfiles.filter(p =>
+        p.full_name?.toLowerCase().includes(visitorSearch.toLowerCase())
+    );
+
     return (
         <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 text-slate-800 dark:text-white">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
@@ -631,9 +894,6 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
                             Comercial & Eventos
                         </span>
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">
-                        Agende visitas comerciais, reuniões com clientes e treinamentos para sua equipe.
-                    </p>
                 </div>
             </div>
 
@@ -655,15 +915,68 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
                         </h3>
 
                         <form onSubmit={handleSaveVisit} className="space-y-4">
-                            <div className="space-y-1">
+                            <div className="space-y-1 relative">
                                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Quem fará a visita? *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={visitorName}
-                                    onChange={(e) => setVisitorName(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary font-semibold text-slate-805 dark:text-white"
-                                />
+                                <div className="min-h-[42px] w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-3 py-1.5 flex flex-wrap gap-1.5 items-center">
+                                    {selectedVisitors.map(visitor => (
+                                        <span key={visitor.id} className="inline-flex items-center gap-1 bg-brand-primary/10 text-brand-primary dark:text-emerald-450 text-xs font-bold px-2 py-1 rounded-lg border border-brand-primary/20">
+                                            {visitor.full_name}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedVisitors(prev => prev.filter(v => v.id !== visitor.id))}
+                                                className="hover:text-red-500 font-extrabold focus:outline-none ml-1"
+                                            >
+                                                ×
+                                            </button>
+                                        </span>
+                                    ))}
+                                    <input
+                                        type="text"
+                                        placeholder={selectedVisitors.length === 0 ? "Selecione os visitantes..." : ""}
+                                        value={visitorSearch}
+                                        onChange={(e) => {
+                                            setVisitorSearch(e.target.value);
+                                            setShowVisitorDropdown(true);
+                                        }}
+                                        onFocus={() => setShowVisitorDropdown(true)}
+                                        className="flex-1 bg-transparent border-none outline-none text-sm font-semibold text-slate-805 dark:text-white min-w-[100px]"
+                                    />
+                                </div>
+                                
+                                {showVisitorDropdown && (
+                                    <>
+                                        <div className="fixed inset-0 z-45" onClick={() => setShowVisitorDropdown(false)} />
+                                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                            {filteredProfiles.length === 0 ? (
+                                                <div className="p-3 text-xs text-gray-500 dark:text-gray-400 text-center">Nenhum colaborador encontrado</div>
+                                            ) : (
+                                                filteredProfiles.map(p => {
+                                                    const isSelected = selectedVisitors.some(v => v.id === p.id);
+                                                    return (
+                                                        <button
+                                                            key={p.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setSelectedVisitors(prev => prev.filter(v => v.id !== p.id));
+                                                                } else {
+                                                                    setSelectedVisitors(prev => [...prev, { id: p.id, full_name: p.full_name || '' }]);
+                                                                }
+                                                                setVisitorSearch('');
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                                                                isSelected ? 'font-bold text-brand-primary bg-brand-primary/5' : 'text-slate-700 dark:text-slate-350'
+                                                            }`}
+                                                        >
+                                                            <span>{p.full_name}</span>
+                                                            {isSelected && <span className="text-brand-primary">✓</span>}
+                                                        </button>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             <div className="space-y-1">
@@ -776,7 +1089,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
                                                     </h4>
                                                     <span className="text-slate-400 text-xs">•</span>
                                                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                        Visitante: <strong className="text-slate-700 dark:text-slate-300">{visit.visitor_name}</strong>
+                                                        Visitante: <strong className="text-slate-700 dark:text-slate-300">{parseVisitorNames(visit.visitor_name)}</strong>
                                                     </span>
                                                 </div>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{visit.description}</p>
@@ -1337,6 +1650,31 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
                                 </label>
                             </div>
 
+                            {needsReturn && (
+                                <div className="grid grid-cols-2 gap-4 pt-2 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-750 dark:text-slate-300 uppercase">Data de Retorno *</label>
+                                        <input
+                                            type="date"
+                                            required
+                                            value={returnData}
+                                            onChange={(e) => setReturnData(e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-primary font-semibold text-slate-805 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-750 dark:text-slate-300 uppercase">Hora do Retorno *</label>
+                                        <input
+                                            type="time"
+                                            required
+                                            value={returnTime}
+                                            onChange={(e) => setReturnTime(e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-primary font-semibold text-slate-805 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
                                 <button
                                     type="button"
@@ -1377,7 +1715,7 @@ const AgendaPage: React.FC<AgendaPageProps> = ({ initialTab, initialDate }) => {
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             <h4 className="font-extrabold text-sm text-slate-850 dark:text-white">{visit.client_name}</h4>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">Visitante: {visit.visitor_name}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">Visitante: {parseVisitorNames(visit.visitor_name)}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full border ${

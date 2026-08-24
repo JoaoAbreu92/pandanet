@@ -78,21 +78,14 @@ const UsersTab: React.FC = () => {
         if (employees) {
             const mappedEmployees: Employee[] = employees.map(e => ({
                 ...e,
+                name: e.full_name || '',
+                avatarUrl: e.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(e.full_name || 'User')}&background=E2E8F0&color=475569`,
                 permissions: e.permissions || {}, // Handle potential nulls
                 whatspanda_permissions: e.whatspanda_permissions || null
             })) as any;
 
             setAllEmployees(mappedEmployees);
-
-            // Filter agents: those who have ANY entries in whatspanda_permissions
-            // OR we can just show everyone. Let's show only those with permissions set (Agents)
-            // But initially no one has permissions. So maybe show everyone?
-            // The user request says "adicionar um usuário... busca na lista de funcionários".
-            // So the list should show "Agents" (those added to WhatsPanda).
-            // "Adding" means setting initial permissions.
-
-            const activeAgents = mappedEmployees.filter(e => e.whatspanda_permissions !== null && e.whatspanda_permissions !== undefined);
-            setAgents(activeAgents);
+            setAgents(mappedEmployees);
         }
         setLoading(false);
     };
@@ -168,13 +161,6 @@ const UsersTab: React.FC = () => {
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Usuários e Permissões</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Usuário
-                </button>
             </div>
 
             {loading ? (

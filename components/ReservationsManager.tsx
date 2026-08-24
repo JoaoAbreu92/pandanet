@@ -8,7 +8,8 @@ import {
     TrashIcon, 
     PencilIcon,
     SparklesIcon,
-    XMarkIcon
+    XMarkIcon,
+    ClockIcon
 } from './icons';
 
 interface ReservationItem {
@@ -48,11 +49,136 @@ const ReservationsManager: React.FC = () => {
     const [brand, setBrand] = useState('');
     const [color, setColor] = useState('');
 
+    // New states for requests management
+    const [subTab, setSubTab] = useState<'items' | 'pending' | 'history'>('items');
+    const [reservations, setReservations] = useState<any[]>([]);
+    const [rejectingResId, setRejectingResId] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+
     useEffect(() => {
         if (currentUser?.company_id) {
             fetchItems();
+            fetchReservations();
         }
     }, [currentUser]);
+
+    const fetchReservations = async () => {
+        if (!currentUser?.company_id) return;
+        try {
+            const { data, error } = await supabase
+                .from('reservations')
+                .select('*, reservation_items(name, type)')
+                .eq('company_id', currentUser.company_id)
+                .order('start_date', { ascending: false })
+                .order('start_time', { ascending: false });
+
+            if (error) throw error;
+            setReservations(data || []);
+        } catch (err: any) {
+            console.error('Erro ao buscar solicitações de reserva:', err);
+        }
+    };
+
+    const handleApprove = async (res: any) => {
+        try {
+            // 1. Update reservation status
+            const { error: updateErr } = await supabase
+                .from('reservations')
+                .update({ status: 'approved' })
+                .eq('id', res.id);
+
+            if (updateErr) throw updateErr;
+
+            // 2. Calculate times and create calendar event
+            const startObj = new Date(`${res.start_date}T${res.start_time}:00`);
+            const num = parseInt(res.duration) || 1;
+            const unit = res.duration.toLowerCase();
+            const endObj = new Date(startObj.getTime());
+            if (unit.includes('hora') || unit.includes('hour')) {
+                endObj.setHours(endObj.getHours() + num);
+            } else if (unit.includes('dia') || unit.includes('day')) {
+                endObj.setDate(endObj.getDate() + num);
+            } else if (unit.includes('semana') || unit.includes('week')) {
+                endObj.setDate(endObj.getDate() + num * 7);
+            } else {
+                endObj.setHours(endObj.getHours() + num);
+            }
+
+            const combinedStartTime = startObj.toISOString();
+            const combinedEndTime = endObj.toISOString();
+
+            const eventPayload = {
+                company_id: res.company_id,
+                creator_id: res.user_id,
+                title: `Reserva: ${res.reservation_items?.name} (${res.solicitante})`,
+                description: `Reserva efetuada pelo colaborador ${res.solicitante}. Motivo: ${res.motivo || 'Não informado'}. Duração: ${res.duration}.`,
+                date: res.start_date,
+                start_time: combinedStartTime,
+                end_time: combinedEndTime,
+                category: 'Reserva',
+                location: res.reservation_items?.type === 'room' ? res.reservation_items?.name : 'Veículo Corporativo',
+                is_private: false
+            };
+
+            const { error: eventError } = await supabase
+                .from('events')
+                .insert(eventPayload);
+
+            if (eventError) throw eventError;
+
+            // 3. Notify applicant
+            await supabase.from('notifications').insert({
+                user_id: res.user_id,
+                type: 'system',
+                title: 'Reserva Aprovada 🟢',
+                description: `Sua solicitação de reserva para ${res.reservation_items?.name || 'recurso'} no dia ${new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às ${res.start_time} foi APROVADA!`,
+                is_read: false,
+                link: '/reservations'
+            });
+
+            alert('Reserva aprovada com sucesso!');
+            fetchReservations();
+        } catch (err: any) {
+            alert('Erro ao aprovar reserva: ' + err.message);
+        }
+    };
+
+    const handleReject = async (resId: string) => {
+        if (!rejectionReason.trim()) {
+            alert('Por favor, informe o motivo da recusa.');
+            return;
+        }
+
+        const res = reservations.find(r => r.id === resId);
+        if (!res) return;
+
+        try {
+            // 1. Update status and rejection reason
+            const { error: updateErr } = await supabase
+                .from('reservations')
+                .update({ status: 'rejected', rejection_reason: rejectionReason.trim() })
+                .eq('id', resId);
+
+            if (updateErr) throw updateErr;
+
+            // 2. Notify applicant
+            await supabase.from('notifications').insert({
+                user_id: res.user_id,
+                type: 'system',
+                title: 'Reserva Recusada 🔴',
+                description: `Sua solicitação de reserva para ${res.reservation_items?.name || 'recurso'} foi recusada. Motivo: ${rejectionReason.trim()}`,
+                is_read: false,
+                link: '/reservations'
+            });
+
+            alert('Reserva recusada com sucesso!');
+            setRejectingResId(null);
+            setRejectionReason('');
+            fetchReservations();
+        } catch (err: any) {
+            alert('Erro ao recusar reserva: ' + err.message);
+        }
+    };
 
     const fetchItems = async () => {
         setLoading(true);
@@ -161,94 +287,278 @@ const ReservationsManager: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-black text-slate-800 dark:text-gray-100 flex items-center gap-2">
-                        <BuildingOfficeIcon className="w-6 h-6 text-brand-primary" />
-                        Gerenciamento de Reservas
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-gray-400">Cadastre salas e veículos que ficarão disponíveis para reserva pelos colaboradores.</p>
-                </div>
+            {/* Sub-tab switcher */}
+            <div className="flex flex-wrap gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
                 <button
-                    onClick={handleOpenCreate}
-                    className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2 transition-all active:scale-95 text-sm"
+                    type="button"
+                    onClick={() => setSubTab('items')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                        subTab === 'items'
+                            ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm dark:bg-emerald-950/20 dark:text-emerald-400'
+                            : 'bg-white hover:bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
                 >
-                    <PlusIcon className="w-5 h-5" />
-                    Novo Item Reservável
+                    Recursos Cadastrados
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSubTab('pending')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                        subTab === 'pending'
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm dark:bg-amber-950/20 dark:text-amber-400'
+                            : 'bg-white hover:bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                >
+                    Solicitações Pendentes
+                    {reservations.filter(r => r.status === 'pending').length > 0 && (
+                        <span className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[9px] font-bold">
+                            {reservations.filter(r => r.status === 'pending').length}
+                        </span>
+                    )}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSubTab('history')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                        subTab === 'history'
+                            ? 'bg-slate-500/10 border-slate-500 text-slate-600 shadow-sm dark:bg-slate-850 dark:text-slate-350'
+                            : 'bg-white hover:bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                >
+                    Histórico de Reservas
                 </button>
             </div>
 
-            {loading ? (
-                <div className="flex justify-center items-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-                </div>
-            ) : items.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 dark:bg-slate-850 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
-                    <BuildingOfficeIcon className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Nenhum item cadastrado</p>
-                    <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">Adicione salas ou veículos para os colaboradores fazerem reservas.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {items.map(item => (
-                        <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-3xl shadow-sm flex items-start justify-between gap-4 hover:shadow-md transition-all">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    {item.type === 'room' ? (
-                                        <span className="p-2 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-xl">
-                                            <BuildingOfficeIcon className="w-5 h-5" />
-                                        </span>
-                                    ) : (
-                                        <span className="p-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                                            <RocketLaunchIcon className="w-5 h-5" />
-                                        </span>
-                                    )}
-                                    <div>
-                                        <h4 className="font-extrabold text-slate-800 dark:text-white text-sm">{item.name}</h4>
-                                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                                            {item.type === 'room' ? 'Sala / Espaço' : 'Veículo'}
-                                        </span>
-                                    </div>
-                                </div>
+            {subTab === 'items' && (
+                <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-800 dark:text-gray-100 flex items-center gap-2">
+                                <BuildingOfficeIcon className="w-6 h-6 text-brand-primary" />
+                                Gerenciamento de Reservas
+                            </h2>
+                            <p className="text-xs text-slate-500 dark:text-gray-400">Cadastre salas e veículos que ficarão disponíveis para reserva pelos colaboradores.</p>
+                        </div>
+                        <button
+                            onClick={handleOpenCreate}
+                            className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2 transition-all active:scale-95 text-sm"
+                        >
+                            <PlusIcon className="w-5 h-5" />
+                            Novo Item Reservável
+                        </button>
+                    </div>
 
-                                {item.type === 'room' ? (
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-1">
-                                        <p><span className="font-bold">Capacidade:</span> {item.details?.capacity || 0} pessoas</p>
-                                        {item.details?.accessories && item.details.accessories.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {item.details.accessories.map((acc, i) => (
-                                                    <span key={i} className="bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">
-                                                        {acc}
-                                                    </span>
-                                                ))}
+                    {loading ? (
+                        <div className="flex justify-center items-center py-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+                        </div>
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-12 bg-slate-50 dark:bg-slate-850 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                            <BuildingOfficeIcon className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Nenhum item cadastrado</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">Adicione salas ou veículos para os colaboradores fazerem reservas.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {items.map(item => (
+                                <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-3xl shadow-sm flex items-start justify-between gap-4 hover:shadow-md transition-all">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            {item.type === 'room' ? (
+                                                <span className="p-2 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                                                    <BuildingOfficeIcon className="w-5 h-5" />
+                                                </span>
+                                            ) : (
+                                                <span className="p-2 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                                                    <RocketLaunchIcon className="w-5 h-5" />
+                                                </span>
+                                            )}
+                                            <div>
+                                                <h4 className="font-extrabold text-slate-800 dark:text-white text-sm">{item.name}</h4>
+                                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                                                    {item.type === 'room' ? 'Sala / Espaço' : 'Veículo'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {item.type === 'room' ? (
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1 pl-1">
+                                                <p><span className="font-bold">Capacidade:</span> {item.details?.capacity || 0} pessoas</p>
+                                                {item.details?.accessories && item.details.accessories.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {item.details.accessories.map((acc, i) => (
+                                                            <span key={i} className="bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold px-2 py-0.5 rounded-md text-slate-660 dark:text-slate-300">
+                                                                {acc}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5 pl-1">
+                                                <p><span className="font-bold">Modelo:</span> {item.details?.model || '-'} ({item.details?.brand || '-'})</p>
+                                                <p><span className="font-bold">Placa:</span> {item.details?.plate || '-'}</p>
+                                                {item.details?.color && <p><span className="font-bold">Cor:</span> {item.details.color}</p>}
                                             </div>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5 pl-1">
-                                        <p><span className="font-bold">Modelo:</span> {item.details?.model || '-'} ({item.details?.brand || '-'})</p>
-                                        <p><span className="font-bold">Placa:</span> {item.details?.plate || '-'}</p>
-                                        {item.details?.color && <p><span className="font-bold">Cor:</span> {item.details.color}</p>}
-                                    </div>
-                                )}
-                            </div>
 
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleOpenEdit(item)}
-                                    className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-650 dark:text-slate-300 rounded-xl text-xs border border-slate-100 dark:border-slate-800"
-                                >
-                                    <PencilIcon className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(item.id)}
-                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:hover:bg-red-950/40 rounded-xl text-xs"
-                                >
-                                    <TrashIcon className="w-4 h-4" />
-                                </button>
-                            </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleOpenEdit(item)}
+                                            className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-650 dark:text-slate-300 rounded-xl text-xs border border-slate-100 dark:border-slate-800"
+                                        >
+                                            <PencilIcon className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(item.id)}
+                                            className="p-2 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:hover:bg-red-950/40 rounded-xl text-xs"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    )}
+                </>
+            )}
+
+            {subTab === 'pending' && (
+                <div className="space-y-4">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 dark:text-gray-100 flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                            Solicitações de Reserva Pendentes
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-gray-400">Analise e aprove ou recuse os pedidos de reserva pendentes da empresa.</p>
+                    </div>
+
+                    {reservations.filter(r => r.status === 'pending').length === 0 ? (
+                        <div className="text-center py-12 bg-slate-55 dark:bg-slate-850 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                            <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Nenhuma solicitação pendente no momento.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {reservations.filter(r => r.status === 'pending').map(res => (
+                                <div key={res.id} className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded">PENDENTE</span>
+                                            <h4 className="font-extrabold text-sm text-slate-800 dark:text-white">{res.reservation_items?.name || 'Recurso'}</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-600 dark:text-slate-350">
+                                            <strong>Solicitante:</strong> {res.solicitante}
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            <strong>Data:</strong> {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time} ({res.duration})
+                                        </p>
+                                        {res.motivo && (
+                                            <p className="text-xs italic text-slate-400 bg-slate-50 dark:bg-slate-850 p-2 rounded border dark:border-slate-800">
+                                                "{res.motivo}"
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleApprove(res)}
+                                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-500/10"
+                                        >
+                                            Aprovar
+                                        </button>
+                                        <button
+                                            onClick={() => setRejectingResId(res.id)}
+                                            className="px-4 py-2 bg-red-500 hover:bg-red-650 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10"
+                                        >
+                                            Recusar
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {subTab === 'history' && (
+                <div className="space-y-4">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800 dark:text-gray-100 flex items-center gap-2">
+                            <ClockIcon className="w-6 h-6 text-slate-500" />
+                            Histórico Geral de Reservas
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-gray-400">Veja o histórico completo de solicitações aprovadas, concluídas ou recusadas.</p>
+                    </div>
+
+                    {reservations.filter(r => r.status !== 'pending').length === 0 ? (
+                        <div className="text-center py-12 bg-slate-55 dark:bg-slate-855 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                            <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Nenhum histórico disponível.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {reservations.filter(r => r.status !== 'pending').map(res => {
+                                const isApproved = res.status === 'approved';
+                                const isRejected = res.status === 'rejected';
+                                return (
+                                    <div key={res.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-3xl shadow-sm space-y-2">
+                                        <div className="flex justify-between items-start">
+                                            <h4 className="font-extrabold text-sm text-slate-800 dark:text-white">{res.reservation_items?.name || 'Recurso'}</h4>
+                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                                                isApproved ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400' : 'bg-red-50 text-red-650 dark:bg-red-950/20 dark:text-red-400'
+                                            }`}>
+                                                {isApproved ? 'Aprovado' : isRejected ? 'Recusado' : res.status}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                                            <p><strong>Solicitante:</strong> {res.solicitante}</p>
+                                            <p><strong>Data:</strong> {new Date(res.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} às {res.start_time} ({res.duration})</p>
+                                            {res.rejection_reason && (
+                                                <p className="text-red-550 dark:text-red-400 font-semibold bg-red-50/50 dark:bg-red-950/10 p-2 rounded border border-red-100 dark:border-red-950/30">
+                                                    ❌ <strong>Motivo da Recusa:</strong> "{res.rejection_reason}"
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modal de Motivo de Recusa */}
+            {rejectingResId && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 p-6 space-y-4">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white">Recusar Solicitação de Reserva</h3>
+                        <p className="text-xs text-slate-500">Informe o motivo da recusa. Este motivo será enviado ao colaborador solicitante.</p>
+                        
+                        <textarea
+                            required
+                            rows={3}
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            placeholder="Ex: Sala reservada para treinamento interno / Veículo em manutenção programada..."
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-primary text-slate-800 dark:text-white font-semibold resize-none"
+                        />
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => { setRejectingResId(null); setRejectionReason(''); }}
+                                className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 font-bold px-4 py-2 rounded-xl text-xs border"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleReject(rejectingResId)}
+                                className="bg-red-500 hover:bg-red-600 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md"
+                            >
+                                Confirmar Recusa
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

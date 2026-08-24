@@ -1423,6 +1423,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             // Backup save as draft
             saveDraft(false).catch(() => { });
         } finally {
+            setIsSending(false);
             setLoading(false);
         }
     };

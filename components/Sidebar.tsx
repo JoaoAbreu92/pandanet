@@ -313,19 +313,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavMenu label="Comercial" icon={CalendarDaysIcon} menuKey="agenda" permission={!!currentUser.permissions?.viewScheduling} featureId="scheduling">
-                    <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission="viewScheduling" featureId="scheduling" />
-                    <NavItem page="scheduling-events" label="Espaços" icon={CalendarDaysIcon} permission="viewScheduling" featureId="scheduling" />
-                </NavMenu>
                 <NavMenu label="Agenda" icon={CalendarIcon} menuKey="newAgenda" permission={!!currentUser.permissions?.viewAgenda} featureId="new_agenda">
                     <NavItem page="agenda" label="Visitas" icon={UsersIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'visits' }} />
                     <NavItem page="agenda" label="Reuniões" icon={UserGroupIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'meetings' }} />
                     <NavItem page="agenda" label="Treinamentos" icon={PlayIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'trainings' }} />
                 </NavMenu>
-                <NavMenu label="Reservas" icon={BuildingOfficeIcon} menuKey="reservations" permission={!!currentUser.permissions?.viewReservations} featureId="reservations">
-                    <NavItem page="reservas" label="Salas" icon={HomeIcon} permission="viewReservations" featureId="reservations" context={{ tab: 'rooms' }} />
-                    <NavItem page="reservas" label="Veículos" icon={RocketLaunchIcon} permission="viewReservations" featureId="reservations" context={{ tab: 'vehicles' }} />
-                </NavMenu>
+                <NavItem page="reservas" label="Reservas" icon={BuildingOfficeIcon} permission="viewReservations" featureId="reservations" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
@@ -345,7 +338,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 {/* <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" /> */}
 
                 <NavMenu label={t('sidebar.rh_gestao')} icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
-                    <NavItem page="directory" label={t('users.title')} icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
+                    <NavItem page="directory" label="Colaboradores" icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
                     <NavItem page="org-chart" label={t('sidebar.org_chart')} icon={ArrowPathIcon} permission="viewOrgChart" featureId="org-chart" />
                     <NavItem page="meu-rh" label={t('sidebar.meu_rh')} icon={BuildingOfficeIcon} permission="viewMeuRH" featureId="meu-rh" />
                     <NavItem page="jobs" label={t('sidebar.jobs')} icon={RocketLaunchIcon} permission="viewJobs" featureId="jobs" />
@@ -354,7 +347,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
                     <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" featureId="onboarding" />
-                    <NavItem page="documentos" label={t('sidebar.library')} icon={FolderIcon} permission="viewDocuments" />
+                    <NavItem page="documentos" label="Biblioteca Corporativa" icon={FolderIcon} permission="viewDocuments" />
                     <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
                     <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
                 </NavMenu>
