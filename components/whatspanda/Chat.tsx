@@ -84,6 +84,29 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: string} | null>(null);
   const [newMessage, setNewMessage] = useState('');
 
+  const [chatFontSize, setChatFontSize] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('whatspanda_chat_font_size');
+      return saved ? parseInt(saved, 10) : 14;
+    }
+    return 14;
+  });
+
+  useEffect(() => {
+    const handleFontSizeChange = () => {
+      const saved = localStorage.getItem('whatspanda_chat_font_size');
+      if (saved) {
+        setChatFontSize(parseInt(saved, 10));
+      }
+    };
+    window.addEventListener('whatspanda_font_size_changed', handleFontSizeChange);
+    window.addEventListener('storage', handleFontSizeChange);
+    return () => {
+      window.removeEventListener('whatspanda_font_size_changed', handleFontSizeChange);
+      window.removeEventListener('storage', handleFontSizeChange);
+    };
+  }, []);
+
   // Message Context Menu & Edit/Delete States
   const [messageContextMenu, setMessageContextMenu] = useState<{ x: number, y: number, message: WhatsAppMessage } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -1937,113 +1960,115 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         {selectedConversation ? (
           <div className="relative z-10 flex flex-col h-full"> {/* Container for z-index */}
             {/* Chat Header */}
-            <div className="px-6 py-4 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex justify-between items-center shadow-lg z-20">
-              <div className="flex items-center gap-3">
+            <div className="px-3 py-2 sm:px-6 sm:py-4 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex justify-between items-center shadow-lg z-20 min-w-0 w-full">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                 <button
                   onClick={() => setSelectedConversation(null)}
-                  className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
+                  className="p-1 sm:p-2 -ml-1 sm:-ml-2 lg:hidden hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white dark:ring-white/10 shadow-lg overflow-hidden transition-all duration-300">
-                  <User className="w-6 h-6" />
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white dark:ring-white/10 shadow-lg overflow-hidden transition-all duration-300">
+                  <User className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
-                <div className="min-w-0 flex flex-col">
-                  <h3 className="font-bold text-slate-800 dark:text-white text-lg truncate leading-tight tracking-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-gray-400 truncate opacity-80">{selectedConversation.contact_phone}</p>
+                <div className="min-w-0 flex flex-col flex-1">
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm sm:text-lg truncate leading-tight tracking-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
+                  <div className="flex flex-wrap items-center gap-1 mt-0.5 sm:mt-1 max-w-full">
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-gray-400 truncate opacity-80">{selectedConversation.contact_phone}</p>
 
                     {selectedConversation.channel && (
-                      <span className="text-[10px] bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-gray-300 font-bold px-3 py-1 rounded-full border border-slate-200 dark:border-white/5 flex items-center gap-1.5 uppercase tracking-widest shadow-sm">
-                        {selectedConversation.channel.channel_type === 'instagram' ? <Instagram className="w-3.5 h-3.5 text-pink-500" /> :
-                          selectedConversation.channel.channel_type === 'messenger' ? <MessageCircle className="w-3.5 h-3.5 text-blue-500" /> :
-                            selectedConversation.channel.channel_type === 'telegram' ? <Send className="w-3.5 h-3.5 text-sky-500" /> :
-                              <Smartphone className="w-3.5 h-3.5 text-emerald-500" />}
-                        {selectedConversation.channel.connection_name || 'WhatsApp'}
+                      <span className="text-[9px] sm:text-[10px] bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-gray-300 font-bold px-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-slate-200 dark:border-white/5 flex items-center gap-1 uppercase tracking-wider shadow-sm truncate max-w-[80px] sm:max-w-none" title={selectedConversation.channel.connection_name || 'WhatsApp'}>
+                        {selectedConversation.channel.channel_type === 'instagram' ? <Instagram className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-pink-500" /> :
+                          selectedConversation.channel.channel_type === 'messenger' ? <MessageCircle className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-blue-500" /> :
+                            selectedConversation.channel.channel_type === 'telegram' ? <Send className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-sky-500" /> :
+                              <Smartphone className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-emerald-500" />}
+                        <span className="truncate">{selectedConversation.channel.connection_name || 'WhatsApp'}</span>
                       </span>
                     )}
 
                     {selectedConversation.assigned_user && (
-                      <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-100">
-                        {selectedConversation.assigned_user.full_name}
+                      <span className="text-[9px] sm:text-[10px] bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 font-bold px-1.5 sm:px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-500/30 flex items-center gap-0.5 shadow-sm truncate max-w-[80px] sm:max-w-none" title={selectedConversation.assigned_user.full_name}>
+                        <User className="w-2.5 h-2.5" />
+                        <span className="truncate">{selectedConversation.assigned_user.full_name.split(' ')[0]}</span>
                       </span>
                     )}
                     {selectedConversation.queue && (
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border"
+                      <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full border truncate max-w-[80px] sm:max-w-none"
                         style={{
                           backgroundColor: `${selectedConversation.queue.color}15`,
                           color: selectedConversation.queue.color,
                           borderColor: `${selectedConversation.queue.color}30`
                         }}
+                        title={selectedConversation.queue.name}
                       >
-                        {selectedConversation.queue.name}
+                        <span className="truncate">{selectedConversation.queue.name}</span>
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-                    <div className="flex gap-2 items-center">
-                      {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && !isGhostMode && (
-                        <button
-                          onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
-                          className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
-                        >
-                          Aceitar
-                        </button>
-                      )}
-                      <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-1" />
-                      <div className="flex gap-1.5">
-                {!isGhostMode && selectedConversation.status !== 'fechado' && (
+              <div className="flex gap-1 sm:gap-2 items-center flex-shrink-0">
+                {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && !isGhostMode && (
                   <button
-                    onClick={() => handleUpdateStatus(selectedConversation.id, 'fechado')}
-                    className="p-2 rounded-full hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 transition-colors"
-                    title="Encerrar Atendimento"
+                    onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
+                    className="px-2 sm:px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-500/20 transition-all whitespace-nowrap"
                   >
-                    <CheckCheck className="w-5 h-5" />
+                    Aceitar
                   </button>
                 )}
-                {/* Botão Reabrir - aparece apenas quando fechado */}
-                {!isGhostMode && selectedConversation.status === 'fechado' && (
+                <div className="h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5 sm:mx-1 hidden sm:block" />
+                <div className="flex gap-0.5 sm:gap-1.5 items-center">
+                  {!isGhostMode && selectedConversation.status !== 'fechado' && (
+                    <button
+                      onClick={() => handleUpdateStatus(selectedConversation.id, 'fechado')}
+                      className="p-1 sm:p-2 rounded-full hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 transition-colors"
+                      title="Encerrar Atendimento"
+                    >
+                      <CheckCheck className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
+                  {/* Botão Reabrir - aparece apenas quando fechado */}
+                  {!isGhostMode && selectedConversation.status === 'fechado' && (
+                    <button
+                      onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto')}
+                      className="px-2 sm:px-4 py-1 sm:py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1"
+                      title="Reabrir Atendimento"
+                    >
+                      <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      <span className="hidden sm:inline">Reabrir</span>
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={handleExportPDF}
+                      className="p-1 sm:p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors hidden sm:block"
+                      title="Exportar Relatório PDF"
+                    >
+                      <Download className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
+                  {!isGhostMode && (
+                    <button
+                      onClick={() => {
+                        setIsTransferModalOpen(true);
+                        setTransferSearch('');
+                      }}
+                      className="p-1 sm:p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+                      title="Transferir Atendimento"
+                    >
+                      <CornerUpRight className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
                   <button
-                    onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto')}
-                    className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1.5"
-                    title="Reabrir Atendimento"
+                    onClick={() => setShowContactSidebar(!showContactSidebar)}
+                    className={`p-1 sm:p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                    title="Informações do Contato"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Reabrir
+                    <Info className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                   </button>
-                )}
-                {isAdmin && (
-                  <button
-                    onClick={handleExportPDF}
-                    className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
-                    title="Exportar Relatório PDF"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-                )}
-                {!isGhostMode && (
-                  <button
-                    onClick={() => {
-                      setIsTransferModalOpen(true);
-                      setTransferSearch('');
-                    }}
-                    className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
-                    title="Transferir Atendimento"
-                  >
-                    <CornerUpRight className="w-5 h-5" />
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowContactSidebar(!showContactSidebar)}
-                  className={`p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
-                  title="Informações do Contato"
-                >
-                  <Info className="w-5 h-5" />
-                </button>
+                </div>
               </div>
             </div>
-                  </div>
 
             {/* Messages */}
             <div 
@@ -2197,7 +2222,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           <textarea
                             value={editingText}
                             onChange={(e) => setEditingText(e.target.value)}
-                            className="w-full p-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 dark:text-white resize-none"
+                            style={{ fontSize: `${chatFontSize}px` }}
+                            className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 dark:text-white resize-none"
                             rows={3}
                           />
                           <div className="flex justify-end gap-1.5">
@@ -2221,11 +2247,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       ) : (
                         <>
                           {msg.message_text && (
-                            <p className={`text-sm font-medium leading-relaxed whitespace-pre-wrap ${
-                              (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
-                              ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
-                              : ''
-                            }`}>
+                            <p 
+                              style={{ fontSize: `${chatFontSize}px` }}
+                              className={`font-medium leading-relaxed whitespace-pre-wrap ${(msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' : ''}`}
+                            >
                               {renderMessageText(msg.message_text)}
                             </p>
                           )}
@@ -2463,7 +2488,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       }}
                       placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
                       disabled={!canSendMessagesResult}
-                      className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent text-[15px] resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
+                      style={{ fontSize: `${chatFontSize}px` }}
+                      className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
                       rows={1}
                     />
                     {newMessage.trim() || attachedFile ? (
