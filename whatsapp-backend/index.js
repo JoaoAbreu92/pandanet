@@ -549,99 +549,14 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
 
-        // 2. Buscar TODOS os Grupos (Lógica Resiliente)
-        try {
-            console.log(`[SYNC] Buscando grupos via fetchAllGroups para ${instanceName}...`);
-            const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, { headers });
-            let groupList = [];
-
-            if (respG.ok) {
-                const groups = await respG.json();
-                groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
-            } else if (respG.status === 400 || respG.status === 500) {
-                console.warn(`[SYNC] Erro ${respG.status} em fetchAllGroups. Tentando fallback para findChats...`);
-            }
-
-            // FALLBACK: Se fetchAllGroups falhar ou vier vazio, tenta buscar via chats recentes
-            if (groupList.length === 0) {
-                console.log(`[SYNC] fetchAllGroups vazio. Tentando extrair grupos das conversas recentes (findChats)...`);
-                const respChats = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { 
-                    method: 'POST', 
-                    headers, 
-                    body: JSON.stringify({ where: {} }) 
-                });
-                
-                if (respChats.ok) {
-                    const chatsRaw = await respChats.json();
-                    const activeChats = Array.isArray(chatsRaw) ? chatsRaw : (chatsRaw.chats || chatsRaw.data || []);
-                    // Filtrar apenas o que for grupo (@g.us)
-                    const detectedGroups = activeChats.filter(c => {
-                        const jid = c.remoteJid || c.jid || c.id || '';
-                        return jid.includes('@g.us');
-                    });
-                    
-                    console.log(`[SYNC] ${detectedGroups.length} grupos detectados via conversas recentes.`);
-                    groupList = detectedGroups.map(g => ({
-                        jid: g.remoteJid || g.jid || g.id,
-                        subject: g.name || g.subject || 'Grupo Detectado'
-                    }));
-                }
-            }
-
-            if (groupList.length > 0) {
-                await supabase.from('whatsapp_settings').update({ 
-                    last_sync_error: `SUCESSO: ${groupList.length} grupos identificados (método resiliente).` 
-                }).eq('id', connectionId);
-
-                for (const g of groupList) {
-                    const jid = g.jid || g.id || g.remoteJid || '';
-                    if (!jid || (!jid.includes('@g.us') && !jid.includes('-'))) continue;
-                    const phone = jid.split('@')[0];
-                    if (!processedJids.has(phone)) {
-                        processedJids.add(phone);
-                        contactsToUpsert.push({ 
-                            company_id: companyId, 
-                            phone, 
-                            name: g.subject || g.name || 'Grupo Sem Nome', 
-                            is_group: true, // Marcar explicitamente como grupo
-                            updated_at: new Date().toISOString() 
-                        });
-                    }
-                }
-            } else {
-                const statusInfo = respG.status !== 200 ? ` (Status ${respG.status})` : "";
-                await supabase.from('whatsapp_settings').update({ 
-                    last_sync_error: `AVISO: Nenhum grupo encontrado na API${statusInfo}. Se você tem grupos, tente RECONECTAR o QR Code.` 
-                }).eq('id', connectionId);
-            }
-        } catch(e) { 
-            console.error(`[SYNC] Erro grupos:`, e.message); 
-            await supabase.from('whatsapp_settings').update({ last_sync_error: `Erro técnico na busca de grupos: ${e.message}` }).eq('id', connectionId);
-        }
-
-        // 3. Salvar Contatos e Garantir Conversas de Grupo
         if (contactsToUpsert.length > 0) {
-            console.log(`[SYNC] Salvando ${contactsToUpsert.length} contatos...`);
-            await supabase.from('whatsapp_contacts').upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
-
-            const groupEntries = contactsToUpsert.filter(c => c.is_group === true || (c.phone && (c.phone.length > 15 || c.phone.includes('-') || c.phone.includes('@g.us'))));
-            for (const group of groupEntries) {
-                try {
-                    const { data: existing } = await supabase.from('whatsapp_conversations').select('id').eq('company_id', companyId).eq('contact_phone', group.phone).maybeSingle();
-                    if (!existing) {
-                        await supabase.from('whatsapp_conversations').insert({
-                            company_id: companyId,
-                            contact_phone: group.phone,
-                            contact_name: group.name,
-                            is_group: true,
-                            status: 'aberto',
-                            connection_id: connectionId,
-                            unread_count: 0
-                        });
-                    }
-                } catch (e) { console.error(`[SYNC] Erro conversa grupo:`, e.message); }
+            console.log(`[SYNC] Upserting ${contactsToUpsert.length} contatos pessoais...`);
+            const chunks = [];
+            for (let i = 0; i < contactsToUpsert.length; i += 500) chunks.push(contactsToUpsert.slice(i, i + 500));
+            for (const chunk of chunks) {
+                await supabase.from('whatsapp_contacts').upsert(chunk, { onConflict: 'company_id,phone', ignoreDuplicates: false });
             }
-            await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos e grupos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
         }
 
         // 4. Buscar Histórico
@@ -930,8 +845,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         let remoteJid = message.key?.remoteJid || '';
         
         // Ignorar broadcasts mas permitir grupos e @lid
-        if (!remoteJid || remoteJid.includes('@broadcast')) return;
-        const isGroup = remoteJid.includes('@g.us');
+        if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@g.us')) return;
+        const isGroup = false;
         
         console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
         
@@ -1015,13 +930,20 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
         
         if (mediaMsg) {
+            mimeType = mediaMsg.mimetype || null;
+            fileName = mediaMsg.fileName || mediaMsg.title || null;
+
             mediaType = m.imageMessage ? 'image' : 
                         m.audioMessage ? 'audio' : 
                         m.videoMessage ? 'video' : 
                         m.stickerMessage ? 'sticker' : 'document';
 
-            mimeType = mediaMsg.mimetype || null;
-            fileName = mediaMsg.fileName || mediaMsg.title || null;
+            // Enhance mediaType detection based on mimeType for documents
+            if (mediaType === 'document' && mimeType) {
+                if (mimeType.includes('image/')) mediaType = 'image';
+                else if (mimeType.includes('audio/')) mediaType = 'audio';
+                else if (mimeType.includes('video/')) mediaType = 'video';
+            }
             
             if (!text) text = `[Mídia: ${mediaType}]`;
             

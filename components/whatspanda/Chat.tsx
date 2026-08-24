@@ -564,9 +564,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       query = query.in('connection_id', filterConnection);
     }
 
-    if (chatTypeFilter !== 'group') {
-      query = query.eq('status', activeTab);
-    }
+    query = query.eq('status', activeTab);
 
     // Pesquisa por nome ou telefone
     if (searchTerm) {
@@ -576,15 +574,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     // Filtros de departamento
     if (filterQueue.length > 0) query = query.in('queue_id', filterQueue);
 
-    // Filtro de Tipo (Privado / Grupo)
-    if (chatTypeFilter === 'group') {
-      // Buscar grupos: apenas is_group = true (mais seguro que query strings)
-      query = query.eq('is_group', true);
-    } else if (chatTypeFilter === 'private') {
-      // Remover grupos
-      query = query.neq('is_group', true);
-    }
-    // Se for 'all', não aplica filtro e mostra ambos
+    // Sempre filtra grupos (remove)
+    query = query.neq('is_group', true);
 
     const { data, error } = await query.order('last_message_at', { ascending: false });
     
@@ -1085,25 +1076,6 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 {tab}
               </button>
             ))}
-          </div>
-          {/* Tipo de conversa: Privado / Grupo - Hide if enforced by prop */}
-          {type === 'all' && (
-            <div className="flex gap-1 mt-2">
-              {([{ v: 'private', label: '💬 Privados' }, { v: 'group', label: '👥 Grupos' }] as const).map(({ v, label }) => (
-                <button
-                  key={v}
-                  onClick={() => setChatTypeFilter(chatTypeFilter === v ? 'all' : v as any)}
-                  className={`flex-1 text-[10px] py-1 rounded-lg font-semibold border transition-all ${
-                    chatTypeFilter === v
-                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                      : 'bg-slate-50 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-emerald-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Search and Actions */}
@@ -1492,7 +1464,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             <Download className="w-4 h-4" />
                           </a>
                         </div>
-                      ) : msg.media_type?.includes('audio') ? (
+                      ) : (msg.media_type?.includes('audio') || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(ogg|mp3|wav|m4a)$/i))) ? (
                         <div className="flex flex-col gap-1 min-w-[200px] p-1">
                           <div className="flex justify-between items-center mb-1">
                             <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">
@@ -1514,7 +1486,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             Seu navegador não suporta áudio.
                           </audio>
                         </div>
-                      ) : msg.media_type?.includes('video') ? (
+                      ) : (msg.media_type?.includes('video') || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(mp4|mov|avi|webm)$/i))) ? (
                         <div className="relative group rounded-xl overflow-hidden shadow-sm cursor-pointer" onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'video' })}>
                           <video 
                             className="max-h-[250px] max-w-[200px] md:max-w-[300px] object-cover pointer-events-none"
