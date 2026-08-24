@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     BanknotesIcon, 
     PlusIcon, 
@@ -10,35 +10,68 @@ import {
     CurrencyDollarIcon,
     CalendarDaysIcon
 } from '../components/icons';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscriptions' | 'contracts';
 
 const CRMSales: React.FC<{ initialTab?: SalesTab }> = ({ initialTab = 'invoices' }) => {
+    const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<SalesTab>(initialTab);
     const [searchQuery, setSearchQuery] = useState('');
+    const [data, setData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const tabs = [
-        { id: 'proposals', label: 'Propostas', icon: DocumentTextIcon },
-        { id: 'estimates', label: 'Estimativas', icon: DocumentTextIcon },
-        { id: 'invoices', label: 'Faturas', icon: BanknotesIcon },
-        { id: 'payments', label: 'Pagamentos', icon: CurrencyDollarIcon },
-        { id: 'subscriptions', label: 'Assinaturas', icon: CalendarDaysIcon },
-        { id: 'contracts', label: 'Contratos', icon: DocumentTextIcon },
+        { id: 'proposals', label: 'Propostas', icon: DocumentTextIcon, table: 'crm_proposals' },
+        { id: 'estimates', label: 'Estimativas', icon: DocumentTextIcon, table: 'crm_estimates' },
+        { id: 'invoices', label: 'Faturas', icon: BanknotesIcon, table: 'crm_invoices' },
+        { id: 'payments', label: 'Pagamentos', icon: CurrencyDollarIcon, table: 'crm_payments' },
+        { id: 'subscriptions', label: 'Assinaturas', icon: CalendarDaysIcon, table: 'crm_subscriptions' },
+        { id: 'contracts', label: 'Contratos', icon: DocumentTextIcon, table: 'crm_contracts' },
     ];
+
+    const fetchData = async () => {
+        if (!currentUser?.company_id) return;
+
+        try {
+            setLoading(true);
+            const currentTab = tabs.find(t => t.id === activeTab);
+            if (!currentTab) return;
+
+            let query = supabase
+                .from(currentTab.table)
+                .select('*, customer:crm_customers(name), project:crm_projects(name)')
+                .eq('company_id', currentUser.company_id);
+
+            if (activeTab === 'contracts') {
+                query = supabase
+                    .from('crm_contracts')
+                    .select('*, customer:crm_customers(name)')
+                    .eq('company_id', currentUser.company_id);
+            }
+
+            const { data: result, error } = await query;
+
+            if (error) throw error;
+            setData(result || []);
+        } catch (error) {
+            console.error(`Error fetching ${activeTab}:`, error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [activeTab, currentUser?.company_id]);
 
     const stats = {
         invoices: [
-            { label: 'Não pago', count: 3, amount: 'US$ 1.956,00', color: 'text-red-500' },
-            { label: 'Não enviado', count: 7, amount: 'US$ 32.256,00', color: 'text-gray-500' },
-            { label: 'Parcialmente pago', count: 4, amount: 'US$ 2.450,00', color: 'text-orange-500' },
-            { label: 'Atrasado', count: 0, amount: 'US$ 0,00', color: 'text-red-600' },
-            { label: 'Pago', count: 4, amount: 'US$ 37.590,00', color: 'text-emerald-500' },
+            { label: 'Total', count: data.length, amount: `R$ ${data.reduce((acc, curr) => acc + (curr.total || 0), 0).toLocaleString()}`, color: 'text-blue-500' },
+            { label: 'Não pago', count: data.filter(d => d.status === 'unpaid').length, color: 'text-red-500' },
+            { label: 'Pago', count: data.filter(d => d.status === 'paid').length, color: 'text-emerald-500' },
         ],
-        contracts: [
-            { label: 'Ativo', count: 5, color: 'text-emerald-500' },
-            { label: 'Expirado', count: 1, color: 'text-red-500' },
-            { label: 'Sobre a expiração', count: 2, color: 'text-orange-500' },
-        ]
     };
 
     return (
@@ -122,43 +155,59 @@ const CRMSales: React.FC<{ initialTab?: SalesTab }> = ({ initialTab = 'invoices'
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800 text-xs">
-                            <tr className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 font-bold text-blue-500">INV-000001</td>
-                                <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">$ 4.412,00</td>
-                                <td className="px-6 py-4 text-gray-400">$ 0,00</td>
-                                <td className="px-6 py-4 text-gray-500">27/02/2026</td>
-                                <td className="px-6 py-4 text-blue-500 font-medium">Carroll-Hyatt</td>
-                                <td className="px-6 py-4 text-gray-400">-</td>
-                                <td className="px-6 py-4 text-gray-500">27/03/2026</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-bold">Parcialmente pago</span>
-                                </td>
-                            </tr>
-                            <tr className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 font-bold text-blue-500">INV-000002</td>
-                                <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">$ 1.250,50</td>
-                                <td className="px-6 py-4 text-gray-400">$ 12,00</td>
-                                <td className="px-6 py-4 text-gray-500">26/02/2026</td>
-                                <td className="px-6 py-4 text-blue-500 font-medium">Schmidt PLC</td>
-                                <td className="px-6 py-4 text-gray-400">PandaNet Redesign</td>
-                                <td className="px-6 py-4 text-gray-500">26/03/2026</td>
-                                <td className="px-6 py-4">
-                                    <span className="px-2 py-1 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[10px] font-bold">Rascunho</span>
-                                </td>
-                            </tr>
+                            {data.map((item, idx) => (
+                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                                    <td className="px-6 py-4 font-bold text-blue-500">
+                                        {activeTab === 'invoices' ? `INV-${item.id.slice(0, 6)}` :
+                                            activeTab === 'proposals' ? `PROP-${item.id.slice(0, 6)}` :
+                                                activeTab === 'estimates' ? `EST-${item.id.slice(0, 6)}` : item.id.slice(0, 8)}
+                                    </td>
+                                    <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
+                                        {item.total ? `R$ ${item.total.toLocaleString()}` :
+                                            item.value ? `R$ ${item.value.toLocaleString()}` : '-'}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-400">
+                                        {item.total_tax ? `R$ ${item.total_tax.toLocaleString()}` : 'R$ 0,00'}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-500">
+                                        {new Date(item.date || item.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 text-blue-500 font-medium">
+                                        {item.customer?.name || item.customer_id || '-'}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-400">
+                                        {item.project?.name || '-'}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-500">
+                                        {item.duedate || item.open_till ? new Date(item.duedate || item.open_till).toLocaleDateString() : '-'}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${['paid', 'accepted', 'active'].includes(item.status) ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' :
+                                                ['unpaid', 'declined', 'expired'].includes(item.status) ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
+                                                    'bg-orange-100 dark:bg-orange-900/30 text-orange-600'
+                                            }`}>
+                                            {item.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {data.length === 0 && !loading && (
+                                <tr>
+                                    <td colSpan={8} className="px-6 py-20 text-center text-gray-500">Nenhum registro encontrado.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
-                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-full">
-                        <MagnifyingGlassIcon className="w-8 h-8 text-gray-300" />
+                {loading && (
+                    <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
+                        <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-full animate-pulse">
+                            <ArrowPathIcon className="w-8 h-8 text-gray-300 animate-spin" />
+                        </div>
+                        <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Carregando dados...</p>
                     </div>
-                    <div>
-                        <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Fim dos dados</p>
-                        <p className="text-gray-300 text-[10px] mt-1">Carregando mais informações do banco de dados...</p>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );

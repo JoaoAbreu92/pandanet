@@ -19,9 +19,10 @@ interface AdminPageProps {
     setCompany: (company: Company) => void;
     plan: Plan;
     customFeatures?: Record<string, boolean>;
+    onNavigate?: (page: any) => void;
 }
 
-const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures }) => {
+const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [activeCategory, setActiveCategory] = useState('Conteúdo');
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -137,6 +138,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
 
         { id: 'forms', label: 'Formulários', category: 'Operações' },
         { id: 'marketplace', label: 'Marketplace', category: 'Operações', featureId: 'marketplace' },
+        { id: 'crm_settings', label: 'CRM / Vendas', category: 'Operações', featureId: 'crm' },
         { id: 'bem-estar', label: 'Bem Estar', category: 'Operações', featureId: 'wellness' },
         { id: 'kpis', label: 'Metas/KPIs', category: 'Operações', featureId: 'kpis' },
 
@@ -343,6 +345,15 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.current} / {i.target} {i.unit}</p></div>}
                 />;
+            case 'crm_settings':
+                return <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Configurações do CRM</h3>
+                    <p className="text-sm text-gray-500 mb-6">O módulo de CRM está ativo para sua empresa. Você pode gerenciar clientes e vendas através do menu lateral.</p>
+                    <div className="flex gap-4">
+                        <button onClick={() => onNavigate?.('crm-dashboard')} className="px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-bold">Ir para Dashboard CRM</button>
+                        <button onClick={() => onNavigate?.('crm-customers')} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold">Gerenciar Clientes</button>
+                    </div>
+                </div>;
             default:
                 return null;
         }

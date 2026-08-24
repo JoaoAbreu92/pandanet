@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -6,11 +6,13 @@ import interactionPlugin from '@fullcalendar/interaction';
 import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { PlusIcon, XMarkIcon, ClockIcon, MapPinIcon, Bars3BottomLeftIcon } from '../components/icons';
 import { useAuth } from './AuthContext';
+import { supabase } from '../supabaseClient';
 
 const CRMCalendar: React.FC = () => {
     const { currentUser } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -19,55 +21,91 @@ const CRMCalendar: React.FC = () => {
         priority: 'medium'
     });
 
-    const [events, setEvents] = useState([
-        {
-            id: '1',
-            title: 'Revisão de Faturas - Carroll-Hyatt',
-            start: '2026-02-27T10:00:00',
-            end: '2026-02-27T12:00:00',
-            backgroundColor: '#3b82f6',
-            borderColor: '#3b82f6',
-            extendedProps: { priority: 'high', type: 'task' }
-        },
-        {
-            id: '2',
-            title: 'Call com Lead: João Silva',
-            start: '2026-02-27T14:30:00',
-            end: '2026-02-27T15:30:00',
-            backgroundColor: '#10b981',
-            borderColor: '#10b981',
-            extendedProps: { priority: 'medium', type: 'event' }
-        },
-        {
-            id: '3',
-            title: 'Entrega Projeto PandaNet v2',
-            start: '2026-02-28',
-            allDay: true,
-            backgroundColor: '#ef4444',
-            borderColor: '#ef4444',
-            extendedProps: { priority: 'urgent', type: 'project' }
+    const [events, setEvents] = useState<any[]>([]);
+
+    const fetchTasks = async () => {
+        if (!currentUser?.company_id) return;
+
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('crm_tasks')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
+
+            if (error) throw error;
+
+            const calendarEvents = (data || []).map(task => ({
+                id: task.id,
+                title: task.title,
+                start: task.start_date,
+                end: task.due_date,
+                backgroundColor: task.priority === 'high' ? '#f59e0b' : task.priority === 'urgent' ? '#ef4444' : '#3b82f6',
+                borderColor: 'transparent',
+                extendedProps: { ...task }
+            }));
+
+            setEvents(calendarEvents);
+        } catch (error) {
+            console.error('Error fetching tasks:', error);
+        } finally {
+            setLoading(false);
         }
-    ]);
+    };
+
+    useEffect(() => {
+        fetchTasks();
+    }, [currentUser?.company_id]);
 
     const handleDateClick = (arg: any) => {
         setSelectedDate(arg.dateStr);
         setIsModalOpen(true);
     };
 
-    const handleSaveTask = (e: React.FormEvent) => {
+    const handleSaveTask = async (e: React.FormEvent) => {
         e.preventDefault();
-        const newEvent = {
-            id: Date.now().toString(),
-            title: formData.title,
-            start: `${selectedDate}T${formData.startTime}:00`,
-            end: `${selectedDate}T${formData.endTime}:00`,
-            backgroundColor: formData.priority === 'high' ? '#f59e0b' : formData.priority === 'urgent' ? '#ef4444' : '#3b82f6',
-            borderColor: 'transparent',
-            extendedProps: { priority: formData.priority, type: 'task' }
-        };
-        setEvents([...events, newEvent]);
-        setIsModalOpen(false);
-        setFormData({ title: '', description: '', startTime: '09:00', endTime: '10:00', priority: 'medium' });
+        if (!currentUser?.company_id || !selectedDate) return;
+
+        try {
+            const startDateTime = `${selectedDate}T${formData.startTime}:00Z`;
+            const endDateTime = `${selectedDate}T${formData.endTime}:00Z`;
+
+            const { data, error } = await supabase
+                .from('crm_tasks')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    title: formData.title,
+                    description: formData.description,
+                    start_date: startDateTime,
+                    due_date: endDateTime,
+                    priority: formData.priority,
+                    created_by: currentUser.id,
+                    status: 'not_started'
+                }])
+                .select();
+
+            if (error) throw error;
+
+            if (data && data[0]) {
+                const newTask = data[0];
+                const newEvent = {
+                    id: newTask.id,
+                    title: newTask.title,
+                    start: newTask.start_date,
+                    end: newTask.due_date,
+                    backgroundColor: newTask.priority === 'high' ? '#f59e0b' : newTask.priority === 'urgent' ? '#ef4444' : '#3b82f6',
+                    borderColor: 'transparent',
+                    extendedProps: { ...newTask }
+                };
+                setEvents([...events, newEvent]);
+            }
+
+            setIsModalOpen(false);
+            setFormData({ title: '', description: '', startTime: '09:00', endTime: '10:00', priority: 'medium' });
+        } catch (error) {
+            console.error('Error saving task:', error);
+            alert('Erro ao salvar tarefa. Verifique o console.');
+        }
     };
 
     return (

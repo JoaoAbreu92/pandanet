@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     PlusIcon, 
     ArrowPathIcon, 
@@ -14,32 +14,60 @@ import {
     UserCircleIcon,
     IdentificationIcon
 } from '../components/icons';
+import { useAuth } from './AuthContext';
+import { supabase } from '../supabaseClient';
+import { CRMCustomer } from '../types';
 
 const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }) => {
+    const { currentUser } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
+    const [customers, setCustomers] = useState<CRMCustomer[]>([]);
+    const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'active' | 'inactive' | 'all'>('all');
 
+    const fetchCustomers = async () => {
+        if (!currentUser?.company_id) return;
+
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('crm_customers')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
+
+            if (error) throw error;
+            setCustomers(data || []);
+        } catch (error) {
+            console.error('Error fetching customers:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCustomers();
+    }, [currentUser?.company_id]);
+
+    const activeCustomers = customers.filter(c => c.status === 'active');
+    const inactiveCustomers = customers.filter(c => c.status === 'inactive');
+
     const stats = [
-        { label: 'Total de clientes', value: 10, color: 'text-blue-500' },
-        { label: 'Clientes Ativos', value: 10, color: 'text-emerald-500' },
-        { label: 'Clientes Inativos', value: 0, color: 'text-red-500' },
-        { label: 'Contatos Ativos', value: 10, color: 'text-blue-500' },
-        { label: 'Contatos Inativos', value: 0, color: 'text-red-500' },
+        { label: 'Total de clientes', value: customers.length, color: 'text-blue-500' },
+        { label: 'Clientes Ativos', value: activeCustomers.length, color: 'text-emerald-500' },
+        { label: 'Clientes Inativos', value: inactiveCustomers.length, color: 'text-red-500' },
+        { label: 'Contatos Ativos', value: activeCustomers.length, color: 'text-blue-500' },
+        { label: 'Contatos Inativos', value: inactiveCustomers.length, color: 'text-red-500' },
         { label: 'Contatos logados hoje', value: 0, color: 'text-gray-500' },
     ];
 
-    const customers = [
-        { id: 1, company: 'Bednar LLC', contact: 'Ewell Bashirian', email: 'client@test.com', phone: '1-908-628-0123', active: true, groups: [], created: '27/02/2026 00:00:21' },
-        { id: 9, company: 'Bergnaum-Raynor', contact: 'César Crona', email: 'giovanny.beier@example.com', phone: '1-415-867-3143', active: true, groups: ['Alto orçamento'], created: '27/02/2026 00:00:21' },
-        { id: 6, company: 'Carroll-Hyatt', contact: 'Vidal Denesik', email: 'damaris12@example.com', phone: '(936) 355-5000', active: true, groups: ['Alto orçamento', 'Atacadista'], created: '27/02/2026 00:00:21' },
-        { id: 7, company: 'Fay-Bogisich', contact: 'Dillon Hodkiewicz', email: 'hahn.ena@example.org', phone: '623-232-5028', active: true, groups: ['Atacadista'], created: '27/02/2026 00:00:21' },
-        { id: 8, company: 'Gorczany, McLaughlin e Hills', contact: 'Zackary Oberbrunner', email: 'lilyan.haag@example.com', phone: '+19305944717', active: true, groups: ['Baixo orçamento', 'Alto orçamento'], created: '27/02/2026 00:00:21' },
-        { id: 5, company: 'Hamill, Bosco e Rosenbaum', contact: 'Norval Leannon', email: 'annabel22@example.net', phone: '+1-708-733-4261', active: true, groups: ['Alto orçamento'], created: '27/02/2026 00:00:21' },
-        { id: 3, company: 'Homem Ltda', contact: 'Bloco Rowland', email: 'terry.lang@example.org', phone: '580-204-2615', active: true, groups: ['Baixo orçamento'], created: '27/02/2026 00:00:21' },
-        { id: 10, company: 'Runolfsdottir PLC', contact: 'Adrian Cartwright', email: 'gilbert.schoen@example.com', phone: '458-484-1347', active: true, groups: ['Baixo orçamento', 'Alto orçamento'], created: '27/02/2026 00:00:21' },
-        { id: 2, company: 'Schmidt PLC', contact: 'Kameron Rutherford', email: 'doyle.yolanda@example.com', phone: '(423) 493-9891', active: true, groups: ['VIP', 'Atacadista'], created: '27/02/2026 00:00:21' },
-        { id: 4, company: 'Stracke Ltda', contact: 'Ansel Wilderman', email: 'bwehner@example.com', phone: '1-770-500-9138', active: true, groups: ['VIP', 'Atacadista'], created: '27/02/2026 00:00:21' },
-    ];
+    const filteredCustomers = customers.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (c.email?.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesView = viewMode === 'all' ||
+            (viewMode === 'active' && c.status === 'active') ||
+            (viewMode === 'inactive' && c.status === 'inactive');
+        return matchesSearch && matchesView;
+    });
 
     return (
         <div className="p-4 md:p-8 bg-gray-50 dark:bg-slate-950 min-h-full space-y-6">
@@ -120,15 +148,15 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800 text-xs">
-                            {customers.map((c) => (
+                            {filteredCustomers.map((c, idx) => (
                                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors group">
                                     <td className="px-6 py-4">
                                         <input type="checkbox" className="rounded border-gray-300 dark:bg-slate-800" />
                                     </td>
-                                    <td className="px-6 py-4 text-gray-400 font-medium">{c.id}</td>
+                                    <td className="px-6 py-4 text-gray-400 font-medium">{idx + 1}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-gray-700 dark:text-slate-200 group-hover:text-blue-500 cursor-pointer">{c.company}</span>
+                                            <span className="font-bold text-gray-700 dark:text-slate-200 group-hover:text-blue-500 cursor-pointer">{c.name}</span>
                                             <div className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button className="text-[10px] text-gray-400 hover:text-blue-500 font-bold uppercase transition-colors">Editar</button>
                                                 <span className="text-gray-200 dark:text-slate-800">|</span>
@@ -139,27 +167,27 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
                                     <td className="px-6 py-4 items-center">
                                         <div className="flex items-center gap-2">
                                             <UserCircleIcon className="w-4 h-4 text-gray-300" />
-                                            <span className="text-gray-600 dark:text-slate-300 font-medium">{c.contact}</span>
+                                            <span className="text-gray-600 dark:text-slate-300 font-medium">{c.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-blue-500 hover:underline cursor-pointer">{c.email}</td>
-                                    <td className="px-6 py-4 text-gray-500">{c.phone}</td>
+                                    <td className="px-6 py-4 text-blue-500 hover:underline cursor-pointer">{c.email || '-'}</td>
+                                    <td className="px-6 py-4 text-gray-500">{c.phone || '-'}</td>
                                     <td className="px-6 py-4">
                                         <div className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={c.active} readOnly className="sr-only peer" />
+                                            <input type="checkbox" checked={c.status === 'active'} readOnly className="sr-only peer" />
                                             <div className="w-9 h-5 bg-gray-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-wrap gap-1">
-                                            {c.groups.map((g, i) => (
+                                            {c.groups?.map((g, i) => (
                                                 <span key={i} className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[10px] border border-gray-200 dark:border-slate-700">
                                                     {g}
                                                 </span>
                                             ))}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-gray-400">{c.created}</td>
+                                    <td className="px-6 py-4 text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
                                 </tr>
                             ))}
                         </tbody>

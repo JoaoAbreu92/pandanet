@@ -46,43 +46,117 @@ const CRMDashboard: React.FC = () => {
     const { currentUser } = useAuth();
     const { t } = useLanguage();
     const [stats, setStats] = useState<DashboardStats>({
-        totalInvoices: 11,
-        paidInvoices: 7,
-        convertedLeads: 7,
-        activeProjects: 4,
-        completedTasks: 46,
-        totalTasks: 62
+        totalInvoices: 0,
+        paidInvoices: 0,
+        convertedLeads: 0,
+        activeProjects: 0,
+        completedTasks: 0,
+        totalTasks: 0
     });
-
+    const [invoiceVision, setInvoiceVision] = useState<any[]>([]);
+    const [leadVision, setLeadVision] = useState<any[]>([]);
+    const [recentTasks, setRecentTasks] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Mock Data for Vision Charts
-    const invoiceVisionData = [
-        { name: 'Rascunho', value: 0, percentage: 0, color: '#94a3b8' },
-        { name: 'Não enviado', value: 7, percentage: 63, color: '#475569' },
-        { name: 'Não pago', value: 3, percentage: 27, color: '#ef4444' },
-        { name: 'Parcialmente pago', value: 4, percentage: 36, color: '#f59e0b' },
-        { name: 'Atrasado', value: 0, percentage: 0, color: '#dc2626' },
-        { name: 'Pago', value: 4, percentage: 36, color: '#10b981' },
-    ];
-
-    const leadVisionData = [
-        { name: 'Novo', value: 15, color: '#3b82f6' },
-        { name: 'Contactado', value: 10, color: '#6366f1' },
-        { name: 'Qualificado', value: 8, color: '#8b5cf6' },
-        { name: 'Trabalhando', value: 12, color: '#10b981' },
-        { name: 'Proposta Enviada', value: 5, color: '#f59e0b' },
-        { name: 'Cliente', value: 7, color: '#84cc16' },
-        { name: 'Leads Perdidos', value: 3, color: '#ef4444' },
-    ];
-
     useEffect(() => {
-        // Here we would fetch real data from Supabase
-        const fetchStats = async () => {
-            setLoading(false);
+        const fetchDashboardData = async () => {
+            if (!currentUser?.company_id) return;
+
+            try {
+                setLoading(true);
+
+                // 1. Fetch Invoices
+                const { data: invoices } = await supabase
+                    .from('crm_invoices')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                // 2. Fetch Leads
+                const { data: leads } = await supabase
+                    .from('crm_leads')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                // 3. Fetch Projects
+                const { data: projects } = await supabase
+                    .from('crm_projects')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                // 4. Fetch Tasks
+                const { data: tasks } = await supabase
+                    .from('crm_tasks')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                // Calculate Stats
+                if (invoices && leads && projects && tasks) {
+                    const totalInv = invoices.length;
+                    const paidInv = invoices.filter(i => i.status === 'paid').length;
+                    const convLeads = leads.filter(l => l.status === 'customer' || l.converted).length;
+                    const activeProj = projects.filter(p => p.status === 'in_progress' || p.status === 'not_started').length;
+                    const completedT = tasks.filter(t => t.status === 'completed').length;
+
+                    setStats({
+                        totalInvoices: totalInv,
+                        paidInvoices: paidInv,
+                        convertedLeads: convLeads,
+                        activeProjects: activeProj,
+                        completedTasks: completedT,
+                        totalTasks: tasks.length
+                    });
+
+                    // Vision Data - Invoices
+                    const invStatuses = [
+                        { id: 'draft', name: 'Rascunho', color: '#94a3b8' },
+                        { id: 'unpaid', name: 'Não pago', color: '#ef4444' },
+                        { id: 'partially_paid', name: 'Parcialmente pago', color: '#f59e0b' },
+                        { id: 'overdue', name: 'Atrasado', color: '#dc2626' },
+                        { id: 'paid', name: 'Pago', color: '#10b981' },
+                    ];
+
+                    const newInvoiceVision = invStatuses.map(s => {
+                        const count = invoices.filter(i => i.status === s.id).length;
+                        return {
+                            name: s.name,
+                            value: count,
+                            percentage: totalInv > 0 ? Math.round((count / totalInv) * 100) : 0,
+                            color: s.color
+                        };
+                    });
+                    setInvoiceVision(newInvoiceVision);
+
+                    // Vision Data - Leads
+                    const leadStatuses = [
+                        { id: 'new', name: 'Novo', color: '#3b82f6' },
+                        { id: 'contacted', name: 'Contactado', color: '#6366f1' },
+                        { id: 'qualified', name: 'Qualificado', color: '#8b5cf6' },
+                        { id: 'working', name: 'Trabalhando', color: '#10b981' },
+                        { id: 'proposal_sent', name: 'Proposta Enviada', color: '#f59e0b' },
+                        { id: 'customer', name: 'Cliente', color: '#84cc16' },
+                        { id: 'lost', name: 'Leads Perdidos', color: '#ef4444' },
+                    ];
+                    setLeadVision(leadStatuses.map(s => ({
+                        name: s.name,
+                        value: leads.filter(l => l.status === s.id).length,
+                        color: s.color
+                    })));
+
+                    // Recent Tasks
+                    const sortedTasks = [...tasks].sort((a, b) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    ).slice(0, 5);
+                    setRecentTasks(sortedTasks);
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
         };
-        fetchStats();
-    }, []);
+
+        fetchDashboardData();
+    }, [currentUser?.company_id]);
 
     const StatWidget = ({ title, current, total, color, icon: Icon }: any) => (
         <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
@@ -178,7 +252,7 @@ const CRMDashboard: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Vision Cards Column */}
                 <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <VisionCard title="Visão geral da fatura" items={invoiceVisionData} icon={DocumentTextIcon} />
+                    <VisionCard title="Visão geral da fatura" items={invoiceVision} icon={DocumentTextIcon} />
                     <VisionCard title="Visão geral da estimativa" items={[
                         { name: 'Rascunho', value: 4, percentage: 40, color: '#94a3b8' },
                         { name: 'Não enviado', value: 4, percentage: 40, color: '#475569' },
@@ -233,12 +307,17 @@ const CRMDashboard: React.FC = () => {
                                     <ExclamationTriangleIcon className="w-3 h-3" />
                                     Últimas tarefas
                                 </div>
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className="group flex items-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-gray-100 dark:hover:border-slate-700">
-                                        <input type="checkbox" className="mt-1 rounded border-gray-300 dark:border-slate-700 dark:bg-slate-800 text-blue-500" />
+                                {recentTasks.map((task, i) => (
+                                    <div key={task.id || i} className="group flex items-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-gray-100 dark:hover:border-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={task.status === 'completed'}
+                                            onChange={() => { }} // TODO: Implement status update
+                                            className="mt-1 rounded border-gray-300 dark:border-slate-700 dark:bg-slate-800 text-blue-500"
+                                        />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs text-gray-700 dark:text-slate-300 line-clamp-2 leading-relaxed">Tarefa exemplo #{i}: Revisar propostas pendentes para novos clientes do setor de TI.</p>
-                                            <p className="text-[10px] text-gray-400 mt-1">27/02/2026 00:00:22</p>
+                                            <p className="text-xs text-gray-700 dark:text-slate-300 line-clamp-2 leading-relaxed">{task.title}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1">{new Date(task.created_at).toLocaleString()}</p>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button className="p-1 text-gray-400 hover:text-blue-500"><PencilSquareIcon className="w-3 h-3" /></button>
@@ -246,6 +325,9 @@ const CRMDashboard: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {recentTasks.length === 0 && (
+                                    <p className="text-xs text-gray-500 text-center py-4">Nenhuma tarefa recente encontrada.</p>
+                                )}
                             </div>
 
                             <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-slate-800">
@@ -253,12 +335,12 @@ const CRMDashboard: React.FC = () => {
                                     <CheckCircleIcon className="w-3 h-3" />
                                     Últimas tarefas concluídas
                                 </div>
-                                {[1, 2].map(i => (
-                                    <div key={i} className="flex items-start gap-3 p-2 opacity-60">
+                                {recentTasks.filter(t => t.status === 'completed').slice(0, 3).map((task, i) => (
+                                    <div key={task.id || i} className="flex items-start gap-3 p-2 opacity-60">
                                         <div className="mt-1 w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
                                             <CheckCircleIcon className="w-3 h-3" />
                                         </div>
-                                        <div className="flex-1 min-w-0 text-xs text-gray-500 line-through">Finalizado o suporte severamente.</div>
+                                        <div className="flex-1 min-w-0 text-xs text-gray-500 line-through">{task.title}</div>
                                     </div>
                                 ))}
                             </div>
@@ -275,7 +357,7 @@ const CRMDashboard: React.FC = () => {
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={leadVisionData}
+                                        data={leadVision}
                                         cx="50%"
                                         cy="50%"
                                         innerRadius={60}
@@ -283,7 +365,7 @@ const CRMDashboard: React.FC = () => {
                                         paddingAngle={5}
                                         dataKey="value"
                                     >
-                                        {leadVisionData.map((entry, index) => (
+                                        {leadVision.map((entry: any, index: number) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -295,7 +377,7 @@ const CRMDashboard: React.FC = () => {
                             </ResponsiveContainer>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-4">
-                            {leadVisionData.map((item, idx) => (
+                            {leadVision.map((item: any, idx: number) => (
                                 <div key={idx} className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-slate-400">
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                                     <span className="truncate">{item.name}</span>
@@ -327,22 +409,38 @@ const CRMDashboard: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800 text-xs">
-                            {[1, 2, 3, 4].map(idx => (
-                                <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                                    <td className="px-6 py-4 text-gray-400">{idx * 15}</td>
+                            {recentTasks.map((task, idx) => (
+                                <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                                    <td className="px-6 py-4 text-gray-400">{idx + 1}</td>
                                     <td className="px-6 py-4">
-                                        <p className="font-semibold text-gray-700 dark:text-slate-300">Corrigir um problema aberto em nosso software</p>
-                                        <p className="text-[10px] text-gray-400 mt-0.5">#4 - Redesenho do site - Carroll-Hyatt</p>
+                                        <p className="font-semibold text-gray-700 dark:text-slate-300">{task.title}</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{task.rel_type ? `#${task.rel_id} - ${task.rel_type}` : 'Tarefa Geral'}</p>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold">Em andamento</span>
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${task.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600' :
+                                            task.status === 'in_progress' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' :
+                                                'bg-gray-50 dark:bg-slate-800 text-gray-600'
+                                            }`}>
+                                            {task.status === 'not_started' ? 'Não Iniciado' :
+                                                task.status === 'in_progress' ? 'Em Andamento' :
+                                                    task.status === 'awaiting_feedback' ? 'Aguardando Feedback' :
+                                                        task.status === 'completed' ? 'Concluído' : task.status}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-4 text-gray-500">27/02/2026</td>
+                                    <td className="px-6 py-4 text-gray-500">{task.start_date ? new Date(task.start_date).toLocaleDateString() : '-'}</td>
                                     <td className="px-6 py-4">
-                                        <span className="text-gray-400 font-medium">Baixa</span>
+                                        <span className={`font-medium ${task.priority === 'urgent' ? 'text-red-600' :
+                                            task.priority === 'high' ? 'text-orange-500' :
+                                                task.priority === 'medium' ? 'text-blue-500' : 'text-gray-400'
+                                            }`}>{task.priority}</span>
                                     </td>
                                 </tr>
                             ))}
+                            {recentTasks.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Nenhuma tarefa encontrada.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

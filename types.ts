@@ -773,6 +773,7 @@ export interface CRMCustomer {
   id: string;
   company_id: string;
   name: string;
+  email?: string;
   vat?: string;
   phone?: string;
   website?: string;
@@ -831,5 +832,28 @@ export interface CRMProposal {
   open_till: string;
   total: number;
   currency: string;
+  created_at: string;
+}
+
+export interface CRMLead {
+  id: string;
+  company_id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  source?: string;
+  status: 'new' | 'contacted' | 'qualified' | 'working' | 'proposal_sent' | 'customer' | 'lost';
+  assigned_to?: string;
+  created_at: string;
+}
+
+export interface CRMProject {
+  id: string;
+  company_id: string;
+  name: string;
+  customer_id: string;
+  status: 'not_started' | 'in_progress' | 'on_hold' | 'cancelled' | 'finished';
+  start_date?: string;
+  deadline?: string;
   created_at: string;
 }

@@ -8,30 +8,83 @@ import {
     GlobeAltIcon,
     MapPinIcon,
     PhoneIcon,
-    GlobeAsiaAustraliaIcon
+    GlobeAsiaAustraliaIcon,
+    IdentificationIcon
 } from '../components/icons';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
-const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const CRMNewCustomerForm: React.FC<{ onClose: () => void; onSuccess?: () => void }> = ({ onClose, onSuccess }) => {
+    const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<'details' | 'billing'>('details');
+    const [loading, setLoading] = useState(false);
+
     const [formData, setFormData] = useState({
         company: '',
         vat: '',
         phone: '',
         website: '',
-        groups: '',
-        currency: 'Padrão do sistema',
-        language: 'Padrão do sistema',
+        groups: [] as string[],
+        currency: 'BRL',
+        language: 'Portuguese',
         address: '',
         city: '',
         state: '',
         zip: '',
-        country: 'Brasil'
+        country: 'Brasil',
+        billing_address: {
+            address: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'Brasil'
+        },
+        shipping_address: {
+            address: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'Brasil'
+        }
     });
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Lógica de salvamento aqui
-        onClose();
+        if (!currentUser?.company_id) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('crm_customers')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    name: formData.company,
+                    vat: formData.vat,
+                    phone: formData.phone,
+                    website: formData.website,
+                    groups: formData.groups,
+                    currency: formData.currency,
+                    default_language: formData.language,
+                    address: formData.address,
+                    city: formData.city,
+                    state: formData.state,
+                    zip: formData.zip,
+                    country: formData.country,
+                    billing_address: formData.billing_address,
+                    shipping_address: formData.shipping_address,
+                    status: 'active'
+                }]);
+
+            if (error) throw error;
+
+            if (onSuccess) onSuccess();
+            onClose();
+        } catch (error) {
+            console.error('Error saving customer:', error);
+            alert('Erro ao salvar cliente. Verifique o console.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -70,6 +123,8 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <input 
                                             required
                                             type="text" 
+                                            value={formData.company}
+                                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                                             className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="Ex: Nome da Empresa Ltda"
                                         />
@@ -81,6 +136,8 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <IdentificationIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                                         <input 
                                             type="text" 
+                                            value={formData.vat}
+                                            onChange={(e) => setFormData({ ...formData, vat: e.target.value })}
                                             className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="00.000.000/0001-00"
                                         />
@@ -92,6 +149,8 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                                         <input 
                                             type="tel" 
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                             className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="+55 (11) 99999-9999"
                                         />
@@ -103,6 +162,8 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <GlobeAltIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                                         <input 
                                             type="url" 
+                                            value={formData.website}
+                                            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                                             className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="https://www.empresa.com.br"
                                         />
@@ -112,11 +173,15 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Grupos</label>
                                     <div className="flex items-center gap-2">
                                         <div className="relative flex-1">
-                                            <select className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                                                <option>Nada selecionado</option>
-                                                <option>Alto orçamento</option>
-                                                <option>Atacadista</option>
-                                                <option>VIP</option>
+                                            <select
+                                                value={formData.groups[0] || ''}
+                                                onChange={(e) => setFormData({ ...formData, groups: e.target.value ? [e.target.value] : [] })}
+                                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                                            >
+                                                <option value="">Nada selecionado</option>
+                                                <option value="Alto orçamento">Alto orçamento</option>
+                                                <option value="Atacadista">Atacadista</option>
+                                                <option value="VIP">VIP</option>
                                             </select>
                                             <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                         </div>
@@ -129,10 +194,14 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Moeda</label>
                                     <div className="relative">
                                         <BanknotesIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                                        <select className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                                            <option>BRL - Real</option>
-                                            <option>USD - Dólar</option>
-                                            <option>EUR - Euro</option>
+                                        <select
+                                            value={formData.currency}
+                                            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                                        >
+                                            <option value="BRL">BRL - Real</option>
+                                            <option value="USD">USD - Dólar</option>
+                                            <option value="EUR">EUR - Euro</option>
                                         </select>
                                         <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     </div>
@@ -141,37 +210,66 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Idioma padrão</label>
                                     <div className="relative">
                                         <GlobeAsiaAustraliaIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                                        <select className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                                            <option>Português</option>
-                                            <option>Inglês</option>
-                                            <option>Espanhol</option>
+                                        <select
+                                            value={formData.language}
+                                            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                                        >
+                                            <option value="Portuguese">Português</option>
+                                            <option value="English">Inglês</option>
+                                            <option value="Spanish">Espanhol</option>
                                         </select>
                                         <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     </div>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Endereço</label>
-                                    <textarea rows={3} className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none no-scrollbar" placeholder="Rua, número, complemento..."></textarea>
+                                    <textarea
+                                        rows={3}
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none no-scrollbar"
+                                        placeholder="Rua, número, complemento..."
+                                    ></textarea>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Cidade</label>
-                                    <input type="text" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    <input
+                                        type="text"
+                                        value={formData.city}
+                                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Estado</label>
-                                    <input type="text" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    <input
+                                        type="text"
+                                        value={formData.state}
+                                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Código postal</label>
-                                    <input type="text" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    <input
+                                        type="text"
+                                        value={formData.zip}
+                                        onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">País</label>
                                     <div className="relative">
-                                        <select className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                                            <option>Brasil</option>
-                                            <option>Portugal</option>
-                                            <option>Estados Unidos</option>
+                                        <select
+                                            value={formData.country}
+                                            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                                        >
+                                            <option value="Brasil">Brasil</option>
+                                            <option value="Portugal">Portugal</option>
+                                            <option value="Estados Unidos">Estados Unidos</option>
                                         </select>
                                         <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     </div>
@@ -187,14 +285,43 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     <h3 className="font-bold text-gray-800 dark:text-white text-sm">Faturamento</h3>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                     <div className="md:col-span-2">
+                                        <div className="md:col-span-2">
                                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Endereço de Faturamento</label>
-                                        <textarea rows={2} className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"></textarea>
+                                            <textarea
+                                                rows={2}
+                                                value={formData.billing_address.address}
+                                                onChange={(e) => setFormData({ ...formData, billing_address: { ...formData.billing_address, address: e.target.value } })}
+                                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                            ></textarea>
                                     </div>
-                                    <input type="text" placeholder="Cidade" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="Estado" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="CEP" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="País" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
+                                        <input
+                                            type="text"
+                                            placeholder="Cidade"
+                                            value={formData.billing_address.city}
+                                            onChange={(e) => setFormData({ ...formData, billing_address: { ...formData.billing_address, city: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Estado"
+                                            value={formData.billing_address.state}
+                                            onChange={(e) => setFormData({ ...formData, billing_address: { ...formData.billing_address, state: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="CEP"
+                                            value={formData.billing_address.zip}
+                                            onChange={(e) => setFormData({ ...formData, billing_address: { ...formData.billing_address, zip: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="País"
+                                            value={formData.billing_address.country}
+                                            onChange={(e) => setFormData({ ...formData, billing_address: { ...formData.billing_address, country: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
                                 </div>
                             </div>
 
@@ -205,17 +332,49 @@ const CRMNewCustomerForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <MapPinIcon className="w-5 h-5 text-emerald-500" />
                                         <h3 className="font-bold text-gray-800 dark:text-white text-sm">Envio</h3>
                                     </div>
-                                    <button className="text-[10px] font-bold text-blue-500 uppercase tracking-wider hover:underline">Copiar faturamento</button>
+                                        <button
+                                            onClick={() => setFormData({ ...formData, shipping_address: { ...formData.billing_address } })}
+                                            className="text-[10px] font-bold text-blue-500 uppercase tracking-wider hover:underline"
+                                        >Copiar faturamento</button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                      <div className="md:col-span-2">
                                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Endereço de Envio</label>
-                                        <textarea rows={2} className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"></textarea>
+                                            <textarea
+                                                rows={2}
+                                                value={formData.shipping_address.address}
+                                                onChange={(e) => setFormData({ ...formData, shipping_address: { ...formData.shipping_address, address: e.target.value } })}
+                                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                            ></textarea>
                                     </div>
-                                    <input type="text" placeholder="Cidade" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="Estado" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="CEP" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
-                                    <input type="text" placeholder="País" className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none" />
+                                        <input
+                                            type="text"
+                                            placeholder="Cidade"
+                                            value={formData.shipping_address.city}
+                                            onChange={(e) => setFormData({ ...formData, shipping_address: { ...formData.shipping_address, city: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Estado"
+                                            value={formData.shipping_address.state}
+                                            onChange={(e) => setFormData({ ...formData, shipping_address: { ...formData.shipping_address, state: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="CEP"
+                                            value={formData.shipping_address.zip}
+                                            onChange={(e) => setFormData({ ...formData, shipping_address: { ...formData.shipping_address, zip: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="País"
+                                            value={formData.shipping_address.country}
+                                            onChange={(e) => setFormData({ ...formData, shipping_address: { ...formData.shipping_address, country: e.target.value } })}
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-sm outline-none"
+                                        />
                                 </div>
                             </div>
                         </div>
