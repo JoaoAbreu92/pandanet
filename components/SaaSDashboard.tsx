@@ -582,8 +582,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 return;
             }
 
-            console.log("[SaaS] Chamando RPC create_company_with_admin_final...");
-            const { data: rpcData, error: rpcError } = await supabase.rpc('create_company_with_admin_final', {
+            console.log("[SaaS] Chamando RPC create_company_with_admin_safe...");
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_company_with_admin_safe', {
                 p_company_name: formData.name,
                 p_company_domain: formData.domain,
                 p_company_cnpj: formData.cnpj || '',
