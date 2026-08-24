@@ -56,7 +56,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             // Fetch Plans
             const { data: plansData, error: plansError } = await supabase.from('plans').select('*');
             if (plansError) console.error('Error fetching plans', plansError);
-            else setLocalPlans(plansData || []);
+            else {
+                // Map raw DB snake_case to CamelCase interface
+                const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
+                    ...p,
+                    userLimit: p.user_limit,
+                    // price is likely 'price' in DB as well, keeping it if it exists, else defaulting
+                    price: p.price
+                }));
+                setLocalPlans(mappedPlans);
+            }
 
             // Fetch Companies
             const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)'); // Join plan
@@ -116,12 +125,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         } else if (type === 'edit' && company) {
             setFormData({ name: company.name, domain: company.domain });
         } else if (type === 'createPlan') {
-            setFormData({ name: '', users: '', conn: '', val: '' });
+            setFormData({ name: '', userLimit: '', price: '' });
             setFeaturesState({});
         } else if (type === 'editPlan' && planId) {
             const plan = localPlans.find(p => p.id === planId);
             if (plan) {
-                setFormData({ name: plan.name, users: plan.users, conn: plan.conn, val: plan.val });
+                setFormData({
+                    name: plan.name,
+                    userLimit: plan.userLimit,
+                    price: plan.price
+                });
                 setFeaturesState(plan.features || {});
             }
         } else if (type === 'config' && company) {
@@ -251,12 +264,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     };
 
     // 6. PLANS (Create/Edit)
-    // 6. PLANS (Create/Edit)
     const submitPlanForm = async () => {
         const planData = {
             name: formData.name,
-            user_limit: parseInt(formData.users) || 0,
-            price: parseFloat(formData.val) || 0,
+            user_limit: parseInt(formData.userLimit) || 0,
+            price: parseFloat(formData.price) || 0,
             features: featuresState
         };
 
@@ -423,7 +435,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                             <th className="px-6 py-4 text-center">Ações</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="text-xs divide-y divide-gray-50 dark:divide-gray-700/50">
+                                    <tbody className="text-xs divide-y divide-gray-5 dark:divide-gray-700/50">
                                         {filteredCompanies.map((comp, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                 <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{comp.name}</td>
@@ -470,7 +482,6 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                     <tr>
                                         <th className="px-6 py-4">Nome</th>
                                         <th className="px-6 py-4 text-center">Usuários</th>
-                                        <th className="px-6 py-4 text-center">Conexões</th>
                                         <th className="px-6 py-4 text-right">Valor</th>
                                         <th className="px-6 py-4 text-right">Ações</th>
                                     </tr>
@@ -479,9 +490,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                     {localPlans.map(plan => (
                                         <tr key={plan.id}>
                                             <td className="px-6 py-4 font-medium">{plan.name}</td>
-                                            <td className="px-6 py-4 text-center">{plan.users}</td>
-                                            <td className="px-6 py-4 text-center">{plan.conn}</td>
-                                            <td className="px-6 py-4 text-right">{plan.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                            <td className="px-6 py-4 text-center">{plan.userLimit}</td>
+                                            <td className="px-6 py-4 text-right">{(plan.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-3 text-green-500">
                                                     <button onClick={() => openModal('editPlan', null, plan.id)} className="hover:text-blue-600"><PencilIcon className="w-4 h-4" /></button>
@@ -589,10 +599,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                             <div className="space-y-3 mb-6">
                                 <h4 className="font-bold text-gray-700">Detalhes do Plano</h4>
                                 <input type="text" placeholder="Nome" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                <div className="grid grid-cols-3 gap-3">
-                                    <input type="number" placeholder="Max Usuários" value={formData.users || ''} onChange={(e) => handleInputChange('users', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                    <input type="number" placeholder="Max Conexões" value={formData.conn || ''} onChange={(e) => handleInputChange('conn', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                    <input type="number" placeholder="Valor (R$)" value={formData.val || ''} onChange={(e) => handleInputChange('val', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="number" placeholder="Max Usuários" value={formData.userLimit || ''} onChange={(e) => handleInputChange('userLimit', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                    <input type="number" placeholder="Valor (R$)" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border rounded text-sm" />
                                 </div>
                             </div>
                         )}
