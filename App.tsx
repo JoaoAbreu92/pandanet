@@ -135,6 +135,7 @@ const AppContent: React.FC = () => {
                                     name: p.full_name,
                                     email: p.email,
                                     avatarUrl: p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name)}&background=random`,
+                                    coverUrl: p.cover_url,
                                     role: p.role || 'Colaborador',
                                     team: p.team || p.department || 'Geral',
                                     isAdmin: p.is_admin || false,

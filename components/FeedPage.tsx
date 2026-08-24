@@ -540,9 +540,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     <Card title="" className="text-center pb-6">
                         <div className="relative mb-4">
                             {currentUser.coverUrl ? (
-                                <img src={currentUser.coverUrl} alt="Capa" className="h-20 w-full object-cover rounded-t-xl -mx-6 -mt-6 mb-10" />
+                                <img src={currentUser.coverUrl} alt="Capa" className="h-20 w-full object-cover rounded-t-xl -mx-6 -mt-6 mb-16" />
                             ) : (
-                                <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-10"></div>
+                                <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-16"></div>
                             )}
                             <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white absolute left-1/2 -translate-x-1/2 top-10 shadow-md object-cover" />
                         </div>

@@ -104,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     role: isMasterAdmin ? 'Super Admin' : (data.role || 'Visitante'),
                     team: isMasterAdmin ? 'Admin' : (data.team || 'Geral'),
                     avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name || 'User')}`,
+                    coverUrl: data.cover_url,
                     joinDate: data.join_date || new Date().toISOString(),
                     birthDate: data.birth_date || new Date().toISOString(),
                     isAdmin: isMasterAdmin ? true : (data.is_admin || false),
