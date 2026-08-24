@@ -375,7 +375,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                              </button>
                                          </div>
                                          
-                                         {currentUser.isAdmin && !isImpersonating && (
+                                         {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && !isImpersonating && (
                                              <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
                                                  <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
                                              </button>
