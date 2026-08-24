@@ -874,20 +874,25 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
 /**
  * Sobe Buffer/Base64 para o Supabase Storage
  */
-async function uploadMediaToSupabase(base64, mediatype, companyId) {
+async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = null, fileName = null) {
     try {
         if (!base64) return null;
         
         let ext = 'bin';
-        let contentType = 'application/octet-stream';
+        let contentType = mimeType || 'application/octet-stream';
         
-        if (mediatype === 'image') { ext = 'jpg'; contentType = 'image/jpeg'; }
-        else if (mediatype === 'audio') { ext = 'mp3'; contentType = 'audio/mpeg'; }
-        else if (mediatype === 'video') { ext = 'mp4'; contentType = 'video/mp4'; }
-        else if (mediatype === 'sticker') { ext = 'webp'; contentType = 'image/webp'; }
+        if (mediatype === 'image') { ext = 'jpg'; contentType = mimeType || 'image/jpeg'; }
+        else if (mediatype === 'audio') { ext = 'ogg'; contentType = mimeType || 'audio/ogg'; }
+        else if (mediatype === 'video') { ext = 'mp4'; contentType = mimeType || 'video/mp4'; }
+        else if (mediatype === 'sticker') { ext = 'webp'; contentType = mimeType || 'image/webp'; }
+        else if (fileName) {
+            const parts = fileName.split('.');
+            if (parts.length > 1) ext = parts.pop();
+        }
 
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-        const filePath = `received/${companyId}/${fileName}`;
+        const safeFileName = fileName ? fileName.replace(/[^a-zA-Z0-9.-]/g, '_') : `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const finalName = fileName ? `${Date.now()}_${safeFileName}` : safeFileName;
+        const filePath = `received/${companyId}/${finalName}`;
         console.log(`[STORAGE] Fazendo upload para: ${filePath} (MIME: ${contentType})`);
         
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
@@ -1001,17 +1006,22 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                    m.imageMessage?.caption || 
                    m.videoMessage?.caption || 
                    m.documentMessage?.caption ||
-                   message.text || "";
+            message.text || message?.message?.text || "";
 
         let mediaUrl = null;
         let mediaType = null;
+        let mimeType = null;
+        let fileName = null;
         const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
         
         if (mediaMsg) {
             mediaType = m.imageMessage ? 'image' : 
                         m.audioMessage ? 'audio' : 
                         m.videoMessage ? 'video' : 
-                        m.stickerMessage ? 'sticker' : 'file';
+                        m.stickerMessage ? 'sticker' : 'document';
+
+            mimeType = mediaMsg.mimetype || null;
+            fileName = mediaMsg.fileName || mediaMsg.title || null;
             
             if (!text) text = `[Mídia: ${mediaType}]`;
             
@@ -1024,7 +1034,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             try {
                 const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
                 if (base64) {
-                    mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId);
+                    mediaUrl = await uploadMediaToSupabase(base64, mediaType, companyId, mimeType, fileName);
                     if (mediaUrl) {
                         console.log(`[MEDIA] Sucesso! URL salva: ${mediaUrl}`);
                     } else {

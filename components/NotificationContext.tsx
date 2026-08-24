@@ -153,6 +153,28 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setTimeout(() => playNotificationSound('message', soundId), 100);
     };
 
+    const flashPageTitle = useCallback((message: string) => {
+        const originalTitle = 'PandaNet';
+        let showMessage = true;
+
+        const interval = setInterval(() => {
+            document.title = showMessage ? message : originalTitle;
+            showMessage = !showMessage;
+        }, 1200);
+
+        const stopFlashing = () => {
+            clearInterval(interval);
+            document.title = originalTitle;
+            window.removeEventListener('focus', stopFlashing);
+            window.removeEventListener('click', stopFlashing);
+        };
+
+        window.addEventListener('focus', stopFlashing);
+        window.addEventListener('click', stopFlashing);
+        
+        setTimeout(stopFlashing, 30000); // Para após 30 segundos sozinho
+    }, []);
+
     const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
         if (!('Notification' in window)) {
             console.warn('[PandaNet] Browser does not support desktop notifications.');
@@ -351,6 +373,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         if (newMsg && newMsg.is_from_customer) {
                             console.log('[PandaNet] Nova mensagem WhatsPanda -> Disparando Som Global');
                             playNotificationSound('message');
+                            flashPageTitle('(1) Nova Mensagem!');
 
                             // Fetch o nome do contato para exibir no Popup
                             const { data: convInfo } = await supabase
@@ -382,7 +405,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 if (whatsappMessagesChannel) supabase.removeChannel(whatsappMessagesChannel);
             };
         }
-    }, [currentUser?.id, currentUser?.company_id, fetchNotifications, playNotificationSound, showDesktopNotification]);
+    }, [currentUser?.id, currentUser?.company_id, fetchNotifications, playNotificationSound, showDesktopNotification, flashPageTitle]);
 
     const markAsRead = async (id: string) => {
         if (isGhostMode) return; // Ghost mode blocks marking as read
