@@ -893,8 +893,20 @@ CREATE POLICY "whatsapp_conversations_delete_policy"
 -- 13. WHATSAPP SETTINGS PAIRING_CODE COLUMN
 ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS pairing_code TEXT;
 
+-- 14. WHATSAPP SETTINGS & QUEUES TRANSFER AND HORARIOS COLUMNS
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS transfer_message_client TEXT DEFAULT 'Seu atendimento foi transferido para {target}. Por favor, aguarde.';
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS transfer_message_agent TEXT DEFAULT 'Atendimento transferido para {target} por {sender}.';
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS send_transfer_message_to_client BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE public.whatsapp_queues ADD COLUMN IF NOT EXISTS custom_hours BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.whatsapp_queues ADD COLUMN IF NOT EXISTS business_hours JSONB DEFAULT NULL;
+ALTER TABLE public.whatsapp_queues ADD COLUMN IF NOT EXISTS away_message TEXT DEFAULT NULL;
+
+ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS last_away_message_at TIMESTAMPTZ DEFAULT NULL;
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
 
 

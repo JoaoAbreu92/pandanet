@@ -868,12 +868,22 @@ async function getBase64FromUrl(url) {
 async function updateInstanceSettings(instanceName) {
     try {
         console.log(`[SETTINGS] Configurando instância ${instanceName}...`);
+        const connectionId = instanceName.replace('conn_', '');
+        const { data: conn } = await supabase
+            .from('whatsapp_settings')
+            .select('reject_calls, rejection_message')
+            .eq('id', connectionId)
+            .maybeSingle();
+
+        const rejectCall = conn ? !!conn.reject_calls : false;
+        const msgCall = conn?.rejection_message || "";
+
         const resp = await fetch(`${evoUrl}/settings/set/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                reject_call: false,
-                msg_call: "",
+                reject_call: rejectCall,
+                msg_call: msgCall,
                 groups_ignore: false,
                 always_online: true,
                 read_messages: false,
@@ -1441,6 +1451,69 @@ async function fetchGroupInfo(instanceName, groupJid) {
     return null;
 }
 
+/**
+ * Retorna { inHours: boolean, awayMessage: string | null }
+ */
+async function checkBusinessHours(companyId, connectionId, queueId = null) {
+    const now = new Date();
+    // Converter para fuso de Brasília (UTC-3)
+    const spOffset = -3;
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const spTime = new Date(utc + (3600000 * spOffset));
+    
+    const daysMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const currentDay = daysMap[spTime.getDay()];
+    const currentHourStr = spTime.toTimeString().slice(0, 5); // "HH:MM"
+
+    // 1. Se tiver setor (queueId), verificar expediente personalizado do setor primeiro
+    if (queueId) {
+        const { data: queue } = await supabase
+            .from('whatsapp_queues')
+            .select('custom_hours, business_hours, away_message')
+            .eq('id', queueId)
+            .maybeSingle();
+
+        if (queue && queue.custom_hours && queue.business_hours) {
+            const dayConfig = queue.business_hours[currentDay];
+            if (dayConfig) {
+                if (dayConfig.closed) {
+                    return { inHours: false, awayMessage: queue.away_message || 'Estamos fora do horário de expediente deste setor.' };
+                }
+                const { start, end } = dayConfig;
+                if (currentHourStr < start || currentHourStr > end) {
+                    return { inHours: false, awayMessage: queue.away_message || 'Estamos fora do horário de expediente deste setor.' };
+                }
+            }
+            return { inHours: true, awayMessage: null };
+        }
+    }
+
+    // 2. Caso contrário, verificar expediente geral da conexão/canal
+    const { data: settings } = await supabase
+        .from('whatsapp_settings')
+        .select('business_hours_start, business_hours_end, away_message')
+        .eq('id', connectionId)
+        .maybeSingle();
+
+    if (settings) {
+        const start = settings.business_hours_start ? settings.business_hours_start.slice(0, 5) : null;
+        const end = settings.business_hours_end ? settings.business_hours_end.slice(0, 5) : null;
+        const awayMessage = settings.away_message || 'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
+
+        if (start && end) {
+            if (currentHourStr < start || currentHourStr > end) {
+                return { inHours: false, awayMessage };
+            }
+            const isWeekend = spTime.getDay() === 0 || spTime.getDay() === 6;
+            if (isWeekend) {
+                return { inHours: false, awayMessage };
+            }
+        }
+    }
+
+    return { inHours: true, awayMessage: null };
+}
+
 const activeCreations = new Map(); // key: `${companyId}_${fromPhone}` -> Promise<conversationId>
 
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
@@ -1795,8 +1868,49 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             }
 
             if (!isHistorical && !isFromMe && !isGroup) {
-                // Chatbot se necessário (apenas para privados, não grupos)
-                runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                // Verificar Expediente e Horários de Ausência (com limitador anti-spam de 2 horas)
+                try {
+                    const currentConv = conv || { id: conversationId, queue_id: null, last_away_message_at: null };
+                    const { inHours, awayMessage } = await checkBusinessHours(companyId, connectionId, currentConv.queue_id);
+                    if (!inHours && awayMessage) {
+                        const lastAway = currentConv.last_away_message_at ? new Date(currentConv.last_away_message_at).getTime() : 0;
+                        const twoHoursMs = 2 * 60 * 60 * 1000;
+                        if (Date.now() - lastAway > twoHoursMs) {
+                            console.log(`[MSG] Fora do expediente. Enviando mensagem de ausência para ${fromPhone}`);
+                            
+                            // Atualizar timestamp anti-spam no banco
+                            await supabase
+                                .from('whatsapp_conversations')
+                                .update({ last_away_message_at: new Date().toISOString() })
+                                .eq('id', conversationId);
+
+                            // Enviar mensagem via Evolution API
+                            const instanceName = `conn_${connectionId}`;
+                            fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                                method: 'POST',
+                                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    number: fromPhone,
+                                    text: awayMessage
+                                })
+                            }).catch(e => console.error('[EXPEDIENTE] Erro ao enviar mensagem de ausência:', e.message));
+
+                            // Inserir registro no chat
+                            await supabase.from('whatsapp_messages').insert({
+                                company_id: companyId,
+                                conversation_id: conversationId,
+                                message_text: awayMessage,
+                                is_from_customer: false,
+                                sent_by: null
+                            });
+                        }
+                    } else {
+                        // Só executa o chatbot se estiver dentro do horário de expediente
+                        runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                    }
+                } catch (expErr) {
+                    console.error('[EXPEDIENTE] Erro na validação de horário:', expErr.message);
+                }
             }
         }
     } catch (err) {

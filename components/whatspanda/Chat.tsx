@@ -805,6 +805,32 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!selectedConversation || isGhostMode) return;
     setTransferLoading(true);
     try {
+      // 1. Resolver o nome do destino
+      let targetName = 'outro';
+      if (type === 'agent') {
+        const agent = agents.find((a: any) => a.id === targetId);
+        targetName = agent?.full_name || 'outro atendente';
+      } else {
+        const queue = queues.find((q: any) => q.id === targetId);
+        targetName = queue?.name || 'outro setor';
+      }
+
+      // 2. Buscar configurações de transferência do canal
+      const { data: connSettings } = await supabase
+        .from('whatsapp_settings')
+        .select('transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
+        .eq('id', selectedConversation.connection_id)
+        .maybeSingle();
+
+      const clientTpl = connSettings?.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.';
+      const agentTpl = connSettings?.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.';
+      const sendToClient = connSettings?.send_transfer_message_to_client !== false;
+
+      const senderName = activeProfile?.full_name || profile?.full_name || 'Atendente';
+      const formattedClient = clientTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
+      const formattedAgent = agentTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
+
+      // 3. Atualizar a conversa no banco
       const updateData: any = type === 'agent'
         ? { assigned_to: targetId }
         : { queue_id: targetId, assigned_to: null };
@@ -815,6 +841,33 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         .eq('id', selectedConversation.id);
 
       if (error) throw error;
+
+      // 4. Inserir log interno no chat
+      await supabase.from('whatsapp_messages').insert({
+        conversation_id: selectedConversation.id,
+        company_id: currentUser?.company_id || profile?.company_id,
+        message_text: formattedAgent,
+        is_from_customer: false,
+        sent_by: activeProfile?.id || profile?.id
+      });
+
+      // 5. Enviar mensagem de transferência ao cliente via WhatsApp
+      if (sendToClient) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          fetch(`/api/whatsapp/messages/send/${selectedConversation.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+              message: formattedClient
+            })
+          }).catch(e => console.error('Error sending client transfer message:', e));
+        }
+      }
 
       setIsTransferModalOpen(false);
       setTransferSearch('');

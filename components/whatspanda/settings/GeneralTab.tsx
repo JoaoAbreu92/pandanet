@@ -13,6 +13,9 @@ interface WhatsAppSettingsData {
     reject_calls?: boolean;
     rejection_message?: string;
     auto_assign?: boolean;
+    transfer_message_client?: string;
+    transfer_message_agent?: string;
+    send_transfer_message_to_client?: boolean;
 }
 
 const GeneralTab: React.FC = () => {
@@ -29,6 +32,11 @@ const GeneralTab: React.FC = () => {
     const [rejectCalls, setRejectCalls] = useState(false);
     const [rejectionMessage, setRejectionMessage] = useState('');
     const [autoAssign, setAutoAssign] = useState(false);
+    
+    // Transfer Settings State
+    const [transferMessageClient, setTransferMessageClient] = useState('Seu atendimento foi transferido para {target}. Por favor, aguarde.');
+    const [transferMessageAgent, setTransferMessageAgent] = useState('Atendimento transferido para {target} por {sender}.');
+    const [sendTransferMessageToClient, setSendTransferMessageToClient] = useState(true);
 
     useEffect(() => {
         fetchConnections();
@@ -41,7 +49,7 @@ const GeneralTab: React.FC = () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('whatsapp_settings')
-            .select('id, connection_name, phone_number, business_hours_start, business_hours_end, away_message, reject_calls, rejection_message, auto_assign')
+            .select('id, connection_name, phone_number, business_hours_start, business_hours_end, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
             .eq('company_id', companyId);
 
         if (error) {
@@ -63,6 +71,9 @@ const GeneralTab: React.FC = () => {
         setRejectCalls(!!conn.reject_calls);
         setRejectionMessage(conn.rejection_message || '');
         setAutoAssign(!!conn.auto_assign);
+        setTransferMessageClient(conn.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.');
+        setTransferMessageAgent(conn.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.');
+        setSendTransferMessageToClient(conn.send_transfer_message_to_client !== false);
     };
 
     const handleConnectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -85,6 +96,9 @@ const GeneralTab: React.FC = () => {
             reject_calls: rejectCalls,
             rejection_message: rejectionMessage,
             auto_assign: autoAssign,
+            transfer_message_client: transferMessageClient,
+            transfer_message_agent: transferMessageAgent,
+            send_transfer_message_to_client: sendTransferMessageToClient,
             updated_at: new Date().toISOString()
         };
 
@@ -92,6 +106,19 @@ const GeneralTab: React.FC = () => {
             .from('whatsapp_settings')
             .update(updates)
             .eq('id', selectedConnId);
+
+        if (!error) {
+            // Call repair endpoint to sync reject call settings with Evolution
+            const companyId = currentUser?.company_id || profile?.company_id;
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (token && companyId) {
+                fetch(`/api/whatsapp/repair-webhooks/${companyId}/${selectedConnId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).catch(e => console.error('Error syncing settings with Evolution:', e));
+            }
+        }
 
         setSaving(false);
 
@@ -244,6 +271,58 @@ const GeneralTab: React.FC = () => {
                         </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Atribui automaticamente o atendimento ao primeiro atendente que responder à conversa na aba "Aguardando".</p>
+                </div>
+
+                {/* Transfer Message Configurations */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
+                    <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5 text-indigo-500" /> Mensagens de Transferência de Atendimento
+                        </h4>
+                        <div className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="send-transfer-msg-toggle"
+                                checked={sendTransferMessageToClient}
+                                onChange={(e) => setSendTransferMessageToClient(e.target.checked)}
+                                className="sr-only peer cursor-pointer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">
+                        Defina o comportamento das mensagens enviadas quando um atendimento for transferido para outra fila ou atendente.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                Mensagem Enviada ao Cliente (WhatsApp)
+                            </label>
+                            <textarea
+                                value={transferMessageClient}
+                                onChange={(e) => setTransferMessageClient(e.target.value)}
+                                disabled={!sendTransferMessageToClient}
+                                rows={3}
+                                placeholder="Ex: Seu atendimento foi transferido para {target}. Por favor, aguarde."
+                                className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                            />
+                            <p className="text-[9px] text-gray-400 mt-1 font-bold">Use as tags: <code className="text-emerald-500">{'{target}'}</code> para o destino.</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                Mensagem Interna no Histórico (Chat)
+                            </label>
+                            <textarea
+                                value={transferMessageAgent}
+                                onChange={(e) => setTransferMessageAgent(e.target.value)}
+                                rows={3}
+                                placeholder="Ex: Atendimento transferido para {target} por {sender}."
+                                className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400"
+                            />
+                            <p className="text-[9px] text-gray-400 mt-1 font-bold">Use as tags: <code className="text-emerald-500">{'{target}'}</code> para destino, <code className="text-emerald-500">{'{sender}'}</code> para quem transferiu.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

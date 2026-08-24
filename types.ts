@@ -706,6 +706,7 @@ export interface WhatsAppConversation {
   unread_count: number;
   is_muted?: boolean; // Novo: silenciar notificações
   is_group?: boolean;
+  last_away_message_at?: string | null;
 }
 
 export interface WhatsAppMessage {
@@ -750,6 +751,9 @@ export interface WhatsAppSettings {
   api_token?: string;
   last_sync_error?: string;
   pairing_code?: string;
+  transfer_message_client?: string;
+  transfer_message_agent?: string;
+  send_transfer_message_to_client?: boolean;
 }
 
 export interface WhatsAppQueue {
@@ -760,6 +764,9 @@ export interface WhatsAppQueue {
   color: string;
   is_active: boolean;
   created_at: string;
+  custom_hours?: boolean;
+  business_hours?: any;
+  away_message?: string | null;
 }
 
 export interface WhatsAppTag {

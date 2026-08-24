@@ -800,9 +800,24 @@ const ChatbotSettings: React.FC = () => {
                                                                             className="w-40 p-3 text-xs bg-gray-50 dark:bg-black/10 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500/20 dark:text-white font-semibold cursor-pointer"
                                                                         >
                                                                             <option value="">Próximo Passo</option>
-                                                                            {nodes.filter(n => n.id !== node.id).map((n, i) => (
-                                                                                <option key={n.id} value={n.id} className="dark:bg-slate-900">Passo #{i + 1} ({n.type})</option>
-                                                                            ))}
+                                                                            {nodes.filter(n => n.id !== node.id).map((n) => {
+                                                                                const originalIdx = nodes.findIndex(orgNode => orgNode.id === n.id);
+                                                                                const translateType = (type: string) => {
+                                                                                    switch (type) {
+                                                                                        case 'greeting': return 'Saudação';
+                                                                                        case 'menu': return 'Menu';
+                                                                                        case 'transfer_queue': return 'Setor';
+                                                                                        case 'transfer_user': return 'Agente';
+                                                                                        case 'message': return 'Mensagem';
+                                                                                        default: return type;
+                                                                                    }
+                                                                                };
+                                                                                return (
+                                                                                    <option key={n.id} value={n.id} className="dark:bg-slate-900">
+                                                                                        Passo #{originalIdx + 1} ({translateType(n.type)})
+                                                                                    </option>
+                                                                                );
+                                                                            })}
                                                                         </select>
                                                                     </div>
                                                                     <button 
@@ -892,7 +907,7 @@ const ChatbotSettings: React.FC = () => {
                                                     if (msg.sender === 'system') {
                                                         return (
                                                             <div key={msg.id} className="text-center py-1">
-                                                                <span className="bg-indigo-500/10 text-indigo-400 text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-indigo-500/20">
+                                                                <span className="bg-indigo-500/20 text-indigo-200 text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full border border-indigo-500/30 shadow-inner block w-fit mx-auto">
                                                                     {msg.text}
                                                                 </span>
                                                             </div>

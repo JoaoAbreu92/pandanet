@@ -16,6 +16,19 @@ const QueuesTab: React.FC = () => {
     const [description, setDescription] = useState('');
     const [color, setColor] = useState('#3B82F6');
 
+    // Business Hours State
+    const [customHours, setCustomHours] = useState(false);
+    const [businessHours, setBusinessHours] = useState<any>({
+        mon: { start: '08:00', end: '18:00', closed: false },
+        tue: { start: '08:00', end: '18:00', closed: false },
+        wed: { start: '08:00', end: '18:00', closed: false },
+        thu: { start: '08:00', end: '18:00', closed: false },
+        fri: { start: '08:00', end: '18:00', closed: false },
+        sat: { start: '08:00', end: '12:00', closed: true },
+        sun: { start: '08:00', end: '12:00', closed: true }
+    });
+    const [awayMessage, setAwayMessage] = useState('');
+
     useEffect(() => {
         fetchQueues();
     }, []);
@@ -42,11 +55,37 @@ const QueuesTab: React.FC = () => {
             setName(queue.name);
             setDescription(queue.description || '');
             setColor(queue.color);
+            setCustomHours(!!queue.custom_hours);
+            setAwayMessage(queue.away_message || '');
+            if (queue.business_hours) {
+                setBusinessHours(queue.business_hours);
+            } else {
+                setBusinessHours({
+                    mon: { start: '08:00', end: '18:00', closed: false },
+                    tue: { start: '08:00', end: '18:00', closed: false },
+                    wed: { start: '08:00', end: '18:00', closed: false },
+                    thu: { start: '08:00', end: '18:00', closed: false },
+                    fri: { start: '08:00', end: '18:00', closed: false },
+                    sat: { start: '08:00', end: '12:00', closed: true },
+                    sun: { start: '08:00', end: '12:00', closed: true }
+                });
+            }
         } else {
             setEditingQueue(null);
             setName('');
             setDescription('');
             setColor('#3B82F6');
+            setCustomHours(false);
+            setAwayMessage('');
+            setBusinessHours({
+                mon: { start: '08:00', end: '18:00', closed: false },
+                tue: { start: '08:00', end: '18:00', closed: false },
+                wed: { start: '08:00', end: '18:00', closed: false },
+                thu: { start: '08:00', end: '18:00', closed: false },
+                fri: { start: '08:00', end: '18:00', closed: false },
+                sat: { start: '08:00', end: '12:00', closed: true },
+                sun: { start: '08:00', end: '12:00', closed: true }
+            });
         }
         setIsModalOpen(true);
     };
@@ -65,7 +104,10 @@ const QueuesTab: React.FC = () => {
             description,
             color,
             company_id: companyId,
-            is_active: true
+            is_active: true,
+            custom_hours: customHours,
+            business_hours: customHours ? businessHours : null,
+            away_message: customHours ? awayMessage : null
         };
 
         let error;
@@ -224,6 +266,105 @@ const QueuesTab: React.FC = () => {
                                     placeholder="Descrição opcional..."
                                 />
                             </div>
+
+                            {/* Horário de Funcionamento do Setor */}
+                            <div className="space-y-4 border-t border-gray-100 dark:border-white/5 pt-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Expediente Personalizado</label>
+                                        <p className="text-[10px] text-gray-400 mt-1">Defina horários de atendimento exclusivos para este setor.</p>
+                                    </div>
+                                    <div className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={customHours}
+                                            onChange={(e) => setCustomHours(e.target.checked)}
+                                            className="sr-only peer cursor-pointer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
+                                    </div>
+                                </div>
+
+                                {customHours && (
+                                    <div className="space-y-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5 animate-in fade-in duration-300">
+                                        <div className="space-y-3">
+                                            {Object.entries({
+                                                mon: 'Segunda-Feira',
+                                                tue: 'Terça-Feira',
+                                                wed: 'Quarta-Feira',
+                                                thu: 'Quinta-Feira',
+                                                fri: 'Sexta-Feira',
+                                                sat: 'Sábado',
+                                                sun: 'Domingo'
+                                            }).map(([day, label]) => {
+                                                const dayConfig = businessHours[day] || { start: '08:00', end: '18:00', closed: false };
+                                                return (
+                                                    <div key={day} className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 dark:border-white/5 last:border-0">
+                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 w-28">{label}</span>
+                                                        
+                                                        <div className="flex items-center gap-4">
+                                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={dayConfig.closed}
+                                                                    onChange={(e) => {
+                                                                        setBusinessHours({
+                                                                            ...businessHours,
+                                                                            [day]: { ...dayConfig, closed: e.target.checked }
+                                                                        });
+                                                                    }}
+                                                                    className="rounded border-gray-300 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 bg-transparent"
+                                                                />
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Fechado</span>
+                                                            </label>
+
+                                                            {!dayConfig.closed && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="time"
+                                                                        value={dayConfig.start}
+                                                                        onChange={(e) => {
+                                                                            setBusinessHours({
+                                                                                ...businessHours,
+                                                                                [day]: { ...dayConfig, start: e.target.value }
+                                                                            });
+                                                                        }}
+                                                                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-lg text-gray-800 dark:text-white"
+                                                                    />
+                                                                    <span className="text-gray-400 text-xs">às</span>
+                                                                    <input
+                                                                        type="time"
+                                                                        value={dayConfig.end}
+                                                                        onChange={(e) => {
+                                                                            setBusinessHours({
+                                                                                ...businessHours,
+                                                                                [day]: { ...dayConfig, end: e.target.value }
+                                                                            });
+                                                                        }}
+                                                                        className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-lg text-gray-800 dark:text-white"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+                                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Mensagem de Ausência do Setor</label>
+                                            <textarea
+                                                value={awayMessage}
+                                                onChange={(e) => setAwayMessage(e.target.value)}
+                                                rows={2}
+                                                placeholder="Mensagem enviada se o contato interagir com este setor fora do horário..."
+                                                className="w-full px-4 py-3 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-xs resize-none font-medium placeholder:text-gray-400"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Identidade Visual (Cor)</label>
                                 <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
