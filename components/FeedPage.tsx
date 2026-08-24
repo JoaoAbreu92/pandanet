@@ -160,90 +160,47 @@ interface FeedPageProps {
     setPosts?: (posts: Post[]) => void;
 }
 
-const WeatherWidget: React.FC<{ address?: string }> = ({ address }) => {
-    const [weather, setWeather] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchWeather = async () => {
-            try {
-                const location = address || 'São Paulo, Brasil';
-                setTimeout(() => {
-                    setWeather({
-                        temp: 28,
-                        condition: 'Ensolarado',
-                        icon: '☀️',
-                        location: location,
-                        forecast: [
-                            { day: 'Sex', temp: 29, icon: '☀️' },
-                            { day: 'Sáb', temp: 27, icon: '⛅' },
-                            { day: 'Dom', temp: 25, icon: '🌧️' }
-                        ]
-                    });
-                    setLoading(false);
-                }, 1000);
-            } catch (err) {
-                console.error(err);
-                setLoading(false);
-            }
-        };
-        fetchWeather();
-    }, [address]);
-
-    if (loading) return <div className="animate-pulse bg-white p-4 rounded-xl shadow-sm border h-32 flex items-center justify-center text-gray-400">Carregando previsão...</div>;
-
-    return (
-        <div className="bg-gradient-to-br from-blue-400 to-blue-600 p-4 rounded-xl shadow-lg text-white mb-6">
-            <div className="flex justify-between items-start mb-4">
-                <div>
-                    <p className="text-xs font-semibold opacity-80 uppercase tracking-wider">Clima Atual</p>
-                    <h4 className="text-lg font-bold truncate max-w-[150px]">{weather.location}</h4>
-                </div>
-                <span className="text-4xl">{weather.icon}</span>
-            </div>
-            <div className="flex items-end justify-between">
-                <div>
-                    <span className="text-4xl font-black">{weather.temp}°C</span>
-                    <p className="text-sm opacity-90">{weather.condition}</p>
-                </div>
-                <div className="flex space-x-3 text-center">
-                    {weather.forecast.map((f: any, i: number) => (
-                        <div key={i} className="bg-white/10 rounded-lg p-1 px-2 border border-white/5">
-                            <p className="text-[10px] opacity-80">{f.day}</p>
-                            <p className="text-sm my-0.5">{f.icon}</p>
-                            <p className="text-xs font-bold">{f.temp}°</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
+// Widget de Clima removido a pedido do usuário
 
 const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
-    const onlineUsers = users.filter((u, i) => i < 5 || u.isOnline);
+    const onlineUsers = users.filter(u => u.isOnline);
+    const suggestedUsers = users.filter(u => !u.isOnline).slice(0, 5);
 
     return (
-        <Card title="Usuários Online" className="pb-4">
+        <Card title="Pessoas" className="pb-4">
             <div className="space-y-4">
-                {onlineUsers.length === 0 ? (
-                    <p className="text-xs text-gray-500 text-center py-2">Ninguém online no momento.</p>
-                ) : (
-                    onlineUsers.map(user => (
+                {onlineUsers.length > 0 && (
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Online Agora</p>
+                        {onlineUsers.map(user => (
+                            <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                                <div className="relative">
+                                    <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                )}
+
+                <div className="space-y-3 pt-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sugestões para seguir</p>
+                    {suggestedUsers.map(user => (
                         <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                            <div className="relative">
-                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
-                                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
-                            </div>
+                            <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
                                 <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
                             </div>
                         </a>
-                    ))
-                )}
+                    ))}
+                </div>
             </div>
-            <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">Ver Todos</button>
+            <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">Descobrir Mais</button>
         </Card>
     );
 };
@@ -555,7 +512,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         </div>
                     </Card>
 
-                    <WeatherWidget address={currentUser.address} />
+                    {/* Espaço para mural removendo o clima */}
 
                     {loading ? (
                         <div className="space-y-6">

@@ -28,11 +28,11 @@ const availableEmojis = [
     '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
     '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
     '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
-    '🥴', '🤢', '🤮', 'sneezing_face', 'mask', 'thermometer', 'head_bandage',
-    'poop', 'clown_face', 'ogre', 'goblin', 'ghost', 'alien', 'space_invader', 'robot',
-    'jack_o_lantern', 'smiley_cat', 'smile_cat', 'joy_cat', 'heart_eyes_cat', 'smirk_cat',
-    'kissing_cat', 'scream_cat', 'crying_cat_face', 'pouting_cat', 'open_hands', 'raised_hands',
-    'clap', '👍', '👎', '👊', '✊', '🤛', '🤜',
+    '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕',
+    '💩', '🤡', '👺', '👹', '👻', '👽', '👾', '🤖',
+    '🎃', '😺', '😸', '😹', '😻', '😼',
+    '😽', '🙀', '😿', '😾', '👐', '🙌',
+    '👏', '👍', '👎', '👊', '✊', '🤛', '🤜',
     '🤞', '✌️', '🤟', '🤘', '👌', '🤏', '🤌',
     '💪', '🦾', '🦵', '🦿', '🦶', '👂', '🦻',
     '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅',
@@ -291,7 +291,7 @@ const Messages: React.FC<MessagesProps> = () => {
                 text: m.text,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
-                file: m.file_url ? { name: 'Anexo', url: m.file_url } : undefined,
+                file: m.file_url ? { name: (m.file_type?.startsWith('image/') || m.file_type === 'sticker') ? 'Imagem' : 'Anexo', url: m.file_url, type: m.file_type } : undefined,
                 // replyingTo: support needs a column or parsing payload
             }));
 
@@ -563,7 +563,11 @@ const Messages: React.FC<MessagesProps> = () => {
                         )}
                         <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-sm border border-gray-100`}>
                             <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>
-                            {message.file && (
+                            {message.file.type?.startsWith('image/') || message.file.type === 'sticker' ? (
+                                <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
+                                    <img src={message.file.url} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => window.open(message.file?.url)} />
+                                </div>
+                            ) : (
                                 <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
                                     <PaperClipIcon className="w-4 h-4 shrink-0" />
                                     <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
@@ -775,6 +779,9 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
                                     <FaceSmileIcon className="w-6 h-6" />
                                 </button>
+                                <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} title="Stickers e GIFs" className="p-2 text-gray-500 hover:text-brand-primary">
+                                    <SparklesIcon className="w-6 h-6" />
+                                </button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
                                     <PaperClipIcon className="w-6 h-6" />
@@ -790,6 +797,22 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessageText.trim() && !attachedFile)}>
                                     <PaperAirplaneIcon className="w-6 h-6" />
                                 </button>
+                                {showStickerPicker && (
+                                    <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-3 w-72 z-50 animate-fade-in-up">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
+                                            <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                                            {stickers.map((url, i) => (
+                                                <button key={i} onClick={() => handleSendSticker(url)} className="hover:scale-110 transition-transform bg-gray-50 rounded-lg p-1">
+                                                    <img src={url} alt="sticker" className="w-full h-16 object-contain" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-3 text-center">Mais itens em breve!</p>
+                                    </div>
+                                )}
                             </form>
                         </div>
                     </>
