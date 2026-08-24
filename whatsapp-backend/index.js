@@ -61,15 +61,17 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' })); // Evolution API webhooks can be large
 
 // Fix URL for Docker internal network if localhost is provided
-let supabaseUrl = process.env.SUPABASE_URL || '';
-if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
-  supabaseUrl = supabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
+// Base Supabase URL
+let internalSupabaseUrl = process.env.SUPABASE_URL || '';
+if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('127.0.0.1')) {
+  internalSupabaseUrl = internalSupabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
 }
 
+let publicSupabaseUrl = internalSupabaseUrl;
 // Em produção, a conexão direta via contêiner ou IP pode falhar no WebSocket (Realtime) devido a cabeçalhos de Host do Kong.
 // Forçar o uso da URL pública com SSL garante que o WebSocket suba com sucesso através do Nginx.
-if (process.env.NODE_ENV === 'production' || supabaseUrl.includes('supabase-kong') || supabaseUrl.includes('77.37.43.60')) {
-    supabaseUrl = 'https://pandanet.grupopixel.com.br';
+if (process.env.NODE_ENV === 'production' || publicSupabaseUrl.includes('supabase-kong') || publicSupabaseUrl.includes('77.37.43.60')) {
+    publicSupabaseUrl = 'https://pandanet.grupopixel.com.br';
 }
 
 if (evoUrl.includes('localhost') || evoUrl.includes('127.0.0.1')) {
@@ -104,7 +106,10 @@ function parseMessageTimestamp(ts) {
 }
 
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
+// Client for queries (uses internal fast URL to avoid SSL/DNS/Proxy issues)
+const supabase = createClient(internalSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
+// Client for public Realtime websockets
+const realtimeSupabase = createClient(publicSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
 global.realtimeStatus = {
     notifications: 'unknown',
@@ -117,7 +122,7 @@ function setupPushNotificationsListener() {
     console.log('[FCM] Inicializando ouvintes do Supabase Realtime para notificações...');
 
     // 1. Ouvinte para a tabela: notifications
-    supabase
+    realtimeSupabase
         .channel('fcm-notifications-insert')
         .on('postgres_changes', {
             event: 'INSERT',
@@ -176,7 +181,7 @@ function setupPushNotificationsListener() {
         });
 
     // 2. Ouvinte para a tabela: messages (Chat Interno)
-    supabase
+    realtimeSupabase
         .channel('fcm-messages-insert')
         .on('postgres_changes', {
             event: 'INSERT',
@@ -250,7 +255,7 @@ function setupPushNotificationsListener() {
         });
 
     // 3. Ouvinte para a tabela: whatsapp_messages (WhatsPanda)
-    supabase
+    realtimeSupabase
         .channel('fcm-whatsapp-messages-insert')
         .on('postgres_changes', {
             event: 'INSERT',
@@ -354,6 +359,9 @@ setupPushNotificationsListener();
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (global.addDebugLog) {
+      global.addDebugLog('AUTH_WARN', 'No Bearer token provided in Authorization header');
+    }
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -368,9 +376,15 @@ async function authMiddleware(req, res, next) {
       } catch (jwtErr) {
         // JWT inválido, tenta Supabase como fallback
         console.warn('[AUTH] JWT local falhou, tentando Supabase:', jwtErr.message);
+        if (global.addDebugLog) {
+            global.addDebugLog('AUTH_JWT_FAIL', `JWT local falhou: ${jwtErr.message}. Tentando Supabase getUser...`);
+        }
         const { data: { user }, error } = await supabase.auth.getUser(token);
         if (error || !user) {
           console.error('[AUTH] Supabase também falhou:', error?.message);
+          if (global.addDebugLog) {
+              global.addDebugLog('AUTH_SUPABASE_FAIL', `Supabase auth falhou: ${error?.message || 'Nenhum usuário retornado'}`);
+          }
           return res.status(401).json({ error: 'Token inválido. Faça login novamente.' });
         }
         req.user = user;
@@ -379,9 +393,15 @@ async function authMiddleware(req, res, next) {
     } else {
       // Sem JWT_SECRET configurado, usa apenas Supabase
       console.warn('[AUTH] JWT_SECRET não configurado! Usando apenas Supabase auth.');
+      if (global.addDebugLog) {
+          global.addDebugLog('AUTH_NO_SECRET', 'JWT_SECRET não configurado! Usando apenas Supabase auth...');
+      }
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (error || !user) {
         console.error('[AUTH] Supabase error (sem JWT_SECRET):', error?.message);
+        if (global.addDebugLog) {
+            global.addDebugLog('AUTH_SUPABASE_FAIL_NO_SECRET', `Supabase auth (sem secret) falhou: ${error?.message || 'Nenhum usuário retornado'}`);
+        }
         return res.status(401).json({ error: 'Servidor mal configurado ou token inválido.' });
       }
       req.user = user;
@@ -400,12 +420,18 @@ async function authMiddleware(req, res, next) {
         const isMasterAdmin = req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
         if (!isMasterAdmin) {
           console.error('[AUTH] Perfil não encontrado:', profileErr?.message);
+          if (global.addDebugLog) {
+              global.addDebugLog('AUTH_PROFILE_NOT_FOUND', `Perfil não encontrado para usuário ${req.user.email || req.user.id}: ${profileErr?.message}`);
+          }
           return res.status(403).json({ error: 'Forbidden: Perfil não encontrado' });
         }
       } else {
         const isMasterAdmin = profile.role === 'Super Admin' || req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
         if (!isMasterAdmin && profile.company_id !== companyId) {
           console.warn(`[AUTH] Acesso negado: User ${req.user.id} (Empresa ${profile.company_id}) tentou acessar Empresa ${companyId}`);
+          if (global.addDebugLog) {
+              global.addDebugLog('AUTH_FORBIDDEN', `Acesso negado: Usuário ${req.user.email} da Empresa ${profile.company_id} tentou acessar Empresa ${companyId}`);
+          }
           return res.status(403).json({ error: 'Forbidden: Acesso a outra empresa negado' });
         }
       }
@@ -414,6 +440,9 @@ async function authMiddleware(req, res, next) {
     next();
   } catch (error) {
     console.error('[AUTH] Erro fatal no middleware:', error.message);
+    if (global.addDebugLog) {
+        global.addDebugLog('AUTH_FATAL', `Erro fatal no middleware de autenticação: ${error.message}`);
+    }
     return res.status(401).json({ error: 'Erro de autenticação interno' });
   }
 }
