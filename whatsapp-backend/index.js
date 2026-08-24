@@ -613,6 +613,15 @@ async function authMiddleware(req, res, next) {
         const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
         if (error || !user) {
           console.error('[AUTH] Supabase também falhou:', error?.message);
+          
+          // DEEP DEBUG LOGGING FOR JWT:
+          try {
+            const decodedPayload = jwt.decode(token);
+            console.error('[AUTH_DEBUG] Decoded Token Payload:', JSON.stringify(decodedPayload));
+          } catch(e) {
+            console.error('[AUTH_DEBUG] Token un-decodable:', e.message);
+          }
+          
           if (global.addDebugLog) {
               global.addDebugLog('AUTH_SUPABASE_FAIL', `Supabase auth falhou: ${error?.message || 'Nenhum usuário retornado'}`);
           }
