@@ -2234,10 +2234,9 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             .eq('id', connectionId)
             .maybeSingle();
         
-        const channelPhone = channelSettings?.phone_number ? channelSettings.phone_number.replace(/\D/g, '') : '';
-        const cleanFromPhone = fromPhone.replace(/\D/g, '');
-        if (channelPhone && (cleanFromPhone === channelPhone || cleanFromPhone.endsWith(channelPhone) || channelPhone.endsWith(cleanFromPhone))) {
-            console.log(`[MSG] Ignorando mensagem do próprio número da conexão: ${fromPhone}`);
+        // Ignorar apenas se for uma mensagem enviada para SI MESMO (canal enviando para o próprio número do canal)
+        if (isFromMe && channelPhone && cleanFromPhone === channelPhone) {
+            console.log(`[MSG] Ignorando mensagem enviada para o próprio número da conexão: ${fromPhone}`);
             return;
         }
 
