@@ -14,20 +14,6 @@ async function testConnection(host: string, port: number, timeout = 5000) {
   }
 }
 
-// Helper para testar handshake TLS nativo do Deno
-async function testTlsHandshake(host: string, port: number) {
-  try {
-    const conn = await Deno.connectTls({
-      hostname: host, 
-      port,
-    });
-    conn.close();
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: e.message };
-  }
-}
-
 // Escaneia portas comuns em caso de falha para dar diagnóstico ao usuário
 async function scanCommonPorts(host: string) {
   const ports = [143, 993, 587, 465, 110, 995, 25];
@@ -39,10 +25,10 @@ async function scanCommonPorts(host: string) {
   return results;
 }
 
-console.log("Edge Function 'email-handler' V23 (CORS Fix & Deep Diag) iniciada.");
+console.log("Edge Function 'email-handler' V24 (Explicit SSL Control) iniciada.");
 
 Deno.serve(async (req) => {
-  // 1. CORS Preflight - SEMPRE NO TOPO ABSOLUTO
+  // 1. CORS Preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -51,7 +37,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V23). CORS Fixed.' 
+      message: 'Edge Function Online (V24). Explicit SSL Control.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -65,7 +51,7 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V23] Ação: ${action}`);
+    console.log(`[V24] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
@@ -73,61 +59,45 @@ Deno.serve(async (req) => {
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
+      // Determinar flags de SSL (priorizar flags explícitas, fallback para porta)
+      const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
+      const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
+
+      console.log(`[V24] Config: SMTP SSL=${useSmtpSsl}, IMAP SSL=${useImapSsl}`);
+
       // --- TESTE SMTP ---
       try {
-        const isPort465 = Number(settings.smtp_port) === 465;
         const transporter = nodemailer.default.createTransport({
           host: settings.smtp_host,
           port: settings.smtp_port,
-          secure: isPort465,
+          secure: useSmtpSsl,
           auth: { user: settings.user, pass: settings.pass },
           tls: { 
-            rejectUnauthorized: true, // Começar restrito na V23
-            servername: settings.smtp_host
+            rejectUnauthorized: false,
+            minVersion: 'TLSv1'
           },
-          requireTLS: !isPort465, 
           connectionTimeout: 15000,
           greetingTimeout: 15000
         })
         await transporter.verify();
       } catch (e: any) {
-        // Se falhar, tentar bypass agressivo
-        console.log("[V23] SMTP falhou, tentando fallback com ignore TLS...");
-        const transporter = nodemailer.default.createTransport({
-          host: settings.smtp_host,
-          port: settings.smtp_port,
-          secure: Number(settings.smtp_port) === 465,
-          auth: { user: settings.user, pass: settings.pass },
-          tls: {
-            rejectUnauthorized: false, // Bypass aqui se o normal falhar
-            servername: settings.smtp_host
-          }
-        });
-        await transporter.verify().catch(err => {
-          throw new Error(`SMTP Falhou: ${err.message}`);
-        });
+        const openPorts = await scanCommonPorts(settings.smtp_host);
+        throw new Error(`SMTP Falhou: ${e.message}. (Portas abertas: ${openPorts.join(', ') || 'Nenhuma'})`);
       }
 
       // --- TESTE IMAP ---
       try {
-        const isPort993 = Number(settings.imap_port) === 993;
-
-        // Diagnóstico Nativo
-        if (isPort993) {
-          const nativeTls = await testTlsHandshake(settings.imap_host, settings.imap_port);
-          if (!nativeTls.ok) console.error("[V23] Handshake Nativo Falhou:", nativeTls.error);
-        }
-
         const client = new ImapFlow({
           host: settings.imap_host,
           port: settings.imap_port,
-          secure: isPort993,
+          secure: useImapSsl,
           auth: { user: settings.user, pass: settings.pass },
           logger: true,
           tls: { 
             rejectUnauthorized: false,
-            servername: settings.imap_host,
-            checkServerIdentity: () => undefined
+            servername: settings.imap_host, // Mantemos SNI padrão, mas com bypass de cert
+            checkServerIdentity: () => undefined,
+            minVersion: 'TLSv1'
           },
           connectionTimeout: 30000,
           greetingTimeout: 30000
@@ -135,25 +105,29 @@ Deno.serve(async (req) => {
         await client.connect();
         await client.logout();
       } catch (e: any) {
-        console.error("[IMAP V23 ERROR]", e);
+        console.error("[IMAP V24 ERROR]", e);
         const openPorts = await scanCommonPorts(settings.imap_host);
+
         let msg = e.message;
-        if (msg.includes('Unexpected close')) msg = "Conexão fechada durante handshake (TLS/SSL).";
+        if (msg.includes('Unexpected close')) {
+          msg = `Conexão fechada inesperadamente. Possível incompatibilidade de SSL. Tente ${useImapSsl ? 'desmarcar' : 'marcar'} a opção de SSL`;
+        }
+
         throw new Error(`IMAP Falhou: ${msg}. Portas abertas detectadas: ${openPorts.join(', ') || 'Nenhuma'}`);
       }
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conectado com sucesso na V23!'
+        message: 'Conectado com sucesso na V24!'
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V23.' }), { 
+    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V24.' }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error: any) {
-    console.error(`[V23 ERROR]`, error.message);
+    console.error(`[V24 ERROR]`, error.message);
     return new Response(JSON.stringify({
       success: false,
       error: error.message

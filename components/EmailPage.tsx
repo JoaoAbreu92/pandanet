@@ -63,7 +63,9 @@ interface EmailServerConfig {
     smtp_port: number;
     user: string;
     pass: string;
-    use_ssl: boolean;
+    imap_ssl: boolean;
+    smtp_ssl: boolean;
+    use_ssl: boolean; // Mantido para compatibilidade reversa temporária
 }
 
 interface EmailPageProps {
@@ -99,6 +101,8 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
         smtp_port: 465,
         user: '',
         pass: '',
+        imap_ssl: true,
+        smtp_ssl: true,
         use_ssl: true
     });
     const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -150,6 +154,8 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                     smtp_port: settingsData.smtp_port,
                     user: settingsData.email_user,
                     pass: settingsData.email_pass,
+                    imap_ssl: settingsData.imap_ssl ?? settingsData.use_ssl ?? true,
+                    smtp_ssl: settingsData.smtp_ssl ?? settingsData.use_ssl ?? true,
                     use_ssl: settingsData.use_ssl
                 });
             }
@@ -408,6 +414,8 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                 smtp_port: serverConfig.smtp_port,
                 email_user: serverConfig.user,
                 email_pass: serverConfig.pass,
+                imap_ssl: serverConfig.imap_ssl,
+                smtp_ssl: serverConfig.smtp_ssl,
                 use_ssl: serverConfig.use_ssl,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
@@ -812,12 +820,23 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Porta IMAP</label>
-                                                        <input
-                                                            type="number"
-                                                            className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
-                                                            value={serverConfig.imap_port}
-                                                            onChange={(e) => setServerConfig(prev => ({ ...prev, imap_port: parseInt(e.target.value) }))}
-                                                        />
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
+                                                                value={serverConfig.imap_port}
+                                                                onChange={(e) => setServerConfig(prev => ({ ...prev, imap_port: parseInt(e.target.value) }))}
+                                                            />
+                                                            <label className={`flex items-center gap-2 px-3 border rounded-xl cursor-pointer transition-all ${serverConfig.imap_ssl ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={serverConfig.imap_ssl}
+                                                                    onChange={(e) => setServerConfig(prev => ({ ...prev, imap_ssl: e.target.checked }))}
+                                                                    className="accent-brand-primary w-3.5 h-3.5"
+                                                                />
+                                                                <span className="text-[10px] font-black uppercase">SSL</span>
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Servidor SMTP</label>
@@ -831,12 +850,23 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Porta SMTP</label>
-                                                        <input
-                                                            type="number"
-                                                            className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
-                                                            value={serverConfig.smtp_port}
-                                                            onChange={(e) => setServerConfig(prev => ({ ...prev, smtp_port: parseInt(e.target.value) }))}
-                                                        />
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full p-2.5 text-xs border border-gray-100 rounded-xl focus:ring-2 focus:ring-brand-primary bg-gray-50/50 outline-none"
+                                                                value={serverConfig.smtp_port}
+                                                                onChange={(e) => setServerConfig(prev => ({ ...prev, smtp_port: parseInt(e.target.value) }))}
+                                                            />
+                                                            <label className={`flex items-center gap-2 px-3 border rounded-xl cursor-pointer transition-all ${serverConfig.smtp_ssl ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={serverConfig.smtp_ssl}
+                                                                    onChange={(e) => setServerConfig(prev => ({ ...prev, smtp_ssl: e.target.checked }))}
+                                                                    className="accent-brand-primary w-3.5 h-3.5"
+                                                                />
+                                                                <span className="text-[10px] font-black uppercase">SSL</span>
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-col gap-1.5 col-span-2">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">E-mail Corporativo</label>
