@@ -2761,6 +2761,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </div>
                       ) : (
                         <>
+                          {/* Mensagem Citada / Resposta (Quoted Message) */}
+                          {((msg as any).quoted_message_text) && (
+                            <div className="mb-2 p-2 bg-black/5 dark:bg-white/10 border-l-4 border-emerald-500 rounded-r-xl text-xs overflow-hidden leading-snug opacity-95">
+                              <p className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400 mb-0.5">
+                                {(msg as any).quoted_message_sender ? `Em resposta a ${(msg as any).quoted_message_sender}` : 'Mensagem citada'}
+                              </p>
+                              <p className="truncate text-slate-700 dark:text-slate-200 font-medium italic">
+                                "{(msg as any).quoted_message_text}"
+                              </p>
+                            </div>
+                          )}
+
                           {msg.message_text && !isPlaceholderMediaText(msg.message_text) && (
                             <p 
                               style={{ fontSize: `${chatFontSize}px` }}

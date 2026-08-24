@@ -2336,6 +2336,32 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                    m.documentMessage?.caption ||
             message.text || message?.message?.text || "";
 
+        // Extrair informações de resposta (Quoted Message / Resposta a mensagem)
+        let quotedMessageText = null;
+        let quotedMessageSender = null;
+
+        const contextInfo = m.contextInfo || 
+                            m.extendedTextMessage?.contextInfo || 
+                            m.imageMessage?.contextInfo || 
+                            m.videoMessage?.contextInfo || 
+                            m.documentMessage?.contextInfo || 
+                            m.audioMessage?.contextInfo;
+
+        if (contextInfo && contextInfo.quotedMessage) {
+            const qMsg = getRealMessage(contextInfo.quotedMessage);
+            quotedMessageText = qMsg.conversation || 
+                                qMsg.extendedTextMessage?.text || 
+                                qMsg.imageMessage?.caption || 
+                                qMsg.videoMessage?.caption || 
+                                qMsg.documentMessage?.caption || 
+                                (qMsg.imageMessage ? '📷 Imagem' : qMsg.audioMessage ? '🎵 Áudio' : qMsg.videoMessage ? '🎥 Vídeo' : qMsg.documentMessage ? '📄 Documento' : null);
+
+            if (contextInfo.participant) {
+                const pPhone = contextInfo.participant.split('@')[0].replace(/\D/g, '');
+                quotedMessageSender = pPhone;
+            }
+        }
+
         let mediaUrl = null;
         let mediaType = null;
         let mimeType = null;
@@ -2592,6 +2618,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     media_type: mediaType,
                     sender_phone: senderPhone,
                     sender_name: senderName,
+                    quoted_message_text: quotedMessageText,
+                    quoted_message_sender: quotedMessageSender,
                     created_at: parseMessageTimestamp(message.messageTimestamp),
                     queue_id: conv ? conv.queue_id : null
                 });
