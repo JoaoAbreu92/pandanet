@@ -146,7 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     </button>
                 )}
 
-                {(currentUser.isAdmin || currentUser.is_company_admin) && (
+                {(currentUser.isAdmin || currentUser.isCompanyAdmin) && (
                     <button
                         type="button"
                         onClick={() => onNavigate('admin')}
