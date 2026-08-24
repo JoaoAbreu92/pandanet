@@ -146,9 +146,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             if (!compId) return;
 
             // OPTIMISTIC UI: Shake immediately!
-            if ((window as any).triggerDetectionShake) {
-                console.log("Triggering local shake immediately");
-                (window as any).triggerDetectionShake();
+            // OPTIMISTIC UI: Shake immediately!
+            try {
+                if ((window as any).triggerDetectionShake) {
+                    console.log("[PandaNet] Triggering local shake via window function");
+                    (window as any).triggerDetectionShake();
+                } else {
+                    console.warn("[PandaNet] triggerDetectionShake not found on window object");
+                }
+            } catch (e) {
+                console.error("Error triggering shake:", e);
             }
 
             const { error } = await supabase.from('messages').insert({
