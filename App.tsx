@@ -209,11 +209,31 @@ const AppContent: React.FC = () => {
         }
     };
 
-    const handleSetCompanyForAdmin = (updatedCompany: Company) => {
+    const handleSetCompanyForAdmin = async (updatedCompany: Company) => {
         setCurrentCompany(updatedCompany);
         setCompanyData(updatedCompany.data);
         setCompanySettings(updatedCompany.settings);
         setCompanies(prev => prev.map(c => c.domain === updatedCompany.domain ? updatedCompany : c));
+
+        // Persist to Supabase
+        if (updatedCompany.id && updatedCompany.id !== 'root') {
+            try {
+                const { error } = await supabase
+                    .from('companies')
+                    .update({
+                        data: updatedCompany.data,
+                        settings: updatedCompany.settings,
+                        name: updatedCompany.name,
+                        domain: updatedCompany.domain
+                    })
+                    .eq('id', updatedCompany.id);
+                if (error) throw error;
+                console.log("Alterações da empresa salvas no Supabase.");
+            } catch (err: any) {
+                console.error("Erro ao persistir dados da empresa:", err.message);
+                alert("Erro ao salvar no banco de dados: " + err.message);
+            }
+        }
     };
 
     const handleUpdateFeedPosts = (newPosts: Post[]) => {

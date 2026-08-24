@@ -3,6 +3,8 @@ import Card from './Card';
 import type { Employee, Plan } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
 import { useLanguage } from './LanguageContext';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface UserManagerProps {
     users: Employee[];
@@ -207,21 +209,75 @@ const UserFormModal: React.FC<{
 
 
 const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
+    const { profile } = useAuth();
     const { t } = useLanguage();
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Employee | null>(null);
 
-    const handleSave = (userData: Omit<Employee, 'id'> | Employee) => {
-        if ('id' in userData) {
-            setUsers(users.map(u => u.id === userData.id ? userData : u));
-        } else {
-            if (users.length >= plan.userLimit) {
-                alert(`Limite de ${plan.userLimit} usuários para o plano ${plan.name} atingido.`);
-                return;
-            }
-            const newUser: Employee = { ...userData, id: Date.now().toString() };
-            setUsers([newUser, ...users]);
+    const handleSave = async (userData: Omit<Employee, 'id'> | Employee) => {
+        if (!profile?.company_id && profile?.role !== 'Super Admin') {
+            alert("Erro: Empresa não identificada.");
+            return;
         }
+
+        const targetCompanyId = profile?.company_id || '56eaa5ed-8d1b-4879-a002-838702eeb14d'; // Fallback to Pixel if super admin
+
+        try {
+            if ('id' in userData && userData.id.length > 15) { // UUID is long, local id (Date.now()) is shorter
+                // UPDATE
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        full_name: userData.name,
+                        email: userData.email,
+                        role: userData.role,
+                        team: userData.team,
+                        is_admin: userData.isAdmin,
+                        is_company_admin: userData.isAdmin, // Mapping admin to company_admin
+                        permissions: userData.permissions,
+                        avatar_url: userData.avatarUrl
+                    })
+                    .eq('id', userData.id);
+
+                if (error) throw error;
+                setUsers(users.map(u => u.id === userData.id ? userData : u));
+            } else {
+                // INSERT (Note: This is profile table, not Auth yet. In a real app we'd need Auth.signUp)
+                // For this MVP, we create the profile and the user will link via email on first login
+                if (users.length >= plan.userLimit) {
+                    alert(`Limite de ${plan.userLimit} usuários para o plano ${plan.name} atingido.`);
+                    return;
+                }
+
+                // Since we don't have auth.uid yet, we generate a UUID for the profile
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .insert([{
+                        full_name: userData.name,
+                        email: userData.email,
+                        role: userData.role,
+                        team: userData.team,
+                        company_id: targetCompanyId,
+                        is_admin: userData.isAdmin,
+                        is_company_admin: userData.isAdmin,
+                        permissions: userData.permissions,
+                        avatar_url: userData.avatarUrl,
+                        join_date: userData.joinDate,
+                        birth_date: userData.birthDate
+                    }])
+                    .select();
+
+                if (error) throw error;
+                if (data) {
+                    const newUser = { ...userData, id: data[0].id } as Employee;
+                    setUsers([newUser, ...users]);
+                }
+            }
+        } catch (err: any) {
+            console.error("Erro ao salvar usuário:", err.message);
+            alert("Erro ao salvar no banco: " + err.message);
+        }
+
         setModalOpen(false);
         setEditingUser(null);
     };
@@ -231,9 +287,15 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
         setModalOpen(true);
     };
 
-    const handleDelete = (userId: string) => {
+    const handleDelete = async (userId: string) => {
         if (window.confirm("Tem certeza que deseja apagar este usuário?")) {
-            setUsers(users.filter(u => u.id !== userId));
+            try {
+                const { error } = await supabase.from('profiles').delete().eq('id', userId);
+                if (error) throw error;
+                setUsers(users.filter(u => u.id !== userId));
+            } catch (err: any) {
+                alert("Erro ao excluir: " + err.message);
+            }
         }
     };
 

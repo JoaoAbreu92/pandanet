@@ -47,6 +47,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, fe
                 office_location: tempUserData.officeLocation,
                 avatar_url: tempUserData.avatarUrl,
                 cover_url: tempUserData.coverUrl,
+                birth_date: tempUserData.birthDate,
                 updated_at: new Date()
             };
 
