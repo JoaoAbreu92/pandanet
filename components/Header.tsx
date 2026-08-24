@@ -53,34 +53,38 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
 
 
                 <div className="flex items-center space-x-4">
-                    <button
-                        onClick={async () => {
-                            const { data, error } = await supabase.from('notifications').select('id, title').order('created_at', { ascending: false }).limit(5);
-                            const channels = (supabase as any).realtime?.channels;
-                            const activeChannels = channels ? Object.keys(channels).length : 0;
+                    {(currentUser.isAdmin || currentUser.email === 'ti@grupopixel.com.br') && (
+                        <>
+                            <button
+                                onClick={async () => {
+                                    const { data, error } = await supabase.from('notifications').select('id, title').order('created_at', { ascending: false }).limit(5);
+                                    const channels = (supabase as any).realtime?.channels;
+                                    const activeChannels = channels ? Object.keys(channels).length : 0;
 
-                            if (error) {
-                                alert(`ERRO BANCO: ${error.message}`);
-                            } else {
-                                if (data && data.length === 0) {
-                                    alert(`Banco OK. Canais Ativos: ${activeChannels}. Nenhuma notificação encontrada no banco.`);
-                                } else if (data) {
-                                    alert(`Sucesso! Banco OK. Canais Ativos: ${activeChannels}. Última: ${data[0].title}`);
-                                }
-                            }
-                        }}
-                        className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title="Verificar Diagnóstico"
-                    >
-                        <Cog6ToothIcon className="w-5 h-5 text-blue-400" />
-                    </button>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title="Recarregar"
-                    >
-                        <ArrowPathIcon className="w-5 h-5 text-red-400" />
-                    </button>
+                                    if (error) {
+                                        alert(`ERRO BANCO: ${error.message}`);
+                                    } else {
+                                        if (data && data.length === 0) {
+                                            alert(`Banco OK. Canais Ativos: ${activeChannels}. Nenhuma notificação encontrada no banco.`);
+                                        } else if (data) {
+                                            alert(`Sucesso! Banco OK. Canais Ativos: ${activeChannels}. Última: ${data[0].title}`);
+                                        }
+                                    }
+                                }}
+                                className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                                title="Verificar Diagnóstico"
+                            >
+                                <Cog6ToothIcon className="w-5 h-5 text-blue-400" />
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                                title="Recarregar"
+                            >
+                                <ArrowPathIcon className="w-5 h-5 text-red-400" />
+                            </button>
+                        </>
+                    )}
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
                         {unreadNotificationsCount > 0 && (

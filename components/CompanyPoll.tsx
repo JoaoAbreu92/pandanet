@@ -80,7 +80,8 @@ const CompanyPoll: React.FC = () => {
             {
               poll_id: poll.id,
               option_id: selectedOption,
-              user_id: currentUser.id
+              user_id: currentUser.id,
+              company_id: currentUser.company_id
             }
           ]);
 

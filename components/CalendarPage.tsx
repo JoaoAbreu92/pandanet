@@ -484,12 +484,14 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <button onClick={handleToday} className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-100 text-brand-text bg-white transition-colors">Hoje</button>
                     </div>
                     <div className="flex items-center space-x-2">
-                        <button onClick={async () => {
-                            const { data, error } = await supabase.rpc('get_my_company_id');
-                            alert(`Debug: Company ID from DB: ${data} \nError: ${error?.message} \nLocal User ID: ${currentUser?.id} \nLocal Company ID: ${currentUser?.company_id}`);
-                            console.log('Debug Employees:', employees);
-                            console.log('Debug Departments:', departments);
-                        }} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Debug DB</button>
+                        {(currentUser?.isAdmin || currentUser?.email === 'ti@grupopixel.com.br') && (
+                            <button onClick={async () => {
+                                const { data, error } = await supabase.rpc('get_my_company_id');
+                                alert(`Debug: Company ID from DB: ${data} \nError: ${error?.message} \nLocal User ID: ${currentUser?.id} \nLocal Company ID: ${currentUser?.company_id}`);
+                                console.log('Debug Employees:', employees);
+                                console.log('Debug Departments:', departments);
+                            }} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Debug DB</button>
+                        )}
 
                         <div className="bg-gray-100 p-1 rounded-md flex">
                             <button onClick={() => setView('month')} className={`px-3 py-1 text-sm rounded transition-colors ${view === 'month' ? 'bg-white shadow text-brand-primary font-medium' : 'text-gray-500 hover:text-gray-700'}`}>Mês</button>
