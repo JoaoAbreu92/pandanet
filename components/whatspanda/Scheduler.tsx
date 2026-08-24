@@ -184,21 +184,21 @@ const Scheduler: React.FC = () => {
     setLoadingContacts(true);
     try {
       const { data, error } = await supabase
-        .from('whatsapp_conversations')
-        .select('contact_name, contact_phone')
+        .from('whatsapp_contacts')
+        .select('name, phone')
         .eq('company_id', companyId)
-        .not('contact_phone', 'is', null);
+        .not('phone', 'is', null);
 
       if (error) throw error;
 
       if (data) {
         const uniqueMap = new Map<string, string>();
         data.forEach(c => {
-          const cleanPhone = c.contact_phone.replace(/\D/g, '');
+          const cleanPhone = c.phone.replace(/\D/g, '');
           if (cleanPhone && cleanPhone.length >= 8) {
             const existingName = uniqueMap.get(cleanPhone);
-            if (!existingName || (!existingName.startsWith('+') && c.contact_name)) {
-              uniqueMap.set(cleanPhone, c.contact_name || `+${cleanPhone}`);
+            if (!existingName || (!existingName.startsWith('+') && c.name)) {
+              uniqueMap.set(cleanPhone, c.name || `+${cleanPhone}`);
             }
           }
         });
@@ -390,16 +390,16 @@ const Scheduler: React.FC = () => {
       if (mediaFile) {
         setUploadingMedia(true);
         const fileExt = mediaFile.name.split('.').pop();
-        const fileName = `campaigns/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `whatsapp/campaigns/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const { data: uploadData, error: uploadErr } = await supabase.storage
           .from('chat-media')
-          .upload(fileName, mediaFile);
+          .upload(filePath, mediaFile);
 
         if (uploadErr) throw uploadErr;
 
         const { data: urlData } = supabase.storage
           .from('chat-media')
-          .getPublicUrl(fileName);
+          .getPublicUrl(filePath);
 
         finalImageUrl = urlData.publicUrl;
       }
