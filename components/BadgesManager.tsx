@@ -1333,6 +1333,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
     const [segmentedStyle, setSegmentedStyle] = useState<'clean' | 'segmented' | 'neon' | 'sparkle'>('sparkle');
     const [showBadgeFrame, setShowBadgeFrame] = useState<boolean>(true);
     const [badgeLevelColor, setBadgeLevelColor] = useState<string>('#f59e0b');
+    const [badgeTextColor, setBadgeTextColor] = useState<string>('#ffffff');
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [previewUrl, setPreviewUrl] = useState<string>('');
 
@@ -1341,6 +1342,22 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
     const currentConfig = companyLevels.find(l => l.level_number === selectedLevel);
 
+    const parseHashParams = (url: string) => {
+        const params: { [key: string]: string } = {};
+        if (!url) return params;
+        const hashIndex = url.indexOf('#');
+        if (hashIndex === -1) return params;
+        const hash = url.substring(hashIndex + 1);
+        const pairs = hash.split('&');
+        pairs.forEach(pair => {
+            const [key, value] = pair.split('=');
+            if (key && value) {
+                params[key] = decodeURIComponent(value);
+            }
+        });
+        return params;
+    };
+
     useEffect(() => {
         if (currentConfig) {
             setLevelName(currentConfig.name || '');
@@ -1348,14 +1365,24 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
             
             // Extrair cor do badge a partir da URL se existir
             const url = currentConfig.ring_image_url || '';
-            if (url.includes('#color=')) {
+            const params = parseHashParams(url);
+            
+            if (params.color) {
+                setBadgeLevelColor(params.color);
+            } else if (url.includes('#color=')) {
+                // fallback para formato antigo
                 const colorPart = url.split('#color=')[1];
                 if (colorPart) {
-                    setBadgeLevelColor(decodeURIComponent(colorPart));
+                    setBadgeLevelColor(decodeURIComponent(colorPart.split('&')[0]));
                 }
             } else {
-                // Caso não tenha cor customizada salva na URL, usar um padrão amigável
                 setBadgeLevelColor('#f59e0b');
+            }
+
+            if (params.textColor) {
+                setBadgeTextColor(params.textColor);
+            } else {
+                setBadgeTextColor('#ffffff');
             }
         }
     }, [selectedLevel, companyLevels]);
@@ -1363,16 +1390,16 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const PRESETS = [
-        { name: 'Bronze 🟫', color1: '#8a4f32', color2: '#c98a6b', color3: '#5c301c', glowColor: '#c98a6b', glowBlur: 10, borderColor: '#d7a187', borderWidth: 2, innerBorderColor: '#5c301c', innerBorderWidth: 1, starsCount: 1, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true, badgeLevelColor: '#8a4f32' },
-        { name: 'Prata ⬜', color1: '#7e8590', color2: '#cbd5e1', color3: '#475569', glowColor: '#cbd5e1', glowBlur: 12, borderColor: '#ffffff', borderWidth: 2, innerBorderColor: '#475569', innerBorderWidth: 1, starsCount: 2, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true, badgeLevelColor: '#7e8590' },
-        { name: 'Ouro 🟨', color1: '#b45309', color2: '#f59e0b', color3: '#78350f', glowColor: '#fbbf24', glowBlur: 15, borderColor: '#fef08a', borderWidth: 3, innerBorderColor: '#78350f', innerBorderWidth: 1.5, starsCount: 3, ringThickness: 35, segmentedStyle: 'sparkle', showBadgeFrame: true, badgeLevelColor: '#b45309' },
-        { name: 'Platina 💎', color1: '#0891b2', color2: '#38bdf8', color3: '#1e3a8a', glowColor: '#06b6d4', glowBlur: 16, borderColor: '#e0f2fe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 4, ringThickness: 35, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#0891b2' },
-        { name: 'Esmeralda 🟩', color1: '#047857', color2: '#34d399', color3: '#064e3b', glowColor: '#10b981', glowBlur: 16, borderColor: '#a7f3d0', borderWidth: 3, innerBorderColor: '#064e3b', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#047857' },
-        { name: 'Safira 🟦', color1: '#1d4ed8', color2: '#60a5fa', color3: '#1e3a8a', glowColor: '#3b82f6', glowBlur: 18, borderColor: '#bfdbfe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#1d4ed8' },
-        { name: 'Rubi 🟥', color1: '#b91c1c', color2: '#f87171', color3: '#7f1d1d', glowColor: '#ef4444', glowBlur: 20, borderColor: '#fca5a5', borderWidth: 3, innerBorderColor: '#7f1d1d', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 40, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#b91c1c' },
-        { name: 'Diamante 👑', color1: '#0284c7', color2: '#bae6fd', color3: '#a855f7', glowColor: '#38bdf8', glowBlur: 22, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#a855f7', innerBorderWidth: 2, starsCount: 5, ringThickness: 42, segmentedStyle: 'sparkle', showBadgeFrame: true, badgeLevelColor: '#0284c7' },
-        { name: 'Lendário 👾', color1: '#ec4899', color2: '#8b5cf6', color3: '#06b6d4', glowColor: '#d946ef', glowBlur: 25, borderColor: '#fdf2f8', borderWidth: 4, innerBorderColor: '#0891b2', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true, badgeLevelColor: '#ec4899' },
-        { name: 'Arco-Íris 🌈', color1: '#f43f5e', color2: '#eab308', color3: '#3b82f6', glowColor: '#10b981', glowBlur: 25, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#1e1b4b', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true, badgeLevelColor: '#f43f5e' }
+        { name: 'Bronze 🟫', color1: '#8a4f32', color2: '#c98a6b', color3: '#5c301c', glowColor: '#c98a6b', glowBlur: 10, borderColor: '#d7a187', borderWidth: 2, innerBorderColor: '#5c301c', innerBorderWidth: 1, starsCount: 1, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true, badgeLevelColor: '#8a4f32', badgeTextColor: '#ffffff' },
+        { name: 'Prata ⬜', color1: '#7e8590', color2: '#cbd5e1', color3: '#475569', glowColor: '#cbd5e1', glowBlur: 12, borderColor: '#ffffff', borderWidth: 2, innerBorderColor: '#475569', innerBorderWidth: 1, starsCount: 2, ringThickness: 30, segmentedStyle: 'clean', showBadgeFrame: true, badgeLevelColor: '#7e8590', badgeTextColor: '#ffffff' },
+        { name: 'Ouro 🟨', color1: '#b45309', color2: '#f59e0b', color3: '#78350f', glowColor: '#fbbf24', glowBlur: 15, borderColor: '#fef08a', borderWidth: 3, innerBorderColor: '#78350f', innerBorderWidth: 1.5, starsCount: 3, ringThickness: 35, segmentedStyle: 'sparkle', showBadgeFrame: true, badgeLevelColor: '#b45309', badgeTextColor: '#ffffff' },
+        { name: 'Platina 💎', color1: '#0891b2', color2: '#38bdf8', color3: '#1e3a8a', glowColor: '#06b6d4', glowBlur: 16, borderColor: '#e0f2fe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 4, ringThickness: 35, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#0891b2', badgeTextColor: '#ffffff' },
+        { name: 'Esmeralda 🟩', color1: '#047857', color2: '#34d399', color3: '#064e3b', glowColor: '#10b981', glowBlur: 16, borderColor: '#a7f3d0', borderWidth: 3, innerBorderColor: '#064e3b', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#047857', badgeTextColor: '#ffffff' },
+        { name: 'Safira 🟦', color1: '#1d4ed8', color2: '#60a5fa', color3: '#1e3a8a', glowColor: '#3b82f6', glowBlur: 18, borderColor: '#bfdbfe', borderWidth: 3, innerBorderColor: '#1e3a8a', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 38, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#1d4ed8', badgeTextColor: '#ffffff' },
+        { name: 'Rubi 🟥', color1: '#b91c1c', color2: '#f87171', color3: '#7f1d1d', glowColor: '#ef4444', glowBlur: 20, borderColor: '#fca5a5', borderWidth: 3, innerBorderColor: '#7f1d1d', innerBorderWidth: 1.5, starsCount: 5, ringThickness: 40, segmentedStyle: 'segmented', showBadgeFrame: true, badgeLevelColor: '#b91c1c', badgeTextColor: '#ffffff' },
+        { name: 'Diamante 👑', color1: '#0284c7', color2: '#bae6fd', color3: '#a855f7', glowColor: '#38bdf8', glowBlur: 22, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#a855f7', innerBorderWidth: 2, starsCount: 5, ringThickness: 42, segmentedStyle: 'sparkle', showBadgeFrame: true, badgeLevelColor: '#0284c7', badgeTextColor: '#ffffff' },
+        { name: 'Lendário 👾', color1: '#ec4899', color2: '#8b5cf6', color3: '#06b6d4', glowColor: '#d946ef', glowBlur: 25, borderColor: '#fdf2f8', borderWidth: 4, innerBorderColor: '#0891b2', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true, badgeLevelColor: '#ec4899', badgeTextColor: '#ffffff' },
+        { name: 'Arco-Íris 🌈', color1: '#f43f5e', color2: '#eab308', color3: '#3b82f6', glowColor: '#10b981', glowBlur: 25, borderColor: '#ffffff', borderWidth: 4, innerBorderColor: '#1e1b4b', innerBorderWidth: 2, starsCount: 5, ringThickness: 45, segmentedStyle: 'neon', showBadgeFrame: true, badgeLevelColor: '#f43f5e', badgeTextColor: '#ffffff' }
     ];
 
     useEffect(() => {
@@ -1396,6 +1423,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
         setSegmentedStyle(preset.segmentedStyle as any);
         setShowBadgeFrame(preset.showBadgeFrame);
         setBadgeLevelColor(preset.badgeLevelColor);
+        setBadgeTextColor(preset.badgeTextColor || '#ffffff');
     };
 
     const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes: number, outerRadius: number, innerRadius: number) => {
@@ -1705,7 +1733,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
             if (!publicUrl) throw new Error("Erro ao obter URL pública da imagem");
 
-            const finalUrl = `${publicUrl}#color=${encodeURIComponent(badgeLevelColor)}`;
+            const finalUrl = `${publicUrl}#color=${encodeURIComponent(badgeLevelColor)}&textColor=${encodeURIComponent(badgeTextColor)}`;
 
             const { error: dbError } = await supabase
                 .from('company_levels')
@@ -1974,21 +2002,38 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
                                     </label>
                                 </div>
                                 {showBadgeFrame && (
-                                    <div className="flex gap-2 items-center animate-in fade-in duration-200">
-                                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">Cor do Badge:</label>
-                                        <input
-                                            type="color"
-                                            value={badgeLevelColor}
-                                            onChange={(e) => setBadgeLevelColor(e.target.value)}
-                                            className="w-7 h-7 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={badgeLevelColor}
-                                            onChange={(e) => setBadgeLevelColor(e.target.value)}
-                                            className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
-                                        />
-                                    </div>
+                                    <>
+                                        <div className="flex gap-2 items-center animate-in fade-in duration-200">
+                                            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0 w-24">Fundo do Badge:</label>
+                                            <input
+                                                type="color"
+                                                value={badgeLevelColor}
+                                                onChange={(e) => setBadgeLevelColor(e.target.value)}
+                                                className="w-7 h-7 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={badgeLevelColor}
+                                                onChange={(e) => setBadgeLevelColor(e.target.value)}
+                                                className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 items-center animate-in fade-in duration-200 mt-1">
+                                            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0 w-24">Número do Badge:</label>
+                                            <input
+                                                type="color"
+                                                value={badgeTextColor}
+                                                onChange={(e) => setBadgeTextColor(e.target.value)}
+                                                className="w-7 h-7 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer bg-transparent shrink-0"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={badgeTextColor}
+                                                onChange={(e) => setBadgeTextColor(e.target.value)}
+                                                className="flex-1 w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white"
+                                            />
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -2039,7 +2084,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
                                     name={profile?.full_name || 'Amostra'}
                                     level={selectedLevel}
                                     size="xl"
-                                    ring_image_url={`${previewUrl}#color=${encodeURIComponent(badgeLevelColor)}`}
+                                    ring_image_url={`${previewUrl}#color=${encodeURIComponent(badgeLevelColor)}&textColor=${encodeURIComponent(badgeTextColor)}`}
                                 />
                             )}
                         </div>

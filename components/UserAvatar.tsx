@@ -1,5 +1,21 @@
 import React from 'react';
 
+const parseHashParams = (url: string) => {
+  const params: { [key: string]: string } = {};
+  if (!url) return params;
+  const hashIndex = url.indexOf('#');
+  if (hashIndex === -1) return params;
+  const hash = url.substring(hashIndex + 1);
+  const pairs = hash.split('&');
+  pairs.forEach(pair => {
+    const [key, value] = pair.split('=');
+    if (key && value) {
+      params[key] = decodeURIComponent(value);
+    }
+  });
+  return params;
+};
+
 interface UserAvatarProps {
   src?: string;
   name?: string;
@@ -150,15 +166,23 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
   // Se tiver imagem de anel customizada cadastrada pelo administrador ou informada por prop
   if (activeRingUrl) {
-    let customBadgeStyle = {};
-    let hasCustomColor = false;
-    if (activeRingUrl.includes('#color=')) {
-      const colorPart = activeRingUrl.split('#color=')[1];
-      if (colorPart) {
-        customBadgeStyle = { backgroundColor: decodeURIComponent(colorPart) };
-        hasCustomColor = true;
+    const params = parseHashParams(activeRingUrl);
+    let badgeBgColor = params.color;
+    let badgeTxtColor = params.textColor;
+
+    if (!badgeBgColor && activeRingUrl.includes('#color=')) {
+      const parts = activeRingUrl.split('#color=');
+      if (parts[1]) {
+        badgeBgColor = decodeURIComponent(parts[1].split('&')[0]);
       }
     }
+
+    const customBadgeStyle: React.CSSProperties = {};
+    if (badgeBgColor) customBadgeStyle.backgroundColor = badgeBgColor;
+    if (badgeTxtColor) customBadgeStyle.color = badgeTxtColor;
+
+    const hasCustomColor = !!badgeBgColor;
+    const hasCustomTextColor = !!badgeTxtColor;
 
     return (
       <div className={`relative inline-block select-none ${sizeClasses[size]} ${className}`}>
@@ -176,7 +200,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
         {/* Badge de Nível */}
         <div
-          className={`absolute rounded-full flex items-center justify-center font-extrabold text-white border-white dark:border-slate-950 z-20 ${badgeClasses[size]} ${hasCustomColor ? '' : badgeBg} shadow-md`}
+          className={`absolute rounded-full flex items-center justify-center font-extrabold border-white dark:border-slate-950 z-20 ${badgeClasses[size]} ${hasCustomColor ? '' : badgeBg} ${hasCustomTextColor ? '' : 'text-white'} shadow-md`}
           style={customBadgeStyle}
           title={`Nível ${level} - ${currentLevelConfig.name}`}
         >
