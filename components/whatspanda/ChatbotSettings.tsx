@@ -40,6 +40,7 @@ const ChatbotSettings: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [geminiKey, setGeminiKey] = useState('');
     const [chatbotMode, setChatbotMode] = useState<'disabled' | 'flow' | 'gemini'>('disabled');
+    const [chatbotMaxRetries, setChatbotMaxRetries] = useState<number>(2);
     const activeProfile = currentUser || profile;
     const [signature, setSignature] = useState('');
     const [useSignature, setUseSignature] = useState(false);
@@ -240,7 +241,7 @@ const ChatbotSettings: React.FC = () => {
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
         const { data: queuesData } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         const { data: teamData } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
-        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode').eq('company_id', companyId).limit(1).single();
+        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode, chatbot_max_retries').eq('company_id', companyId).limit(1).single();
 
         if (flowsData) setFlows(flowsData);
         if (queuesData) setQueues(queuesData);
@@ -248,6 +249,7 @@ const ChatbotSettings: React.FC = () => {
         if (settingsData) {
             setGeminiKey(settingsData.gemini_api_key || '');
             setChatbotMode((settingsData.chatbot_mode as any) || 'disabled');
+            setChatbotMaxRetries(settingsData.chatbot_max_retries !== undefined ? settingsData.chatbot_max_retries : 2);
         }
     };
 
@@ -438,17 +440,23 @@ const ChatbotSettings: React.FC = () => {
         }
     };
 
-    const handleSaveGeminiKey = async () => {
+    const handleSaveChatbotSettings = async () => {
         const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
         setLoading(true);
-        const { error } = await supabase.from('whatsapp_settings').update({ gemini_api_key: geminiKey }).eq('company_id', companyId);
+        const { error } = await supabase
+            .from('whatsapp_settings')
+            .update({ 
+                gemini_api_key: geminiKey,
+                chatbot_max_retries: chatbotMaxRetries
+            })
+            .eq('company_id', companyId);
         setLoading(false);
         if (error) {
-            console.error('Erro ao salvar Gemini API Key:', error);
-            alert('Erro ao salvar Gemini API Key: ' + error.message);
+            console.error('Erro ao salvar configurações do Chatbot:', error);
+            alert('Erro ao salvar configurações do Chatbot: ' + error.message);
         } else {
-            alert('Configuração salva!');
+            alert('Configurações do Chatbot salvas com sucesso!');
         }
     };
 
@@ -979,34 +987,66 @@ const ChatbotSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Configuração do Google Gemini */}
-            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
+            {/* Configurações Gerais do Chatbot */}
+            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
-                            <SparklesIcon className="w-6 h-6 text-emerald-500" /> Configuração do Google Gemini
+                            <SparklesIcon className="w-6 h-6 text-emerald-500" /> Configurações Gerais do Chatbot
                         </h2>
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest mt-1">
-                            Necessária para transferências inteligentes e análise de sentimentos.
+                            Ajuste a inteligência artificial do Gemini e limites de comportamento do bot.
                         </p>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-gray-100/50 dark:bg-black/20 p-2 rounded-2xl border border-transparent dark:border-white/5 w-full sm:w-auto sm:min-w-[340px] max-w-full">
-                        <input 
-                            type="password" 
-                            placeholder="Insira sua Gemini API Key..."
-                            value={geminiKey}
-                            onChange={(e) => setGeminiKey(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm px-3 py-2 sm:py-0 flex-1 dark:text-white min-w-0"
-                        />
-                        <button 
-                            onClick={handleSaveGeminiKey} 
-                            disabled={loading}
-                            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50 shrink-0"
-                        >
-                            {loading ? <RefreshCw className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
-                            Salvar Chave
-                        </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Input Chave API Gemini */}
+                    <div className="flex flex-col space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                            Chave de API do Google Gemini
+                        </label>
+                        <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
+                            <input 
+                                type="password" 
+                                placeholder="Insira sua Gemini API Key..."
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                className="bg-transparent border-none outline-none text-sm px-3 py-2 flex-1 dark:text-white min-w-0"
+                            />
+                        </div>
                     </div>
+
+                    {/* Input Tentativas do Chatbot */}
+                    <div className="flex flex-col space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                            Máximo de Tentativas (Opções Inválidas)
+                        </label>
+                        <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
+                            <input 
+                                type="number" 
+                                min={1}
+                                max={10}
+                                value={chatbotMaxRetries}
+                                onChange={(e) => setChatbotMaxRetries(parseInt(e.target.value) || 2)}
+                                className="bg-transparent border-none outline-none text-sm px-3 py-2 flex-1 dark:text-white min-w-0"
+                            />
+                        </div>
+                        <span className="text-[9px] text-gray-450 dark:text-gray-400 font-bold opacity-70">
+                            Quantas vezes o menu reaparecerá se o cliente digitar uma opção errada antes de desativar o bot.
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                    <button 
+                        onClick={handleSaveChatbotSettings} 
+                        disabled={loading}
+                        className="flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50"
+                    >
+                        {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Salvar Configurações
+                    </button>
                 </div>
             </div>
 

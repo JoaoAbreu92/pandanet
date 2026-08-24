@@ -3,6 +3,7 @@ import { X, User, Phone, Mail, MapPin, Calendar, Image as ImageIcon } from 'luci
 import NotesSection from './NotesSection';
 import TagsManager from './TagsManager';
 import { WhatsAppConversation } from '../../types';
+import { supabase } from '../../supabaseClient';
 
 interface ContactSidebarProps {
   conversation: WhatsAppConversation | null;
@@ -11,7 +12,53 @@ interface ContactSidebarProps {
 
 const ContactSidebar: React.FC<ContactSidebarProps> = ({ conversation, onClose }) => {
   const [showImageModal, setShowImageModal] = useState(false);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [disableBot, setDisableBot] = useState(false);
+  const [loadingBotSetting, setLoadingBotSetting] = useState(false);
+
+  // Carrega a configuração do bot quando a conversa muda
+  React.useEffect(() => {
+    const fetchContactBotSetting = async () => {
+      if (!conversation) return;
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_contacts')
+          .select('disable_bot')
+          .eq('company_id', conversation.company_id)
+          .eq('phone', conversation.contact_phone)
+          .maybeSingle();
+
+        if (data) {
+          setDisableBot(data.disable_bot || false);
+        } else {
+          setDisableBot(false);
+        }
+      } catch (err) {
+        console.error('Erro ao ler configuração do bot para contato:', err);
+      }
+    };
+    fetchContactBotSetting();
+  }, [conversation]);
+
+  const handleToggleBot = async () => {
+    if (!conversation) return;
+    const nextVal = !disableBot;
+    setLoadingBotSetting(true);
+    try {
+      const { error } = await supabase
+        .from('whatsapp_contacts')
+        .update({ disable_bot: nextVal })
+        .eq('company_id', conversation.company_id)
+        .eq('phone', conversation.contact_phone);
+
+      if (error) throw error;
+      setDisableBot(nextVal);
+    } catch (err: any) {
+      console.error('Erro ao atualizar configuração de bot do contato:', err.message);
+      alert('Erro ao atualizar configuração de bot: ' + err.message);
+    } finally {
+      setLoadingBotSetting(false);
+    }
+  };
 
   if (!conversation) return null;
 
@@ -114,8 +161,24 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({ conversation, onClose }
                   <p className="text-xs text-green-700 font-medium">Mensagens não lidas</p>
                 </div>
               </div>
-            )}
+          {/* Configuração de Robô */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 mt-4">
+            <div className="space-y-0.5">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Desabilitar Robô (Chatbot)</p>
+              <p className="text-[10px] text-slate-450 dark:text-gray-400 font-semibold opacity-70">Ignora o chatbot para este contato</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={disableBot} 
+                onChange={handleToggleBot}
+                disabled={loadingBotSetting}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-650 peer-checked:bg-red-500"></div>
+            </label>
           </div>
+        </div>
 
           {/* Tags Section */}
           <div className="border-t border-gray-200 pt-6">

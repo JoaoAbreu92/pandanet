@@ -1021,6 +1021,40 @@ CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_quick_messages
     USING (company_id = public.get_user_company_id() OR public.is_admin_in_profile())
     WITH CHECK (company_id = public.get_user_company_id() OR public.is_admin_in_profile());
 
+-- 20. WHATSAPP CHATBOT RETRIES & CONTACT BLOCK BOT
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_max_retries INTEGER DEFAULT 2;
+ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retries INTEGER DEFAULT 0;
+ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
+
+-- 21. WHATSAPP CAMPAIGNS RLS POLICIES FOR FRONTEND ACCESS
+ALTER TABLE public.whatsapp_scheduled_campaigns ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_scheduled_campaigns;
+CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_scheduled_campaigns
+    FOR ALL TO authenticated
+    USING (company_id = public.get_user_company_id() OR public.is_admin_in_profile())
+    WITH CHECK (company_id = public.get_user_company_id() OR public.is_admin_in_profile());
+
+ALTER TABLE public.whatsapp_scheduled_targets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_scheduled_targets;
+CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_scheduled_targets
+    FOR ALL TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.whatsapp_scheduled_campaigns c
+            WHERE c.id = whatsapp_scheduled_targets.campaign_id
+              AND (c.company_id = public.get_user_company_id() OR public.is_admin_in_profile())
+        )
+    )
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.whatsapp_scheduled_campaigns c
+            WHERE c.id = whatsapp_scheduled_targets.campaign_id
+              AND (c.company_id = public.get_user_company_id() OR public.is_admin_in_profile())
+        )
+    );
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 

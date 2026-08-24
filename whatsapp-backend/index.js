@@ -172,6 +172,15 @@ async function runAutoMigration() {
             console.log('[MIGRATION] Auto-migração da tabela whatsapp_quick_messages executada.');
         }
 
+        console.log('[MIGRATION] Verificando e criando colunas adicionais para chatbot, retries e bloqueio de bot...');
+        await supabase.rpc('exec_sql', {
+            sql: `
+                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_max_retries INTEGER DEFAULT 2;
+                ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retries INTEGER DEFAULT 0;
+                ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
+            `
+        }).catch(e => console.error('[MIGRATION] Erro ao adicionar novas colunas de chatbot:', e));
+
         // Forçar o recarregamento do schema cache do PostgREST para o frontend enxergar todas as atualizações
         await supabase.rpc('exec_sql', { sql: "NOTIFY pgrst, 'reload schema';" });
         console.log('[MIGRATION] PostgREST schema cache recarregado com sucesso.');
@@ -1529,7 +1538,15 @@ async function runChatbot(incomingText, conversation, companyId, connectionId) {
         
         if (nodesErr || !nodes || nodes.length === 0) return;
 
-        let currentNodeId = conversation.chatbot_node_id;
+        // Buscar versão mais recente da conversa para garantir integridade do contador
+        const { data: freshConv } = await supabase
+            .from('whatsapp_conversations')
+            .select('chatbot_node_id, chatbot_retries')
+            .eq('id', conversation.id)
+            .maybeSingle();
+
+        const currentConv = freshConv || conversation;
+        let currentNodeId = currentConv.chatbot_node_id;
         let currentNode = currentNodeId ? nodes.find(n => n.id === currentNodeId) : null;
 
         // Se o nó atual for do tipo menu, processar a resposta do usuário
@@ -1551,14 +1568,52 @@ async function runChatbot(incomingText, conversation, companyId, connectionId) {
             if (selectedOption) {
                 const nextNode = nodes.find(n => n.id === selectedOption.next_node);
                 if (nextNode) {
+                    // Resposta válida: zera as tentativas
+                    await supabase
+                        .from('whatsapp_conversations')
+                        .update({ chatbot_retries: 0 })
+                        .eq('id', conversation.id);
                     await executeNode(nextNode, conversation, companyId, connectionId, nodes);
                 } else {
                     await sendBotMessage("🤖 Opção configurada sem destino. Por favor, tente novamente.", conversation, companyId, connectionId);
                     await executeNode(currentNode, conversation, companyId, connectionId, nodes);
                 }
             } else {
-                await sendBotMessage("Opção inválida. Por favor, escolha uma das opções do menu:", conversation, companyId, connectionId);
-                await executeNode(currentNode, conversation, companyId, connectionId, nodes);
+                // Resposta inválida: busca limite de tentativas (chatbot_max_retries) da whatsapp_settings
+                let maxRetries = 2;
+                try {
+                    const { data: settings } = await supabase
+                        .from('whatsapp_settings')
+                        .select('chatbot_max_retries')
+                        .eq('id', connectionId)
+                        .maybeSingle();
+                    if (settings && settings.chatbot_max_retries !== undefined) {
+                        maxRetries = settings.chatbot_max_retries;
+                    }
+                } catch (e) {
+                    console.error('[CHATBOT] Erro ao ler chatbot_max_retries:', e.message);
+                }
+
+                // Incrementa a tentativa
+                const currentRetries = (currentConv.chatbot_retries || 0) + 1;
+
+                if (currentRetries >= maxRetries) {
+                    // Limite atingido: avisa e finaliza bot (atribui chatbot_node_id = null e chatbot_retries = 0)
+                    await sendBotMessage("Não entendi a sua resposta. Encaminhando você para nossos atendentes...", conversation, companyId, connectionId);
+                    await supabase
+                        .from('whatsapp_conversations')
+                        .update({ chatbot_node_id: null, chatbot_retries: 0 })
+                        .eq('id', conversation.id);
+                } else {
+                    // Ainda não atingiu o limite: incrementa e repete o menu
+                    await supabase
+                        .from('whatsapp_conversations')
+                        .update({ chatbot_retries: currentRetries })
+                        .eq('id', conversation.id);
+                    
+                    await sendBotMessage("Opção inválida. Por favor, escolha uma das opções do menu:", conversation, companyId, connectionId);
+                    await executeNode(currentNode, conversation, companyId, connectionId, nodes);
+                }
             }
         } else {
             // Se chatbot_node_id for nulo ou se o nó atual não for um 'menu'
@@ -1926,11 +1981,12 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             }
         }
 
-        // 0. Verificar se o contato está bloqueado
+        // 0. Verificar se o contato está bloqueado ou com bot desabilitado
+        let disableBotForContact = false;
         if (!isGroup) {
             const { data: contact } = await supabase
                 .from('whatsapp_contacts')
-                .select('is_blocked')
+                .select('is_blocked, disable_bot')
                 .eq('company_id', companyId)
                 .eq('phone', fromPhone)
                 .maybeSingle();
@@ -1939,6 +1995,9 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 console.log(`[BOT] Contato ${fromPhone} bloqueado.`);
                 addDebugLog('MSG_BLOCKED', `Contato ${fromPhone} está bloqueado.`);
                 return;
+            }
+            if (contact?.disable_bot) {
+                disableBotForContact = true;
             }
         }
 
@@ -2283,20 +2342,24 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         let geminiKey = null;
                         let businessHours = null;
 
-                        try {
-                            const { data: settings } = await supabase
-                                .from('whatsapp_settings')
-                                .select('chatbot_mode, gemini_api_key, business_hours')
-                                .eq('id', connectionId)
-                                .maybeSingle();
+                        if (disableBotForContact) {
+                            console.log(`[CHATBOT] Chatbot desabilitado para o contato: ${fromPhone}`);
+                        } else {
+                            try {
+                                const { data: settings } = await supabase
+                                    .from('whatsapp_settings')
+                                    .select('chatbot_mode, gemini_api_key, business_hours')
+                                    .eq('id', connectionId)
+                                    .maybeSingle();
 
-                            if (settings) {
-                                chatbotMode = settings.chatbot_mode || 'disabled';
-                                geminiKey = settings.gemini_api_key;
-                                businessHours = settings.business_hours;
+                                if (settings) {
+                                    chatbotMode = settings.chatbot_mode || 'disabled';
+                                    geminiKey = settings.gemini_api_key;
+                                    businessHours = settings.business_hours;
+                                }
+                            } catch (err) {
+                                console.error('[CHATBOT-MODE] Erro ao carregar configurações da conexão:', err.message);
                             }
-                        } catch (err) {
-                            console.error('[CHATBOT-MODE] Erro ao carregar configurações da conexão:', err.message);
                         }
 
                         let hasTransferred = false;
@@ -2590,6 +2653,9 @@ async function processScheduledCampaigns() {
             }
 
             // 2. Buscar o próximo alvo pendente
+            console.log(`[CAMPANHA] Buscando alvos pendentes para a campanha ${camp.id}...`);
+            global.addDebugLog('CAMPANHA_BUSCA_ALVOS', `Buscando alvos pendentes para a campanha ${camp.name}`, { campaign_id: camp.id });
+
             const { data: targets, error: targetErr } = await supabase
                 .from('whatsapp_scheduled_targets')
                 .select('*')
@@ -2600,8 +2666,14 @@ async function processScheduledCampaigns() {
 
             if (targetErr) {
                 console.error(`[CAMPANHA] Erro ao buscar alvos para campanha ${camp.id}:`, targetErr.message);
+                global.addDebugLog('CAMPANHA_BUSCA_ALVOS_ERR', `Erro ao buscar alvos: ${targetErr.message}`, { error: targetErr });
                 continue;
             }
+
+            console.log(`[CAMPANHA] Busca finalizada para "${camp.name}". Alvos encontrados: ${targets ? targets.length : 0}`);
+            global.addDebugLog('CAMPANHA_BUSCA_ALVOS_RES', `Busca finalizada para "${camp.name}". Alvos encontrados: ${targets ? targets.length : 0}`, { 
+                targets_found: targets ? targets.length : 0 
+            });
 
             // Se não houver mais alvos pendentes (e nenhum 'sending' em andamento), a campanha está finalizada!
             if (!targets || targets.length === 0) {
