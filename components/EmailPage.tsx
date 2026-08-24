@@ -51,6 +51,7 @@ interface EmailMessage {
     seq: string;
     from: string;
     to: string;
+    cc?: string;
     subject: string;
     date: string;
     html?: string;
@@ -334,7 +335,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             if (data.error) throw new Error(data.error);
 
             // Update local emails list with the body
-            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments } : e));
+            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments, cc: data.cc } : e));
 
             // Mark local real-state emails as seen
             setEmails(prev => prev.map(e => {
@@ -359,6 +360,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     text: data.text,
                     html: data.html, 
                     attachments: data.attachments,
+                    cc: data.cc,
                     flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen'] 
                 };
             });
@@ -367,7 +369,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             const cacheKey = `${currentUser.id}_${folder}_${page}`;
             if (emailCache[cacheKey]) {
                 emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
-                    e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html, attachments: data.attachments } : e
+                    e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html, attachments: data.attachments, cc: data.cc } : e
                 );
             }
 
@@ -1418,11 +1420,18 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     </div>
                                     <div>
                                         <div className="font-bold text-gray-900 dark:text-white tracking-tight">{selectedEmail.from}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                            Para: <span className="truncate max-w-[200px]">{selectedEmail.to || 'mim'}</span>
-                                            <button onClick={() => setShowDetails(!showDetails)} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors rounded text-[10px] font-bold uppercase cursor-pointer">
-                                                {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
-                                            </button>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                                Para: <span className="truncate max-w-[200px]">{selectedEmail.to || 'mim'}</span>
+                                                <button onClick={() => setShowDetails(!showDetails)} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors rounded text-[10px] font-bold uppercase cursor-pointer">
+                                                    {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                                                </button>
+                                            </div>
+                                            {selectedEmail.cc && (
+                                                <div className="text-[10px] opacity-80 truncate max-w-[300px]">
+                                                    Cc: {selectedEmail.cc}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full">
@@ -1433,7 +1442,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 {showDetails && (
                                     <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-white/5 text-xs text-gray-600 dark:text-gray-300 space-y-2 relative overflow-hidden break-words">
                                         <div><strong>De:</strong> {selectedEmail.from}</div>
-                                        <div><strong>Para:</strong> {selectedEmail.to || '-'}</div>
+                                        <div><strong>Para:</strong> {selectedEmail.to || (selectedEmail.from === settings.imap_user ? 'mim' : '-')}</div>
+                                        {selectedEmail.cc && <div><strong>Cc:</strong> {selectedEmail.cc}</div>}
                                         <div><strong>Data:</strong> {new Date(selectedEmail.date).toString()}</div>
                                         <div><strong>Assunto:</strong> {selectedEmail.subject}</div>
                                         {selectedEmail.messageId && <div><strong>Mensagem-ID:</strong> {selectedEmail.messageId}</div>}
