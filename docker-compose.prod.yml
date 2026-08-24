@@ -3,6 +3,13 @@ version: '3.8'
 services:
   # O Supabase já roda em sua própria stack (network: supabase_network)
 
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+
+
   whatsapp-backend:
     container_name: whatsapp_backend_prod
     build: 
@@ -27,6 +34,9 @@ services:
         - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
         - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     restart: always
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
     ports:
       - "80:80"
     depends_on:
