@@ -56,6 +56,18 @@ if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
 if (evoUrl.includes('localhost') || evoUrl.includes('127.0.0.1')) {
     evoUrl = evoUrl.replace('localhost', 'evolution-api').replace('127.0.0.1', 'evolution-api');
 }
+// Função de Suporte: Formatar Números de Telefone (ex: 5541999999999 -> +55 41 99999-9999)
+function formatPhoneDisplay(phoneStr) {
+    if (!phoneStr) return "Desconhecido";
+    let clean = phoneStr.replace(/\D/g, '');
+    if (clean.length === 12 && clean.startsWith('55')) {
+        return `+${clean.slice(0,2)} ${clean.slice(2,4)} ${clean.slice(4,8)}-${clean.slice(8)}`;
+    } else if (clean.length === 13 && clean.startsWith('55')) {
+        return `+${clean.slice(0,2)} ${clean.slice(2,4)} ${clean.slice(4,9)}-${clean.slice(9)}`;
+    }
+    return phoneStr;
+}
+
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
@@ -413,7 +425,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
             const isGroup = jid.includes('@g.us');
             const phone = isGroup ? jid : jid.split('@')[0];
-            const name = chat.name || chat.pushName || chat.contact?.name || phone;
+            // Tenta puxar o nome preferencialmente do PushName (nome que a pessoa usa no perfil)
+            const rawName = chat.pushName || chat.verifiedName || chat.name || chat.contact?.name || chat.contact?.pushName;
+            const name = rawName ? rawName : formatPhoneDisplay(phone);
 
             // Preparar Contato
             contactsToUpsert.push({
@@ -459,10 +473,11 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                             if (!jid || processedJids.has(jid)) continue;
                             processedJids.add(jid);
                             const phone = jid.split('@')[0];
+                            const rawName = c.pushName || c.verifiedName || c.name;
                             contactsToUpsert.push({
                                 company_id: companyId,
                                 phone: phone,
-                                name: c.name || c.pushName || c.verifiedName || phone,
+                                name: rawName ? rawName : formatPhoneDisplay(phone),
                                 updated_at: new Date().toISOString()
                             });
                         }
@@ -711,7 +726,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         if (!conv) {
             console.log(`[MSG] Criando nova conversa para ${fromPhone}...`);
-            const contactName = message.pushName || fromPhone;
+            const rawName = message.pushName || message.contact?.name || message.verifiedName;
+            const contactName = rawName ? rawName : formatPhoneDisplay(fromPhone);
             const { data: newConv, error: createErr } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
@@ -734,13 +750,14 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 conversationId = newConv?.id;
             }
         } else if (!isHistorical) {
-            // Se a conversa estava fechada, ela deve reabrir como pendente
-            const newStatus = conv.status === 'fechado' ? 'pendente' : conv.status;
+            // Se a conversa estava fechada, ela deve reabrir como pendente. Mas se eu mesmo respondi (isFromMe), não deve reabrir pra pendente se eu apenas esqueci de fechar.
+            // Para mantermos simples: qualquer msg nova abre.
+            const newStatus = (!isFromMe && conv.status === 'fechado') ? 'pendente' : conv.status;
             
             await supabase
                 .from('whatsapp_conversations')
                 .update({
-                    unread_count: (conv.unread_count || 0) + 1,
+                    unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), // Não soma unread se eu enviei!
                     last_message_at: new Date().toISOString(),
                     status: newStatus
                 }).eq('id', conversationId);
@@ -868,10 +885,11 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         }
     }
 
-    // ----- MENSAGEM RECEBIDA -----
-    if (event === 'messages.upsert') {
-        const message = data.messages ? data.messages[0] : data.message;
-        if (!message) return;
+    // ----- MENSAGEM RECEBIDA OU ENVIADA -----
+    // A Evolution API envia mensagens enviadas do celular do próprio cliente usando event 'messages.upsert' ou 'send.message'
+    if (event === 'messages.upsert' || event === 'send.message' || event === 'SEND_MESSAGE') {
+        const message = data.messages ? data.messages[0] : (data.message || data);
+        if (!message || (!message.key && !message.messageTimestamp)) return; // Ignora se vier payload vazio ou mal formatado
 
         await processInboundMessage(message, companyId, connectionId);
     }
