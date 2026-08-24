@@ -109,8 +109,25 @@ const AppContent: React.FC = () => {
                         if (company) {
                             const mappedCompany = company as unknown as Company;
                             const baseData = (mappedCompany.data || {}) as any;
+                            // Fetch real employees for this company
+                            const { data: realProfiles } = await supabase
+                                .from('profiles')
+                                .select('*')
+                                .eq('company_id', targetCompanyId);
+
                             const mergedData: AppData = {
-                                employees: baseData.employees || [],
+                                ...baseData,
+                                employees: (realProfiles || []).map((p: any) => ({
+                                    id: p.id,
+                                    name: p.full_name,
+                                    email: p.email,
+                                    avatarUrl: p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name)}&background=random`,
+                                    role: p.role || 'Colaborador',
+                                    team: p.team || p.department || 'Geral',
+                                    isAdmin: p.is_admin || false,
+                                    isOnline: true, // Should implement real status later
+                                    company_id: p.company_id
+                                })),
                                 announcements: baseData.announcements || [],
                                 banners: baseData.banners || [],
                                 conversations: baseData.conversations || [],

@@ -712,14 +712,14 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <button onClick={() => setSelectedConversationId(null)} className="md:hidden -ml-2 mr-2 p-2 text-gray-500 rounded-full hover:bg-gray-100">
                                     <ChevronLeftIcon className="w-6 h-6" />
                                 </button>
-                                <img src={selectedConversation.participantAvatarUrl} alt={selectedConversation.participantName} className="w-10 h-10 rounded-full object-cover" />
+                                <img src={selectedConversation?.participantAvatarUrl} alt={selectedConversation?.participantName} className="w-10 h-10 rounded-full object-cover" />
                                 <div>
-                                    <p className="font-bold text-brand-text">{selectedConversation.participantName}</p>
+                                    <p className="font-bold text-brand-text">{selectedConversation?.participantName}</p>
                                     {/* Online/Typing status removed for MVP as it requires Realtime Presence */}
-                                    <p className="text-xs text-gray-500">Online</p>
+                                    <p className="text-xs text-gray-500">Panda Offline</p>
                                 </div>
                             </div>
-                            {selectedConversation.isGroup && (
+                            {selectedConversation?.isGroup && (
                                 <div className="flex items-center space-x-1">
                                     <div className="relative">
                                         <button

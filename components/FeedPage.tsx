@@ -164,7 +164,11 @@ interface FeedPageProps {
 
 const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
     const onlineUsers = users.filter(u => u.isOnline);
-    const suggestedUsers = users.filter(u => !u.isOnline).slice(0, 5);
+    // Sugerimos pessoas que NÃO estão online no momento para "descobrir"
+    const suggestedUsers = users.filter(u => !u.isOnline).slice(0, 10);
+    // Fallback: se não houver "offline", mostra qualquer um exceto o atual? 
+    // Por enquanto vamos apenas garantir que mostre algo se a lista existir
+    const displaySuggestions = suggestedUsers.length > 0 ? suggestedUsers : users.slice(0, 10);
 
     return (
         <Card title="Pessoas" className="pb-4">
@@ -188,16 +192,20 @@ const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
                 )}
 
                 <div className="space-y-3 pt-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sugestões para seguir</p>
-                    {suggestedUsers.map(user => (
-                        <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                            <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
-                                <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
-                            </div>
-                        </a>
-                    ))}
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sugestões de Colaboradores</p>
+                    {displaySuggestions.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">Nenhum outro usuário encontrado.</p>
+                    ) : (
+                        displaySuggestions.map(user => (
+                            <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
+                                    <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
+                                </div>
+                            </a>
+                        ))
+                    )}
                 </div>
             </div>
             <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">Descobrir Mais</button>
