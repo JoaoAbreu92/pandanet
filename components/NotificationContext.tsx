@@ -242,18 +242,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // Request Permission
         if ("Notification" in window) {
             const permission = await Notification.requestPermission();
+            console.log('[PandaNet] Notification permission:', permission);
             if (permission !== 'granted') {
-                alert('Permissão de notificação negada. Ative nas configurações do navegador.');
+                alert('Permissão de notificação negada. Ative nas configurações do navegador para receber alertas.');
             }
         }
 
-        // Play Sound
+        // Play Sound using the robust method
         try {
-            const audio = new Audio(SOUNDS.message);
-            await audio.play();
+            console.log('[PandaNet] Testing sound playback...');
+            playNotificationSound('message');
         } catch (err) {
-            console.error('Falha ao tocar áudio de teste:', err);
-            alert('Falha ao tocar som. O navegador pode estar bloqueando áudio automático.');
+            console.error('Falha ao acionar playNotificationSound:', err);
         }
 
         // Show Desktop Notif

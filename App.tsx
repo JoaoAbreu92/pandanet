@@ -82,16 +82,23 @@ const AppContent: React.FC = () => {
                         .select('user_id')
                         .eq('conversation_id', newMsg.conversation_id)
                         .eq('user_id', currentUser.id)
-                        .single();
+                    if (participation) {
+                        const isSender = newMsg.sender_id === currentUser.id;
 
-                    if (participation && newMsg.sender_id !== currentUser.id) {
-                        console.log('[PandaNet] Nudge direcionado a mim! Ativando efeitos...');
-                        // Reproduzir som de alerta
-                        playNotificationSound('nudge');
+                        // Play sound only for receiver (avoid double echo if sender)
+                        // OR play for both if we want that satisfaction
+                        if (!isSender) {
+                            playNotificationSound('nudge');
+                        }
 
-                        // Direcionar para o chat
-                        setCurrentPage('messages');
-                        setPageContext({ conversationId: newMsg.conversation_id });
+                        // Always shake! (MSN Style)
+                        console.log('[PandaNet] Executing Nudge Shake!');
+
+                        // Force navigation only for receiver
+                        if (!isSender) {
+                            setCurrentPage('messages');
+                            setPageContext({ conversationId: newMsg.conversation_id });
+                        }
 
                         // Tremer a tela
                         setIsShaking(true);
@@ -100,7 +107,7 @@ const AppContent: React.FC = () => {
                             setIsShaking(false);
                         }, 5000);
                     } else {
-                        console.log('[PandaNet] Nudge ignorado (não sou o destinatário ou sou o autor).');
+                        console.log('[PandaNet] Nudge ignorado (não participo desta conversa).');
                     }
                 }
             })
@@ -114,35 +121,6 @@ const AppContent: React.FC = () => {
     const toggleTheme = () => {
         setTheme('light');
     };
-
-    // Proteção contra Inspeção de Código (DevTools)
-    useEffect(() => {
-        const handleContextMenu = (e: MouseEvent) => {
-            e.preventDefault();
-        };
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // F12
-            if (e.keyCode === 123) {
-                e.preventDefault();
-            }
-            // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
-            if (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) {
-                e.preventDefault();
-            }
-            if (e.ctrlKey && e.keyCode === 85) {
-                e.preventDefault();
-            }
-        };
-
-        window.addEventListener('contextmenu', handleContextMenu);
-        window.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            window.removeEventListener('contextmenu', handleContextMenu);
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, []);
 
     const [isImpersonating, setIsImpersonating] = useState(false);
     const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
