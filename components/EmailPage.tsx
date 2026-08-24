@@ -626,6 +626,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     setSelectedEmail(null);
                 }
                 showToast(`${selectedEmailUids.length} e-mails movidos para a lixeira.`, 'success');
+                // Força atualização da lista em background para refletir a nova listagem do Server bypassando o cache otimista local
+                fetchEmails(true, true);
             },
             'danger'
         );

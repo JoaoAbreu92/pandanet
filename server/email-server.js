@@ -298,14 +298,16 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
     const fromMailboxPath = fromPath || 'INBOX';
     if (!config || !uids || !toPath) return res.status(400).json({ error: 'Missing parameters' });
 
-    const uidsNum = Array.isArray(uids) ? uids.map(Number) : [Number(uids)];
-    console.log(`[email-server] MOVE: UIDs ${uidsNum.join(',')} from ${fromMailboxPath} to ${toPath}`);
+    // ImapFlow expects a sequence string (e.g. "1,2,3") or a single sequence string
+    const uidsStr = Array.isArray(uids) ? uids.join(',') : String(uids);
+    console.log(`[email-server] MOVE: UIDs [${uidsStr}] from ${fromMailboxPath} to ${toPath}`);
 
     try {
         const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(fromMailboxPath);
         try {
-            await client.messageMove(uidsNum, toPath, { uid: true });
+            await client.messageMove(uidsStr, toPath, { uid: true });
+            console.log(`[email-server] Successfully moved UIDs [${uidsStr}]`);
             return res.json({ success: true });
         } finally {
             lock.release();

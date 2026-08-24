@@ -8,7 +8,9 @@ import {
     BanknotesIcon,
     QueueListIcon,
     DocumentTextIcon,
-    InformationCircleIcon
+    InformationCircleIcon,
+    CreditCardIcon,
+    TagIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -28,13 +30,16 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
 
     const [formData, setFormData] = useState({
         customer_id: '',
-        name: '',
-        description: '',
-        quantity: 1,
+        name: '', // Nome da Assinatura
+        stripe_plan_id: '', // Plano para Inscrição (Stripe)
+        tax_1: 0,
+        tax_2: 0,
+        description: '', // Descrição na Fatura
+        include_description_in_item: false,
+        first_billing_date: '', // Data da 1ª Fatura
         currency: 'BRL',
-        stripe_plan_id: '',
-        terms: '',
-        next_billing_cycle: ''
+        quantity: 1,
+        terms: ''
     });
 
     useEffect(() => {
@@ -77,7 +82,7 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
                     currency: formData.currency,
                     stripe_plan_id: formData.stripe_plan_id,
                     terms: formData.terms,
-                    next_billing_cycle: formData.next_billing_cycle || null,
+                    next_billing_cycle: formData.first_billing_date || null,
                     status: 'active'
                 }]);
 
@@ -85,9 +90,13 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
             toast.success('Assinatura criada com sucesso!');
             onSave();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving subscription:', error);
-            toast.error('Erro ao salvar assinatura.');
+            if (error.code === '42P01') {
+                toast.error('SQL Error: A tabela crm_subscriptions não foi encontrada.');
+            } else {
+                toast.error('Erro ao salvar assinatura.');
+            }
         } finally {
             setLoading(false);
         }
@@ -95,29 +104,33 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
 
     return (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/10 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/10 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/50">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Nova Assinatura</h2>
-                        <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">Configuração de fatura recorrente</p>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <DocumentTextIcon className="w-6 h-6 text-brand-primary" />
+                            Nova Assinatura
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">Configuração de Faturamento Recorrente e Contrato</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors">
                         <XMarkIcon className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar max-h-[75vh]">
-                    {/* Customer Selection */}
+                <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar max-h-[75vh]">
+
+                    {/* Linha 1: Seleções principais */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
+                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                <span className="text-red-500">*</span> Selecionar Cliente
+                                <span className="text-red-500">*</span> Faturar Cliente
                             </label>
                             <div className="relative">
                                 <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <select 
                                     required
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white appearance-none"
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
                                     value={formData.customer_id}
                                     onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
                                 >
@@ -131,23 +144,33 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
 
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                <span className="text-red-500">*</span> Nome da Assinatura
+                                <span className="text-red-500">*</span> Plano para a Inscrição (Stripe)
                             </label>
-                            <input 
-                                required
-                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white"
-                                placeholder="Ex: Upgrade de armazenamento"
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            />
+                            <div className="relative">
+                                <CreditCardIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <select
+                                    required
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
+                                    value={formData.stripe_plan_id}
+                                    onChange={e => setFormData({ ...formData, stripe_plan_id: e.target.value })}
+                                >
+                                    <option value="">Nenhum plano selecionado</option>
+                                    <option value="plano_mensal_basico">Mensal Básico R$ 99</option>
+                                    <option value="plano_mensal_pro">Mensal Pro R$ 199</option>
+                                    <option value="plano_anual">Anual com Desconto R$ 999</option>
+                                </select>
+                            </div>
                         </div>
+                    </div>
 
+                    {/* Linha 2: Quantidade e Datas */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Moeda</label>
                             <div className="relative">
                                 <BanknotesIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white appearance-none"
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
                                     value={formData.currency}
                                     onChange={e => setFormData({ ...formData, currency: e.target.value })}
                                 >
@@ -157,61 +180,120 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
                                 </select>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Quantidade</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Quantidade do Plano</label>
                             <input 
                                 type="number"
-                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white"
+                                min="1"
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
                                 value={formData.quantity}
                                 onChange={e => setFormData({ ...formData, quantity: Number(e.target.value) })}
                             />
                         </div>
+
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Faturamento Futuro</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Data da Primeira Fatura</label>
                             <div className="relative">
                                 <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input 
                                     type="date"
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white"
-                                    value={formData.next_billing_cycle}
-                                    onChange={e => setFormData({ ...formData, next_billing_cycle: e.target.value })}
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
+                                    value={formData.first_billing_date}
+                                    onChange={e => setFormData({ ...formData, first_billing_date: e.target.value })}
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição (Opcional)</label>
-                        <textarea 
-                            rows={3}
-                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white resize-none"
-                            placeholder="Descreva detalhes específicos da assinatura..."
-                            value={formData.description}
-                            onChange={e => setFormData({ ...formData, description: e.target.value })}
-                        />
+                    {/* Descricao em Lote e Impostos */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-gray-100 dark:border-slate-800 pt-6 mt-6">
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nome da Assinatura (Contrato Interno)</label>
+                                <div className="relative">
+                                    <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        required
+                                        className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
+                                        placeholder="Ex: Contrato de Suporte Nível 1"
+                                        value={formData.name}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição Fatura (Opcional)</label>
+                                <textarea
+                                    rows={3}
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white resize-none"
+                                    placeholder="Descrição explícita apresentada na fatura recorrente gerada..."
+                                    value={formData.description}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </div>
+
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                                    checked={formData.include_description_in_item}
+                                    onChange={e => setFormData({ ...formData, include_description_in_item: e.target.checked })}
+                                />
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Incluir as informações da assinatura na descrição do item da fatura</span>
+                            </label>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Imposto (%) - Nível 1</label>
+                                <select
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
+                                    value={formData.tax_1}
+                                    onChange={e => setFormData({ ...formData, tax_1: Number(e.target.value) })}
+                                >
+                                    <option value={0}>Sem Imposto (0%)</option>
+                                    <option value={5}>ISS (5%)</option>
+                                    <option value={10}>PIS/COFINS (10%)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Imposto (%) - Nível 2</label>
+                                <select
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
+                                    value={formData.tax_2}
+                                    onChange={e => setFormData({ ...formData, tax_2: Number(e.target.value) })}
+                                >
+                                    <option value={0}>Sem Imposto 2 (0%)</option>
+                                    <option value={2}>Outro (2%)</option>
+                                    <option value={5}>Outro (5%)</option>
+                                </select>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Termos e Condições</label>
+                    <div className="border-t border-gray-100 dark:border-slate-800 pt-6 mt-6">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Termos e Condições Específicos</label>
                         <div className="relative">
                             <DocumentTextIcon className="absolute left-3 top-4 w-4 h-4 text-gray-400" />
                             <textarea 
                                 rows={4}
-                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white resize-none"
-                                placeholder="Termos específicos para esta assinatura..."
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white resize-none"
+                                placeholder="Ao adicionar novos termos, os termos base padrão são completamente substituídos nas faturas dessa assinatura..."
                                 value={formData.terms}
                                 onChange={e => setFormData({ ...formData, terms: e.target.value })}
                             />
                         </div>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl flex gap-3 border border-blue-100 dark:border-blue-800/30">
+                    <div className="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-2xl flex gap-3 border border-blue-100 dark:border-blue-800/30">
                         <InformationCircleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-                            A assinatura criará faturas automáticas com base no ciclo de faturamento definido. Certifique-se de que os dados fiscais do cliente estão corretos.
+                            Configurar uma assinatura fará com que o sistema gere as notas no ciclo estipulado pelo plano Stripe de forma automática.
                         </p>
                     </div>
                 </form>
@@ -220,16 +302,16 @@ const CRMSubscriptionForm: React.FC<CRMSubscriptionFormProps> = ({ onClose, onSa
                     <button 
                         type="button"
                         onClick={onClose}
-                        className="px-6 py-2.5 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                        className="px-6 py-2.5 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-slate-700 transition-colors"
                     >
                         Cancelar
                     </button>
                     <button 
                         onClick={handleSave}
-                        disabled={loading}
-                        className="px-8 py-2.5 rounded-xl font-bold text-sm bg-slate-800 dark:bg-blue-600 hover:bg-slate-700 dark:hover:bg-blue-700 text-white transition-all shadow-lg flex items-center gap-2"
+                        disabled={loading || !formData.stripe_plan_id || !formData.customer_id || !formData.name}
+                        className="px-8 py-2.5 rounded-xl font-bold text-sm bg-brand-primary hover:bg-brand-primary/90 text-white transition-all shadow-lg flex items-center gap-2 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     >
-                        {loading && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+                        {loading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-5 h-5" />}
                         Salvar Assinatura
                     </button>
                 </div>

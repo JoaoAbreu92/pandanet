@@ -18,11 +18,14 @@ import toast from 'react-hot-toast';
 
 interface CRMItemLine {
     id: string;
+    item_id?: string;
     description: string;
     long_description: string;
     qty: number;
     rate: number;
     tax?: string;
+    tax_1?: number;
+    tax_2?: number;
     amount: number;
 }
 
@@ -55,6 +58,29 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
 
     const [subTotal, setSubTotal] = useState(0);
     const [total, setTotal] = useState(0);
+    const [savedItems, setSavedItems] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (currentUser?.company_id) {
+            fetchSavedItems();
+        }
+    }, [currentUser]);
+
+    const fetchSavedItems = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('crm_items')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .eq('status', 'active');
+
+            if (!error && data) {
+                setSavedItems(data);
+            }
+        } catch (error) {
+            console.error('Error fetching items:', error);
+        }
+    };
 
     // Calculate totals whenever items, discount or adjustment changes
     useEffect(() => {
@@ -97,6 +123,30 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
             )
         }));
     };
+
+    const handleSelectItem = (lineId: string, savedItemId: string) => {
+        if (!savedItemId) return;
+        const selectedItem = savedItems.find(i => i.id === savedItemId);
+        if (!selectedItem) return;
+
+        setFormData(prev => ({
+            ...prev,
+            items: prev.items.map(item =>
+                item.id === lineId ? {
+                    ...item,
+                    item_id: selectedItem.id,
+                    description: selectedItem.name,
+                    long_description: selectedItem.description || '',
+                    rate: selectedItem.rate || 0,
+                    tax_1: selectedItem.tax_1 || 0,
+                    tax_2: selectedItem.tax_2 || 0,
+                    qty: 1
+                } : item
+            )
+        }));
+    };
+
+
 
     const handleSave = async () => {
         if (!formData.customer_id) {
@@ -274,16 +324,27 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                     {formData.items.map((item) => (
                                         <tr key={item.id}>
                                             <td className="px-6 py-4">
-                                                <div className="flex flex-col gap-1">
+                                                <div className="flex flex-col gap-2">
+                                                    <select
+                                                        className="w-full bg-slate-50 dark:bg-slate-800/80 outline-none dark:text-gray-300 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 appearance-none max-w-[200px]"
+                                                        onChange={(e) => handleSelectItem(item.id, e.target.value)}
+                                                        value={item.item_id || ''}
+                                                    >
+                                                        <option value="">Selecione um item rápido...</option>
+                                                        {savedItems.map(si => (
+                                                            <option key={si.id} value={si.id}>{si.name}</option>
+                                                        ))}
+                                                    </select>
                                                     <input 
                                                         className="w-full bg-transparent outline-none dark:text-white font-bold text-sm"
-                                                        placeholder="Nome do Item (ex: Consultoria)"
+                                                        placeholder="Nome do Item (ou selecione acima)"
                                                         value={item.description}
                                                         onChange={e => updateItem(item.id, 'description', e.target.value)}
                                                     />
-                                                    <input 
-                                                        className="w-full bg-transparent outline-none text-gray-400 text-[11px] font-medium"
-                                                        placeholder="Adicione detalhes extras aqui..."
+                                                    <textarea
+                                                        rows={2}
+                                                        className="w-full bg-transparent outline-none text-gray-500 dark:text-gray-400 text-[11px] font-medium resize-none border-l-2 border-brand-primary/20 pl-2 focus:border-brand-primary"
+                                                        placeholder="Adicione detalhes extras longo aqui..."
                                                         value={item.long_description}
                                                         onChange={e => updateItem(item.id, 'long_description', e.target.value)}
                                                     />

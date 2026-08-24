@@ -858,3 +858,32 @@ export interface CRMProject {
   deadline?: string;
   created_at: string;
 }
+
+export interface CRMItem {
+  id: string;
+  company_id: string;
+  name: string;
+  description?: string;
+  rate: number;
+  tax_1?: number;
+  tax_2?: number;
+  unit?: string;
+  item_group?: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
+export interface CRMSubscription {
+  id: string;
+  company_id: string;
+  customer_id: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  currency: string;
+  stripe_plan_id?: string;
+  terms?: string;
+  next_billing_cycle?: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}

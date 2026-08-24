@@ -688,7 +688,11 @@ const AppContent: React.FC = () => {
                     <CRMSales
                         initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any}
                         onViewCustomer={handleViewCustomer}
-                        onNewRequest={(type) => setFinanceFormType(type as any)}
+                        onNewRequest={(type) => {
+                            if (type === 'item') setShowItemForm(true);
+                            else if (type === 'subscription') setShowSubscriptionForm(true);
+                            else setFinanceFormType(type as any);
+                        }}
                     />
                 );
             case 'crm-subscriptions':

@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { 
     XMarkIcon, 
     CheckIcon,
-    DocumentTextIcon,
+    Bars3CenterLeftIcon,
     CurrencyDollarIcon,
     TagIcon,
-    Square3Stack3DIcon,
-    ScaleIcon,
+    QueueListIcon,
     ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '../supabaseClient';
@@ -21,14 +20,15 @@ interface CRMItemFormProps {
 const CRMItemForm: React.FC<CRMItemFormProps> = ({ onClose, onSave }) => {
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
+
     const [formData, setFormData] = useState({
-        description: '',
-        long_description: '',
+        name: '', // Displayed as *Descrição*
+        description: '', // Displayed as *Descrição Longa*
         rate: 0,
-        tax1: 0,
-        tax2: 0,
-        unit: '',
-        group_name: ''
+        tax_1: 0,
+        tax_2: 0,
+        unit: 'unidade',
+        item_group: ''
     });
 
     const handleSave = async (e: React.FormEvent) => {
@@ -41,136 +41,171 @@ const CRMItemForm: React.FC<CRMItemFormProps> = ({ onClose, onSave }) => {
                 .from('crm_items')
                 .insert([{
                     company_id: currentUser.company_id,
+                    name: formData.name,
                     description: formData.description,
-                    long_description: formData.long_description,
                     rate: formData.rate,
-                    tax1_vlr: formData.tax1,
-                    tax2_vlr: formData.tax2,
+                    tax_1: formData.tax_1,
+                    tax_2: formData.tax_2,
                     unit: formData.unit,
-                    group_name: formData.group_name
+                    item_group: formData.item_group,
+                    status: 'active'
                 }]);
 
             if (error) throw error;
-            toast.success('Item cadastrado com sucesso!');
+            toast.success('Item criado com sucesso!');
             onSave();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving item:', error);
-            toast.error('Erro ao salvar item.');
+            // Handling missing table or columns for seamless setup
+            if (error.code === '42P01') {
+                toast.error('SQL Error: A tabela crm_items não foi encontrada.');
+            } else {
+                toast.error('Erro ao salvar item.');
+            }
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/10">
-                <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Adicionar novo item</h2>
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 border border-white/10 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-800/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <QueueListIcon className="w-6 h-6 text-brand-primary" />
+                            Adicionar Novo Item
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-bold">Cadastro de serviços ou produtos</p>
+                    </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors">
                         <XMarkIcon className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSave} className="p-6 space-y-5 overflow-y-auto no-scrollbar max-h-[80vh]">
+                <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar max-h-[75vh]">
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                            <span className="text-red-500">*</span> Descrição
+                            <span className="text-red-500">*</span> Descrição (Nome do Item)
                         </label>
-                        <input 
-                            required
-                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                            value={formData.description}
-                            onChange={e => setFormData({ ...formData, description: e.target.value })}
-                        />
+                        <div className="relative">
+                            <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                required
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
+                                placeholder="Consultoria Mensal, Servidor VPS, etc..."
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            />
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição longa</label>
-                        <textarea 
-                            rows={3}
-                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white resize-none"
-                            value={formData.long_description}
-                            onChange={e => setFormData({ ...formData, long_description: e.target.value })}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                <span className="text-red-500">*</span> Tarifa - BRL (Moeda base)
-                            </label>
-                            <input 
-                                required
-                                type="number"
-                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                                value={formData.rate}
-                                onChange={e => setFormData({ ...formData, rate: Number(e.target.value) })}
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição Longa</label>
+                        <div className="relative">
+                            <Bars3CenterLeftIcon className="absolute left-3 top-4 w-4 h-4 text-gray-400" />
+                            <textarea
+                                rows={3}
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white resize-none"
+                                placeholder="Detalhes completos que aparecerão na fatura..."
+                                value={formData.description}
+                                onChange={e => setFormData({ ...formData, description: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                                <span className="text-red-500">*</span> Tarifa / Preço Base
+                            </label>
+                            <div className="relative">
+                                <CurrencyDollarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input 
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
+                                    value={formData.rate}
+                                    onChange={e => setFormData({ ...formData, rate: Number(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unidade</label>
                             <input 
                                 className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                                placeholder="Ex: hrs, un, etc"
+                                placeholder="Ex: hrs, meses, unidades..."
                                 value={formData.unit}
                                 onChange={e => setFormData({ ...formData, unit: e.target.value })}
                             />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Imposto 1 (%)</label>
                             <input 
                                 type="number"
+                                step="0.01"
                                 className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                                value={formData.tax1}
-                                onChange={e => setFormData({ ...formData, tax1: Number(e.target.value) })}
+                                value={formData.tax_1}
+                                onChange={e => setFormData({ ...formData, tax_1: Number(e.target.value) })}
                             />
                         </div>
+
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Imposto 2 (%)</label>
                             <input 
                                 type="number"
+                                step="0.01"
                                 className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                                value={formData.tax2}
-                                onChange={e => setFormData({ ...formData, tax2: Number(e.target.value) })}
+                                value={formData.tax_2}
+                                onChange={e => setFormData({ ...formData, tax_2: Number(e.target.value) })}
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Grupo de itens</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Grupo do Item / Categoria</label>
                         <select 
-                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white"
-                            value={formData.group_name}
-                            onChange={e => setFormData({ ...formData, group_name: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none text-sm dark:text-white appearance-none"
+                            value={formData.item_group}
+                            onChange={e => setFormData({ ...formData, item_group: e.target.value })}
                         >
-                            <option value="">Nenhum selecionado</option>
+                            <option value="">Sem grupo</option>
+                            <option value="Hardware">Hardware</option>
+                            <option value="Software">Software</option>
                             <option value="Serviços">Serviços</option>
-                            <option value="Produtos">Produtos</option>
                         </select>
                     </div>
 
-                    <div className="pt-4 flex justify-end gap-3">
-                        <button 
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-2.5 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            Fechar
-                        </button>
-                        <button 
-                            type="submit"
-                            disabled={loading}
-                            className="px-8 py-2.5 rounded-xl font-bold text-sm bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white transition-all shadow-lg flex items-center gap-2"
-                        >
-                            {loading && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
-                            Salvar
-                        </button>
-                    </div>
                 </form>
+
+                <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-6 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={handleSave}
+                        disabled={loading || !formData.name}
+                        className="px-6 py-2.5 text-sm font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-xl shadow-lg hover:shadow-brand-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {loading ? (
+                            <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <CheckIcon className="w-5 h-5" />
+                        )}
+                        Salvar Item
+                    </button>
+                </div>
             </div>
         </div>
     );
