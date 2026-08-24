@@ -1076,6 +1076,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 {tab}
               </button>
             ))}
+          </div>
         </div>
 
         {/* Search and Actions */}
