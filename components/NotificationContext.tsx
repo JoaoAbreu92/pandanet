@@ -265,6 +265,44 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 setNotifications(mapped);
             }
 
+            // Check client-side daily reminders for tasks
+            try {
+                const { data: pendingTasks } = await supabase
+                    .from('personal_tasks')
+                    .select('id, title, user_id')
+                    .eq('user_id', currentUser.id)
+                    .eq('completed', false)
+                    .eq('notify_daily', true);
+
+                if (pendingTasks && pendingTasks.length > 0) {
+                    for (const task of pendingTasks) {
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        const { data: existingNotif } = await supabase
+                            .from('notifications')
+                            .select('id')
+                            .eq('user_id', currentUser.id)
+                            .eq('type', 'event')
+                            .eq('link', 'personal-tasks')
+                            .eq('title', 'Lembrete de Tarefa')
+                            .like('description', `%${task.title}%`)
+                            .gte('created_at', todayStr)
+                            .limit(1);
+
+                        if (!existingNotif || existingNotif.length === 0) {
+                            await addNotification({
+                                type: 'event',
+                                title: 'Lembrete de Tarefa',
+                                description: `A tarefa "${task.title}" continua pendente. Não se esqueça de concluí-la!`,
+                                avatarUrl: currentUser.avatarUrl,
+                                link: 'personal-tasks'
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not run client-side daily task reminders check:', err);
+            }
+
             // Fetch explicitly Unread Internal Messages (Conversations with unread_count > 0)
             const { data: convsData } = await supabase
                 .from('conversations')

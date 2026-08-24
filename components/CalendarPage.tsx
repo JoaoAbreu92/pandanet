@@ -26,6 +26,29 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
 
+const getDatesInRange = (startDateStr: string, endDateStr: string): string[] => {
+    const dates: string[] = [];
+    try {
+        const start = new Date(startDateStr);
+        const end = new Date(endDateStr);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return [startDateStr];
+
+        const current = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+        const limit = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+
+        let count = 0;
+        while (current <= limit && count < 180) {
+            dates.push(current.toISOString().split('T')[0]);
+            current.setUTCDate(current.getUTCDate() + 1);
+            count++;
+        }
+    } catch (e) {
+        console.error('Error calculating dates range:', e);
+        return [startDateStr];
+    }
+    return dates;
+};
+
 const mockHolidays = [
     // Nacionais
     { title: 'Confraternização Universal', date: '2026-01-01', scope: 'Nacional', description: 'Início do ano civil, adotado por quase todas as nações do mundo. Celebra a paz e a união entre os povos.' },
@@ -319,24 +342,84 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             isSystem: true
         }));
 
-        const taskEvents: CalendarEvent[] = personalTasks
-            .filter(t => t.date)
-            .map(t => ({
-                id: `task-${t.id}`,
-                title: `Tarefa: ${t.title}`,
-                date: t.date,
-                startTime: '00:00',
-                endTime: '23:59',
-                category: 'Tarefa' as any,
-                location: '',
-                attendees: [],
-                notes: '',
-                isPrivate: true,
-                isSystem: false,
-                isTask: true,
-                taskCompleted: t.completed,
-                taskCompletedAt: t.completed_at
-            }));
+        const taskEvents: CalendarEvent[] = [];
+        personalTasks.forEach(t => {
+            if (!t.date) {
+                const targetDate = t.limit_date || t.date;
+                if (targetDate) {
+                    taskEvents.push({
+                        id: `task-${t.id}`,
+                        title: `Tarefa: ${t.title}`,
+                        date: targetDate,
+                        startTime: '00:00',
+                        endTime: '23:59',
+                        category: 'Tarefa' as any,
+                        location: '',
+                        attendees: [],
+                        notes: '',
+                        isPrivate: true,
+                        isSystem: false,
+                        isTask: true,
+                        taskCompleted: t.completed,
+                        taskCompletedAt: t.completed_at,
+                        isTaskStart: true,
+                        isTaskEnd: true,
+                        isTaskMiddle: false,
+                        taskStartDate: t.date,
+                        taskLimitDate: t.limit_date
+                    } as any);
+                }
+            } else {
+                if (t.limit_date && t.limit_date >= t.date) {
+                    const dates = getDatesInRange(t.date, t.limit_date);
+                    dates.forEach(d => {
+                        taskEvents.push({
+                            id: `task-${t.id}-${d}`,
+                            title: `Tarefa: ${t.title}`,
+                            date: d,
+                            startTime: '00:00',
+                            endTime: '23:59',
+                            category: 'Tarefa' as any,
+                            location: '',
+                            attendees: [],
+                            notes: '',
+                            isPrivate: true,
+                            isSystem: false,
+                            isTask: true,
+                            taskCompleted: t.completed,
+                            taskCompletedAt: t.completed_at,
+                            isTaskStart: d === t.date,
+                            isTaskEnd: d === t.limit_date,
+                            isTaskMiddle: d !== t.date && d !== t.limit_date,
+                            taskStartDate: t.date,
+                            taskLimitDate: t.limit_date
+                        } as any);
+                    });
+                } else {
+                    taskEvents.push({
+                        id: `task-${t.id}`,
+                        title: `Tarefa: ${t.title}`,
+                        date: t.date,
+                        startTime: '00:00',
+                        endTime: '23:59',
+                        category: 'Tarefa' as any,
+                        location: '',
+                        attendees: [],
+                        notes: '',
+                        isPrivate: true,
+                        isSystem: false,
+                        isTask: true,
+                        taskCompleted: t.completed,
+                        taskCompletedAt: t.completed_at,
+                        isTaskStart: true,
+                        isTaskEnd: true,
+                        isTaskMiddle: false,
+                        taskStartDate: t.date,
+                        taskLimitDate: t.limit_date
+                    } as any);
+                }
+            }
+        });
 
         return [...events, ...birthdayEvents, ...holidayEvents, ...taskEvents];
     }, [events, employees, currentDate, personalTasks]);
@@ -513,29 +596,64 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                             {evs.map(e => {
                                                 const isTask = (e as any).isTask;
                                                 const taskCompleted = (e as any).taskCompleted;
+                                                const isTaskStart = (e as any).isTaskStart;
+                                                const isTaskEnd = (e as any).isTaskEnd;
+                                                const isTaskMiddle = (e as any).isTaskMiddle;
+
+                                                let taskClasses = '';
+                                                if (isTask) {
+                                                    if (taskCompleted) {
+                                                        taskClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30 ';
+                                                        if (isTaskStart && isTaskEnd) {
+                                                            taskClasses += 'rounded-lg border-l-4 border-l-emerald-500';
+                                                        } else if (isTaskStart) {
+                                                            taskClasses += 'rounded-l-lg rounded-r-none border-r-0 border-l-4 border-l-emerald-500';
+                                                        } else if (isTaskEnd) {
+                                                            taskClasses += 'rounded-r-lg rounded-l-none border-l-0 border-r-4 border-r-emerald-500';
+                                                        } else if (isTaskMiddle) {
+                                                            taskClasses += 'rounded-none border-x-0 opacity-75';
+                                                        }
+                                                    } else {
+                                                        if (isTaskStart && isTaskEnd) {
+                                                            taskClasses = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30 rounded-lg border-l-4 border-l-amber-500';
+                                                        } else if (isTaskStart) {
+                                                            taskClasses = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30 rounded-l-lg rounded-r-none border-r-0 border-l-4 border-l-amber-500';
+                                                        } else if (isTaskEnd) {
+                                                            taskClasses = 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950/20 dark:text-red-300 dark:border-red-900/30 rounded-r-lg rounded-l-none border-l-0 border-r-4 border-r-red-500 font-bold';
+                                                        } else if (isTaskMiddle) {
+                                                            taskClasses = 'bg-amber-50/60 text-amber-700/80 border-amber-200/50 dark:bg-amber-950/10 dark:text-amber-300/70 dark:border-amber-900/20 rounded-none border-x-0';
+                                                        }
+                                                    }
+                                                }
+
                                                 return (
                                                     <button 
                                                         key={e.id} 
                                                         onClick={(evt) => { 
                                                             evt.stopPropagation(); 
                                                             if (isTask) {
-                                                                onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                                                const taskId = e.id.replace('task-', '').split('-')[0];
+                                                                onNavigate?.('personal-tasks' as Page, { taskId });
                                                             } else {
                                                                 setSelectedEvent(e); 
                                                                 setDetailModalOpen(true); 
                                                             }
                                                         }} 
-                                                        className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${
-                                                            isTask 
-                                                                ? (taskCompleted 
-                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30' 
-                                                                    : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30')
-                                                                : getCategoryColor(e.category)
+                                                        className={`w-full text-left p-1.5 text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${
+                                                            isTask ? taskClasses : getCategoryColor(e.category)
                                                         }`}
                                                     >
                                                         {isTask ? (
                                                             <span className="flex items-center gap-1">
-                                                                {taskCompleted ? '🟢' : '⚪'} <span>{e.title}</span>
+                                                                {taskCompleted ? (
+                                                                    <>🟢 <span>{e.title} {isTaskEnd && '(Fim)'}</span></>
+                                                                ) : (
+                                                                    <>
+                                                                        {isTaskStart && <span>⚪ {e.title}</span>}
+                                                                        {isTaskMiddle && <span className="opacity-60">↳ {e.title}</span>}
+                                                                        {isTaskEnd && <span className="text-red-600 dark:text-red-400">⚠️ {e.title} (Prazo)</span>}
+                                                                    </>
+                                                                )}
                                                             </span>
                                                         ) : (
                                                             <>
@@ -639,7 +757,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         key={e.id}
                                         onClick={() => {
                                             if (isTask) {
-                                                onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                                const taskId = e.id.replace('task-', '').split('-')[0];
+                                                onNavigate?.('personal-tasks' as Page, { taskId });
                                             } else {
                                                 setSelectedEvent(e);
                                                 setDetailModalOpen(true);
@@ -1092,7 +1211,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                     onClick={() => {
                                                         setDayOptionsOpen(false);
                                                         if (isTask) {
-                                                            onNavigate?.('personal-tasks' as Page, { taskId: e.id.replace('task-', '') });
+                                                            const taskId = e.id.replace('task-', '').split('-')[0];
+                                                            onNavigate?.('personal-tasks' as Page, { taskId });
                                                         } else {
                                                             setSelectedEvent(e);
                                                             setDetailModalOpen(true);

@@ -18,10 +18,12 @@ interface Task {
     id: string;
     user_id: string;
     title: string;
-    date: string | null; // Data no formato YYYY-MM-DD para o calendário (Data Final/Agendada)
+    date: string | null; // Data no formato YYYY-MM-DD para o calendário (Data de Início)
+    limit_date: string | null; // Data limite / prazo final
     items: SubTask[];
     completed: boolean;
     completed_at: string | null; // Data de conclusão
+    notify_daily: boolean; // Enviar lembrete diário por notificação
     created_at: string;
     updated_at: string;
 }
@@ -38,7 +40,9 @@ const PersonalTasksPage: React.FC<PersonalTasksPageProps> = ({ currentUser, isGh
     // Estados do formulário do painel lateral de edição
     const [editTitle, setEditTitle] = useState('');
     const [editDate, setEditDate] = useState('');
+    const [editLimitDate, setEditLimitDate] = useState('');
     const [editCompletedDate, setEditCompletedDate] = useState('');
+    const [editNotifyDaily, setEditNotifyDaily] = useState(false);
     const [newSubTaskText, setNewSubTaskText] = useState('');
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -183,7 +187,9 @@ WITH CHECK (
                     setSelectedTask(foundTask);
                     setEditTitle(foundTask.title);
                     setEditDate(foundTask.date || '');
+                    setEditLimitDate(foundTask.limit_date || '');
                     setEditCompletedDate(foundTask.completed_at || '');
+                    setEditNotifyDaily(foundTask.notify_daily || false);
                     return;
                 }
             }
@@ -192,7 +198,9 @@ WITH CHECK (
                 setSelectedTask(initialTask);
                 setEditTitle(initialTask.title);
                 setEditDate(initialTask.date || '');
+                setEditLimitDate(initialTask.limit_date || '');
                 setEditCompletedDate(initialTask.completed_at || '');
+                setEditNotifyDaily(initialTask.notify_daily || false);
             }
         }
     }, [tasks, pageContext?.taskId]);
@@ -201,7 +209,9 @@ WITH CHECK (
         setSelectedTask(task);
         setEditTitle(task.title);
         setEditDate(task.date || '');
+        setEditLimitDate(task.limit_date || '');
         setEditCompletedDate(task.completed_at || '');
+        setEditNotifyDaily(task.notify_daily || false);
         setNewSubTaskText('');
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -215,9 +225,11 @@ WITH CHECK (
                 .update({
                     title: taskToSave.title,
                     date: taskToSave.date ? taskToSave.date : null,
+                    limit_date: taskToSave.limit_date ? taskToSave.limit_date : null,
                     items: taskToSave.items,
                     completed: taskToSave.completed,
                     completed_at: taskToSave.completed_at ? taskToSave.completed_at : null,
+                    notify_daily: taskToSave.notify_daily,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', taskToSave.id);
@@ -236,9 +248,11 @@ WITH CHECK (
                 user_id: currentUser.id,
                 title: 'Nova Tarefa',
                 date: null,
+                limit_date: null,
                 items: [],
                 completed: false,
-                completed_at: null
+                completed_at: null,
+                notify_daily: false
             };
 
             const { data, error } = await supabase
@@ -601,16 +615,26 @@ WITH CHECK (
                                             {task.date ? (
                                                 <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
                                                     📅 {formatShortDate(task.date)}
+                                                    {task.limit_date && ` até ${formatShortDate(task.limit_date)}`}
+                                                </span>
+                                            ) : task.limit_date ? (
+                                                <span className="flex items-center gap-1 font-semibold text-red-500 dark:text-red-400">
+                                                    📅 Limite: {formatShortDate(task.limit_date)}
                                                 </span>
                                             ) : (
                                                 <span className="italic">Sem prazo/data final</span>
                                             )}
                                             
-                                            {totalCount > 0 ? (
-                                                <span>{completedCount}/{totalCount} itens</span>
-                                            ) : (
-                                                <span className="italic text-[9px]">Checklist vazio</span>
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                {task.notify_daily && (
+                                                    <span className="text-emerald-500 font-bold" title="Lembrete diário ativo">🔔</span>
+                                                )}
+                                                {totalCount > 0 ? (
+                                                    <span>{completedCount}/{totalCount} itens</span>
+                                                ) : (
+                                                    <span className="italic text-[9px]">Checklist vazio</span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="flex justify-between items-center mt-2.5 pt-1.5 border-t border-slate-100/50 dark:border-slate-800/40 text-[9px] text-slate-400">
@@ -666,12 +690,12 @@ WITH CHECK (
                             </div>
                         </div>
 
-                        {/* Seção 2: Metadados (Prazo Final e Data de Conclusão) */}
-                        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/10 dark:bg-slate-900/5">
-                            {/* Data Final / Prazo */}
+                        {/* Seção 2: Metadados (Data de Início, Prazo Limite, Data de Conclusão e Lembrete Diário) */}
+                        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/10 dark:bg-slate-900/5">
+                            {/* Data de Início */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                                    📅 Prazo Final / Exibir no Calendário
+                                    📅 Data de Início / Calendário
                                 </label>
                                 <input
                                     type="date"
@@ -684,10 +708,26 @@ WITH CHECK (
                                 />
                             </div>
 
+                            {/* Data Limite / Prazo */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                    🏁 Data Limite / Prazo Final
+                                </label>
+                                <input
+                                    type="date"
+                                    value={editLimitDate}
+                                    onChange={(e) => {
+                                        setEditLimitDate(e.target.value);
+                                        triggerAutoSave({ limit_date: e.target.value || null }, false); // Salva imediatamente
+                                    }}
+                                    className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full"
+                                />
+                            </div>
+
                             {/* Data de Conclusão */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                                    ✅ Data de Conclusão / Finalização
+                                    ✅ Data de Conclusão
                                 </label>
                                 <input
                                     type="date"
@@ -699,6 +739,24 @@ WITH CHECK (
                                     }}
                                     className="px-3 py-2 bg-slate-50 disabled:bg-slate-100/50 dark:bg-slate-800 dark:disabled:bg-slate-900/50 text-slate-700 dark:text-slate-200 disabled:text-slate-400 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full"
                                 />
+                            </div>
+
+                            {/* Notificação Diária */}
+                            <div className="sm:col-span-3 flex items-center space-x-3 p-3 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-xl border border-emerald-100/50 dark:border-emerald-900/20">
+                                <input
+                                    type="checkbox"
+                                    id="notifyDaily"
+                                    checked={editNotifyDaily}
+                                    onChange={(e) => {
+                                        setEditNotifyDaily(e.target.checked);
+                                        triggerAutoSave({ notify_daily: e.target.checked }, false); // Salva imediatamente
+                                    }}
+                                    className="w-4 h-4 rounded text-emerald-500 border-slate-300 dark:border-slate-700 focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <label htmlFor="notifyDaily" className="flex-1 cursor-pointer">
+                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-200">🔔 Lembrar diariamente por Notificação</div>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Você receberá uma notificação de alerta todos os dias até concluir a tarefa.</p>
+                                </label>
                             </div>
                         </div>
 
