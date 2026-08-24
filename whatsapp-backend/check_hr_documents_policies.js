@@ -18,8 +18,8 @@ async function execSQL(sql) {
 }
 
 async function run() {
-  const res = await execSQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'profiles'");
-  console.log('Columns:', res.body);
+  const res = await execSQL("SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename = 'hr_documents'");
+  console.log('Policies:', res.body);
 }
 
 run().catch(console.error);

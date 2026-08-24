@@ -18,7 +18,7 @@ async function execSQL(sql) {
 }
 
 async function run() {
-  const res = await execSQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'profiles'");
+  const res = await execSQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'agenda_visits'");
   console.log('Columns:', res.body);
 }
 

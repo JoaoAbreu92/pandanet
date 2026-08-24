@@ -18,8 +18,10 @@ async function execSQL(sql) {
 }
 
 async function run() {
-  const res = await execSQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'profiles'");
-  console.log('Columns:', res.body);
+  const res = await execSQL("UPDATE storage.buckets SET public = true WHERE id = 'hr-files'");
+  console.log('Result:', res.body);
+  const verify = await execSQL("SELECT id, name, public FROM storage.buckets WHERE id = 'hr-files'");
+  console.log('Verified:', verify.body);
 }
 
 run().catch(console.error);

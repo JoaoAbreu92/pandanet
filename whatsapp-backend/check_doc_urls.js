@@ -18,8 +18,10 @@ async function execSQL(sql) {
 }
 
 async function run() {
-  const res = await execSQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'profiles'");
-  console.log('Columns:', res.body);
+  const res1 = await execSQL("SELECT id, name, file_url, file_name FROM hr_documents LIMIT 5");
+  console.log('Documents:', res1.body);
+  const res2 = await execSQL("SELECT id, month, file_url, file_name FROM hr_payslips LIMIT 5");
+  console.log('Payslips:', res2.body);
 }
 
 run().catch(console.error);

@@ -33,6 +33,12 @@ const HRManager: React.FC = () => {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
+  // Document targeting
+  const [docTargetType, setDocTargetType] = useState<'all' | 'users' | 'departments'>('all');
+  const [docTargetUsers, setDocTargetUsers] = useState<string[]>([]);
+  const [docTargetDepts, setDocTargetDepts] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<{id: string; name: string}[]>([]);
+  const [userSearch, setUserSearch] = useState('');
 
   // Payslips state
   const [payslips, setPayslips] = useState<any[]>([]);
@@ -116,9 +122,18 @@ const HRManager: React.FC = () => {
       fetchTimeBank(),
       fetchEmployeeBenefits(),
       fetchEvaluations(),
-      fetchCompetencies()
+      fetchCompetencies(),
+      fetchDepartments()
     ]);
     setLoading(false);
+  };
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase.from('departments')
+      .select('id, name')
+      .eq('company_id', profile!.company_id!)
+      .order('name');
+    if (data) setDepartments(data);
   };
 
   const fetchRequests = async () => {
@@ -337,13 +352,24 @@ const HRManager: React.FC = () => {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('hr-files').getPublicUrl(path);
       const { error } = await supabase.from('hr_documents').insert({
-        company_id: profile!.company_id!, ...docForm, file_url: publicUrl,
-        file_name: docFile.name, created_by: profile!.id
+        company_id: profile!.company_id!,
+        ...docForm,
+        file_url: publicUrl,
+        file_name: docFile.name,
+        created_by: profile!.id,
+        target_type: docTargetType,
+        target_users: docTargetType === 'users' ? docTargetUsers : [],
+        target_departments: docTargetType === 'departments' ? docTargetDepts : [],
       });
       if (error) throw error;
       showToast('Documento publicado!');
       setDocForm({ name: '', description: '', category: 'general', is_public: true });
-      setDocFile(null); if (docInputRef.current) docInputRef.current.value = '';
+      setDocFile(null);
+      setDocTargetType('all');
+      setDocTargetUsers([]);
+      setDocTargetDepts([]);
+      setUserSearch('');
+      if (docInputRef.current) docInputRef.current.value = '';
       fetchDocuments();
     } catch (e: any) { showToast(e.message || 'Erro ao publicar.', false); }
     finally { setUploadingDoc(false); }
@@ -551,11 +577,102 @@ const HRManager: React.FC = () => {
                 <input type="file" ref={docInputRef} onChange={e => setDocFile(e.target.files?.[0] || null)}
                   className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
               </div>
-              <div className="md:col-span-2 flex items-center gap-2">
-                <input type="checkbox" id="is_public" checked={docForm.is_public}
-                  onChange={e => setDocForm(f => ({ ...f, is_public: e.target.checked }))}
-                  className="rounded" />
-                <label htmlFor="is_public" className="text-sm text-gray-600 dark:text-gray-300">Visível para todos os colaboradores</label>
+
+              {/* ── Seleção de Destinatários ── */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">📤 Enviar para</label>
+                <div className="flex gap-2 flex-wrap mb-3">
+                  {(['all', 'departments', 'users'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setDocTargetType(t); setDocTargetUsers([]); setDocTargetDepts([]); setUserSearch(''); }}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        docTargetType === t
+                          ? 'bg-brand-primary text-white border-brand-primary'
+                          : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-brand-primary hover:text-brand-primary'
+                      }`}
+                    >
+                      {t === 'all' ? '🌐 Todos os funcionários' : t === 'departments' ? '🏢 Setor específico' : '👤 Pessoas específicas'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Setor */}
+                {docTargetType === 'departments' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Selecione os setores</p>
+                    <div className="flex flex-wrap gap-2">
+                      {departments.map(dept => (
+                        <button
+                          key={dept.id}
+                          type="button"
+                          onClick={() => setDocTargetDepts(prev =>
+                            prev.includes(dept.id) ? prev.filter(id => id !== dept.id) : [...prev, dept.id]
+                          )}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            docTargetDepts.includes(dept.id)
+                              ? 'bg-emerald-500 text-white border-emerald-500'
+                              : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-emerald-400'
+                          }`}
+                        >
+                          {docTargetDepts.includes(dept.id) ? '✓ ' : ''}{dept.name}
+                        </button>
+                      ))}
+                      {departments.length === 0 && <p className="text-xs text-gray-400">Nenhum setor cadastrado.</p>}
+                    </div>
+                    {docTargetDepts.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-2">
+                        {docTargetDepts.length} setor(es) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Pessoas específicas */}
+                {docTargetType === 'users' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecione os funcionários</p>
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      placeholder="Buscar funcionário..."
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                      {employees
+                        .filter(emp => emp.full_name.toLowerCase().includes(userSearch.toLowerCase()))
+                        .map(emp => (
+                          <div
+                            key={emp.id}
+                            onClick={() => setDocTargetUsers(prev =>
+                              prev.includes(emp.id) ? prev.filter(id => id !== emp.id) : [...prev, emp.id]
+                            )}
+                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                              docTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+                                : 'hover:bg-gray-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              docTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                              {docTargetUsers.includes(emp.id) && <span className="text-white text-xs">✓</span>}
+                            </div>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">{emp.full_name}</span>
+                          </div>
+                        ))}
+                    </div>
+                    {docTargetUsers.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        {docTargetUsers.length} funcionário(s) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <button onClick={uploadDocument} disabled={uploadingDoc}
@@ -563,6 +680,7 @@ const HRManager: React.FC = () => {
               {uploadingDoc ? 'Publicando...' : 'Publicar Documento'}
             </button>
           </div>
+
 
           <div>
             <h3 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-3">Documentos Publicados ({docs.length})</h3>
