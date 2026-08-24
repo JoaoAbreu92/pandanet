@@ -133,7 +133,7 @@ function setupPushNotificationsListener() {
                 // Buscar token push do usuário destinatário
                 const { data: profile, error } = await supabase
                     .from('profiles')
-                    .select('push_token, role, email')
+                    .select('push_token, role, email, is_admin, is_company_admin')
                     .eq('id', notif.user_id)
                     .single();
 
@@ -142,7 +142,11 @@ function setupPushNotificationsListener() {
                     return;
                 }
 
-                const isMaster = profile.role === 'Super Admin' || profile.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                const isMaster = profile.role === 'Super Admin' || 
+                                 profile.is_company_admin === true || 
+                                 profile.is_admin === true ||
+                                 profile.email?.toLowerCase() === 'ti@grupopixel.com.br' ||
+                                 profile.email?.toLowerCase() === 'ti@acrilight.com.br';
                 if (!isMaster) {
                     console.log(`[FCM] Ignorando notificação push para usuário não master: ${profile.email}`);
                     return;
@@ -207,12 +211,16 @@ function setupPushNotificationsListener() {
                     // Buscar o token push de cada participante
                     const { data: prof } = await supabase
                         .from('profiles')
-                        .select('push_token, role, email')
+                        .select('push_token, role, email, is_admin, is_company_admin')
                         .eq('id', p.user_id)
                         .maybeSingle();
 
                     if (prof?.push_token) {
-                        const isMaster = prof.role === 'Super Admin' || prof.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                        const isMaster = prof.role === 'Super Admin' || 
+                                         prof.is_company_admin === true || 
+                                         prof.is_admin === true ||
+                                         prof.email?.toLowerCase() === 'ti@grupopixel.com.br' ||
+                                         prof.email?.toLowerCase() === 'ti@acrilight.com.br';
                         if (!isMaster) continue;
 
                         await pushService.sendPushNotification(
@@ -269,12 +277,16 @@ function setupPushNotificationsListener() {
                     // Se estiver atribuído a um atendente específico, notifica ele
                     const { data: agent } = await supabase
                         .from('profiles')
-                        .select('push_token, role, email')
+                        .select('push_token, role, email, is_admin, is_company_admin')
                         .eq('id', convInfo.assigned_to)
                         .maybeSingle();
 
                     if (agent?.push_token) {
-                        const isMaster = agent.role === 'Super Admin' || agent.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                        const isMaster = agent.role === 'Super Admin' || 
+                                         agent.is_company_admin === true || 
+                                         agent.is_admin === true ||
+                                         agent.email?.toLowerCase() === 'ti@grupopixel.com.br' ||
+                                         agent.email?.toLowerCase() === 'ti@acrilight.com.br';
                         if (isMaster) {
                             await pushService.sendPushNotification(
                                 agent.push_token,
@@ -292,14 +304,18 @@ function setupPushNotificationsListener() {
                     // Se não estiver atribuído, notifica administradores da mesma empresa
                     const { data: admins } = await supabase
                         .from('profiles')
-                        .select('push_token, role, email')
+                        .select('push_token, role, email, is_admin, is_company_admin')
                         .eq('company_id', convInfo.company_id)
                         .or('role.eq.Super Admin,is_admin.eq.true,is_company_admin.eq.true');
 
                     if (admins && admins.length > 0) {
                         for (const adminProf of admins) {
                             if (adminProf.push_token) {
-                                const isMaster = adminProf.role === 'Super Admin' || adminProf.email?.toLowerCase() === 'ti@grupopixel.com.br';
+                                const isMaster = adminProf.role === 'Super Admin' || 
+                                                 adminProf.is_company_admin === true || 
+                                                 adminProf.is_admin === true ||
+                                                 adminProf.email?.toLowerCase() === 'ti@grupopixel.com.br' ||
+                                                 adminProf.email?.toLowerCase() === 'ti@acrilight.com.br';
                                 if (!isMaster) continue;
 
                                 await pushService.sendPushNotification(
