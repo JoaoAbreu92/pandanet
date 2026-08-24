@@ -970,11 +970,33 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             
             const cleanUrl = mediaUrl.split('?')[0];
             const fileName = cleanUrl.split('/').pop() || 'file';
-            
-            // Data URI ou URL pública do áudio
+
+            // Fazer upload de mídias base64 para o Supabase Storage para obter URL pública HTTPS limpa
+            let savedMediaUrl = mediaUrl;
+            const audioDataUri = mediaUrl.startsWith('data:')
+                ? mediaUrl
+                : `data:${mediaType || 'audio/webm'};base64,${base64Data}`;
+
+            if (mediaUrl.startsWith('data:')) {
+                const uploadedUrl = await uploadMediaToSupabase(
+                    base64Data,
+                    isAudio ? 'audio' : (isSticker ? 'sticker' : getEvoMediaType(mediaType)),
+                    conv.company_id,
+                    mediaType || 'application/octet-stream',
+                    fileName && fileName !== 'file' ? fileName : (isAudio ? `audio_${Date.now()}.webm` : `file_${Date.now()}`)
+                );
+                if (uploadedUrl) {
+                    savedMediaUrl = uploadedUrl;
+                }
+            }
+
             const audioSource = (savedMediaUrl && !savedMediaUrl.startsWith('data:'))
                 ? savedMediaUrl
                 : audioDataUri;
+
+            const mediaSource = (savedMediaUrl && !savedMediaUrl.startsWith('data:'))
+                ? savedMediaUrl
+                : base64Data;
 
             // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
@@ -996,9 +1018,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 number: phoneNumber,
                 mediaMessage: {
                     mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
-                    mimetype: mediaType,
-                    media: base64Data,
-                    fileName: fileName,
+                    mimetype: mediaType || 'application/octet-stream',
+                    media: mediaSource,
+                    fileName: fileName || 'documento',
                     caption: message || ''
                 }
             };
