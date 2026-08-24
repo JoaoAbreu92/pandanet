@@ -111,6 +111,9 @@ const Chat: React.FC = () => {
   };
 
   const fetchConversations = async () => {
+    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    if (!companyId) return;
+
     const { data } = await supabase
       .from('whatsapp_conversations')
       .select(`
@@ -119,6 +122,7 @@ const Chat: React.FC = () => {
         department:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name)
       `)
+      .eq('company_id', companyId)
       .order('last_message_at', { ascending: false });
     
     if (data) setConversations(data as WhatsAppConversationWithDetails[]);
@@ -136,6 +140,9 @@ const Chat: React.FC = () => {
   };
 
   const markAsRead = async (conversationId: string) => {
+    const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
+    if (isImpersonating) return; // Ghost mode blocks marking as read
+
     await supabase
       .from('whatsapp_conversations')
       .update({ unread_count: 0 })

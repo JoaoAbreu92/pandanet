@@ -106,6 +106,8 @@ export interface Event {
   date: string; // YYYY-MM-DD
   time: string;
   location: string;
+  meeting_url?: string;
+  is_specific_audience?: boolean;
   imageUrl?: string;
   category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro';
   imageType?: 'url' | 'upload';

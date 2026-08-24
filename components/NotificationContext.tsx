@@ -265,6 +265,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [currentUser?.id, fetchNotifications, playNotificationSound, showDesktopNotification]);
 
     const markAsRead = async (id: string) => {
+        const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
+        if (isImpersonating) return; // Ghost mode blocks marking as read
+
         try {
             const { error } = await supabase
                 .from('notifications')
@@ -280,6 +283,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const markAllAsRead = async () => {
         if (!currentUser?.id) return;
+
+        const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
+        if (isImpersonating) return; // Ghost mode blocks marking as read
+
         try {
             const { error } = await supabase
                 .from('notifications')

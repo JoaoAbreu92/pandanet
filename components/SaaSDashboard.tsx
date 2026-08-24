@@ -41,6 +41,8 @@ import {
     PlayCircleIcon
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon, ChatBubbleLeftRightIcon as HeroChatBubbleLeftRightIcon, MegaphoneIcon as HeroMegaphoneIcon, ArrowRightOnRectangleIcon as HeroArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { Ghost } from 'lucide-react';
+import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { useLanguage } from './LanguageContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -74,6 +76,7 @@ const CompanyUserCount = ({ companyId }: { companyId: string }) => {
 };
 
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImpersonate }) => {
+    const { profile: currentUser } = useAuth();
     const { showToast } = useToast();
     const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -997,6 +1000,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 <td className="px-6 py-4 text-gray-500">{comp.plan?.name || 'Standard'}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
+                                                        {currentUser?.email === 'ti@grupopixel.com.br' && onImpersonate && (
+                                                            <ActionButton
+                                                                icon={Ghost}
+                                                                color="text-gray-900 dark:text-gray-100 hover:text-purple-600"
+                                                                title="Acesso Fantasma (Invisível)"
+                                                                onClick={() => onImpersonate(comp)}
+                                                            />
+                                                        )}
                                                         <ActionButton icon={BanknotesIcon} color="text-green-600" title={t('dashboard.invoices')} onClick={() => openModal('invoices', comp)} />
                                                         <ActionButton icon={CalendarDaysIcon} color="text-blue-500" title={t('dashboard.add_month')} onClick={() => openModal('addMonth', comp)} />
                                                         <ActionButton icon={ChartPieIcon} color="text-purple-500" title={t('dashboard.stats')} onClick={() => openModal('stats', comp)} />

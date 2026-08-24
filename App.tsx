@@ -420,12 +420,15 @@ const AppContent: React.FC = () => {
         setCompanyData(company.data || { employees: [] } as any);
         setCompanySettings(company.settings || { companyName: company.name });
         setIsImpersonating(true);
+        localStorage.setItem('pixel_is_impersonating', 'true');
+        setCurrentPage('home'); // Redirect to company home automatically
         setAuthStage('logged_in');
     };
 
     const handleImpersonateEnd = () => {
         setIsImpersonating(false);
         setImpersonatedCompany(null);
+        localStorage.removeItem('pixel_is_impersonating');
         // Force refresh to reload real user data
         window.location.reload();
     };
@@ -601,7 +604,7 @@ const AppContent: React.FC = () => {
             case 'knowledge-base': return canAccess('viewKnowledgeBase') ? <KnowledgeBasePage /> : null;
             case 'service-status': return canAccess('viewServiceStatus') ? <StatusPage /> : null;
             case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage /> : null;
-            case 'events': return <EventsPage />;
+            case 'events': return <EventsPage initialEventId={pageContext?.eventId} />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
             case 'jobs': return <JobsPage />;
             case 'meu-rh': return <EmployeePortal />;

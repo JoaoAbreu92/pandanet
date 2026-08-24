@@ -335,7 +335,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 // INSERT (Note: This is profile table, not Auth yet. In a real app we'd need Auth.signUp)
                 // For this MVP, we create the profile and the user will link via email on first login
                 if (users.length >= plan.userLimit) {
-                    alert(`Limite de ${plan.userLimit} usuários para o plano ${plan.name} atingido.`);
+                    alert(`Atenção: Sua empresa excedeu o limite de ${plan.userLimit} usuários do seu plano atual (${plan.name}). Por favor, contate o suporte para mudar o plano e liberar novos acessos.`);
                     return;
                 }
 

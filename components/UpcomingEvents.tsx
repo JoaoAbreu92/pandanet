@@ -22,7 +22,21 @@ const UpcomingEvents: React.FC = () => {
         .limit(3);
 
       if (error) throw error;
-      setEvents(data || []);
+
+      const filtered = (data || []).filter(event => {
+        const isInvited = (event.invited_ids || []).includes(currentUser?.id || '');
+        const isAttending = (event.attendees || []).includes(currentUser?.id || '');
+        const isDeclined = (event.declined || []).some((d: any) => d.userId === currentUser?.id);
+
+        if (event.is_specific_audience) {
+          return (isInvited || isAttending) && !isDeclined;
+        }
+
+        const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invited_ids || event.invited_ids.length === 0;
+        return (isSocialOrPublic || isInvited || isAttending) && !isDeclined;
+      });
+
+      setEvents(filtered);
     } catch (err) {
       console.error('Error fetching upcoming events:', err);
     } finally {
@@ -58,9 +72,22 @@ const UpcomingEvents: React.FC = () => {
                   <p className="text-xs font-bold text-brand-primary uppercase">{month}</p>
                   <p className="text-xl font-bold text-brand-primary leading-tight">{day}</p>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-brand-text truncate max-w-[150px]">{event.title}</h4>
-                  <p className="text-sm text-brand-subtle-text truncate max-w-[150px]">{event.time} - {event.location}</p>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-brand-text truncate">{event.title}</h4>
+                  <div className="flex items-center space-x-2 text-sm text-brand-subtle-text">
+                    <span className="truncate">{event.time} - {event.location}</span>
+                    {event.meeting_url && (
+                      <a
+                        href={event.meeting_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-600 flex-shrink-0"
+                        title="Participar da Reunião"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" /></svg>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             );

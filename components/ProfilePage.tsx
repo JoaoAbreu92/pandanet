@@ -223,12 +223,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
             console.log("[Profile] Auth User ID:", user.id);
             
-            // Verificar se o perfil existe
-            console.log("[Profile] Verificando se perfil existe...");
+            console.log("[Profile] Verificando se perfil existe para o alvo que estamos editando...");
+            const targetUserId = tempUserData.id;
+
+            if (!targetUserId) {
+                throw new Error("ID do usuário a ser editado não foi encontrado no estado.");
+            }
+
             const { data: existingProfile, error: checkError } = await supabase
                 .from('profiles')
                 .select('id')
-                .eq('id', user.id)
+                .eq('id', targetUserId)
                 .single();
 
             if (checkError) {
@@ -237,7 +242,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             }
 
             if (!existingProfile) {
-                console.error("[Profile] Perfil não encontrado para ID:", user.id);
+                console.error("[Profile] Perfil não encontrado para ID alvo:", targetUserId);
                 throw new Error("Perfil não encontrado. Entre em contato com o suporte.");
             }
 
@@ -279,7 +284,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update(dbUpdates)
-                .eq('id', user.id);
+                .eq('id', targetUserId);
 
             console.log("[Profile] Resposta do UPDATE:");
             console.log("[Profile] - error:", updateError);
@@ -300,7 +305,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             const { data: freshProfile, error: reloadError } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('id', user.id)
+                .eq('id', targetUserId)
                 .single();
 
             if (!reloadError && freshProfile) {

@@ -6,7 +6,11 @@ import { useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
-const EventsPage: React.FC = () => {
+interface EventsPageProps {
+    initialEventId?: string;
+}
+
+const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
     const { profile: currentUser } = useAuth();
     const { t } = useLanguage();
     const { addNotification } = useNotifications();
@@ -23,8 +27,14 @@ const EventsPage: React.FC = () => {
         start_time: '09:00',
         location: '',
         category: 'Corporativo',
-        imageUrl: ''
+        imageUrl: '',
+        meetingUrl: '',
+        isSpecificAudience: false,
+        selectedUsers: [] as string[],
+        selectedDepartments: [] as string[]
     });
+    const [companyDepartments, setCompanyDepartments] = useState<any[]>([]);
+    const [companyUsers, setCompanyUsers] = useState<any[]>([]);
 
     const fetchEvents = async () => {
         if (!currentUser?.company_id) return;
@@ -50,6 +60,8 @@ const EventsPage: React.FC = () => {
                     imageUrl: e.imageUrl,
                     category: (e.category as any) || 'Outro',
                     imageType: 'url',
+                    meeting_url: e.meeting_url,
+                    is_specific_audience: e.is_specific_audience,
                     invited_ids: e.invited_ids || [], // Map to the correct column
                     attendees: e.attendees || [],
                     declined: e.declined || []
@@ -64,6 +76,20 @@ const EventsPage: React.FC = () => {
     };
 
     useEffect(() => {
+        const fetchCompanyData = async () => {
+            if (!currentUser?.company_id) return;
+            try {
+                const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
+                if (depts) setCompanyDepartments(depts);
+
+                const { data: users } = await supabase.from('profiles').select('id, full_name, department_id').eq('company_id', currentUser.company_id);
+                if (users) setCompanyUsers(users);
+            } catch (e) {
+                console.error("Erro ao buscar dados da empresa", e);
+            }
+        };
+
+        fetchCompanyData();
         fetchEvents();
 
         // Subscription for realtime updates?
@@ -78,6 +104,16 @@ const EventsPage: React.FC = () => {
             subscription.unsubscribe();
         }
     }, [currentUser?.company_id]);
+
+    // Lógica para abrir evento via notificação (initialEventId)
+    useEffect(() => {
+        if (initialEventId && events.length > 0) {
+            const event = events.find(e => e.id === initialEventId);
+            if (event) {
+                setSelectedEvent(event);
+            }
+        }
+    }, [initialEventId, events]);
 
     const handleJoinEvent = async (eventId: string) => {
         if (!currentUser) return;
@@ -197,6 +233,13 @@ const EventsPage: React.FC = () => {
             // Use local date string to avoid timezone issues when possible, or just build ISO
             const isoStart = new Date(`${newEvent.date}T${newEvent.start_time}:00`).toISOString();
 
+            let finalInvitedIds: string[] = [];
+
+            if (newEvent.isSpecificAudience) {
+                const deptUserIds = companyUsers.filter(u => newEvent.selectedDepartments.includes(u.department_id)).map(u => u.id);
+                finalInvitedIds = Array.from(new Set([...deptUserIds, ...newEvent.selectedUsers]));
+            }
+
             const { data: createdEvent, error } = await supabase
                 .from('events')
                 .insert([{
@@ -209,9 +252,11 @@ const EventsPage: React.FC = () => {
                     category: newEvent.category,
                     type: newEvent.category, // Fallback for 'type' column
                     image_url: newEvent.imageUrl,
+                    meeting_url: newEvent.meetingUrl || null,
+                    is_specific_audience: newEvent.isSpecificAudience,
                     company_id: currentUser.company_id,
                     attendees: [],
-                    invited_ids: [], // Ensure this is sent
+                    invited_ids: finalInvitedIds,
                     declined: []
                 }])
                 .select()
@@ -222,11 +267,23 @@ const EventsPage: React.FC = () => {
             console.log('Evento criado com sucesso!');
             setIsCreateModalOpen(false);
 
-            // Notify everyone in the company (simple approach for now)
-            // In a large company, this might be slow or should be a background task
-            // We'll only notify if it's a public/social event.
-            if (['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(newEvent.category)) {
-                // Fetch employees to notify
+            // Notify users
+            if (newEvent.isSpecificAudience) {
+                // Notificar apenas os convidados
+                for (const uid of finalInvitedIds) {
+                    if (uid !== currentUser.id) {
+                        addNotification({
+                            user_id: uid,
+                            company_id: currentUser.company_id,
+                            type: 'event',
+                            title: 'Você foi convidado!',
+                            description: `Convite para: ${newEvent.title}`,
+                            link: '/events'
+                        });
+                    }
+                }
+            } else if (['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(newEvent.category)) {
+            // Fetch employees to notify all
                 const { data: emps } = await supabase.from('profiles').select('id').eq('company_id', currentUser.company_id);
                 if (emps) {
                     for (const emp of emps) {
@@ -244,7 +301,9 @@ const EventsPage: React.FC = () => {
                 }
             }
 
-            setNewEvent({ title: '', description: '', date: '', start_time: '09:00', location: '', category: 'Corporativo', imageUrl: '' });
+            setNewEvent({
+                title: '', description: '', date: '', start_time: '09:00', location: '', category: 'Corporativo', imageUrl: '', meetingUrl: '', isSpecificAudience: false, selectedUsers: [], selectedDepartments: []
+            });
             fetchEvents();
         } catch (err: any) {
             console.error("Error creating event:", err);
@@ -256,10 +315,17 @@ const EventsPage: React.FC = () => {
         const isInvited = (event.invited_ids || []).includes(currentUser?.id || '');
         const isAttending = (event.attendees || []).includes(currentUser?.id || '');
         const isDeclined = (event.declined || []).some((d: any) => d.userId === currentUser?.id);
+        const isSuperAdmin = currentUser?.role === 'Super Admin';
+
+        // Se for audiência específica, só mostra se estiver convidado ou já confirmado (ou se for Super Admin)
+        if (event.is_specific_audience) {
+            return (isInvited || isAttending || isSuperAdmin) && !isDeclined;
+        }
+
         const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invited_ids || event.invited_ids.length === 0;
 
         // Don't show declined events in the main list unless explicitly asked
-        return (isSocialOrPublic || isInvited || isAttending) && !isDeclined;
+        return (isSocialOrPublic || isInvited || isAttending || isSuperAdmin) && !isDeclined;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     if (loading) return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Carregando eventos...</div>;
@@ -541,7 +607,91 @@ const EventsPage: React.FC = () => {
                                         placeholder="https://..."
                                     />
                                 </div>
-                                <div className="flex justify-end pt-4">
+                                <div className="border-t dark:border-slate-700 pt-4 mt-4">
+                                    <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-3">Videoconferência & Convidados</h4>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Link da Reunião (Meet, Zoom, Teams) - Opcional</label>
+                                        <input
+                                            type="url"
+                                            className="w-full border dark:border-slate-700 rounded-lg p-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                                            value={newEvent.meetingUrl}
+                                            onChange={e => setNewEvent({ ...newEvent, meetingUrl: e.target.value })}
+                                            placeholder="https://meet.google.com/..."
+                                        />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Público Alvo</label>
+                                        <div className="flex space-x-4">
+                                            <label className="flex items-center space-x-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    checked={!newEvent.isSpecificAudience}
+                                                    onChange={() => setNewEvent({ ...newEvent, isSpecificAudience: false, selectedDepartments: [], selectedUsers: [] })}
+                                                    className="w-4 h-4 text-brand-primary border-gray-300 focus:ring-brand-primary"
+                                                />
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">Toda a Empresa</span>
+                                            </label>
+                                            <label className="flex items-center space-x-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    checked={newEvent.isSpecificAudience}
+                                                    onChange={() => setNewEvent({ ...newEvent, isSpecificAudience: true })}
+                                                    className="w-4 h-4 text-brand-primary border-gray-300 focus:ring-brand-primary"
+                                                />
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">Específico (Departamentos/Pessoas)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {newEvent.isSpecificAudience && (
+                                        <div className="space-y-4 bg-gray-50 dark:bg-slate-700/50 p-4 rounded-lg border border-gray-100 dark:border-slate-600">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Convidar Departamentos Inteiros</label>
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded bg-white dark:bg-slate-700 p-2 grid grid-cols-2 gap-2">
+                                                    {companyDepartments.map(dept => (
+                                                        <label key={dept.id} className="flex items-center space-x-2 text-sm cursor-pointer p-1 hover:bg-gray-50 dark:hover:bg-slate-600 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={newEvent.selectedDepartments.includes(dept.id)}
+                                                                onChange={(e) => {
+                                                                    const updated = e.target.checked
+                                                                        ? [...newEvent.selectedDepartments, dept.id]
+                                                                        : newEvent.selectedDepartments.filter(id => id !== dept.id);
+                                                                    setNewEvent({ ...newEvent, selectedDepartments: updated });
+                                                                }}
+                                                                className="rounded text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                                            />
+                                                            <span className="text-gray-700 dark:text-gray-200 line-clamp-1">{dept.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Convidar Pessoas Específicas</label>
+                                                <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded bg-white dark:bg-slate-700 p-2 space-y-1">
+                                                    {companyUsers.filter(u => !newEvent.selectedDepartments.includes(u.department_id)).map(user => (
+                                                        <label key={user.id} className="flex items-center space-x-3 text-sm cursor-pointer p-1.5 hover:bg-gray-50 dark:hover:bg-slate-600 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={newEvent.selectedUsers.includes(user.id)}
+                                                                onChange={(e) => {
+                                                                    const updated = e.target.checked
+                                                                        ? [...newEvent.selectedUsers, user.id]
+                                                                        : newEvent.selectedUsers.filter(id => id !== user.id);
+                                                                    setNewEvent({ ...newEvent, selectedUsers: updated });
+                                                                }}
+                                                                className="rounded text-brand-primary focus:ring-brand-primary h-4 w-4"
+                                                            />
+                                                            <span className="text-gray-900 dark:text-gray-100 font-medium">{user.full_name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 italic">* Pessoas de departamentos já selecionados acima foram ocultadas desta lista para evitar duplicidade.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex justify-end pt-4 mt-2">
                                     <button type="submit" className="bg-brand-primary text-white px-6 py-2.5 rounded-lg hover:bg-emerald-600 font-bold shadow-lg transition-all">
                                         Criar Evento
                                     </button>
