@@ -60,6 +60,7 @@ interface EmailMessage {
     metadata?: EmailMetadata; // Expanded locally
     attachments?: Array<{ id: number; filename: string; contentType: string; size: number }>;
     snippet?: string;
+    folder?: string;
 }
 
 interface EmailMetadata {
@@ -211,13 +212,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             try {
                 const email = JSON.parse(savedSelected);
                 setSelectedEmail(email);
-                // If it was open, fetch body again to be sure
-                if (savedView === 'read') {
-                    fetchEmailBody(email.uid, email.folder || savedFolder || 'INBOX');
-                }
             } catch (e) { console.error("Error parsing saved selected email", e); }
         }
     }, [currentUser.id]);
+
+    // Fetch body for restored email only after settings are loaded
+    useEffect(() => {
+        if (savedImapUser && view === 'read' && selectedEmail && !selectedEmail.html && !selectedEmail.text) {
+            fetchEmailBody(selectedEmail.uid, selectedEmail.folder || currentFolder || 'INBOX');
+        }
+    }, [savedImapUser, view, selectedEmail]);
 
     useEffect(() => {
         if (!currentUser?.id) return;
