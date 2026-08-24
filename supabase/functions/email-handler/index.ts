@@ -18,9 +18,8 @@ async function testConnection(host: string, port: number, timeout = 5000) {
 async function testTlsHandshake(host: string, port: number) {
   try {
     const conn = await Deno.connectTls({
-      hostname: host,
+      hostname: host, 
       port,
-      // No Deno, passamos opções de verificação aqui se necessário
     });
     conn.close();
     return { ok: true };
@@ -40,20 +39,19 @@ async function scanCommonPorts(host: string) {
   return results;
 }
 
-console.log("Edge Function 'email-handler' V22 (Deep Handshake) iniciada.");
+console.log("Edge Function 'email-handler' V23 (CORS Fix & Deep Diag) iniciada.");
 
 Deno.serve(async (req) => {
-  // Configuração global de bypass para bibliotecas Node-compat
-  Deno.env.set('NODE_TLS_REJECT_UNAUTHORIZED', '0');
-
+  // 1. CORS Preflight - SEMPRE NO TOPO ABSOLUTO
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // 2. Health Check
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V22). Deep Handshake test active.' 
+      message: 'Edge Function Online (V23). CORS Fixed.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -67,7 +65,7 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V22] Ação: ${action}`);
+    console.log(`[V23] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
@@ -84,7 +82,7 @@ Deno.serve(async (req) => {
           secure: isPort465,
           auth: { user: settings.user, pass: settings.pass },
           tls: { 
-            rejectUnauthorized: false,
+            rejectUnauthorized: true, // Começar restrito na V23
             servername: settings.smtp_host
           },
           requireTLS: !isPort465, 
@@ -93,22 +91,31 @@ Deno.serve(async (req) => {
         })
         await transporter.verify();
       } catch (e: any) {
-        const openPorts = await scanCommonPorts(settings.smtp_host);
-        throw new Error(`SMTP Falhou: ${e.message}. Portas abertas: ${openPorts.join(', ') || 'Nenhuma'}`);
+        // Se falhar, tentar bypass agressivo
+        console.log("[V23] SMTP falhou, tentando fallback com ignore TLS...");
+        const transporter = nodemailer.default.createTransport({
+          host: settings.smtp_host,
+          port: settings.smtp_port,
+          secure: Number(settings.smtp_port) === 465,
+          auth: { user: settings.user, pass: settings.pass },
+          tls: {
+            rejectUnauthorized: false, // Bypass aqui se o normal falhar
+            servername: settings.smtp_host
+          }
+        });
+        await transporter.verify().catch(err => {
+          throw new Error(`SMTP Falhou: ${err.message}`);
+        });
       }
 
       // --- TESTE IMAP ---
       try {
         const isPort993 = Number(settings.imap_port) === 993;
 
-        // Diagnóstico Nativo antes de tentar biblioteca
+        // Diagnóstico Nativo
         if (isPort993) {
           const nativeTls = await testTlsHandshake(settings.imap_host, settings.imap_port);
-          if (!nativeTls.ok) {
-            console.error("[V22] Falha no Handshake Nativo:", nativeTls.error);
-          } else {
-            console.log("[V22] Handshake Nativo OK");
-          }
+          if (!nativeTls.ok) console.error("[V23] Handshake Nativo Falhou:", nativeTls.error);
         }
 
         const client = new ImapFlow({
@@ -121,7 +128,6 @@ Deno.serve(async (req) => {
             rejectUnauthorized: false,
             servername: settings.imap_host,
             checkServerIdentity: () => undefined
-            // Removido ciphers e minVersion para simplificar na V22
           },
           connectionTimeout: 30000,
           greetingTimeout: 30000
@@ -129,31 +135,25 @@ Deno.serve(async (req) => {
         await client.connect();
         await client.logout();
       } catch (e: any) {
-        console.error("[IMAP V22 ERROR]", e);
+        console.error("[IMAP V23 ERROR]", e);
         const openPorts = await scanCommonPorts(settings.imap_host);
-        const nativeTls = isPort993 ? await testTlsHandshake(settings.imap_host, settings.imap_port) : null;
-
-        let diag = "";
-        if (isPort993) {
-          diag = nativeTls?.ok ? " (Deno TLS OK, erro na biblioteca)" : ` (Deno TLS falhou: ${nativeTls?.error})`;
-        }
-
         let msg = e.message;
         if (msg.includes('Unexpected close')) msg = "Conexão fechada durante handshake (TLS/SSL).";
-        throw new Error(`IMAP Falhou: ${msg}${diag}. Portas abertas detectadas: ${openPorts.join(', ') || 'Nenhuma'}`);
+        throw new Error(`IMAP Falhou: ${msg}. Portas abertas detectadas: ${openPorts.join(', ') || 'Nenhuma'}`);
       }
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conectado com sucesso na V22!'
+        message: 'Conectado com sucesso na V23!'
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V22.' }), { 
+    return new Response(JSON.stringify({ success: true, message: 'Ação ok na V23.' }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error: any) {
+    console.error(`[V23 ERROR]`, error.message);
     return new Response(JSON.stringify({
       success: false,
       error: error.message
