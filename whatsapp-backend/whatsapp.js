@@ -271,50 +271,34 @@ async function syncHistory(companyId, contacts, messages) {
 
 // Helper to update settings in DB
 async function updateCompanySettings(companyId, updates) {
-    if (!companyId) return;
-    
-    // Upsert equivalent logic
-    const { data, error } = await supabase
-        .from('whatsapp_settings')
-        .select('id')
-        .eq('company_id', companyId)
-        .single();
-    
-    if (error && error.code !== 'PGRST116') {
-        console.error('[updateCompanySettings] Error fetching settings:', error);
-        return;
+    if (!companyId) {
+        console.log('[updateCompanySettings] No company ID provided');
+        return false;
     }
 
-    if (!data) {
-        // Insert
-        console.log(`[updateCompanySettings] Inserting new settings for company ${companyId}:`, updates);
-        const { data: insertData, error: insertError } = await supabase
-            .from('whatsapp_settings')
-            .insert({
-                company_id: companyId,
-                ...updates
-            })
-            .select();
+    console.log('=== UPDATE COMPANY SETTINGS START ===');
+    console.log('[updateCompanySettings] Company ID:', companyId);
+    console.log('[updateCompanySettings] Updates:', JSON.stringify(updates, null, 2));
 
-        if (insertError) {
-            console.error('[updateCompanySettings] INSERT ERROR:', insertError);
-        } else {
-            console.log('[updateCompanySettings] INSERT SUCCESS:', insertData);
-        }
-    } else {
-        // Update
-        console.log(`[updateCompanySettings] Updating settings for company ${companyId}:`, updates);
-        const { data: updateData, error: updateError } = await supabase
+    try {
+        const { data, error } = await supabase
             .from('whatsapp_settings')
             .update(updates)
             .eq('company_id', companyId)
             .select();
 
-        if (updateError) {
-            console.error('[updateCompanySettings] UPDATE ERROR:', updateError);
-        } else {
-            console.log('[updateCompanySettings] UPDATE SUCCESS:', updateData);
+        if (error) {
+            console.error('[updateCompanySettings] ❌ SUPABASE ERROR:', JSON.stringify(error, null, 2));
+            return false;
         }
+
+        console.log('[updateCompanySettings] ✅ SUPABASE SUCCESS:', JSON.stringify(data, null, 2));
+        console.log('=== UPDATE COMPANY SETTINGS END ===');
+        return true;
+    } catch (err) {
+        console.error('[updateCompanySettings] ❌ EXCEPTION:', err);
+        console.log('=== UPDATE COMPANY SETTINGS END ===');
+        return false;
     }
 }
 
