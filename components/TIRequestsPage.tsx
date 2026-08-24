@@ -3,6 +3,7 @@ import Card from './Card';
 import { PlusIcon, XCircleIcon, TrashIcon, CheckCircleIcon, ArchiveBoxIcon } from './icons';
 import type { TIRequest, TIRequestStatus, TIRequestType, Employee } from '../types';
 import { supabase } from '../supabaseClient';
+import { useNotifications } from './NotificationContext';
 
 interface TIRequestsPageProps {
     submissions: TIRequest[];
@@ -85,6 +86,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
     const [activeTab, setActiveTab] = useState<'active' | 'finalized'>('active');
     const [loading, setLoading] = useState(true);
     const [selectableUsers, setSelectableUsers] = useState<Array<{ id: string; full_name: string }>>([]);
+    const { addNotification } = useNotifications();
 
     const fetchRequests = async () => {
         if (!currentUser?.company_id) return;
@@ -178,6 +180,19 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 }]);
 
             if (error) throw error;
+
+            // Send notification to the assigned user
+            if (data.assignedUserId) {
+                const assignedUser = selectableUsers.find(u => u.id === data.assignedUserId);
+                await addNotification({
+                    type: 'system',
+                    title: 'Nova Solicitação de TI Atribuída',
+                    description: `${currentUser.name} atribuiu a você uma solicitação: ${data.itemName}`,
+                    user_id: data.assignedUserId,
+                    avatarUrl: currentUser.avatarUrl,
+                    link: '/ti-requests'
+                });
+            }
 
             fetchRequests();
             setModalOpen(false);
