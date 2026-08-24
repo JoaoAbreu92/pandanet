@@ -237,7 +237,11 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
         res.json({ status: 'success', message: 'Sincronização iniciada em segundo plano' });
     } catch (err) {
         console.error('[SYNC-API] Erro fatal no handler:', err.message);
-        res.status(500).json({ error: 'Internal server error during sync request' });
+        res.status(500).json({ 
+            error: 'Internal server error during sync request',
+            details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 });
 
