@@ -117,6 +117,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         ai_api_key: data?.ai_api_key || null,
                         ai_provider: data?.ai_provider || null,
                         ai_behavior: data?.ai_behavior || null,
+                        can_nudge: true,
+                        nudge_cooldown: 30
                     };
                     setProfile(masterAdmin);
                     return;
@@ -169,6 +171,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     whatsapp_signature: data.whatsapp_signature || '',
                     use_whatsapp_signature: data.use_whatsapp_signature || false,
                     whatspanda_permissions: data.whatspanda_permissions || null,
+                    can_nudge: data.can_nudge ?? true,
+                    nudge_cooldown: data.nudge_cooldown ?? 30,
                 };
                 setProfile(employee);
             }

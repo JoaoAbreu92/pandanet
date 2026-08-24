@@ -1524,7 +1524,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
 
                 {/* Botão Chamar Atenção (Nudge) */}
-                {activeProfile?.can_nudge && (
+                {activeProfile?.can_nudge !== false && (
                   <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
                     <button
                       type="button"

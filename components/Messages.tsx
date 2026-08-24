@@ -1781,7 +1781,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                         </button>
 
                                             {/* Nudge Button */}
-                                            {profile?.can_nudge && (
+                                            {profile?.can_nudge !== false && (
                                                 <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
                                                     <button
                                                         type="button"
