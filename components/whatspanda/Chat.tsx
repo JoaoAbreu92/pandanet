@@ -22,7 +22,8 @@ import {
   Instagram,
   Smartphone,
   LayoutGrid,
-  List
+  List,
+  RefreshCcw
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -189,13 +190,27 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       query = query.or(`contact_name.ilike.%${searchTerm}%,contact_phone.ilike.%${searchTerm}%`);
     }
 
-    // Filter by queues if not Admin and cannot see all departments
-    if (!isAdmin && profile?.id && !permissions.can_see_all_departments && !permissions.can_view_others_chats) {
-      const assignedQueues = permissions.assigned_queues || [];
-      if (assignedQueues.length > 0) {
-        query = query.or(`queue_id.in.(${assignedQueues.join(',')}),queue_id.is.null,assigned_to.eq.${profile.id}`);
-      } else {
-        query = query.or(`assigned_to.eq.${profile.id}`);
+    // O fluxo estilo Whaticket: 
+    // Pendente = Sem dono.
+    // Aberto = Meus atendimentos (ou de todos, se eu for admin).
+    // Fechado = Meus fechados (ou de todos, se eu for admin).
+    const canViewAll = isAdmin || permissions.can_view_others_chats;
+    const canSeeAllDeps = isAdmin || permissions.can_see_all_departments;
+
+    if (activeTab === 'pendente') {
+      // Pendentes independentemente de cargo: precisam estar aguardando
+      query = query.is('assigned_to', null);
+      if (!canSeeAllDeps) {
+        const assignedQueues = permissions.assigned_queues || [];
+        if (assignedQueues.length > 0) {
+          query = query.in('queue_id', assignedQueues);
+        }
+      }
+    } else {
+      // Aberto ou Fechado
+      if (!canViewAll && profile?.id) {
+        // Se não sou admin, vejo SÓ os MEUS
+        query = query.eq('assigned_to', profile.id);
       }
     }
 
@@ -376,6 +391,38 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
               >
                 {viewMode === 'list' ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
               </button>
+              
+              <button 
+                onClick={async () => {
+                  const companyId = currentUser?.company_id;
+                  const connectionId = settings?.id;
+                  if (!companyId || !connectionId) return;
+
+                  try {
+                    const { data: sessionData } = await supabase.auth.getSession();
+                    const token = sessionData?.session?.access_token;
+                    if (!token) throw new Error("No active session");
+
+                    const response = await fetch(`/api/whatsapp/repair-webhooks/${companyId}/${connectionId}`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${token}`
+                      }
+                    });
+                    
+                    if (!response.ok) throw new Error();
+                    alert('Conexão reparada! Webhooks recriados na Evolution API.');
+                    fetchConversations();
+                  } catch {
+                    alert('Erro ao reparar conexão. Verifique se a conexão está ativa nas configurações.');
+                  }
+                }}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500 transition-colors"
+                title="Sincronizar e Reparar Conexão"
+              >
+                <RefreshCcw className="w-4 h-4" />
+              </button>
+
               <div className={`w-3 h-3 rounded-full ring-4 shadow-lg ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-500/20 animate-pulse' : 'bg-red-500 ring-red-500/20'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
             </div>
           </div>

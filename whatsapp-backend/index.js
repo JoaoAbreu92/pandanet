@@ -725,15 +725,24 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 }).select().single();
             
             if (createErr) {
-                console.error(`[MSG] Erro ao criar conversa:`, createErr.message);
+                console.error(`[MSG] Erro CRÍTICO ao criar conversa:`, createErr.message);
+                // Se falhou, tenta buscar novamente por via das dúvidas
+                const { data: retryConv } = await supabase.from('whatsapp_conversations')
+                    .select('id').eq('company_id', companyId).eq('contact_phone', fromPhone).maybeSingle();
+                conversationId = retryConv?.id;
+            } else {
+                conversationId = newConv?.id;
             }
-            conversationId = newConv?.id;
         } else if (!isHistorical) {
+            // Se a conversa estava fechada, ela deve reabrir como pendente
+            const newStatus = conv.status === 'fechado' ? 'pendente' : conv.status;
+            
             await supabase
                 .from('whatsapp_conversations')
                 .update({
                     unread_count: (conv.unread_count || 0) + 1,
-                    last_message_at: new Date().toISOString()
+                    last_message_at: new Date().toISOString(),
+                    status: newStatus
                 }).eq('id', conversationId);
         }
 
