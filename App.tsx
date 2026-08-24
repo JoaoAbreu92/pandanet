@@ -8,6 +8,7 @@ import { LanguageProvider } from './components/LanguageContext';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import { supabase } from './supabaseClient';
+import { ToastProvider } from './components/ToastContext';
 
 import HomePage from './components/HomePage';
 import Messages from './components/Messages';
@@ -422,9 +423,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
     return (
         <LanguageProvider>
-            <AuthProvider>
-                <AppContent />
-            </AuthProvider>
+            <ToastProvider>
+                <AuthProvider>
+                    <AppContent />
+                </AuthProvider>
+            </ToastProvider>
         </LanguageProvider>
     );
 };

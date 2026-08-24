@@ -447,6 +447,7 @@ export interface Company {
   cnpj?: string; // Added
   plan_id?: string; // FK
   plan?: Plan;
+  custom_features?: Record<string, boolean>; // Overrides for plan features
   subscriptionEndDate?: string; // YYYY-MM-DD
   status?: 'active' | 'inactive' | 'expired';
   responsible_name?: string;

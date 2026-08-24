@@ -30,6 +30,8 @@ import {
     MagnifyingGlassIcon,
     ShieldCheckIcon
 } from './icons';
+import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon } from '@heroicons/react/24/outline';
+import { useToast } from './ToastContext';
 
 interface SaaSDashboardProps {
     companies?: Company[]; // Keep for compatibility but we will fetch internal state
@@ -38,18 +40,19 @@ interface SaaSDashboardProps {
 type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
 
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
-    // --- State for Data & Filters ---
+    // --- Estado para Dados e Filtros ---
     const [localCompanies, setLocalCompanies] = useState<Company[]>([]);
     const [localPlans, setLocalPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
-    const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // State for users in modal
+    const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // Estado para usuários no modal
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
 
-    // --- Fetch Data ---
+    // --- Buscar Dados ---
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -71,8 +74,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)'); // Join plan
             if (companiesError) console.error('Error fetching companies', companiesError);
             else {
-                // Fetch user counts for each company if possible, or just raw companies
-                // Ideally we join profiles count, but for now just getting companies
+                // Buscar contagem de usuários para cada empresa se possível
+                // Idealmente faríamos um join com count de profiles, mas por agora pegamos apenas as empresas
                 setLocalCompanies(companiesData as unknown as Company[] || []);
             }
         } catch (e) {
@@ -86,7 +89,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         fetchData();
     }, []);
 
-    // --- Computed Data ---
+    // --- Dados Computados ---
     const filteredCompanies = localCompanies.filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             c.domain.toLowerCase().includes(searchQuery.toLowerCase());
@@ -96,15 +99,15 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         return matchesSearch && matchesStatus;
     });
 
-    // Metrics
+    // Métricas
     const totalCompanies = localCompanies.length;
     const activeCompaniesCount = localCompanies.filter(c => c.status !== 'inactive').length;
     const expiredCompaniesCount = localCompanies.filter(c => c.status === 'expired').length;
     const inactiveCompaniesCount = localCompanies.filter(c => c.status === 'inactive').length;
-    const totalUsers = 0; // TODO: Count from profiles
+    const totalUsers = 0; // TODO: Contar de profiles
     const onlineUsers = 0; // TODO
 
-    // --- Modal State Management ---
+    // --- Gerenciamento de Estado de Modais ---
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
     const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
     const [modalOpen, setModalOpen] = useState<Record<string, boolean>>({});
@@ -139,8 +142,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 setFeaturesState(plan.features || {});
             }
         } else if (type === 'config' && company) {
-            // Load company features if they exist, otherwise default
-            setFeaturesState({}); // In a real app, this would come from company.settings
+            // Carrega recursos da empresa se existirem, caso contrário usa o padrão
+            setFeaturesState(company.custom_features || company.plan?.features || {});
         } else if (type === 'users' && company) {
             // Fetch users for this company
             fetchCompanyUsers(company.id!);
@@ -179,9 +182,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         setFeaturesState({});
     };
 
-    // --- Actions ---
+    // --- Ações ---
 
-    // 1. DELETE
+    // 1. EXCLUIR
     const handleDeleteCompany = async () => {
         if (selectedCompany) {
             const { error } = await supabase.from('companies').delete().eq('id', selectedCompany.id);
@@ -205,7 +208,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         }
     };
 
-    // 2. CREATE / UPDATE COMPANY
+    // 2. CRIAR / ATUALIZAR EMPRESA
     const submitCompanyForm = async () => {
         if (modalOpen.createCompany) {
             const selectedPlan = localPlans.find(p => p.name === formData.plan);
@@ -213,9 +216,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             const newCompany = {
                 name: formData.name,
                 status: 'active',
-                cnpj: formData.cnpj, // Assuming added field
+                cnpj: formData.cnpj,
                 plan_id: selectedPlan?.id,
-                domain: formData.domain, // Ensure domain is sent
+                domain: formData.domain,
                 responsible_name: formData.responsibleName,
                 responsible_email: formData.responsibleEmail,
                 subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -225,26 +228,35 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             const { data, error } = await supabase.from('companies').insert([newCompany]).select();
 
             if (error) {
-                alert('Erro ao criar empresa: ' + error.message);
+                showToast('Erro ao criar empresa: ' + error.message, 'error');
                 return;
             }
             if (data) {
-                // If created successfully, we could try to assign the responsible user
-                // But normally we'd create the user profile next.
-                // Re-fetch logic or optimistically update
+                showToast('Empresa criada com sucesso!', 'success');
                 fetchData();
             }
         } else if (modalOpen.edit && selectedCompany) {
+            const selectedPlan = localPlans.find(p => p.name === formData.plan); // Find plan by name
+
             const { error } = await supabase.from('companies')
-                .update({ name: formData.name, domain: formData.domain })
+                .update({
+                    name: formData.name,
+                    domain: formData.domain,
+                    plan_id: selectedPlan?.id // Update plan_id
+                })
                 .eq('id', selectedCompany.id);
 
-            if (!error) fetchData();
+            if (error) {
+                showToast('Erro ao atualizar empresa: ' + error.message, 'error');
+            } else {
+                showToast('Empresa atualizada com sucesso!', 'success');
+                fetchData();
+            }
         }
         closeModal();
     };
 
-    // 3. DISABLE
+    // 3. DESATIVAR
     const handleDisableCompany = async () => {
         if (selectedCompany) {
             const { error } = await supabase
@@ -253,19 +265,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 .eq('id', selectedCompany.id);
 
             if (error) {
-                alert('Erro ao desativar empresa: ' + error.message);
+                showToast('Erro ao desativar empresa: ' + error.message, 'error');
             } else {
+                showToast('Empresa desativada com sucesso!', 'success');
                 fetchData();
                 closeModal();
             }
         }
     };
 
-    // 4. ADD MONTH
+    // 4. ADICIONAR MÊS
     const handleAddMonth = async () => {
         if (selectedCompany) {
             const currentEnd = selectedCompany.subscriptionEndDate ? new Date(selectedCompany.subscriptionEndDate) : new Date();
-            // If expired, start from now, else add 30 days to existing end
             const baseDate = currentEnd < new Date() ? new Date() : currentEnd;
             const newDate = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -275,23 +287,34 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 .eq('id', selectedCompany.id);
 
             if (error) {
-                alert('Erro ao adicionar mês: ' + error.message);
+                showToast('Erro ao adicionar mês: ' + error.message, 'error');
             } else {
-                fetchData(); // Refresh list to show new date
-                alert('30 dias adicionados com sucesso!');
+                fetchData();
+                showToast('30 dias adicionados com sucesso!', 'success');
             }
         }
     };
 
 
-    // 5. UPDATE CONFIG (Menu Features)
-    const handleSaveConfig = () => {
-        // In a real app we would save 'featuresState' to the company settings
-        console.log("Saving features for company", selectedCompany?.name, featuresState);
-        closeModal();
+    // 5. ATUALIZAR CONFIGURAÇÃO (Recursos do Menu)
+    const handleSaveConfig = async () => {
+        if (!selectedCompany) return;
+
+        const { error } = await supabase
+            .from('companies')
+            .update({ custom_features: featuresState })
+            .eq('id', selectedCompany.id);
+
+        if (error) {
+            showToast('Erro ao salvar configurações do menu: ' + error.message, 'error');
+        } else {
+            showToast('Configurações do menu salvas com sucesso!', 'success');
+            fetchData();
+            closeModal();
+        }
     };
 
-    // 6. PLANS (Create/Edit)
+    // 6. PLANOS (Criar/Editar)
     const submitPlanForm = async () => {
         const planData = {
             name: formData.name,
@@ -302,18 +325,24 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
         if (modalOpen.createPlan) {
             const { error } = await supabase.from('plans').insert([planData]);
-            if (error) alert('Erro ao criar plano: ' + error.message);
-            else fetchData();
+            if (error) showToast('Erro ao criar plano: ' + error.message, 'error');
+            else {
+                showToast('Plano criado com sucesso!', 'success');
+                fetchData();
+            }
         } else if (modalOpen.editPlan && selectedPlanId) {
             const { error } = await supabase.from('plans').update(planData).eq('id', selectedPlanId);
-            if (error) alert('Erro ao atualizar plano: ' + error.message);
-            else fetchData();
+            if (error) showToast('Erro ao atualizar plano: ' + error.message, 'error');
+            else {
+                showToast('Plano atualizado com sucesso!', 'success');
+                fetchData();
+            }
         }
         closeModal();
     };
 
 
-    // --- Generic Handlers ---
+    // --- Handlers Genéricos ---
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev: any) => ({ ...prev, [field]: value }));
     };
@@ -323,7 +352,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     };
 
 
-    // --- Subcomponents within Scope ---
+    // --- Subcomponentes do Escopo ---
     const MetricCardSimple = ({ title, value, icon: Icon, subText }: any) => (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
             <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-3">{title}</p>
@@ -716,7 +745,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     );
 };
 
-// --- Helper Components ---
+// --- Componentes Auxiliares ---
 const Modal = ({ title, onClose, children, width = "max-w-xl" }: any) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
         <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full ${width} m-4 flex flex-col max-h-[90vh]`}>
