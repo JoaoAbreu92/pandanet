@@ -33,14 +33,14 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
     }, []);
 
     return (
-        <div className={`flex flex-col items-center ${className}`}>
+        <div className={`flex flex-col items-center p-2 bg-white rounded-lg shadow-sm border border-gray-100 ${className}`}>
             <img
                 src={(companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo)}
                 alt="Logo"
-                className="h-24 w-auto object-contain transition-all duration-300"
+                className="h-20 w-auto object-contain transition-all duration-300"
             />
             {showText && (
-                <span className="text-[10px] text-gray-400 font-medium tracking-wider mt-1">
+                <span className="text-[10px] text-gray-500 font-bold tracking-wider mt-1 uppercase">
                     v{SYSTEM_VERSION}
                 </span>
             )}

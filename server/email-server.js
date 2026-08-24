@@ -154,14 +154,19 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const range = `${startIndex}:${endIndex}`;
             console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
-            for await (const message of client.fetch(range, { envelope: true, uid: true })) {
+            for await (const message of client.fetch(range, { envelope: true, uid: true, source: true })) {
+                // Generate a simple snippet by parsing the source briefly or just first part
+                const parsed = await simpleParser(message.source);
+                const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
+
                 emails.push({
                     uid: message.uid,
                     messageId: message.envelope.messageId,
                     subject: message.envelope.subject || '(Sem Assunto)',
                     from: message.envelope.from?.[0]?.address || 'Desconhecido',
                     date: message.envelope.date,
-                    flags: message.flags
+                    flags: message.flags,
+                    snippet: snippet + (snippet.length === 100 ? '...' : '')
                 });
             }
             // Sort by date desc
@@ -181,7 +186,10 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 const simpleParser = require('mailparser').simpleParser;
 
 app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
+    const { config, uid, path } = req.body;
+    const mailboxPath = path || 'INBOX';
     const uidNum = Number(uid);
+
     if (!config || !uid) return res.status(400).json({ error: 'Missing config or uid' });
 
     console.log(`[email-server] FETCH BODY: UID ${uid} in ${mailboxPath}`);

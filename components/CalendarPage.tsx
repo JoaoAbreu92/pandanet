@@ -24,6 +24,7 @@ import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
+import { useLanguage } from './LanguageContext';
 
 const mockHolidays = [
     // Nacionais
@@ -51,18 +52,18 @@ const mockHolidays = [
 ];
 
 const MONTH_THEMES: Record<number, { name: string, color: string, bg: string, border: string, text: string, phrase: string, campaign: string }> = {
-    0: { name: 'Janeiro', color: 'bg-white', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', campaign: 'Branco', phrase: 'Cuidar da mente é cuidar da vida.' },
-    1: { name: 'Fevereiro', color: 'bg-purple-500', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', campaign: 'Roxo', phrase: 'Conscientização sobre Lúpus, Alzheimer e Fibromialgia.' },
-    2: { name: 'Março', color: 'bg-fuchsia-500', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-700', campaign: 'Lilás', phrase: 'Prevenção do câncer de colo de útero.' },
-    3: { name: 'Abril', color: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', campaign: 'Azul', phrase: 'Conscientização sobre o Autismo.' },
-    4: { name: 'Maio', color: 'bg-yellow-400', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', campaign: 'Amarelo', phrase: 'Atenção pela vida no trânsito.' },
-    5: { name: 'Junho', color: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', campaign: 'Vermelho', phrase: 'Doe sangue, doe vida.' },
-    6: { name: 'Julho', color: 'bg-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', campaign: 'Amarelo', phrase: 'Combate às hepatites virais.' },
-    7: { name: 'Agosto', color: 'bg-amber-400', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', campaign: 'Dourado', phrase: 'Amamentar é a base da vida.' },
-    8: { name: 'Setembro', color: 'bg-yellow-400', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', campaign: 'Amarelo', phrase: 'Falar é a melhor solução (Prevenção ao Suicídio).' },
-    9: { name: 'Outubro', color: 'bg-pink-400', bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', campaign: 'Rosa', phrase: 'Um toque de cuidado (Pela prevenção do câncer de mama).' },
-    10: { name: 'Novembro', color: 'bg-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', campaign: 'Azul', phrase: 'Saúde também é coisa de homem.' },
-    11: { name: 'Dezembro', color: 'bg-orange-500', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', campaign: 'Laranja', phrase: 'Prevenção do câncer de pele.' },
+    0: { name: 'Jan', color: 'bg-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/10', border: 'border-indigo-200 dark:border-indigo-500/30', text: 'text-indigo-700 dark:text-indigo-300', campaign: 'Branco', phrase: 'Cuidar da mente é cuidar da vida.' },
+    1: { name: 'Fev', color: 'bg-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-200 dark:border-purple-500/30', text: 'text-purple-700 dark:text-purple-300', campaign: 'Roxo', phrase: 'Conscientização sobre Lúpus, Alzheimer e Fibromialgia.' },
+    2: { name: 'Mar', color: 'bg-fuchsia-500', bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/10', border: 'border-fuchsia-200 dark:border-fuchsia-500/30', text: 'text-fuchsia-700 dark:text-fuchsia-300', campaign: 'Lilás', phrase: 'Prevenção do câncer de colo de útero.' },
+    3: { name: 'Abr', color: 'bg-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-200 dark:border-blue-500/30', text: 'text-blue-700 dark:text-blue-300', campaign: 'Azul', phrase: 'Conscientização sobre o Autismo.' },
+    4: { name: 'Mai', color: 'bg-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/10', border: 'border-emerald-200 dark:border-emerald-500/30', text: 'text-emerald-700 dark:text-emerald-300', campaign: 'Amarelo', phrase: 'Atenção pela vida no trânsito.' },
+    5: { name: 'Jun', color: 'bg-red-500', bg: 'bg-red-50 dark:bg-red-900/10', border: 'border-red-200 dark:border-red-500/30', text: 'text-red-700 dark:text-red-300', campaign: 'Vermelho', phrase: 'Doe sangue, doe vida.' },
+    6: { name: 'Jul', color: 'bg-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-amber-200 dark:border-amber-500/30', text: 'text-amber-700 dark:text-amber-300', campaign: 'Amarelo', phrase: 'Combate às hepatites virais.' },
+    7: { name: 'Ago', color: 'bg-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-200 dark:border-yellow-500/30', text: 'text-yellow-700 dark:text-yellow-300', campaign: 'Dourado', phrase: 'Amamentar é a base da vida.' },
+    8: { name: 'Set', color: 'bg-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-200 dark:border-yellow-500/30', text: 'text-yellow-700 dark:text-yellow-300', campaign: 'Amarelo', phrase: 'Falar é a melhor solução (Prevenção ao Suicídio).' },
+    9: { name: 'Out', color: 'bg-pink-400', bg: 'bg-pink-50 dark:bg-pink-900/10', border: 'border-pink-200 dark:border-pink-500/30', text: 'text-pink-700 dark:text-pink-300', campaign: 'Rosa', phrase: 'Um toque de cuidado (Pela prevenção do câncer de mama).' },
+    10: { name: 'Nov', color: 'bg-sky-600', bg: 'bg-sky-50 dark:bg-sky-900/10', border: 'border-sky-200 dark:border-sky-500/30', text: 'text-sky-700 dark:text-sky-300', campaign: 'Azul', phrase: 'Saúde também é coisa de homem.' },
+    11: { name: 'Dez', color: 'bg-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/10', border: 'border-rose-200 dark:border-rose-500/30', text: 'text-rose-700 dark:text-rose-300', campaign: 'Laranja', phrase: 'Prevenção do câncer de pele.' },
 };
 
 interface CalendarPageProps {
@@ -74,6 +75,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const { profile: contextUser } = useAuth();
     const currentUser = propUser || contextUser;
     const { addNotification } = useNotifications();
+    const { t } = useLanguage();
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'year' | 'month' | 'week'>('year');
@@ -112,6 +114,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     team: e.team,
                     avatarUrl: e.avatar_url,
                     birthDate: e.birth_date,
+                    isAdmin: e.is_admin || false,
                     permissions: {} as any, joinDate: e.created_at, following: []
                 })));
             }
@@ -254,9 +257,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const allCalendarEvents = useMemo(() => {
         const birthdayEvents: CalendarEvent[] = employees.map((emp: any) => ({
             id: `bday-${emp.id}`,
-            title: `Aniversário de ${emp.name?.split(' ')[0]}`,
+            title: t('calendar.birthdays') + ` de ${emp.name?.split(' ')[0]}`,
             date: emp.birthDate ? `${currentDate.getFullYear()}-${emp.birthDate.substring(5, 10)}` : '',
-            startTime: '00:00', endTime: '23:59', category: 'Aniversário', location: '', attendees: [], notes: ''
+            startTime: '00:00', endTime: '23:59', category: 'Aniversário' as CalendarEventCategory, location: '', attendees: [], notes: ''
         })).filter(e => e.date);
 
         const holidayEvents: CalendarEvent[] = mockHolidays.map((h, i) => ({
@@ -316,7 +319,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <h4 className={`text-lg font-bold ${theme.text} dark:text-gray-100`}>{theme.name}</h4>
+                                    <h4 className={`text-lg font-bold ${theme.text} dark:text-gray-100`}>{t(`month.${monthIdx}`)}</h4>
                                     <p className="text-[10px] uppercase tracking-wider font-semibold opacity-60 dark:text-gray-400">{theme.campaign}</p>
                                 </div>
                                 <span className="bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-bold text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-slate-700 italic">
@@ -332,11 +335,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 ))}
                                 {monthEvents.length > 3 && (
                                     <div className="text-[9px] text-gray-400 font-medium pl-2">
-                                        + {monthEvents.length - 3} mais...
+                                        + {monthEvents.length - 3} {t('common.more')}...
                                     </div>
                                 )}
                                 {monthEvents.length === 0 && (
-                                    <div className="text-[10px] text-gray-400 italic py-2">Sem compromissos</div>
+                                    <div className="text-[10px] text-gray-400 italic py-2">{t('calendar.no_events') || 'Sem compromissos'}</div>
                                 )}
                             </div>
 
@@ -379,7 +382,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             </button>
 
                             <div className="text-center min-w-[200px]">
-                                <h3 className={`text-2xl font-black ${theme.text} dark:text-gray-100`}>{theme.name} <span className="opacity-40">{year}</span></h3>
+                                <h3 className={`text-2xl font-black ${theme.text} dark:text-gray-100`}>{t(`month.${month}`)} <span className="opacity-40">{year}</span></h3>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 italic mt-0.5">{theme.phrase}</p>
                             </div>
 
@@ -393,15 +396,15 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     </div>
                     <div className="flex items-center space-x-3">
                         <div className={`px-4 py-2 rounded-xl bg-white/80 dark:bg-slate-800/80 border ${theme.border} dark:border-slate-700 shadow-sm backdrop-blur-md`}>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 leading-none mb-1">Campanha do Mês</p>
-                            <p className={`text-xs font-black uppercase ${theme.text} dark:text-gray-200`}>Mês {theme.campaign}</p>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 leading-none mb-1">{t('calendar.campaign')}</p>
+                            <p className={`text-xs font-black uppercase ${theme.text} dark:text-gray-200`}>{t('month.' + month)} {theme.campaign}</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-7 border-b dark:border-slate-800">
-                    {['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map(d => (
-                        <div key={d} className="py-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 border-r dark:border-slate-800 last:border-0">{d}</div>
+                    {[0, 1, 2, 3, 4, 5, 6].map(d => (
+                        <div key={d} className="py-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 border-r dark:border-slate-800 last:border-0">{t(`day.${d}`)}</div>
                     ))}
                 </div>
 
@@ -450,17 +453,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         <div className="max-w-screen-2xl mx-auto space-y-6">
             <div className="flex items-center justify-between mb-2">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-800 dark:text-gray-100 tracking-tight">Calendário <span className="text-brand-primary italic">Panda</span></h1>
-                    <p className="text-slate-500 dark:text-gray-400 font-medium">Gestão de eventos e compromissos</p>
+                    <h1 className="text-3xl font-black text-slate-800 dark:text-gray-100 tracking-tight">{t('calendar.title')} <span className="text-brand-primary italic">Panda</span></h1>
+                    <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.subtitle')}</p>
                 </div>
                 <div className="flex items-center space-x-3">
                     <button onClick={() => setCreateModalOpen(true)} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
-                        <PlusIcon className="w-5 h-5" /><span>Novo Evento</span>
+                        <PlusIcon className="w-5 h-5" /><span>{t('calendar.new_event')}</span>
                     </button>
                 </div>
             </div>
 
-            <Card className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
+            <Card title="" className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
                 <header className="bg-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 gap-4">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
@@ -475,8 +478,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     </div>
 
                     <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
-                        <button onClick={() => setView('year')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'year' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>VISÃO ANUAL</button>
-                        <button onClick={() => setView('month')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'month' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>VISÃO MENSAL</button>
+                        <button onClick={() => setView('year')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'year' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.year_view')}</button>
+                        <button onClick={() => setView('month')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'month' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.month_view')}</button>
                     </div>
                 </header>
 
@@ -490,8 +493,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-8 relative animate-scale-in">
                         <button onClick={() => setCreateModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
                         <div className="mb-6">
-                            <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100">Agendar Evento</h3>
-                            <p className="text-slate-500 dark:text-gray-400 font-medium">Preencha os detalhes do compromisso</p>
+                            <h3 className="text-3xl font-black text-slate-800 dark:text-gray-100">{t('calendar.schedule_event')}</h3>
+                            <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.event_details')}</p>
                         </div>
                         <form onSubmit={handleCreateEvent} className="space-y-6">
                             <div className="space-y-2">
@@ -581,8 +584,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             )}
 
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setCreateModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">CANCELAR</button>
-                                <button type="submit" className="px-8 py-4 text-sm font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">SALVAR EVENTO</button>
+                                <button type="button" onClick={() => setCreateModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">{t('calendar.cancel')}</button>
+                                <button type="submit" className="px-8 py-4 text-sm font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">{t('calendar.save')}</button>
                             </div>
                         </form>
                     </div>

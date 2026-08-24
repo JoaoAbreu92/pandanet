@@ -6,6 +6,7 @@ import RecognitionModal from './RecognitionModal';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
+import { useLanguage } from './LanguageContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon } from './icons';
 import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page } from '../types';
 
@@ -21,6 +22,7 @@ export const PostCard: React.FC<{
     const [showReactionMenu, setShowReactionMenu] = useState(false);
     const timeoutRef = useRef<any>(null);
     const commentInputRef = useRef<HTMLInputElement>(null);
+    const { t } = useLanguage();
 
     const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀', '🚀', '💯'];
 
@@ -91,7 +93,7 @@ export const PostCard: React.FC<{
                     </div>
                 </div>
                 {isAuthor && (
-                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Excluir postagem">
+                    <button onClick={() => onDelete(post.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title={t('feed.delete_post')}>
                         <TrashIcon className="w-5 h-5" />
                     </button>
                 )}
@@ -130,15 +132,15 @@ export const PostCard: React.FC<{
                             ))}
                         </div>
                     )}
-                    <span>{post.reactions.length} reações</span>
+                    <span>{post.reactions.length} {t('feed.interactions')}</span>
                 </div>
-                <span>{post.comments.length} comentários</span>
+                <span>{post.comments.length} {t('feed.comment')}s</span>
             </div>
 
             <div className="flex justify-around py-1 relative">
                 <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="flex-1">
                     <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
-                        <HandThumbUpIcon className="w-5 h-5" /><span>Reagir</span>
+                        <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
                         <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
@@ -151,10 +153,10 @@ export const PostCard: React.FC<{
                     )}
                 </div>
                 <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <ChatBubbleLeftIcon className="w-5 h-5" /><span>Comentar</span>
+                    <ChatBubbleLeftIcon className="w-5 h-5" /><span>{t('feed.comment')}</span>
                 </button>
                 <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <ShareIcon className="w-5 h-5" /><span>Compartilhar</span>
+                    <ShareIcon className="w-5 h-5" /><span>{t('feed.share')}</span>
                 </button>
             </div>
 
@@ -179,7 +181,7 @@ export const PostCard: React.FC<{
                     <input
                         ref={commentInputRef}
                         type="text"
-                        placeholder="Escreva um comentário..."
+                        placeholder={t('feed.write_comment')}
                         className="w-full bg-gray-50 dark:bg-slate-700/50 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-brand-primary outline-none dark:text-gray-100"
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
@@ -214,14 +216,15 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
     // Por enquanto vamos apenas garantir que mostre algo se a lista existir
     const displaySuggestions = suggestedUsers.length > 0 ? suggestedUsers : users.slice(0, 10);
 
+    const { t } = useLanguage();
     return (
-        <Card title="Pessoas" className="pb-4">
+        <Card title={t('feed.people')} className="pb-4">
             <div className="space-y-4">
                 {onlineUsers.length > 0 && (
                     <div className="space-y-3">
-                        <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Online Agora</p>
+                        <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">{t('feed.online_now')}</p>
                         {onlineUsers.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <div className="relative">
                                     <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></span>
@@ -236,12 +239,12 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                 )}
 
                 <div className="space-y-3 pt-2">
-                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Sugestões de Colaboradores</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t('feed.suggestions')}</p>
                     {displaySuggestions.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic">Nenhum outro usuário encontrado.</p>
+                        <p className="text-xs text-gray-400 italic">{t('common.no_results') || 'Nenhum outro usuário encontrado.'}</p>
                     ) : (
                         displaySuggestions.map(user => (
-                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 dark:hover:bg-slate-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
@@ -252,7 +255,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                     )}
                 </div>
             </div>
-            <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">Descobrir Mais</button>
+            <button className="w-full mt-4 text-xs font-bold text-brand-primary hover:text-emerald-700 transition-colors uppercase tracking-wider">{t('feed.discover_more')}</button>
         </Card>
     );
 };
@@ -268,6 +271,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [mentionSearch, setMentionSearch] = useState('');
     const [mentionIndex, setMentionIndex] = useState(-1);
     const [mentions, setMentions] = useState<{ id: string, name: string }[]>([]);
+    const { t } = useLanguage();
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -569,7 +573,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 if (newReactions[existingIdx].emoji === emoji) newReactions.splice(existingIdx, 1);
                 else newReactions[existingIdx] = { ...newReactions[existingIdx], emoji };
             } else {
-                newReactions.push({ postId, userId: currentUser.id, emoji });
+                newReactions.push({ userId: currentUser.id, emoji });
             }
             return { ...p, reactions: newReactions };
         }));
@@ -589,7 +593,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleDeletePost = async (postId: string) => {
-        if (!window.confirm("Tem certeza que deseja excluir esta postagem?")) return;
+        if (!window.confirm(t('feed.delete_confirm'))) return;
 
         // Optimistic update
         setPosts(prev => prev.filter(p => p.id !== postId));
@@ -647,15 +651,15 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div className="grid grid-cols-3 gap-2 border-t border-gray-100 dark:border-slate-800 pt-5 mt-2">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{(currentUser.following || []).length}</span>
-                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Seguidores</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.followers')}</span>
                                 </div>
                                 <div className="flex flex-col items-center border-x border-gray-100 dark:border-slate-800">
                                     <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.length}</span>
-                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Usuários</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.users')}</span>
                                 </div>
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-brand-text dark:text-gray-100 text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
-                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">Interações</span>
+                                    <span className="text-[9px] text-brand-subtle-text dark:text-gray-500 font-semibold uppercase tracking-tight mt-1">{t('feed.interactions')}</span>
                                 </div>
                             </div>
                         </div>
@@ -671,7 +675,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 <div className="flex-1 relative">
                                     <textarea
                                         ref={postTextareaRef}
-                                        placeholder="O que está acontecendo na empresa?"
+                                        placeholder={t('feed.placeholder')}
                                         className="w-full p-4 border border-gray-100 dark:border-slate-700 rounded-xl bg-gray-50/50 dark:bg-slate-700/30 text-brand-text dark:text-gray-100 focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/20 outline-none transition-all resize-none min-h-[120px]"
                                         value={newPostContent}
                                         onChange={handlePostContentChange}
@@ -700,17 +704,17 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
                                 <div className="flex justify-around sm:justify-start space-x-2">
-                                    <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">Foto</span></button>
-                                    <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">Reconhecer</span></button>
+                                    <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
+                                    <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
                                 </div>
-                                <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
+                                <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
                             </div>
                             <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 dark:border-slate-800 pt-3 gap-2">
                                 <div className="flex items-start space-x-2">
                                     <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
-                                    <span className="text-orange-600 font-bold leading-tight">Importante: Postagens expiram automaticamente em 90 dias para otimização de espaço.</span>
+                                    <span className="text-orange-600 font-bold leading-tight">{t('feed.important')}</span>
                                 </div>
-                                <span className="italic whitespace-nowrap hidden sm:inline text-right">Acervo organizado e eficiente</span>
+                                <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organizado e eficiente'}</span>
                             </div>
 
                             <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />

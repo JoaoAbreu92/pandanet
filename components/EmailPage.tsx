@@ -621,28 +621,28 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     // --- Contacts & Folders Helpers ---
 
     const getFolderName = (path: string) => {
-        if (path === 'INBOX') return 'Caixa de Entrada';
+        if (path === 'INBOX') return t('sidebar.inbox') || 'Caixa de Entrada';
 
         // Remove prefix like 'INBOX.' or 'INBOX/'
         let cleanPath = path.replace(/^INBOX[\./]/i, '');
 
         // Standard translation mapping
-        const translations: Record<string, string> = {
-            'Sent': 'Enviados',
-            'Sent Messages': 'Enviados',
-            'Drafts': 'Rascunhos',
-            'Trash': 'Lixeira',
-            'Deleted Items': 'Lixeira',
-            'Junk': 'Spam',
-            'Spam': 'Spam',
-            'Archive': 'Arquivo',
-            'Outbox': 'Caixa de Saída'
+        const folderTranslations: Record<string, string> = {
+            'Sent': t('email.sent_folder') || 'Enviados',
+            'Sent Messages': t('email.sent_folder') || 'Enviados',
+            'Drafts': t('email.drafts_folder') || 'Rascunhos',
+            'Trash': t('email.trash_folder') || 'Lixeira',
+            'Deleted Items': t('email.trash_folder') || 'Lixeira',
+            'Junk': t('email.spam') || 'Spam',
+            'Spam': t('email.spam') || 'Spam',
+            'Archive': t('email.archive_folder') || 'Arquivo',
+            'Outbox': t('email.outbox_folder') || 'Caixa de Saída'
         };
 
         const parts = cleanPath.split(/[\./]/);
         const lastPart = parts[parts.length - 1];
 
-        return translations[lastPart] || lastPart || path;
+        return folderTranslations[lastPart] || lastPart || path;
     }
 
     const fetchContacts = async () => {
@@ -844,7 +844,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         {email.subject}
                                     </div>
                                     <div className="text-xs text-gray-500 line-clamp-2">
-                                        {email.text ? email.text.substring(0, 100) : 'Sem pré-visualização...'}
+                                        {email.text ? email.text.substring(0, 100) : t('email.no_preview')}
                                     </div>
                                     {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
                                         <div className="flex gap-1 mt-2">
@@ -885,7 +885,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                             {/* Tags Submenu Header */}
                             <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-t mt-1 bg-gray-50/50">
-                                Adicionar Tag
+                                {t('email.add_tag')}
                             </div>
                             <div className="max-h-32 overflow-y-auto">
                                 {availableTags.length > 0 ? availableTags.map(tag => (
@@ -898,7 +898,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         {tag.label}
                                     </button>
                                 )) : (
-                                    <div className="px-4 py-2 text-xs text-gray-400 italic">Nenhuma tag cadastrada</div>
+                                        <div className="px-4 py-2 text-xs text-gray-400 italic">{t('email.no_tags')}</div>
                                 )}
                             </div>
 
@@ -933,7 +933,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     {view === 'inbox' && (
                         <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
                             <span className="text-xs text-gray-500">
-                                Página {page} de {Math.ceil(totalEmails / pageSize) || 1}
+                                {t('email.page')} {page} {t('email.of')} {Math.ceil(totalEmails / pageSize) || 1}
                             </span>
                             <div className="flex gap-2">
                                 <button
@@ -941,14 +941,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     disabled={page === 1 || loading}
                                     className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
                                 >
-                                    Anterior
+                                    {t('email.previous')}
                                 </button>
                                 <button
                                     onClick={() => setPage(p => p + 1)}
                                     disabled={page * pageSize >= totalEmails || loading}
                                     className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
                                 >
-                                    Próxima
+                                    {t('email.next')}
                                 </button>
                             </div>
                         </div>
@@ -967,7 +967,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         <ChevronLeftIcon className="w-6 h-6" />
                         </button>
                     <span className="font-bold text-gray-700">
-                        {view === 'read' ? 'Mensagem' : view === 'compose' ? 'Nova Mensagem' : 'Configurações'}
+                        {view === 'read' ? t('email.message') : view === 'compose' ? t('email.new_message') : t('email.settings')}
                     </span>
                     </div>
 
@@ -1046,14 +1046,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             {loadingBody ? (
                                 <div className="flex items-center justify-center h-40">
                                     <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
-                                    <span className="ml-2 text-gray-400">Carregando conteúdo...</span>
+                                    <span className="ml-2 text-gray-400">{t('email.loading_content')}</span>
                                 </div>
                             ) : (
                                     <>
                                         <div
                                             className="prose max-w-none text-gray-800"
                                             dangerouslySetInnerHTML={{
-                                            __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || '<div class="text-gray-400 italic">Sem conteúdo disponível ou falha ao carregar.</div>')
+                                                __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`)
                                         }}
                                     />
 
@@ -1130,7 +1130,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                                 />
                                                 <input
                                                     className="col-span-2 border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
-                                                    placeholder="Reply-To (Opcional):"
+                                                    placeholder="Reply-To (Optional):"
                                                     value={composeReplyTo}
                                                     onChange={e => setComposeReplyTo(e.target.value)}
                                                 />
@@ -1138,7 +1138,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         )}
                                         <input
                                             className="w-full border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary font-medium placeholder-gray-400"
-                                            placeholder="Assunto"
+                                            placeholder={t('email.placeholder_subject')}
                                             value={composeSubject}
                                             onChange={e => setComposeSubject(e.target.value)}
                                         />
@@ -1164,17 +1164,17 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                                     <div className="flex justify-between items-center pt-2">
                                         <span className="text-xs text-gray-400 ml-1">
-                                            {settings.signature ? 'Sua assinatura será adicionada automaticamente.' : 'Sem assinatura configurada.'}
+                                            {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
                                         </span>
                                         <div className="flex gap-2">
-                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">Cancelar</button>
+                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md font-medium">{t('generic.cancel')}</button>
                                             <button
                                                 onClick={sendEmail}
                                                 disabled={loading}
                                                 className="px-6 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 shadow-lg flex items-center gap-2"
                                             >
                                                 <PaperAirplaneIcon className="w-4 h-4" />
-                                                {loading ? 'Enviando...' : 'Enviar'}
+                                                {loading ? t('email.sending') : t('email.send')}
                                             </button>
                                         </div>
                                     </div>
@@ -1182,26 +1182,26 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             </div>
                         ) : view === 'settings' ? (
                             <div className="flex-1 p-8 overflow-y-auto">
-                                <h2 className="text-2xl font-bold text-gray-800 mb-6">Configurações de E-mail</h2>
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-6">{t('email.settings_title')}</h2>
 
                                     <div className="grid gap-6 max-w-3xl">
                                         <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
-                                            <h3 className="font-semibold text-gray-700 mb-4">Servidor de Entrada (IMAP)</h3>
+                                            <h3 className="font-semibold text-gray-700 mb-4">{t('email.incoming_server')}</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Host IMAP</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.host_imap')}</label>
                                                     <input value={settings.imap_host} onChange={e => setSettings(s => ({ ...s, imap_host: e.target.value }))} className="w-full mt-1 border rounded p-2" placeholder="imap.gmail.com" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Porta</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.port')}</label>
                                                     <input type="number" value={settings.imap_port} onChange={e => setSettings(s => ({ ...s, imap_port: parseInt(e.target.value) }))} className="w-full mt-1 border rounded p-2" placeholder="993" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Usuário</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.user')}</label>
                                                     <input value={settings.imap_user} onChange={e => setSettings(s => ({ ...s, imap_user: e.target.value, smtp_user: e.target.value }))} className="w-full mt-1 border rounded p-2" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Senha do App</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.pass')}</label>
                                                     <div className="relative mt-1">
                                                         <input type={showEmailPass ? 'text' : 'password'} value={settings.imap_pass} onChange={e => setSettings(s => ({ ...s, imap_pass: e.target.value, smtp_pass: e.target.value }))} className="w-full border rounded p-2 pr-10" />
                                                         <button type="button" onClick={() => setShowEmailPass(p => !p)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
@@ -1211,31 +1211,31 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <input type="checkbox" checked={settings.imap_ssl} onChange={e => setSettings(s => ({ ...s, imap_ssl: e.target.checked }))} />
-                                                    <label className="text-sm">Usar SSL/TLS</label>
+                                                    <label className="text-sm">{t('email.use_ssl')}</label>
                                                 </div>
                                             </div>
 
-                                            <h3 className="font-semibold text-gray-700 mb-4 mt-6">Servidor de Saída (SMTP)</h3>
+                                            <h3 className="font-semibold text-gray-700 mb-4 mt-6">{t('email.outgoing_server')}</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Host SMTP</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.host_smtp')}</label>
                                                     <input value={settings.smtp_host} onChange={e => setSettings(s => ({ ...s, smtp_host: e.target.value }))} className="w-full mt-1 border rounded p-2" placeholder="smtp.gmail.com" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">Porta</label>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('email.port')}</label>
                                                     <input type="number" value={settings.smtp_port} onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))} className="w-full mt-1 border rounded p-2" placeholder="465" />
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <input type="checkbox" checked={settings.smtp_ssl} onChange={e => setSettings(s => ({ ...s, smtp_ssl: e.target.checked }))} />
-                                                    <label className="text-sm">Usar SSL/TLS</label>
+                                                    <label className="text-sm">{t('email.use_ssl')}</label>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Signature Editor */}
                                         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                                            <h3 className="font-semibold text-gray-700 mb-4">Assinatura Automática</h3>
-                                            <p className="text-sm text-gray-500 mb-2">Esta assinatura será adicionada ao final de todos os e-mails enviados.</p>
+                                            <h3 className="font-semibold text-gray-700 mb-4">{t('email.signature_title')}</h3>
+                                            <p className="text-sm text-gray-500 mb-2">{t('email.signature_desc')}</p>
                                             <div className="h-48 mb-12">
                                                 <ReactQuill
                                                     theme="snow"
@@ -1247,8 +1247,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         </div>
 
                                         <div className="flex justify-end gap-3 pt-4 border-t">
-                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600">Cancelar</button>
-                                            <button onClick={saveSettings} className="px-6 py-2 bg-brand-primary text-white rounded font-medium shadow">Salvar Configurações</button>
+                                            <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-600">{t('generic.cancel')}</button>
+                                            <button onClick={saveSettings} className="px-6 py-2 bg-brand-primary text-white rounded font-medium shadow">{t('email.save_settings')}</button>
                                         </div>
                                     </div>
                     </div>
@@ -1259,12 +1259,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             {showTagModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-                        <h3 className="text-lg font-bold mb-4">Gerenciar Tags</h3>
+                        <h3 className="text-lg font-bold mb-4">{t('email.manage_tags')}</h3>
 
                         <div className="flex gap-2 mb-4">
                             <input
                                 className="flex-1 border rounded px-2"
-                                placeholder="Nova tag..."
+                                placeholder={t('email.new_tag')}
                                 value={newTagLabel}
                                 onChange={e => setNewTagLabel(e.target.value)}
                             />
@@ -1294,7 +1294,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Fechar</button>
+                            <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">{t('email.close')}</button>
                         </div>
                     </div>
                 </div>
@@ -1304,7 +1304,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-700">Contatos</h3>
+                            <h3 className="font-bold text-gray-700">{t('sidebar.directory')}</h3>
                             <button onClick={() => setShowContactsModal(false)} className="text-gray-400 hover:text-gray-600">
                                 <span className="text-2xl">&times;</span>
                             </button>
@@ -1330,7 +1330,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             {contacts.length === 0 ? (
-                                <p className="text-center text-gray-500 text-sm">Nenhum contato salvo.</p>
+                                <p className="text-center text-gray-500 text-sm">{t('email.no_tags')}</p>
                             ) : (
                                 contacts.map(contact => (
                                     <div key={contact.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 group">

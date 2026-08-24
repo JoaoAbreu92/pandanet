@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserGroupIcon, PlusIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from './icons';
 import type { Event } from '../types';
 import { supabase } from '../supabaseClient';
+import { useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
 const EventsPage: React.FC = () => {
     const { profile: currentUser } = useAuth();
+    const { t } = useLanguage();
     const { addNotification } = useNotifications();
     const [events, setEvents] = useState<Event[]>([]);
     const [declineModalOpen, setDeclineModalOpen] = useState<string | null>(null);
@@ -83,7 +85,7 @@ const EventsPage: React.FC = () => {
         if (!event) return;
 
         const updatedAttendees = [...(event.attendees || []), currentUser.id];
-        const updatedInvited = (event.invitees || []).filter(id => id !== currentUser.id);
+        const updatedInvited = (event.invited_ids || []).filter(id => id !== currentUser.id);
         const updatedDeclined = (event.declined || []).filter((d: any) => d.userId !== currentUser.id);
 
         try {
@@ -136,7 +138,7 @@ const EventsPage: React.FC = () => {
         if (!event) return;
 
         const updatedDeclined = [...(event.declined || []), { userId: currentUser.id, reason }];
-        const updatedInvited = (event.invitees || []).filter(id => id !== currentUser.id);
+        const updatedInvited = (event.invited_ids || []).filter(id => id !== currentUser.id);
         const updatedAttendees = (event.attendees || []).filter(id => id !== currentUser.id);
 
         try {
@@ -206,8 +208,7 @@ const EventsPage: React.FC = () => {
                     location: newEvent.location,
                     category: newEvent.category,
                     type: newEvent.category, // Fallback for 'type' column
-                    image_url: newEvent.imageUrl, // Snake case standard
-                    imageUrl: newEvent.imageUrl, // Fallback for camelCase column
+                    image_url: newEvent.imageUrl,
                     company_id: currentUser.company_id,
                     attendees: [],
                     invited_ids: [], // Ensure this is sent
@@ -438,7 +439,7 @@ const EventsPage: React.FC = () => {
                                     required
                                     rows={4}
                                     className="w-full border dark:border-slate-700 rounded-lg p-3 mb-4 focus:ring-brand-primary focus:border-brand-primary bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
-                                    placeholder="Motivo..."
+                                    placeholder={t('events.placeholder_reason')}
                                     value={declineReason}
                                     onChange={e => setDeclineReason(e.target.value)}
                                 />

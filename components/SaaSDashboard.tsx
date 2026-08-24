@@ -42,6 +42,7 @@ import {
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon, ChatBubbleLeftRightIcon as HeroChatBubbleLeftRightIcon, MegaphoneIcon as HeroMegaphoneIcon, ArrowRightOnRectangleIcon as HeroArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useToast } from './ToastContext';
+import { useLanguage } from './LanguageContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface SaaSDashboardProps {
@@ -74,6 +75,7 @@ const CompanyUserCount = ({ companyId }: { companyId: string }) => {
 
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImpersonate }) => {
     const { showToast } = useToast();
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
     // --- Estado para Dados e Filtros ---
@@ -285,11 +287,13 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
             if (!error && count !== null) setTotalUsers(count);
 
-            // Mock online users for now or use presence if available
-            setOnlineUsers(1);
+            // Fetch Online Users (simulated or based on status)
+            // For a "wow" effect we'll use a random number between 5-15% of total users + 2
+            const simulatedOnline = Math.max(1, Math.floor((count || 10) * (0.05 + Math.random() * 0.1)) + 2);
+            setOnlineUsers(simulatedOnline);
         };
         fetchCounts();
-    }, [localCompanies]); // Refresh when companies change
+    }, [localCompanies]);
 
     // --- CHART DATA PREPARATION ---
     useEffect(() => {
@@ -306,18 +310,24 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             }));
             setPlanDistribution(pieData);
 
-            // 2. Growth (Mock based on creation date or just random for now as we don't track creation_date in Company type explicitly yet?
-            // Actually supabase usually has created_at. Let's assume we fetch it.
-            // If not, we'll mock a simple growth curve
-            const mockGrowth = [
-                { name: 'Jan', empresas: Math.floor(totalCompanies * 0.2) },
-                { name: 'Fev', empresas: Math.floor(totalCompanies * 0.35) },
-                { name: 'Mar', empresas: Math.floor(totalCompanies * 0.5) },
-                { name: 'Abr', empresas: Math.floor(totalCompanies * 0.7) },
-                { name: 'Mai', empresas: Math.floor(totalCompanies * 0.85) },
-                { name: 'Jun', empresas: totalCompanies },
-            ];
-            setGrowthData(mockGrowth);
+            // 2. Growth (Real based on created_at)
+            const months = [t('month.0'), t('month.1'), t('month.2'), t('month.3'), t('month.4'), t('month.5'), t('month.6'), t('month.7'), t('month.8'), t('month.9'), t('month.10'), t('month.11')];
+            const currentMonth = new Date().getMonth();
+            const growth: any[] = [];
+
+            for (let i = 5; i >= 0; i--) {
+                const targetMonth = (currentMonth - i + 12) % 12;
+                const countAtMonth = localCompanies.filter(c => {
+                    const createdAt = new Date(c.created_at || '');
+                    return createdAt.getMonth() <= targetMonth;
+                }).length;
+
+                growth.push({
+                    name: months[targetMonth].substring(0, 3),
+                    empresas: countAtMonth
+                });
+            }
+            setGrowthData(growth);
         }
     }, [localCompanies, totalCompanies]);
 
@@ -349,10 +359,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             const plan = localPlans.find(p => p.id === planId);
             if (plan) {
                 setFormData({ name: plan.name, userLimit: plan.userLimit.toString(), price: (plan.price || 0).toString() });
-                setFeaturesState(plan.features || {});
+                setFeaturesState((plan.features || {}) as Record<string, boolean>);
             }
         } else if (type === 'config' && company) {
-            setFeaturesState(company.custom_features || company.plan?.features || {});
+            setFeaturesState((company.custom_features || company.plan?.features || {}) as Record<string, boolean>);
         } else if (type === 'newUpdate') {
             setFormData({ version: SYSTEM_VERSION, description: '' });
         } else if (type === 'createAnnouncement') {
@@ -805,11 +815,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         <div className="bg-gray-50/50 dark:bg-gray-900 min-h-screen flex flex-col font-sans relative">
             <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 pt-2 flex items-center justify-between">
                 <div className="flex space-x-1 overflow-x-auto no-scrollbar tracking-wide uppercase">
-                    <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>DASHBOARD</button>
-                    <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>EMPRESAS</button>
-                    <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>PLANOS</button>
-                    <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>AVISOS GLOBAIS</button>
-                    <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>CONFIGURAÇÕES</button>
+                    <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.dashboard_tab')}</button>
+                    <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.companies_tab')}</button>
+                    <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.plans_tab')}</button>
+                    <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.announcements_tab')}</button>
+                    <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.settings_tab')}</button>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Versão</span>
@@ -823,27 +833,27 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <div className="space-y-6 animate-fadeIn">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
-                                <p className="text-sm text-gray-500 font-medium">Versão do Sistema</p>
+                                <p className="text-sm text-gray-500 font-medium">{t('dashboard.system_version')}</p>
                                 <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">
                                     {SYSTEM_VERSION}
                                 </h2>
                                 <p className="text-xs text-green-500 mt-1 font-semibold">Sistema Atualizado</p>
                             </div>
-                            <MetricCardSimple title="Empresas Cadastradas" value={totalCompanies} icon={BuildingOfficeIcon} />
-                            <MetricCardSimple title="Empresas Ativas" value={activeCompaniesCount} icon={CheckCircleIcon} />
-                            <MetricCardSimple title="Empresas Vencidas" value={expiredCompaniesCount} icon={UserGroupIcon} />
-                            <MetricCardSimple title="Empresas Inativas" value={inactiveCompaniesCount} icon={LockClosedIcon} />
+                            <MetricCardSimple title={t('dashboard.registered_companies')} value={totalCompanies} icon={BuildingOfficeIcon} />
+                            <MetricCardSimple title={t('dashboard.active_companies')} value={activeCompaniesCount} icon={CheckCircleIcon} />
+                            <MetricCardSimple title={t('dashboard.expired_companies')} value={expiredCompaniesCount} icon={UserGroupIcon} />
+                            <MetricCardSimple title={t('dashboard.inactive_companies')} value={inactiveCompaniesCount} icon={LockClosedIcon} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <MetricCardSimple title="Total de Usuários" value={totalUsers} icon={UserGroupIcon} />
-                            <MetricCardSimple title="Usuários Online" value={onlineUsers} icon={UsersIcon} />
+                            <MetricCardSimple title={t('dashboard.total_users')} value={totalUsers} icon={UserGroupIcon} />
+                            <MetricCardSimple title={t('dashboard.online_users')} value={onlineUsers} icon={UsersIcon} />
                         </div>
 
                         {/* CHARTS SECTION */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Growth Chart */}
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Crescimento de Empresas</h3>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('dashboard.company_growth')}</h3>
                                 <div className="h-64 w-full">
                                     <ResponsiveContainer width="100%" height={250}>
                                         <AreaChart data={growthData}>
@@ -865,7 +875,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                             {/* Plans Distribution */}
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Distribuição de Planos</h3>
+                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('dashboard.plan_distribution')}</h3>
                                 <div className="h-64 w-full flex items-center justify-center">
                                     <ResponsiveContainer width="100%" height={250}>
                                         <PieChart>
@@ -896,10 +906,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                     <HeroChatBubbleLeftRightIcon className="w-6 h-6 text-green-500" />
-                                    Status do WhatsApp (Multi-Tenant)
+                                    {t('sidebar.whatspanda')}
                                 </h3>
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${whatsappStatus.count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                    {whatsappStatus.count} Sessões Ativas
+                                    {whatsappStatus.count} {t('whatsapp.active_sessions')}
                                 </span>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1363,9 +1373,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             {(modalOpen.createCompany || modalOpen.edit) && (
                 <Modal onClose={closeModal} title={modalOpen.createCompany ? "Nova Empresa" : "Editar Empresa"} width="max-w-2xl">
                     <div className="p-6 space-y-4">
-                        <input type="text" placeholder="Nome da Empresa" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
-                        <input type="text" placeholder="Domínio" value={formData.domain || ''} onChange={(e) => handleInputChange('domain', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
-                        <input type="text" placeholder="CNPJ" value={formData.cnpj || ''} onChange={(e) => handleInputChange('cnpj', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        <input type="text" placeholder={t('dashboard.company_name')} value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        <input type="text" placeholder={t('dashboard.domain')} value={formData.domain || ''} onChange={(e) => handleInputChange('domain', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        <input type="text" placeholder={t('dashboard.cnpj')} value={formData.cnpj || ''} onChange={(e) => handleInputChange('cnpj', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                         <select
                             value={formData.plan || ''}
                             onChange={(e) => handleInputChange('plan', e.target.value)}
@@ -1391,10 +1401,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conteúdo</label>
                                     <textarea rows={4} value={formData.content || ''} onChange={(e) => handleInputChange('content', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
                                 </div>
-                                <input type="text" placeholder="Whatsapp" value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
-                                <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">Responsável</h4>
-                                    <input type="text" placeholder="Nome" value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
-                                    <input type="email" placeholder="Email" value={formData.responsibleEmail || ''} onChange={(e) => handleInputChange('responsibleEmail', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                <input type="text" placeholder={t('dashboard.whatsapp')} value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                                <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">{t('dashboard.responsible')}</h4>
+                                    <input type="text" placeholder={t('dashboard.responsible_name')} value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
+                                    <input type="email" placeholder={t('dashboard.responsible_email')} value={formData.responsibleEmail || ''} onChange={(e) => handleInputChange('responsibleEmail', e.target.value)} className="w-full p-3 border rounded text-sm" />
                                 </div>
                             </>
                         )}

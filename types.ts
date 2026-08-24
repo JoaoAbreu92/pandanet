@@ -621,6 +621,7 @@ export interface Company {
   status?: 'active' | 'inactive' | 'expired';
   responsible_name?: string;
   responsible_email?: string;
+  created_at?: string;
   settings: CompanySettings;
   data: AppData;
   employees?: Employee[];
