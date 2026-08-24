@@ -163,7 +163,7 @@ router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (re
 });
 
 // API: Sincronizar
-router.post('/sync/:companyId/:connectionId', async (req, res) => {
+router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) => {
     const { companyId, connectionId } = req.params;
     
     // Buscar as configurações para obter o nome da instância
@@ -189,37 +189,26 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 // ============================================
 // WEBHOOKS DA EVOLUTION API E SYNC
-// ============================================
-
-async function syncEvolutionData(instanceName, companyId, connectionId) {
+// ====================async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
-        console.log(`[SYNC] Iniciando sincronização de histórico para a instância ${instanceName}...`);
+        console.log(`[SYNC] [Empresa: ${companyId}] Iniciando sincronização para ${instanceName}...`);
         
-        // 1. Buscar chats da Evolution API
-        const chatRes = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, {
-            headers: { 'apikey': evoKey }
-        });
-        
-        if (!chatRes.ok) {
-            console.error(`[SYNC] Erro ao buscar chats: ${chatRes.statusText}`);
-            return;
-        }
-        
-        const chats = await chatRes.json();
-        if (!Array.isArray(chats)) return;
-
-        console.log(`[SYNC] ${chats.length} chats encontrados. Sincronizando no Supabase...`);
-
-        // 2. Mapear contatos para nomes
+        // 1. Buscar contatos da Evolution API (Fundamental para nomes)
         const contactRes = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
             headers: { 'apikey': evoKey }
-        }).catch(() => null);
+        }).catch(err => {
+            console.error(`[SYNC] Erro ao conectar na Evo para contatos:`, err.message);
+            return null;
+        });
         
         let contactsMap = {};
         if (contactRes && contactRes.ok) {
-            const contacts = await contactRes.json();
+            let contacts = await contactRes.json();
+            // Lida com { data: [...] } ou [...]
+            if (contacts && !Array.isArray(contacts) && Array.isArray(contacts.data)) contacts = contacts.data;
+            
             if (Array.isArray(contacts)) {
-                console.log(`[SYNC] ${contacts.length} contatos encontrados. Salvando no banco...`);
+                console.log(`[SYNC] [Empresa: ${companyId}] ${contacts.length} contatos encontrados.`);
                 for (const c of contacts) {
                     const jid = c.id || c.remoteJid;
                     const phone = jid?.split('@')[0];
@@ -227,7 +216,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         const name = c.name || c.pushName || c.notify || phone;
                         contactsMap[jid] = name;
                         
-                        // Upsert contact
+                        // Upsert contact com empresa garantida
                         await supabase.from('whatsapp_contacts').upsert({
                             company_id: companyId,
                             phone: phone,
@@ -238,6 +227,26 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         }
 
+        // 2. Buscar chats da Evolution API
+        const chatRes = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, {
+            headers: { 'apikey': evoKey }
+        });
+        
+        if (!chatRes.ok) {
+            console.error(`[SYNC] Erro ao buscar chats: ${chatRes.statusText}`);
+            return;
+        }
+        
+        let chats = await chatRes.json();
+        if (chats && !Array.isArray(chats) && Array.isArray(chats.data)) chats = chats.data;
+        
+        if (!Array.isArray(chats)) {
+            console.log(`[SYNC] Nenhum chat retornado ou formato inválido.`);
+            return;
+        }
+
+        console.log(`[SYNC] [Empresa: ${companyId}] ${chats.length} chats encontrados.`);
+        
         // 3. Processar cada chat
         for (const chat of chats) {
             const remoteJid = chat.id || chat.remoteJid;
@@ -278,31 +287,32 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
             // 4. Buscar Mensagens deste Chat (Histórico 30 dias)
             if (conversationId) {
-                console.log(`[SYNC] Buscando mensagens para ${fromPhone}...`);
                 const msgRes = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
                     method: 'POST',
                     headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         where: { remoteJid },
-                        limit: 50 // Pegar as últimas 50 mensagens para começar
+                        limit: 30 // Reduzi o limite para ser mais rápido na carga inicial
                     })
                 }).catch(() => null);
 
                 if (msgRes && msgRes.ok) {
-                    const messages = await msgRes.json();
+                    let messages = await msgRes.json();
+                    if (messages && !Array.isArray(messages) && Array.isArray(messages.data)) messages = messages.data;
+                    
                     if (Array.isArray(messages)) {
                         console.log(`[SYNC] ${messages.length} mensagens encontradas para ${fromPhone}.`);
-                        for (const msg of messages) {
-                            await processInboundMessage(msg, companyId, connectionId, true); // true = historical
+                        // Processar em ordem cronológica (mais antiga primeiro) se possível
+                        const sortedMessages = [...messages].reverse(); 
+                        for (const msg of sortedMessages) {
+                            await processInboundMessage(msg, companyId, connectionId, true);
                         }
-                    } else {
-                        console.log(`[SYNC] Nenhuma mensagem encontrada para ${fromPhone}.`);
                     }
                 }
                 console.log(`[SYNC] Finalizado chat ${fromPhone}.`);
             }
         }
-        console.log(`[SYNC] Sincronização da instância ${instanceName} concluída!`);
+        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso!`);
     } catch (err) {
         console.error(`[SYNC] Erro durante a sincronização:`, err.message);
     }
