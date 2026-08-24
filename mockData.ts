@@ -38,9 +38,9 @@ const enterprisePlanFeatures: Plan['features'] = {
 };
 
 export const mockPlans: Plan[] = [
-    { id: 'free', name: 'Grátis', userLimit: 10, features: { ...basePermissions, viewTiDashboard: false, openTiRequests: false } },
-    { id: 'pro', name: 'Pro', userLimit: 50, features: proPlanFeatures },
-    { id: 'enterprise', name: 'Empresarial', userLimit: 1000, features: enterprisePlanFeatures },
+    { id: 'free', name: 'Grátis', userLimit: 10, whatsappLimit: 1, emailLimit: 1, features: { ...basePermissions, viewTiDashboard: false, openTiRequests: false } },
+    { id: 'pro', name: 'Pro', userLimit: 50, whatsappLimit: 5, emailLimit: 5, features: proPlanFeatures },
+    { id: 'enterprise', name: 'Empresarial', userLimit: 1000, whatsappLimit: 999, emailLimit: 999, features: enterprisePlanFeatures },
 ];
 
 // CLEARED MOCK DATA ARRAYS

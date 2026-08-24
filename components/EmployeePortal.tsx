@@ -74,7 +74,7 @@ const EmployeePortal: React.FC = () => {
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     // Admin upload
-    const isAdmin = profile?.is_admin || (profile?.permissions as any)?.isCompanyAdmin;
+    const isAdmin = profile?.isAdmin || (profile?.permissions as any)?.isCompanyAdmin;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadingPayslip, setUploadingPayslip] = useState(false);
 
@@ -256,7 +256,7 @@ const EmployeePortal: React.FC = () => {
             <header className="flex flex-wrap justify-between items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Meu RH</h1>
-                    <p className="text-gray-500 mt-1">Gestão de documentos e benefícios de {profile?.name || profile?.full_name}.</p>
+                    <p className="text-gray-500 mt-1">Gestão de documentos e benefícios de {profile?.name}.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {vacationBalance && vacationBalance.available_days > 0 && (

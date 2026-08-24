@@ -47,7 +47,13 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       .maybeSingle();
 
     if (existingConv) {
-      // Se existe, selecionamos e direcionamos para a view adequada
+      // Se existe, reabre o atendimento se estiver fechado
+      if (existingConv.status === 'fechado') {
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ status: 'aberto', last_message_at: new Date().toISOString() })
+          .eq('id', existingConv.id);
+      }
       setSelectedConversationId(existingConv.id);
       if (existingConv.is_group) {
         setCurrentView('grupos');

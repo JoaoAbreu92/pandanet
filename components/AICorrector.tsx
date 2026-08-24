@@ -53,7 +53,7 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
         const handleBlur = (e: FocusEvent) => {
             // Pequeno delay para permitir o clique no botão do corretor
             setTimeout(() => {
-                const active = document.activeElement;
+                const active = document.activeElement as HTMLElement | null;
                 if (
                     !active || 
                     (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA' && active.contentEditable !== 'true' && 

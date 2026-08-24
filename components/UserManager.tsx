@@ -480,7 +480,7 @@ const UserFormModal: React.FC<{
                                             className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
                                         >
                                             <option value="">Nenhum</option>
-                                            {users.filter(u => u.id !== editingUser?.id).map(u => (
+                                            {users.filter(u => u.id !== user?.id).map(u => (
                                                 <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                                             ))}
                                         </select>
@@ -1031,7 +1031,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     </table>
                 </div>
             </Card>
-            {isModalOpen && <UserFormModal user={editingUser} departments={departments} onClose={() => setModalOpen(false)} onSave={handleSave} />}
+            {isModalOpen && <UserFormModal user={editingUser} departments={departments} users={users} onClose={() => setModalOpen(false)} onSave={handleSave} />}
             
             {resetPasswordUser && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

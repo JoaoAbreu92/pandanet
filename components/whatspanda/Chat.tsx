@@ -40,6 +40,7 @@ import {
   Calendar,
   AlertCircle,
   Menu,
+  Mic,
   Edit2,
   RefreshCw,
   Bell,
@@ -82,6 +83,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: string} | null>(null);
   const [newMessage, setNewMessage] = useState('');
+
+  // Voice messages state & refs
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<any>(null);
+
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'fechados'>('aguardando');
   const [useSignature, setUseSignature] = useState(false);
@@ -532,7 +541,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     if (data && !error) {
       setSelectedConversation(data as WhatsAppConversationWithDetails);
-      if (data.status) setActiveTab(data.status as any);
+      if (data.status === 'fechado') {
+        setActiveTab('fechados');
+      } else {
+        const userId = activeProfile?.id || profile?.id;
+        if (data.assigned_to === userId) {
+          setActiveTab('meus');
+        } else {
+          setActiveTab('aguardando');
+        }
+      }
       // If it's a group, ensure the filter allows it
       if (data.is_group) {
         setChatTypeFilter('group');
@@ -875,7 +893,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         ['Canal', selectedConversation.channel?.connection_name || 'WhatsApp'],
         ['Atendente', selectedConversation.assigned_user?.full_name || 'Não atribuído'],
         ['Setor', selectedConversation.department?.name || 'Geral'],
-        ['Status', selectedConversation.status === 'open' ? 'Aberto' : 'Finalizado'],
+        ['Status', selectedConversation.status === 'fechado' ? 'Finalizado' : selectedConversation.status === 'pendente' ? 'Aguardando' : 'Aberto'],
       ],
       theme: 'striped',
       headStyles: { fillColor: [16, 185, 129] },
@@ -1033,7 +1051,133 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     handleSendMessage(undefined, 'sticker', url);
     setShowStickerPicker(false);
   };
-  
+
+  const startRecording = async () => {
+    if (isGhostMode) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      
+      let mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else {
+          mimeType = '';
+        }
+      }
+
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+          await handleSendAudio(audioBlob);
+        }
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(200);
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error('Erro ao acessar microfone:', err);
+      alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+    }
+  };
+
+  const stopRecording = (shouldSend: boolean) => {
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      if (!shouldSend) {
+        audioChunksRef.current = [];
+      }
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const handleSendAudio = async (blob: Blob) => {
+    if (!selectedConversation || !currentUser?.company_id) return;
+    try {
+      let fileExt = 'webm';
+      if (blob.type.includes('ogg')) fileExt = 'ogg';
+      else if (blob.type.includes('mp4')) fileExt = 'mp4';
+      else if (blob.type.includes('mpeg') || blob.type.includes('mp3')) fileExt = 'mp3';
+
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `whatsapp/${selectedConversation.id}/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(filePath, blob, {
+              contentType: blob.type
+          });
+
+      if (uploadError) {
+          console.error('Falha no upload do áudio:', uploadError);
+          alert(`Erro ao subir áudio: ${uploadError.message}`);
+          return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("No active session");
+
+      const response = await fetch(`/api/whatsapp/messages/send/${selectedConversation.id}`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ 
+              message: '',
+              mediaUrl: publicUrl,
+              mediaType: blob.type
+          })
+      });
+
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to send audio');
+      }
+
+      fetchMessages(selectedConversation.id);
+      scrollToBottom(true);
+    } catch (error) {
+        console.error('Error sending audio message:', error);
+        alert('Erro ao enviar áudio.');
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
     if (isGhostMode) {
       alert('Modo Auditoria: O envio de mensagens está desabilitado.');
@@ -1053,7 +1197,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     // Assinatura: verifica force_signature no canal da conversa, ou se o usuário ativou manualmente
     const channelPerms = channelAccess.find((ca: any) => ca.channel_id === selectedConversation.connection_id);
     const forceSig = channelPerms?.force_signature === true;
-    const senderName = activeProfile?.full_name || profile?.full_name || '';
+    const senderName = activeProfile?.name || profile?.name || '';
     const autoSignature = forceSig && senderName ? `*${senderName}*` : null;
     const effectiveSignature = autoSignature || (useSignature && signatureText.trim() ? signatureText.trim() : null);
 
@@ -1703,19 +1847,39 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     className={`p-3 md:p-4 rounded-2xl shadow-sm border ${
                       msg.is_from_customer
                       ? 'bg-white dark:bg-white/5 text-slate-800 dark:text-slate-100 rounded-tl-sm border-gray-100 dark:border-white/5'
-                      : (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif'))
+                      : (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif'))
                         ? 'bg-transparent shadow-none border-0 p-0 overflow-visible'
                         : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
                     }`}
                   >
                     <div className="space-y-2">
-                      {(msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
+                      {msg.media_type === 'gif' ? (
+                        <div className="relative group inline-block" onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'video' })}>
+                          <video
+                            src={fixMediaUrl(msg.media_url)}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] hover:opacity-90 transition-opacity border-0 shadow-none bg-transparent"
+                          />
+                          <a 
+                            href={fixMediaUrl(msg.media_url)} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ) : (msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
                         <div className={`relative group inline-block`} onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'image' })}>
                           <img 
                             src={fixMediaUrl(msg.media_url)} 
                             alt="Mídia" 
                             className={`rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] hover:opacity-90 transition-opacity ${
-                              (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                              (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
                               ? 'border-0 shadow-none bg-transparent' 
                               : ''
                             }`}
@@ -1796,7 +1960,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
                       {msg.message_text && (
                         <p className={`text-sm font-medium leading-relaxed whitespace-pre-wrap ${
-                          (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                          (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
                           ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
                           : ''
                         }`}>
@@ -1805,7 +1969,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       )}
                     </div>
                     <div className={`flex justify-end items-center gap-1.5 mt-2 opacity-60 ${
-                      (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
+                      (msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) 
                       ? 'bg-black/20 dark:bg-white/10 px-2 py-0.5 rounded-full w-fit ml-auto' 
                       : ''
                     }`}>
@@ -1942,81 +2106,124 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   accept="image/*,.gif"
                 />
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
-                  disabled={!canSendMedia}
-                  title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar Arquivo"}
-                >
-                  <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
-                </button>
-
-                <button
-                  onClick={() => setShowStickerPicker(!showStickerPicker)}
-                  className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
-                  disabled={!canSendMedia}
-                  title={!canSendMedia ? "Sem permissão para enviar figurinhas" : "Figurinhas / Gifs"}
-                >
-                  <Smile className="w-5 h-5 md:w-5 md:h-5" />
-                </button>
-
-                <div className="flex flex-col items-center justify-center px-1 mb-2">
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
-                  <button
-                    onClick={() => setUseSignature(!useSignature)}
-                    className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
-                    title={useSignature ? "Assinatura Ativa" : "Sem Assinatura"}
-                  >
-                    <CheckCheck className={`w-3.5 h-3.5 ${useSignature ? 'opacity-100' : 'opacity-40'}`} />
-                  </button>
-                </div>
-
-                {/* Botão Chamar Atenção (Nudge) */}
-                {activeProfile?.can_nudge !== false && (
-                  <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
-                    <button
-                      type="button"
-                      onClick={handleSendNudge}
-                      disabled={!!cooldownTimeouts[selectedConversation?.id || '']}
-                      className={`p-2.5 rounded-2xl transition-all relative flex items-center justify-center ${
-                        cooldownTimeouts[selectedConversation?.id || '']
-                          ? 'text-slate-300 cursor-not-allowed opacity-50'
-                          : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50  active:scale-95'
-                      }`}
-                      title="Chamar Atenção (Nudge)"
-                    >
-                      <Bell className={`w-5 h-5 ${cooldownTimeouts[selectedConversation?.id || ''] ? '' : 'animate-bounce'}`} />
-                      {cooldownTimeouts[selectedConversation?.id || ''] && (
-                        <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-[9px] px-1 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[18px] text-center border border-white">
-                          {cooldownTimeouts[selectedConversation?.id || '']}s
-                        </span>
-                      )}
-                    </button>
+                {isRecording ? (
+                  <div className="flex-1 flex items-center justify-between px-3 py-1.5 md:py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-sm font-bold text-red-500 dark:text-red-400">
+                        Gravando ({formatTime(recordingTime)})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => stopRecording(false)}
+                        className="p-2 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded-xl transition-all"
+                        title="Cancelar Gravação"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => stopRecording(true)}
+                        className="p-2.5 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center"
+                        title="Enviar Áudio"
+                      >
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                      disabled={!canSendMedia}
+                      title={!canSendMedia ? "Anexar Arquivo" : "Anexar Arquivo"}
+                    >
+                      <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
+                    </button>
+
+                    <button
+                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      className={`p-2.5 md:p-3 rounded-2xl transition-all duration-300 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
+                      disabled={!canSendMedia}
+                      title={!canSendMedia ? "Figurinhas / Gifs" : "Figurinhas / Gifs"}
+                    >
+                      <Smile className="w-5 h-5 md:w-5 md:h-5" />
+                    </button>
+
+                    <div className="flex flex-col items-center justify-center px-1 mb-2">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
+                      <button
+                        onClick={() => setUseSignature(!useSignature)}
+                        className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
+                        title={useSignature ? "Assinatura Ativa" : "Sem Assinatura"}
+                      >
+                        <CheckCheck className={`w-3.5 h-3.5 ${useSignature ? 'opacity-100' : 'opacity-40'}`} />
+                      </button>
+                    </div>
+
+                    {/* Botão Chamar Atenção (Nudge) */}
+                    {activeProfile?.can_nudge !== false && (
+                      <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
+                        <button
+                          type="button"
+                          onClick={handleSendNudge}
+                          disabled={!!cooldownTimeouts[selectedConversation?.id || '']}
+                          className={`p-2.5 rounded-2xl transition-all relative flex items-center justify-center ${
+                            cooldownTimeouts[selectedConversation?.id || '']
+                              ? 'text-slate-300 cursor-not-allowed opacity-50'
+                              : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
+                          }`}
+                          title="Chamar Atenção (Nudge)"
+                        >
+                          <Bell className={`w-5 h-5 ${cooldownTimeouts[selectedConversation?.id || ''] ? '' : 'animate-bounce'}`} />
+                          {cooldownTimeouts[selectedConversation?.id || ''] && (
+                            <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-[9px] px-1 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[18px] text-center border border-white">
+                              {cooldownTimeouts[selectedConversation?.id || '']}s
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onPaste={handlePaste}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          canSendMessagesResult && handleSendMessage();
+                        }
+                      }}
+                      placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
+                      disabled={!canSendMessagesResult}
+                      className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent text-[15px] resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
+                      rows={1}
+                    />
+                    {newMessage.trim() || attachedFile ? (
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!canSendMessagesResult}
+                        className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-brand-primary/20 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
+                        title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
+                      >
+                        <Send className="w-5 h-5 md:ml-1" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startRecording}
+                        disabled={!canSendMessagesResult}
+                        className="p-2.5 md:p-3 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full md:rounded-2xl hover:bg-slate-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-95 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
+                        title={!canSendMessagesResult ? "Sem permissão para enviar áudios" : "Gravar Áudio"}
+                      >
+                        <Mic className="w-5 h-5" />
+                      </button>
+                    )}
+                  </>
                 )}
-                <textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onPaste={handlePaste}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      canSendMessagesResult && handleSendMessage();
-                    }
-                  }}
-                  placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
-                  disabled={!canSendMessagesResult}
-                  className="flex-1 max-h-32 min-h-[40px] py-3 px-2 md:px-4 bg-transparent text-[15px] resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
-                  rows={1}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={(!newMessage.trim() && !attachedFile) || !canSendMessagesResult}
-                  className="p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-brand-primary/20 mb-0.5 md:mb-px ml-1 md:ml-2 flex-shrink-0"
-                  title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
-                >
-                  <Send className="w-5 h-5 md:ml-1" />
-                </button>
               </div>
               )}
             </div>

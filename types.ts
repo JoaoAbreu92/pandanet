@@ -737,6 +737,11 @@ export interface WhatsAppQueue {
 }
 
 export interface WhatsAppTag {
+  id: string;
+  company_id: string;
+  name: string;
+  color: string;
+  description?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -780,6 +785,10 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
     avatar_url?: string;
   };
   department?: {
+    id: string;
+    name: string;
+  };
+  queue?: {
     id: string;
     name: string;
   };

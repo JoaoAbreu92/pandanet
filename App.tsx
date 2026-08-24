@@ -590,43 +590,44 @@ const AppContent: React.FC = () => {
     const [isReadOnly, setIsReadOnly] = useState(false);
 
 
+    const canAccess = (permission: keyof EmployeePermissions) => {
+        if (!currentUser) return false;
+        if (currentUser.role === 'Super Admin') return true;
+        if (currentUser.permissions?.[permission] === false) return false;
+
+        const featureMap: Record<string, string> = {
+            'viewMessages': 'messages',
+            'viewCalendar': 'calendar',
+            'useMarketplace': 'marketplace',
+            'viewBenefits': 'benefits',
+            'viewWellbeing': 'wellness',
+            'openTickets': 'tickets',
+            'viewKnowledgeBase': 'kb',
+            'viewPolicies': 'policies',
+            'viewRecognition': 'wall',
+            'viewWhatsPanda': 'whatspanda',
+            'viewEmail': 'email',
+            'viewOnboarding': 'onboarding',
+            'viewJobs': 'jobs',
+            'viewTraining': 'training',
+            'viewSurveys': 'surveys',
+            'viewOrgChart': 'org-chart',
+            'viewMeuRH': 'meu-rh',
+            'viewDirectory': 'org-chart',
+            'viewInfoSec': 'infosec',
+            'viewKPIDashboard': 'kpis'
+        };
+
+        const featureId = featureMap[permission];
+        if (featureId && currentCompany?.custom_features && currentCompany.custom_features[featureId] === false) {
+            return false;
+        }
+
+        return true;
+    };
+
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
-
-        const canAccess = (permission: keyof EmployeePermissions) => {
-            if (currentUser.role === 'Super Admin') return true;
-            if (currentUser.permissions?.[permission] === false) return false;
-
-            const featureMap: Record<string, string> = {
-                'viewMessages': 'messages',
-                'viewCalendar': 'calendar',
-                'useMarketplace': 'marketplace',
-                'viewBenefits': 'benefits',
-                'viewWellbeing': 'wellness',
-                'openTickets': 'tickets',
-                'viewKnowledgeBase': 'kb',
-                'viewPolicies': 'policies',
-                'viewRecognition': 'wall',
-                'viewWhatsPanda': 'whatspanda',
-                'viewEmail': 'email',
-                'viewOnboarding': 'onboarding',
-                'viewJobs': 'jobs',
-                'viewTraining': 'training',
-                'viewSurveys': 'surveys',
-                'viewOrgChart': 'org-chart',
-                'viewMeuRH': 'meu-rh',
-                'viewDirectory': 'org-chart',
-                'viewInfoSec': 'infosec',
-                'viewKPIDashboard': 'kpis'
-            };
-
-            const featureId = featureMap[permission];
-            if (featureId && currentCompany?.custom_features && currentCompany.custom_features[featureId] === false) {
-                return false;
-            }
-
-            return true;
-        };
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
@@ -664,7 +665,7 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda initialSearch={globalSearchTerm} /> : null;
+            case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;
@@ -775,6 +776,9 @@ const AppContent: React.FC = () => {
                 isShaking={isShaking}
                 onSearch={handleSearch}
             >
+                <div className="h-full w-full" style={{ display: currentPage === 'whatspanda' ? 'block' : 'none' }}>
+                    {canAccess('viewWhatsPanda') && <WhatsPanda initialSearch={globalSearchTerm} />}
+                </div>
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
                 <AICorrector currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />

@@ -345,22 +345,36 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
 
         if (mediaUrl) {
             // Se for figurinha MAS for GIF, melhor tratar como mídia imagem (Evolution converte melhor no celular)
-            const isGif = mediaUrl.toLowerCase().endsWith('.gif');
+            const isGif = mediaUrl.toLowerCase().split('?')[0].endsWith('.gif');
             const isSticker = mediaType === 'sticker' && !isGif;
-            const endpoint = isSticker ? 'sendSticker' : 'sendMedia';
+            const isAudio = mediaType && (mediaType.startsWith('audio') || mediaType === 'audio');
+            
+            let endpoint = 'sendMedia';
+            if (isSticker) {
+                endpoint = 'sendSticker';
+            } else if (isAudio) {
+                endpoint = 'sendWhatsAppAudio';
+            }
+            
+            const cleanUrl = mediaUrl.split('?')[0];
+            const fileName = cleanUrl.split('/').pop() || 'file';
             
             const body = isSticker ? {
                 number: phoneNumber,
                 stickerMessage: {
                     sticker: mediaUrl
                 }
+            } : isAudio ? {
+                number: phoneNumber,
+                audio: mediaUrl,
+                ptt: true
             } : {
                 number: phoneNumber,
-                mediaMessage: {
-                    mediatype: isGif ? 'image' : getEvoMediaType(mediaType), // GIFs são mediatype image na Evolution
-                    caption: message || '',
-                    media: mediaUrl
-                }
+                mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
+                mimetype: mediaType,
+                media: mediaUrl,
+                fileName: fileName,
+                caption: message || ''
             };
 
             const sendReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
@@ -683,8 +697,53 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     }
                 }
             }
+
+            // Sincronização adicional: buscar todos os grupos da conta no WhatsApp (mesmo inativos no chat recente)
+            console.log(`[SYNC] Buscando todos os grupos de ${instanceName} via fetchAllGroups...`);
+            const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, {
+                method: 'GET',
+                headers
+            });
+            if (respG.ok) {
+                const rawG = await respG.json();
+                const allGroups = Array.isArray(rawG) ? rawG : (rawG.groups || rawG.data || []);
+                console.log(`[SYNC] Encontrados ${allGroups.length} grupos no total.`);
+                addDebugLog('SYNC_GROUPS_RAW', `Encontrados ${allGroups.length} grupos no total.`);
+
+                for (const g of allGroups) {
+                    const jid = g.id || g.jid || '';
+                    if (!jid || !jid.includes('@g.us')) continue;
+                    const phone = jid.split('@')[0];
+
+                    const { data: convExists } = await supabase
+                        .from('whatsapp_conversations')
+                        .select('id')
+                        .eq('company_id', companyId)
+                        .eq('contact_phone', phone)
+                        .maybeSingle();
+
+                    if (!convExists) {
+                        const groupName = g.subject || g.name || 'Grupo (Sem Nome)';
+                        await supabase.from('whatsapp_conversations').insert({
+                            company_id: companyId,
+                            connection_id: connectionId,
+                            contact_phone: phone,
+                            contact_name: groupName,
+                            is_group: true,
+                            status: 'fechado',
+                            unread_count: 0,
+                            last_message_at: new Date().toISOString()
+                        });
+                        console.log(`[SYNC] Grupo importado via fetchAllGroups: ${groupName} (${phone})`);
+                    }
+                }
+            } else {
+                const errText = await respG.text();
+                addDebugLog('SYNC_GROUPS_ERR', `Erro na resposta fetchAllGroups: ${respG.status} - ${errText}`);
+            }
         } catch (groupSyncErr) {
             console.error(`[SYNC] Erro ao sincronizar grupos:`, groupSyncErr.message);
+            addDebugLog('SYNC_GROUPS_EXCEPTION', `Exceção em sincronizar grupos: ${groupSyncErr.message}`);
         }
 
         console.log(`[SYNC] Histórico para ${activeChats.length} chats ignorado por configuração (apenas novas mensagens geram atendimentos).`);
@@ -819,7 +878,7 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
         try {
             console.log(`[MEDIA] [Tentativa ${attempt}] Baixando ${mediatype} da mensagem ${message.key.id}...`);
             
-            const endpoint = mediatype === 'sticker' ? 'getBase64FromSticker' : 'getBase64FromMediaMessage';
+            const endpoint = 'getBase64FromMediaMessage';
             
             // Tentar extrair a mensagem "limpa" para a Evolution
             const cleanMessage = JSON.parse(JSON.stringify(message));
@@ -884,7 +943,7 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
         
         if (mediatype === 'image') { ext = 'jpg'; contentType = mimeType || 'image/jpeg'; }
         else if (mediatype === 'audio') { ext = 'ogg'; contentType = mimeType || 'audio/ogg'; }
-        else if (mediatype === 'video') { ext = 'mp4'; contentType = mimeType || 'video/mp4'; }
+        else if (mediatype === 'video' || mediatype === 'gif') { ext = 'mp4'; contentType = mimeType || 'video/mp4'; }
         else if (mediatype === 'sticker') { ext = 'webp'; contentType = mimeType || 'image/webp'; }
         else if (fileName) {
             const parts = fileName.split('.');
@@ -1090,8 +1149,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
             mediaType = m.imageMessage ? 'image' : 
                         m.audioMessage ? 'audio' : 
-                        m.videoMessage ? 'video' : 
-                        m.stickerMessage ? 'sticker' : 'document';
+                        (m.videoMessage ? (m.videoMessage.gifPlayback ? 'gif' : 'video') : 
+                        (m.stickerMessage ? 'sticker' : 'document'));
 
             // Enhance mediaType detection based on mimeType for documents
             if (mediaType === 'document' && mimeType) {
