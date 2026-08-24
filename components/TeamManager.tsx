@@ -109,6 +109,7 @@ const TeamFormModal: React.FC<TeamFormModalProps> = ({ teamName, initialMembers 
 };
 
 const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }) => {
+    const { currentUser } = useAuth();
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingTeamName, setEditingTeamName] = useState<string | null>(null);
 
@@ -134,6 +135,39 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
                 .in('id', memberIds);
 
             if (error) throw error;
+
+            // Sync: create group chat conversation
+            if (currentUser) {
+                const compId = currentUser.company_id;
+                const { data: newConv, error: createError } = await supabase
+                    .from('conversations')
+                    .insert({
+                        company_id: compId,
+                        is_group: true,
+                        group_name: name,
+                        last_message: 'Grupo da equipe criado',
+                        last_message_at: new Date().toISOString(),
+                        created_by: currentUser.id
+                    })
+                    .select()
+                    .single();
+
+                if (createError) throw createError;
+
+                if (newConv && memberIds.length > 0) {
+                    const participants = memberIds.map(userId => ({
+                        conversation_id: newConv.id,
+                        user_id: userId,
+                        company_id: compId
+                    }));
+
+                    const { error: partError } = await supabase
+                        .from('conversation_participants')
+                        .insert(participants);
+
+                    if (partError) throw partError;
+                }
+            }
 
             // Update selected users to have the new team name
             const updatedUsers = users.map(u => {
@@ -177,6 +211,79 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
                 if (addError) throw addError;
             }
 
+            // 3. Sync: update group chat conversation name and participants
+            if (currentUser) {
+                const compId = currentUser.company_id;
+                
+                // Find existing team conversation
+                const { data: existingConv } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .eq('is_group', true)
+                    .eq('group_name', currentTeamName)
+                    .eq('company_id', compId)
+                    .maybeSingle();
+
+                if (existingConv) {
+                    // Update group name if renamed
+                    if (newName !== currentTeamName) {
+                        const { error: updateError } = await supabase
+                            .from('conversations')
+                            .update({ group_name: newName })
+                            .eq('id', existingConv.id);
+                        if (updateError) throw updateError;
+                    }
+
+                    // Delete old participants
+                    const { error: deletePartsError } = await supabase
+                        .from('conversation_participants')
+                        .delete()
+                        .eq('conversation_id', existingConv.id);
+                    if (deletePartsError) throw deletePartsError;
+
+                    // Insert new participants
+                    if (memberIds.length > 0) {
+                        const participants = memberIds.map(userId => ({
+                            conversation_id: existingConv.id,
+                            user_id: userId,
+                            company_id: compId
+                        }));
+                        const { error: partError } = await supabase
+                            .from('conversation_participants')
+                            .insert(participants);
+                        if (partError) throw partError;
+                    }
+                } else {
+                    // If not found, create new group
+                    const { data: newConv, error: createError } = await supabase
+                        .from('conversations')
+                        .insert({
+                            company_id: compId,
+                            is_group: true,
+                            group_name: newName,
+                            last_message: 'Grupo da equipe criado',
+                            last_message_at: new Date().toISOString(),
+                            created_by: currentUser.id
+                        })
+                        .select()
+                        .single();
+
+                    if (createError) throw createError;
+
+                    if (newConv && memberIds.length > 0) {
+                        const participants = memberIds.map(userId => ({
+                            conversation_id: newConv.id,
+                            user_id: userId,
+                            company_id: compId
+                        }));
+                        const { error: partError } = await supabase
+                            .from('conversation_participants')
+                            .insert(participants);
+                        if (partError) throw partError;
+                    }
+                }
+            }
+
             const updatedUsers = users.map(u => {
                 // Check if user is in the new member list
                 const isSelected = memberIds.includes(u.id);
@@ -214,6 +321,26 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
                     .eq('team', teamName);
 
                 if (error) throw error;
+
+                // Sync: delete the conversation (cascade handles participants and messages)
+                if (currentUser) {
+                    const compId = currentUser.company_id;
+                    const { data: existingConv } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .eq('is_group', true)
+                        .eq('group_name', teamName)
+                        .eq('company_id', compId)
+                        .maybeSingle();
+
+                    if (existingConv) {
+                        const { error: deleteError } = await supabase
+                            .from('conversations')
+                            .delete()
+                            .eq('id', existingConv.id);
+                        if (deleteError) throw deleteError;
+                    }
+                }
 
                 const updatedUsers = users.map(u =>
                     u.team === teamName ? { ...u, team: 'Sem Equipe' } : u
