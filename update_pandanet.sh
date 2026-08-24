@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Script para atualizar APENAS a PandaNet (Frontend e Backends)
-# Não afeta o Perfex CRM (Ayla).
 
 echo "🔄 Iniciando atualização da PandaNet..."
 
