@@ -39,6 +39,10 @@ const PlanFormModal: React.FC<{
                         <label className="block text-sm font-medium text-brand-subtle-text">Limite de Usuários</label>
                         <input type="number" name="userLimit" value={formData.userLimit} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/>
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text">Limite de Canais WhatsApp</label>
+                        <input type="number" name="whatsappLimit" value={formData.whatsappLimit || 1} onChange={(e) => setFormData(prev => ({ ...prev, whatsappLimit: Number(e.target.value) }))} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/>
+                    </div>
                     <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 p-2 rounded-md">
                         <label className="block text-sm font-medium text-brand-subtle-text mb-2">Recursos do Plano</label>
                         {Object.keys(formData.features).map((key) => (
@@ -94,7 +98,8 @@ const PlanManager: React.FC<PlanManagerProps> = ({ plans }) => {
                     {localPlans.map(plan => (
                         <div key={plan.id} className="border rounded-lg p-6 flex flex-col bg-white">
                             <h3 className="text-lg font-bold text-brand-text">{plan.name}</h3>
-                            <p className="text-brand-subtle-text text-sm mb-4">Limite de {plan.userLimit} usuários</p>
+                            <p className="text-brand-subtle-text text-sm">Limite de {plan.userLimit} usuários</p>
+                            <p className="text-brand-subtle-text text-sm mb-4">Limite de {plan.whatsappLimit || 1} canais WhatsApp</p>
                             
                             <div className="border-t pt-4 mb-4">
                                 <p className="font-semibold text-brand-text text-sm mb-2">Recursos Ativos:</p>

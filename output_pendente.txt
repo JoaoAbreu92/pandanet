@@ -1,0 +1,4 @@
+80: const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
+504: // Na aba de grupos, mostramos todos independente do status (aberto/pendente/fechado)
+556: const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
+966: {(['aberto', 'pendente', 'fechado'] as const).map((tab) => (

@@ -77,7 +77,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
+  const [activeTab, setActiveTab] = useState<'aberto' | 'fechado'>('aberto');
   const [useSignature, setUseSignature] = useState(false);
   const [signatureText, setSignatureText] = useState('');
   
@@ -501,7 +501,6 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       query = query.in('connection_id', filterConnection);
     }
 
-    // Na aba de grupos, mostramos todos independente do status (aberto/pendente/fechado)
     if (chatTypeFilter !== 'group') {
       query = query.eq('status', activeTab);
     }
@@ -553,7 +552,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   };
 
-  const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
+  const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado', assignToMe: boolean = false) => {
     if (isGhostMode) {
       alert('Modo Auditoria: Não é permitido alterar o status do atendimento.');
       return;
@@ -963,7 +962,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
-            {(['aberto', 'pendente', 'fechado'] as const).map((tab) => (
+            {(['aberto', 'fechado'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

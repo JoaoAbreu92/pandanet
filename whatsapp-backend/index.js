@@ -595,7 +595,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                             contact_phone: group.phone,
                             contact_name: group.name,
                             is_group: true,
-                            status: 'pendente',
+                            status: 'aberto',
                             connection_id: connectionId,
                             unread_count: 0
                         });
@@ -855,7 +855,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         let conversationId;
         if (!conv) {
             // Se for grupo, abre direto como "aberto" (sem pendente individual)
-            const initialStatus = isGroup ? 'aberto' : 'pendente';
+            const initialStatus = 'aberto';
             const { data: newConv, error: createErr } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
@@ -878,7 +878,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 // Reabrir se estiver fechada
                 let nextStatus = conv.status;
                 if (conv.status === 'fechado' && !isFromMe) {
-                    nextStatus = conv.assigned_to ? 'aberto' : 'pendente';
+                    nextStatus = 'aberto';
                 }
                 
                 await supabase
