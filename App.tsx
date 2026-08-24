@@ -55,6 +55,7 @@ import CRMCalendar from './components/CRMCalendar';
 import CRMSales from './components/CRMSales';
 import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
+import CRMTasks from './components/CRMTasks';
 import AIAssistant from './components/AIAssistant';
 import { CRMCustomer } from './types';
 
@@ -677,6 +678,8 @@ const AppContent: React.FC = () => {
                 ) : <CRMCustomers onNewCustomer={() => setIsNewCustomerModalOpen(true)} onViewCustomer={handleViewCustomer} />;
             case 'crm-calendar':
                 return <CRMCalendar />;
+            case 'crm-tasks':
+                return <CRMTasks />;
             case 'crm-sales':
             case 'crm-invoices':
             case 'crm-proposals':

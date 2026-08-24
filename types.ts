@@ -797,15 +797,19 @@ export interface CRMTask {
   company_id: string;
   title: string;
   description?: string;
-  status: 'not_started' | 'in_progress' | 'awaiting_feedback' | 'completed';
+  status: 'not_started' | 'in_progress' | 'testing' | 'awaiting_feedback' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string;
   due_date?: string;
   created_by?: string;
-  assigned_to?: string;
+  assigned_to?: string[];
+  followers?: string[];
+  tags?: string[];
   rel_id?: string;
   rel_type?: string;
   is_public: boolean;
+  is_billable: boolean;
+  hourly_rate?: number;
   created_at: string;
 }
 
@@ -858,6 +862,7 @@ export interface CRMProject {
   deadline?: string;
   created_at: string;
 }
+
 
 export interface CRMItem {
   id: string;

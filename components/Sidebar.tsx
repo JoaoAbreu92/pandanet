@@ -257,12 +257,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="crm-dashboard" label="Dashboard CRM" icon={ChartBarIcon} permission={true} />
                     <NavItem page="crm-customers" label="Clientes" icon={UserGroupIcon} permission={true} />
                     <NavItem page="crm-proposals" label="Propostas" icon={DocumentTextIcon} permission={true} />
-                    <NavItem page="crm-estimates" label="Estimativas" icon={DocumentTextIcon} permission={true} />
-                    <NavItem page="crm-invoices" label="Faturas" icon={BanknotesIcon} permission={true} />
-                    <NavItem page="crm-payments" label="Pagamentos" icon={CurrencyDollarIcon} permission={true} />
-                    <NavItem page="crm-credit-notes" label="Notas de Crédito" icon={DocumentTextIcon} permission={true} />
-                    <NavItem page="crm-subscriptions" label="Assinaturas" icon={CalendarDaysIcon} permission={true} />
-                    <NavItem page="crm-contracts" label="Contratos" icon={DocumentTextIcon} permission={true} />
                     <NavItem page="crm-tasks" label="Minhas Tarefas" icon={FolderIcon} permission={true} />
                     <NavItem page="crm-calendar" label="Calendário CRM" icon={CalendarDaysIcon} permission={true} />
                 </NavMenu>
