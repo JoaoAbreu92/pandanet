@@ -107,8 +107,8 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
         if (!el) return;
         const rect = el.getBoundingClientRect();
         
-        // Posiciona no canto inferior direito do campo
-        const top = rect.bottom - 28;
+        // Posiciona acima do topo do campo, alinhado ao canto direito dele
+        const top = rect.top - 32;
         const left = rect.right - 28;
 
         setCoords({ top, left });
@@ -197,6 +197,11 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
 
     if (!hasAIEnabled || !activeElement || !coords || textValue.trim().length < 3) return null;
 
+    // Calcular layout inteligente do modal de opções para evitar transbordamento na tela
+    const showAbove = coords.top > 240;
+    const widgetTop = showAbove ? coords.top - 195 : coords.top + 32;
+    const widgetLeft = Math.max(10, Math.min(coords.left - 250, window.innerWidth - 290));
+
     return (
         <>
             {/* 1. Botão Flutuante (Trigger) perto do cursor do Input */}
@@ -208,6 +213,9 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
                     top: `${coords.top}px`,
                     left: `${coords.left}px`,
                     zIndex: 99998
+                }}
+                onMouseDown={(e) => {
+                    e.preventDefault(); // IMPORTANTE: Evita perder foco no input ativo ao clicar!
                 }}
                 onClick={(e) => {
                     e.preventDefault();
@@ -228,10 +236,13 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
                 <div
                     id="ai-corrector-widget"
                     ref={widgetRef}
+                    onMouseDown={(e) => {
+                        e.preventDefault(); // IMPORTANTE: Evita perder foco no input ativo ao clicar dentro do widget!
+                    }}
                     style={{
                         position: 'fixed',
-                        top: `${coords.top + 34}px`,
-                        left: `${Math.min(coords.left - 240, window.innerWidth - 300)}px`,
+                        top: `${widgetTop}px`,
+                        left: `${widgetLeft}px`,
                         zIndex: 99999
                     }}
                     className="w-[280px] bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 p-3.5 flex flex-col gap-3.5 animate-fade-in-up font-sans"
