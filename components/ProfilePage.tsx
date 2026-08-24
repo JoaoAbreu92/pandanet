@@ -122,8 +122,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             const formattedPosts: Post[] = data.map((item: any) => ({
                 id: item.id,
                 authorId: item.author_id,
-                authorName: item.profiles?.full_name || 'Desconhecido',
-                authorAvatar: item.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                authorName: item.profiles?.full_name || 'Usuário Excluído',
+                authorAvatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'Usuario Excluido')}&background=random`,
                 content: item.content,
                 mediaUrl: item.media_url,
                 mediaType: item.media_type as 'image' | 'video',
@@ -136,8 +136,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 comments: item.comments.map((c: any) => ({
                     id: c.id,
                     authorId: c.author_id,
-                    authorName: c.profiles?.full_name || 'Desconhecido',
-                    authorAvatar: c.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                    authorName: c.profiles?.full_name || 'Usuário Excluído',
+                    authorAvatar: c.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.profiles?.full_name || 'Usuario Excluido')}&background=random`,
                     text: c.content,
                     timestamp: c.created_at
                 })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
