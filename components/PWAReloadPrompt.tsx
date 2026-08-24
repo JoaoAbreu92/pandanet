@@ -8,6 +8,14 @@ const PWAReloadPrompt: React.FC = () => {
         needRefresh: [needRefresh, setNeedRefresh],
         updateServiceWorker,
     } = useRegisterSW({
+        onRegisteredSW(swUrl, r) {
+            if (r) {
+                // Verificar atualizações a cada 15 minutos em background (ideal para APKs/WebViews)
+                setInterval(() => {
+                    r.update().catch(err => console.log('Erro ao checar atualização do SW:', err));
+                }, 15 * 60 * 1000);
+            }
+        },
         onRegisterError(error) {
             console.error('SW registration error', error);
         },

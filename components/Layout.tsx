@@ -157,12 +157,12 @@ const Layout: React.FC<LayoutProps> = ({
                             const planFeatures = currentCompany.plan?.features || {};
                             const customFeatures = currentCompany.custom_features || {};
                             const merged: Record<string, any> = {};
-                            
+
                             if (currentCompany.plan) {
                                 Object.keys(planFeatures).forEach(key => {
                                     const planVal = planFeatures[key];
                                     const customVal = customFeatures[key];
-                                    
+
                                     if (planVal === false || planVal === 'disabled') {
                                         merged[key] = false;
                                     } else if (customVal === false || customVal === 'disabled') {
@@ -223,7 +223,7 @@ const Layout: React.FC<LayoutProps> = ({
                 )}
 
                 {onStartDirectChat && (
-                    <div 
+                    <div
                         className="hidden md:block h-full z-45"
                         onMouseEnter={() => {
                             if (window.innerWidth >= 768) {
