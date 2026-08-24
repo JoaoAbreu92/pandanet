@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Instalar curl para o healthcheck
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
