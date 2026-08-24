@@ -229,8 +229,9 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
             lock.release();
         }
     } catch (err) {
-        console.error('[email-server] IMAP Body Error:', err.message);
-        return res.status(500).json({ error: err.message });
+        console.error(`[email-server] IMAP Body Error (UID: ${uid}, Folder: ${mailboxPath}):`, err.message);
+        if (err.stack) console.error(err.stack);
+        return res.status(500).json({ error: `Erro ao buscar corpo do e-mail: ${err.message}` });
     }
 });
 

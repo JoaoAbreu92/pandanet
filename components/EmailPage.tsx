@@ -53,6 +53,7 @@ interface EmailMessage {
     flags: string[];
     metadata?: EmailMetadata; // Expanded locally
     attachments?: Array<{ id: number; filename: string; contentType: string; size: number }>;
+    snippet?: string;
 }
 
 interface EmailMetadata {
@@ -101,6 +102,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [savedImapUser, setSavedImapUser] = useState('');
     const [showEmailPass, setShowEmailPass] = useState(false);
     const [loadingBody, setLoadingBody] = useState(false);
+    const [bodyError, setBodyError] = useState<string | null>(null);
     const [folders, setFolders] = useState<any[]>([]);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
     
@@ -242,6 +244,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         if (!settings.imap_host) return;
 
         setLoadingBody(true);
+        setBodyError(null);
         try {
             const { data, error } = await callEmailServer('fetch-body', {
                 config: settings,
@@ -300,6 +303,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
+            setBodyError(err.message || "Falha ao carregar conteúdo do e-mail.");
         } finally {
             setLoadingBody(false);
         }
@@ -844,7 +848,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         {email.subject}
                                     </div>
                                     <div className="text-xs text-gray-500 line-clamp-2">
-                                        {email.text ? email.text.substring(0, 100) : t('email.no_preview')}
+                                        {email.snippet || t('email.no_preview')}
                                     </div>
                                     {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
                                         <div className="flex gap-1 mt-2">
@@ -1047,6 +1051,17 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 <div className="flex items-center justify-center h-40">
                                     <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
                                     <span className="ml-2 text-gray-400">{t('email.loading_content')}</span>
+                                </div>
+                            ) : bodyError ? (
+                                <div className="flex flex-col items-center justify-center h-40 text-red-500 text-center">
+                                    <ExclamationTriangleIcon className="w-8 h-8 mb-2" />
+                                    <span className="text-sm font-medium">{bodyError}</span>
+                                    <button
+                                        onClick={() => fetchEmailBody(selectedEmail.uid, currentFolder)}
+                                        className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-200 transition-colors text-xs font-bold uppercase"
+                                    >
+                                        Tentar Novamente
+                                    </button>
                                 </div>
                             ) : (
                                     <>

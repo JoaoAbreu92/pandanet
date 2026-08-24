@@ -933,7 +933,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <div className="space-y-6 animate-fadeIn">
                         <div className="flex items-center gap-2 mb-6">
                             <BuildingOfficeIcon className="w-5 h-5 text-gray-800 dark:text-white" />
-                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Empresas</h2>
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">{t('dashboard.companies_tab')}</h2>
                         </div>
                         <div className="flex flex-col md:flex-row gap-4 items-center">
                             <div className="relative flex-1 w-full">
@@ -941,7 +941,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Localize empresa..."
+                                    placeholder={t('dashboard.search_company')}
                                     className="w-full pl-8 pr-4 py-2 bg-gray-100 dark:bg-gray-700 border-none rounded text-sm focus:ring-1 focus:ring-brand-primary outline-none"
                                 />
                                 <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
@@ -951,15 +951,15 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="bg-gray-100 dark:bg-gray-700 border-none rounded py-2 px-4 text-sm w-full md:w-48 text-gray-600 outline-none"
                             >
-                                <option value="all">Status: todas</option>
-                                <option value="active">Ativas</option>
-                                <option value="inactive">Inativas</option>
+                                <option value="all">{t('dashboard.status_all')}</option>
+                                <option value="active">{t('dashboard.active_companies')}</option>
+                                <option value="inactive">{t('dashboard.inactive_companies')}</option>
                             </select>
                             <button
                                 onClick={() => openModal('createCompany')}
                                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase tracking-wide flex items-center gap-2 transition-colors"
                             >
-                                <PlusIcon className="w-4 h-4" /> Adicionar
+                                <PlusIcon className="w-4 h-4" /> {t('dashboard.add_company')}
                             </button>
                         </div>
 
@@ -968,12 +968,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="border-b border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-500 uppercase">
-                                            <th className="px-6 py-4">Nome</th>
-                                            <th className="px-6 py-4">Status</th>
-                                            <th className="px-6 py-4">Usuários</th>
-                                            <th className="px-6 py-4">Vencimento</th>
-                                            <th className="px-6 py-4">Plano</th>
-                                            <th className="px-6 py-4 text-center">Ações</th>
+                                            <th className="px-6 py-4">{t('dashboard.name')}</th>
+                                            <th className="px-6 py-4">{t('dashboard.status')}</th>
+                                            <th className="px-6 py-4">{t('dashboard.users')}</th>
+                                            <th className="px-6 py-4">{t('dashboard.expiry')}</th>
+                                            <th className="px-6 py-4">{t('dashboard.plan')}</th>
+                                            <th className="px-6 py-4 text-center">{t('dashboard.actions')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="text-xs divide-y divide-gray-5 dark:divide-gray-700/50">
@@ -995,15 +995,15 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 <td className="px-6 py-4 text-gray-500">{comp.plan?.name || 'Standard'}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
-                                                        <ActionButton icon={BanknotesIcon} color="text-green-600" title="Faturas" onClick={() => openModal('invoices', comp)} />
-                                                        <ActionButton icon={CalendarDaysIcon} color="text-blue-500" title="Add Mês" onClick={() => openModal('addMonth', comp)} />
-                                                        <ActionButton icon={ChartPieIcon} color="text-purple-500" title="Stats" onClick={() => openModal('stats', comp)} />
-                                                        <ActionButton icon={CloudIcon} color="text-gray-500" title="Disco" onClick={() => openModal('disk', comp)} />
-                                                        <ActionButton icon={NoSymbolIcon} color="text-orange-500" title="Desativar" onClick={() => openModal('disable', comp)} />
-                                                        <ActionButton icon={UserGroupIcon} color="text-teal-500" title="Usuários" onClick={() => openModal('users', comp)} />
-                                                        <ActionButton icon={AdjustmentsHorizontalIcon} color="text-indigo-500" title="Config" onClick={() => openModal('config', comp)} />
-                                                        <ActionButton icon={PencilIcon} color="text-amber-500" title="Editar" onClick={() => openModal('edit', comp)} />
-                                                        <ActionButton icon={TrashIcon} color="text-red-500" title="Excluir" onClick={() => openModal('delete', comp)} />
+                                                        <ActionButton icon={BanknotesIcon} color="text-green-600" title={t('dashboard.invoices')} onClick={() => openModal('invoices', comp)} />
+                                                        <ActionButton icon={CalendarDaysIcon} color="text-blue-500" title={t('dashboard.add_month')} onClick={() => openModal('addMonth', comp)} />
+                                                        <ActionButton icon={ChartPieIcon} color="text-purple-500" title={t('dashboard.stats')} onClick={() => openModal('stats', comp)} />
+                                                        <ActionButton icon={CloudIcon} color="text-gray-500" title={t('dashboard.disk')} onClick={() => openModal('disk', comp)} />
+                                                        <ActionButton icon={NoSymbolIcon} color="text-orange-500" title={t('dashboard.disable')} onClick={() => openModal('disable', comp)} />
+                                                        <ActionButton icon={UserGroupIcon} color="text-teal-500" title={t('dashboard.users')} onClick={() => openModal('users', comp)} />
+                                                        <ActionButton icon={AdjustmentsHorizontalIcon} color="text-indigo-500" title={t('dashboard.config')} onClick={() => openModal('config', comp)} />
+                                                        <ActionButton icon={PencilIcon} color="text-amber-500" title={t('dashboard.edit')} onClick={() => openModal('edit', comp)} />
+                                                        <ActionButton icon={TrashIcon} color="text-red-500" title={t('dashboard.delete')} onClick={() => openModal('delete', comp)} />
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1020,10 +1020,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <div className="space-y-6 animate-fadeIn">
                         <div className="flex items-center gap-2 mb-6">
                             <CurrencyDollarIcon className="w-5 h-5 text-gray-800 dark:text-white" />
-                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Planos</h2>
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">{t('dashboard.plans_tab')}</h2>
                         </div>
                         <div className="flex justify-start mb-4">
-                            <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> Adicionar</button>
+                            <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> {t('dashboard.add_company')}</button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {localPlans.map(plan => (
@@ -1042,16 +1042,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     <div className="space-y-3 mb-6 flex-1">
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                             <UsersIcon className="w-4 h-4 text-gray-400" />
-                                            <span>Capacidade: <strong>{plan.userLimit} usuários</strong></span>
+                                            <span>{t('dashboard.capacity')} <strong>{plan.userLimit} {t('dashboard.users_plural')}</strong></span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                             <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
-                                            <span>{Object.values(plan.features || {}).filter(v => v === true).length} recursos ativos</span>
+                                            <span>{Object.values(plan.features || {}).filter(v => v === true).length} {t('dashboard.active_features')}</span>
                                         </div>
                                     </div>
 
                                     <div className="pt-4 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
-                                        <span className="text-sm text-gray-400 font-medium">Investimento</span>
+                                        <span className="text-sm text-gray-400 font-medium">{t('dashboard.investment')}</span>
                                         <span className="text-xl font-bold text-brand-text dark:text-white">
                                             {(plan.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                         </span>
@@ -1068,13 +1068,13 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <div className="flex items-center gap-2">
                                 <AdjustmentsHorizontalIcon className="w-5 h-5 text-gray-800 dark:text-white" />
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Configurações & Atualizações</h2>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">{t('dashboard.settings_tab')}</h2>
                             </div>
                             <button
                                 onClick={() => openModal('newUpdate')}
                                 className="bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded text-sm font-bold uppercase flex items-center justify-center gap-2 transition-colors shadow-md w-full sm:w-auto"
                             >
-                                <PlusIcon className="w-4 h-4" /> Postar Atualização
+                                <PlusIcon className="w-4 h-4" /> {t('dashboard.post_update')}
                             </button>
                         </div>
 
@@ -1083,7 +1083,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
                                 <div className="flex items-center gap-2 mb-6">
                                     <PhotoIcon className="w-5 h-5 text-gray-500" />
-                                    <h3 className="text-lg font-bold text-gray-700 dark:text-white">Logomarca do Sistema</h3>
+                                    <h3 className="text-lg font-bold text-gray-700 dark:text-white">{t('dashboard.system_logo')}</h3>
                                 </div>
 
                                 <div className="flex flex-col items-center justify-center flex-1 space-y-4">
@@ -1093,7 +1093,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         ) : (
                                             <div className="text-center">
                                                 <BuildingOfficeIcon className="w-10 h-10 text-gray-300 mx-auto" />
-                                                <p className="text-xs text-gray-400 mt-2">Nenhuma logo definida</p>
+                                                    <p className="text-xs text-gray-400 mt-2">{t('dashboard.no_logo_defined')}</p>
                                             </div>
                                         )}
 
@@ -1106,7 +1106,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                                     <div className="w-full">
                                         <label className="block w-full text-center px-4 py-2.5 bg-brand-primary hover:bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer transition-all shadow-sm">
-                                            {logoFile ? 'LOGO SELECIONADA' : 'SELECIONAR NOVA LOGO'}
+                                            {logoFile ? t('dashboard.logo_selected') : t('dashboard.select_new_logo')}
                                             <input
                                                 type="file"
                                                 className="hidden"
@@ -1116,14 +1116,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             />
                                         </label>
                                         <p className="text-[10px] text-gray-400 text-center mt-2 italic">
-                                            * Esta logo será exibida em todas as áreas que não possuem logo própria.
+                                            {t('dashboard.logo_hint')}
                                         </p>
                                     </div>
 
                                     {/* UPDATE DURATION SETTING */}
                                     <div className="w-full pt-4 border-t border-gray-100 dark:border-gray-700 mt-4 space-y-4">
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Manter Notificação Ativa Por:</label>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('dashboard.notification_duration')}</label>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="number"
@@ -1137,8 +1137,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                     onChange={(e) => setUpdateDurationUnit(e.target.value as any)}
                                                     className="flex-1 p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 text-sm font-medium"
                                                 >
-                                                    <option value="hours">Horas</option>
-                                                    <option value="days">Dias</option>
+                                                    <option value="hours">{t('dashboard.hours')}</option>
+                                                    <option value="days">{t('dashboard.days')}</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -1147,7 +1147,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             disabled={isSavingSettings}
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-xs uppercase transition-all shadow-md disabled:opacity-50"
                                         >
-                                            {isSavingSettings ? 'SALVANDO...' : 'SALVAR CONFIGURAÇÕES'}
+                                            {isSavingSettings ? t('dashboard.saving') : t('dashboard.save_settings')}
                                         </button>
                                     </div>
                                 </div>
@@ -1158,19 +1158,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-2">
                                         <PlayIcon className="w-5 h-5 text-emerald-500" />
-                                        <h3 className="text-lg font-bold text-gray-700 dark:text-white">Vídeos do Manual</h3>
+                                        <h3 className="text-lg font-bold text-gray-700 dark:text-white">{t('dashboard.manual_videos')}</h3>
                                     </div>
                                     <button
                                         onClick={() => openModal('newVideo')}
                                         className="text-xs font-bold text-emerald-600 hover:text-emerald-700 uppercase"
                                     >
-                                        + Novo Vídeo
+                                        {t('dashboard.new_video')}
                                     </button>
                                 </div>
 
                                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                                     {manualVideos.length === 0 ? (
-                                        <p className="text-sm text-gray-400 italic">Nenhum vídeo cadastrado.</p>
+                                        <p className="text-sm text-gray-400 italic">{t('dashboard.no_videos')}</p>
                                     ) : (
                                             manualVideos.map(vid => (
                                                 <div key={vid.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700 group">
@@ -1194,10 +1194,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                             {/* VERSION HISTORY */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                                <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-4">Histórico de Versões</h3>
+                                <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-4">{t('dashboard.version_history')}</h3>
                                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                                     {systemUpdates.length === 0 ? (
-                                        <p className="text-sm text-gray-400 italic">Nenhuma atualização registrada.</p>
+                                        <p className="text-sm text-gray-400 italic">{t('dashboard.no_updates')}</p>
                                     ) : (
                                         systemUpdates.map(upd => (
                                             <div key={upd.id} className="border-l-4 border-red-500 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-r-lg">
