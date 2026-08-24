@@ -25,6 +25,7 @@ const ChatbotSettings: React.FC = () => {
     const [queues, setQueues] = useState<any[]>([]);
     const [team, setTeam] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [geminiKey, setGeminiKey] = useState('');
 
     useEffect(() => {
         fetchData();
@@ -37,10 +38,12 @@ const ChatbotSettings: React.FC = () => {
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
         const { data: queuesData } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         const { data: teamData } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
+        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key').eq('company_id', companyId).limit(1).single();
 
         if (flowsData) setFlows(flowsData);
         if (queuesData) setQueues(queuesData);
         if (teamData) setTeam(teamData);
+        if (settingsData) setGeminiKey(settingsData.gemini_api_key || '');
     };
 
     const fetchNodes = async (flowId: string) => {
@@ -111,6 +114,15 @@ const ChatbotSettings: React.FC = () => {
         }
     };
 
+    const handleSaveGeminiKey = async () => {
+        const companyId = profile?.company_id;
+        if (!companyId) return;
+        setLoading(true);
+        await supabase.from('whatsapp_settings').update({ gemini_api_key: geminiKey }).eq('company_id', companyId);
+        setLoading(false);
+        alert('Configuração salva!');
+    };
+
     const handleDeleteNode = async (nodeId: string) => {
         const { error } = await supabase.from('whatsapp_chatbot_nodes').delete().eq('id', nodeId);
         if (!error) setNodes(nodes.filter(n => n.id !== nodeId));
@@ -119,13 +131,30 @@ const ChatbotSettings: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-lg font-bold">Fluxos de Atendimento (Chatbot)</h2>
-                <button 
-                    onClick={handleCreateFlow}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
-                >
-                    <Plus className="w-4 h-4" /> Novo Fluxo
-                </button>
+                <div>
+                    <h2 className="text-lg font-bold">Fluxos de Atendimento (Chatbot)</h2>
+                    <p className="text-xs text-slate-500">Configure automações e roteamento por IA</p>
+                </div>
+                <div className="flex gap-2">
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-lg border border-slate-200 dark:border-white/10">
+                        <input 
+                            type="password" 
+                            placeholder="Gemini API Key"
+                            value={geminiKey}
+                            onChange={(e) => setGeminiKey(e.target.value)}
+                            className="bg-transparent border-none outline-none text-xs px-2 w-32"
+                        />
+                        <button onClick={handleSaveGeminiKey} className="p-1.5 bg-white dark:bg-white/10 text-emerald-500 rounded shadow-sm">
+                            <Save className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                    <button 
+                        onClick={handleCreateFlow}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-medium"
+                    >
+                        <Plus className="w-4 h-4" /> Novo Fluxo
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

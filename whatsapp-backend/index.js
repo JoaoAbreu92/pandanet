@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { analyzeMessageForTransfer } = require('./utils/geminiService');
 
 // Robust .env loading
 dotenv.config(); // Default
@@ -282,54 +283,57 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
-        console.log(`[SYNC] [Empresa: ${companyId}] Iniciando sincronização para ${instanceName}...`);
+        console.log(`[SYNC] Iniciando sincronização para ${instanceName} (Empresa: ${companyId})...`);
         
-        // 1. Buscar contatos da Evolution API (Fundamental para nomes)
-        const contactRes = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
-            headers: { 'apikey': evoKey }
-        }).catch(err => {
-            console.error(`[SYNC] [Empresa: ${companyId}] Erro ao conectar na Evo (${evoUrl}/chat/findContacts/${instanceName}):`, err.message);
-            return null;
-        });
+        // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API
+        const endpoints = [
+            `${evoUrl}/chat/findContacts/${instanceName}`,
+            `${evoUrl}/contact/fetchContacts/${instanceName}`
+        ];
         
-        let contactsMap = {};
-        if (contactRes && contactRes.ok) {
-            let contacts = await contactRes.json();
-            // Lida com { data: [...] } ou [...]
-            if (contacts && !Array.isArray(contacts) && Array.isArray(contacts.data)) contacts = contacts.data;
-            
-            if (Array.isArray(contacts)) {
-                console.log(`[SYNC] [Empresa: ${companyId}] ${contacts.length} contatos encontrados.`);
-                for (const c of contacts) {
-                    const jid = c.id || c.remoteJid;
-                    const phone = jid?.split('@')[0];
-                    if (phone && !jid.includes('@g.us')) {
-                        const name = c.name || c.pushName || c.notify || phone;
-                        contactsMap[jid] = name;
-                        
-                        // Upsert contact com empresa garantida e atualização de campos
-                        const { data: upsertData, error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
-                            company_id: companyId,
-                            phone: phone,
-                            name: name,
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'company_id,phone' }).select();
-                        
-                        if (upsertErr) {
-                            console.error('[SYNC] Erro upsert contato:', upsertErr.message, upsertErr.details);
-                        } else {
-                            console.log(`[SYNC] Contato ${name} (${phone}) sincronizado com sucesso.`);
-                        }
+        let contacts = [];
+        let successEndpoint = null;
+
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, { headers: { 'apikey': evoKey } });
+                if (res.ok) {
+                    const data = await res.json();
+                    contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
+                    if (contacts.length > 0) {
+                        successEndpoint = url;
+                        break;
                     }
                 }
+            } catch (e) {
+                console.warn(`[SYNC] Falha no endpoint ${url}:`, e.message);
             }
         }
 
-        // Chat syncing disabled per user request. 
-        // Only contacts are synchronized now.
-        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso! Apenas contatos foram sincronizados.`);
+        if (contacts.length > 0) {
+            console.log(`[SYNC] ${contacts.length} contatos encontrados via ${successEndpoint}`);
+            for (const c of contacts) {
+                const jid = c.id || c.remoteJid;
+                const phone = jid?.split('@')[0];
+                if (phone && !jid.includes('@g.us')) {
+                    const name = c.name || c.pushName || c.notify || phone;
+                    
+                    const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
+                        company_id: companyId,
+                        phone: phone,
+                        name: name,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'company_id,phone' });
+                    
+                    if (upsertErr) console.error('[SYNC] Erro upsert contato:', upsertErr.message);
+                }
+            }
+            console.log(`[SYNC] Sincronização de ${contacts.length} contatos finalizada.`);
+        } else {
+            console.warn('[SYNC] Nenhum contato retornado pelos endpoints testados.');
+        }
     } catch (err) {
-        console.error(`[SYNC] Erro durante a sincronização:`, err.message);
+        console.error(`[SYNC] Erro fatal na sincronização:`, err.message);
     }
 }
 

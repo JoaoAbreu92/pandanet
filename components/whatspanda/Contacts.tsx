@@ -192,7 +192,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     return (
         <div className="flex h-full flex-col bg-white dark:bg-[#0f111a] text-gray-700 dark:text-gray-300 overflow-hidden font-sans transition-colors duration-300">
             {/* Toolbar - Estilo Print 2 */}
-            <div className="p-4 flex flex-wrap gap-2 items-center bg-gray-50 dark:bg-[#161925] border-b border-gray-200 dark:border-gray-800">
+            <div className="p-4 flex flex-wrap gap-2 items-center bg-gray-50 dark:bg-[#11141d] border-b border-gray-200 dark:border-gray-800">
                 <button 
                     onClick={handleSyncContacts}
                     className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase transition-all shadow-sm"
@@ -312,7 +312,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             {/* Modal de Edição Reformulado - Estilo Print 3 */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-                    <div className="bg-white dark:bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white dark:bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300 overflow-hidden">
                         {/* Header do Modal */}
                         <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
                             <UserPlus className="w-5 h-5 text-emerald-500" />
