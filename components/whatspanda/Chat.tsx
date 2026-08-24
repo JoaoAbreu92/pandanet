@@ -1710,21 +1710,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         return;
       }
 
-      // No PC (Navegador), usar um iframe oculto para baixar o arquivo.
-      // Isso inicia o download nativo do navegador sem abrir novas abas, sem ser bloqueado pelo Chrome,
-      // e sem risco de deslogar/mudar de página se o download der erro.
-      let iframe = document.getElementById('download-iframe') as HTMLIFrameElement;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'download-iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-      }
-      iframe.src = proxyUrl;
-
+      // No PC (Navegador), abrir o proxy diretamente em uma nova aba
+      window.open(proxyUrl, '_blank');
     } catch (err: any) {
       console.warn('Download falhou:', err);
-      alert('Não foi possível baixar o arquivo no momento.\n\nDetalhe do erro: ' + (err.message || err));
+      alert('Não foi possível baixar o arquivo no momento. Verifique sua conexão e tente novamente.');
     }
   };
 
