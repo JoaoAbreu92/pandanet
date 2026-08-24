@@ -992,16 +992,12 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     sticker: base64Data
                 }
             } : isAudio ? {
-                // Formato correto da Evolution API v2 para sendWhatsAppAudio com encoding
+                // Formato padrão da Evolution API v2 para /message/sendWhatsAppAudio
+                // "audio" precisa estar no topo do payload (URL pública ou Data URI com prefixo data:)
                 number: phoneNumber,
-                options: {
-                    delay: 1200,
-                    presence: 'recording',
-                    encoding: true
-                },
-                audioMessage: {
-                    audio: audioDataUri
-                }
+                audio: (savedMediaUrl && !savedMediaUrl.startsWith('data:')) ? savedMediaUrl : audioDataUri,
+                delay: 1200,
+                encoding: true
             } : {
                 number: phoneNumber,
                 mediaMessage: {
@@ -1035,38 +1031,38 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes).substring(0, 500));
 
-            // Se falhou com o formato audioMessage, tenta com o formato legado
+            // Se falhou com sendWhatsAppAudio, tenta com sendMedia (fallback universal)
             if (isAudio && (!sendReq.ok || sendRes?.error)) {
-                console.warn('[SEND API] audioMessage falhou, tentando formato legado (audio com Data URI na raiz)...');
-                const legacyBody = {
+                console.warn('[SEND API] sendWhatsAppAudio falhou, tentando fallback via sendMedia...');
+                const mediaBody = {
                     number: phoneNumber,
-                    audio: audioDataUri,
-                    delay: 1200,
-                    options: { encoding: true }
+                    mediaMessage: {
+                        mediatype: 'audio',
+                        mimetype: mediaType || 'audio/webm',
+                        media: (savedMediaUrl && !savedMediaUrl.startsWith('data:')) ? savedMediaUrl : audioDataUri,
+                        fileName: 'audio.webm'
+                    }
                 };
-                const legacyController = new AbortController();
-                const legacyTimeout = setTimeout(() => legacyController.abort(), 120000);
-                let legacyReq;
+                const fallbackController = new AbortController();
+                const fallbackTimeout = setTimeout(() => fallbackController.abort(), 120000);
                 try {
-                    legacyReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
+                    const fallbackReq = await fetch(`${evoUrl}/message/sendMedia/${instanceName}`, {
                         method: 'POST',
                         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(legacyBody),
-                        signal: legacyController.signal
+                        body: JSON.stringify(mediaBody),
+                        signal: fallbackController.signal
                     });
-                } catch (e) {
-                    clearTimeout(legacyTimeout);
-                    console.error('[SEND API] Formato legado também falhou:', e.message);
-                }
-                clearTimeout(legacyTimeout);
-                if (legacyReq) {
-                    let legacyRes = {};
-                    try { legacyRes = await legacyReq.json(); } catch(e) { }
-                    console.log(`[SEND API] Resposta formato legado (${legacyReq.status}):`, JSON.stringify(legacyRes).substring(0, 300));
-                    if (legacyReq.ok && !legacyRes?.error) {
-                        sendRes = legacyRes;
-                        sendReq = legacyReq;
+                    clearTimeout(fallbackTimeout);
+                    let fallbackRes = {};
+                    try { fallbackRes = await fallbackReq.json(); } catch(e) { }
+                    console.log(`[SEND API] Resposta fallback sendMedia (${fallbackReq.status}):`, JSON.stringify(fallbackRes).substring(0, 300));
+                    if (fallbackReq.ok && !fallbackRes?.error) {
+                        sendRes = fallbackRes;
+                        sendReq = fallbackReq;
                     }
+                } catch (e) {
+                    clearTimeout(fallbackTimeout);
+                    console.error('[SEND API] Fallback sendMedia também falhou:', e.message);
                 }
             }
 
