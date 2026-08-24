@@ -203,25 +203,42 @@ router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (re
 router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) => {
     const { companyId, connectionId } = req.params;
     
-    // We standardise the instance name for Evolution based on connectionId
-    const instanceName = `conn_${connectionId}`;
-    
-    // Just verify the connection exists
-    const { data: settings, error } = await supabase
-        .from('whatsapp_settings')
-        .select('id')
-        .eq('id', connectionId)
-        .single();
-    
-    if (error || !settings) {
-        return res.status(404).json({ error: 'Conexão não encontrada' });
-    }
+    try {
+        console.log(`[SYNC-API] Requisição recebida. Empresa: ${companyId}, Conexão: ${connectionId}`);
 
-    // Disparar sincronização
-    console.log(`[SYNC-API] Iniciando sincronização solicitada pela UI para ${instanceName} (Empresa: ${companyId})`);
-    syncEvolutionData(instanceName, companyId, connectionId);
-    
-    res.json({ status: 'Sync started' });
+        // Verificar se os parâmetros são válidos
+        if (!companyId || !connectionId) {
+            return res.status(400).json({ error: 'Parâmetros companyId e connectionId são obrigatórios' });
+        }
+
+        const instanceName = `conn_${connectionId}`;
+        
+        // Verificar conexão no banco
+        const { data: settings, error } = await supabase
+            .from('whatsapp_settings')
+            .select('id')
+            .eq('id', connectionId)
+            .maybeSingle();
+        
+        if (error) {
+            console.error('[SYNC-API] Erro ao buscar settings:', error.message);
+            return res.status(500).json({ error: 'Erro interno ao validar conexão' });
+        }
+
+        if (!settings) {
+            return res.status(404).json({ error: 'Conexão não encontrada no banco de dados' });
+        }
+
+        // Disparar sincronização em background (não aguardamos o fim para responder à UI)
+        syncEvolutionData(instanceName, companyId, connectionId).catch(err => {
+            console.error(`[SYNC-API] Erro disparando sync em background:`, err.message);
+        });
+        
+        res.json({ status: 'success', message: 'Sincronização iniciada em segundo plano' });
+    } catch (err) {
+        console.error('[SYNC-API] Erro fatal no handler:', err.message);
+        res.status(500).json({ error: 'Internal server error during sync request' });
+    }
 });
 
 // API: Enviar Mensagem
@@ -373,7 +390,13 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         }
 
         const chats = await response.json();
-        console.log(`[SYNC] ${chats.length} chats encontrados.`);
+        
+        if (!Array.isArray(chats)) {
+            console.error(`[SYNC] Resposta inválida da Evolution (esperado array):`, JSON.stringify(chats));
+            return;
+        }
+
+        console.log(`[SYNC] ${chats.length} chats encontrados em ${instanceName}.`);
 
         const contactsToUpsert = [];
         const conversationsToUpsert = [];
