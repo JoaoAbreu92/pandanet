@@ -26,7 +26,8 @@ import {
     ArrowRightOnRectangleIcon,
     ExclamationTriangleIcon, XMarkIcon,
     PaperClipIcon, ArrowDownTrayIcon,
-    Bars3Icon, ChevronDownIcon, ChevronRightIcon, CheckIcon
+    Bars3Icon, ChevronDownIcon, ChevronRightIcon, CheckIcon,
+    UserGroupIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
@@ -187,6 +188,20 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [attachments, setAttachments] = useState<any[]>([]);
     const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024; // 20MB
 
+    // --- State: Contact Groups ---
+    interface ContactGroup { id: string; name: string; description?: string; }
+    interface ContactGroupMember { id: string; group_id: string; contact_name: string; contact_email: string; }
+    const [contactGroups, setContactGroups] = useState<ContactGroup[]>([]);
+    const [showGroupsModal, setShowGroupsModal] = useState(false);
+    const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [newGroupDesc, setNewGroupDesc] = useState('');
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [groupMembers, setGroupMembers] = useState<ContactGroupMember[]>([]);
+    const [groupMemberSearch, setGroupMemberSearch] = useState('');
+    const [addMemberEmail, setAddMemberEmail] = useState('');
+    const [addMemberName, setAddMemberName] = useState('');
+
     // --- Refs ---
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -210,7 +225,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         const savedSelected = localStorage.getItem(`panda_email_selected_${currentUser.id}`);
         const savedLocallySeen = localStorage.getItem(`panda_email_seen_${currentUser.id}`);
 
-        if (savedView) setView(savedView as any);
+        // Nunca restaurar a view de compose — sempre começar da inbox
+        if (savedView && savedView !== 'compose') setView(savedView as any);
         if (savedFolder) setCurrentFolder(savedFolder);
         if (savedLocallySeen) {
             try {
@@ -276,6 +292,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             fetchFolders(); // Load folders once
             fetchTags();    // Load tags once
             fetchContacts(); // Load contacts once
+            fetchContactGroups(); // Load contact groups
         }
     }, [savedImapUser]); // Only fires when settings are loaded from DB, not when user types
 
@@ -1061,6 +1078,94 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (data) setContacts(data);
     };
 
+    // --- Contact Groups CRUD ---
+    const fetchContactGroups = async () => {
+        const { data } = await supabase.from('email_contact_groups').select('*').eq('user_id', currentUser.id).order('name');
+        if (data) setContactGroups(data as any);
+    };
+
+    const fetchGroupMembers = async (groupId: string) => {
+        const { data } = await supabase.from('email_contact_group_members').select('*').eq('group_id', groupId);
+        if (data) setGroupMembers(data as any);
+    };
+
+    const createContactGroup = async () => {
+        if (!newGroupName.trim()) return;
+        const { data, error } = await supabase.from('email_contact_groups').insert({
+            user_id: currentUser.id,
+            company_id: currentUser.company_id,
+            name: newGroupName.trim(),
+            description: newGroupDesc.trim() || null
+        }).select();
+        if (error) { showToast('Erro ao criar grupo: ' + error.message, 'error'); return; }
+        if (data) {
+            setContactGroups(prev => [...prev, data[0] as any]);
+            setNewGroupName('');
+            setNewGroupDesc('');
+            setShowCreateGroupModal(false);
+            showToast('Grupo criado!', 'success');
+        }
+    };
+
+    const addMemberToGroup = async (groupId: string) => {
+        if (!addMemberEmail.trim()) return;
+        const { data, error } = await supabase.from('email_contact_group_members').insert({
+            group_id: groupId,
+            contact_name: addMemberName.trim() || addMemberEmail.split('@')[0],
+            contact_email: addMemberEmail.trim()
+        }).select();
+        if (error) { showToast('Erro: ' + error.message, 'error'); return; }
+        if (data) {
+            setGroupMembers(prev => [...prev, data[0] as any]);
+            setAddMemberEmail('');
+            setAddMemberName('');
+            showToast('Contato adicionado ao grupo!', 'success');
+        }
+    };
+
+    const addContactToGroup = async (groupId: string, contact: Contact) => {
+        const { data, error } = await supabase.from('email_contact_group_members').insert({
+            group_id: groupId,
+            contact_name: contact.name,
+            contact_email: contact.email
+        }).select();
+        if (error) { showToast('Erro: ' + error.message, 'error'); return; }
+        if (data) {
+            setGroupMembers(prev => [...prev, data[0] as any]);
+            showToast(`${contact.name} adicionado ao grupo!`, 'success');
+        }
+    };
+
+    const removeMemberFromGroup = async (memberId: string) => {
+        const { error } = await supabase.from('email_contact_group_members').delete().eq('id', memberId);
+        if (!error) setGroupMembers(prev => prev.filter(m => m.id !== memberId));
+    };
+
+    const deleteContactGroup = async (groupId: string) => {
+        openConfirm('Excluir Grupo', 'Todos os membros serão removidos. Confirmar?', async () => {
+            closeConfirm();
+            await supabase.from('email_contact_group_members').delete().eq('group_id', groupId);
+            const { error } = await supabase.from('email_contact_groups').delete().eq('id', groupId);
+            if (!error) {
+                setContactGroups(prev => prev.filter(g => g.id !== groupId));
+                if (selectedGroupId === groupId) setSelectedGroupId(null);
+                showToast('Grupo excluído.', 'success');
+            }
+        }, 'danger');
+    };
+
+    const applyGroupToCompose = async (group: any) => {
+        const { data } = await supabase.from('email_contact_group_members').select('contact_email').eq('group_id', group.id);
+        if (data && data.length > 0) {
+            const emails = data.map((m: any) => m.contact_email);
+            setToTags(prev => Array.from(new Set([...prev, ...emails])));
+            setView('compose');
+            showToast(`${emails.length} e-mail(s) do grupo "${group.name}" adicionados!`, 'success');
+        } else {
+            showToast('Este grupo não tem membros.', 'warning');
+        }
+    };
+
     const addContact = async () => {
         if (!newContactEmail) return;
         const { data, error } = await supabase.from('email_contacts').insert({
@@ -1280,9 +1385,163 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 <span className="font-medium">Meus Contatos</span>
                             </button>
                         </div>
+
+                        {/* Groups Section */}
+                        <div className="mt-4 border-t pt-4">
+                            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                Grupos de Contatos
+                                <button onClick={() => setShowGroupsModal(true)} className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-brand-primary" title="Gerenciar Grupos">
+                                    <UserGroupIcon className="w-3 h-3" />
+                                </button>
+                            </h3>
+                            {contactGroups.length === 0 && (
+                                <p className="px-3 text-xs text-gray-400 italic">Nenhum grupo criado.</p>
+                            )}
+                            {contactGroups.map(group => (
+                                <button
+                                    key={group.id}
+                                    onClick={() => applyGroupToCompose(group)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-md transition-colors group"
+                                    title={`Enviar email para o grupo: ${group.name}`}
+                                >
+                                    <UserGroupIcon className="w-4 h-4 text-emerald-400 group-hover:text-emerald-600" />
+                                    <span className="truncate font-medium">{group.name}</span>
+                                    <span className="ml-auto text-[10px] text-emerald-500 font-bold opacity-0 group-hover:opacity-100">→ Compose</span>
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setShowGroupsModal(true)}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-brand-primary hover:bg-gray-100 rounded-md font-semibold mt-1"
+                            >
+                                + Gerenciar Grupos
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* === Groups Modal === */}
+            {showGroupsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowGroupsModal(false)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Grupos de Contatos</h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowCreateGroupModal(true)} className="px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition">+ Novo Grupo</button>
+                                <button onClick={() => setShowGroupsModal(false)} className="p-2 text-gray-400 hover:text-gray-600"><XMarkIcon className="w-5 h-5" /></button>
+                            </div>
+                        </div>
+
+                        {contactGroups.length === 0 && (
+                            <div className="text-center py-12 text-gray-400">
+                                <UserGroupIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                <p>Nenhum grupo criado ainda.</p>
+                                <button onClick={() => setShowCreateGroupModal(true)} className="mt-4 px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-semibold">Criar primeiro grupo</button>
+                            </div>
+                        )}
+
+                        <div className="space-y-3">
+                            {contactGroups.map(group => (
+                                <div key={group.id} className="border border-gray-100 dark:border-white/10 rounded-xl overflow-hidden">
+                                    <div
+                                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"
+                                        onClick={() => {
+                                            if (selectedGroupId === group.id) {
+                                                setSelectedGroupId(null);
+                                            } else {
+                                                setSelectedGroupId(group.id);
+                                                fetchGroupMembers(group.id);
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                                                <UserGroupIcon className="w-5 h-5 text-emerald-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-gray-900 dark:text-white">{group.name}</p>
+                                                {group.description && <p className="text-xs text-gray-500">{group.description}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={(e) => { e.stopPropagation(); applyGroupToCompose(group); setShowGroupsModal(false); }} className="px-3 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-100">Enviar E-mail</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteContactGroup(group.id); }} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><TrashIcon className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+
+                                    {selectedGroupId === group.id && (
+                                        <div className="border-t border-gray-100 dark:border-white/10 p-4 bg-gray-50 dark:bg-white/5">
+                                            {/* Add member from existing contacts */}
+                                            <div className="mb-3">
+                                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Adicionar dos Meus Contatos</p>
+                                                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                                                    {contacts
+                                                        .filter(c => !groupMembers.some(m => m.contact_email === c.email))
+                                                        .map(contact => (
+                                                            <button
+                                                                key={contact.id}
+                                                                onClick={() => addContactToGroup(group.id, contact)}
+                                                                className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-full text-xs hover:border-emerald-400 hover:text-emerald-600 transition-colors"
+                                                            >
+                                                                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold">{contact.name[0]}</span>
+                                                                {contact.name}
+                                                                <span className="text-[10px] text-blue-400">+</span>
+                                                            </button>
+                                                        ))
+                                                    }
+                                                    {contacts.filter(c => !groupMembers.some(m => m.contact_email === c.email)).length === 0 && (
+                                                        <p className="text-xs text-gray-400 italic">Todos os contatos já estão no grupo.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Add member manually */}
+                                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Adicionar Manualmente</p>
+                                            <div className="flex gap-2 mb-4">
+                                                <input type="text" placeholder="Nome (opcional)" value={addMemberName} onChange={e => setAddMemberName(e.target.value)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary dark:bg-slate-800 dark:border-white/10 dark:text-white" />
+                                                <input type="email" placeholder="E-mail*" value={addMemberEmail} onChange={e => setAddMemberEmail(e.target.value)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-brand-primary dark:bg-slate-800 dark:border-white/10 dark:text-white" />
+                                                <button onClick={() => addMemberToGroup(group.id)} className="px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-semibold hover:bg-emerald-600">+</button>
+                                            </div>
+
+                                            {/* Members list */}
+                                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Membros ({groupMembers.length})</p>
+                                            {groupMembers.length === 0 && <p className="text-xs text-gray-400 italic mb-2">Nenhum membro ainda.</p>}
+                                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                                {groupMembers.map(member => (
+                                                    <div key={member.id} className="flex items-center justify-between px-3 py-2 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-white/10">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{member.contact_name}</p>
+                                                            <p className="text-xs text-gray-500">{member.contact_email}</p>
+                                                        </div>
+                                                        <button onClick={() => removeMemberFromGroup(member.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors"><XMarkIcon className="w-4 h-4" /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* === Create Group Modal === */}
+            {showCreateGroupModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateGroupModal(false)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Criar Grupo de Contatos</h3>
+                        <div className="space-y-3">
+                            <input type="text" placeholder="Nome do grupo *" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-primary dark:bg-slate-800 dark:border-white/10 dark:text-white" />
+                            <input type="text" placeholder="Descrição (opcional)" value={newGroupDesc} onChange={e => setNewGroupDesc(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-primary dark:bg-slate-800 dark:border-white/10 dark:text-white" />
+                        </div>
+                        <div className="flex gap-3 mt-5">
+                            <button onClick={() => setShowCreateGroupModal(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50">Cancelar</button>
+                            <button onClick={createContactGroup} className="flex-1 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-semibold hover:bg-emerald-600">Criar Grupo</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- Middle: Email List --- */}
             {(view === 'inbox' || view === 'read') && (

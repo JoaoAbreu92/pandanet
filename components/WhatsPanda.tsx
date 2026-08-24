@@ -5,7 +5,9 @@ import {
   PlusCircle,
   QrCode,
   Settings as SettingsIcon,
-  LayoutGrid
+  LayoutGrid,
+  Lock,
+  UsersRound
 } from 'lucide-react';
 import Chat from './whatspanda/Chat';
 import Contacts from './whatspanda/Contacts';
@@ -16,7 +18,7 @@ import Settings from './whatspanda/Settings';
 import { useAuth } from './AuthContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'chat' | 'groups' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
+type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -24,14 +26,14 @@ interface WhatsPandaProps {
 
 const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   const { profile } = useAuth();
-  const [currentView, setCurrentView] = useState<View>('chat');
+  const [currentView, setCurrentView] = useState<View>('privados');
   const [isChatActive, setIsChatActive] = useState(false);
   const [internalSearch, setInternalSearch] = useState(initialSearch);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   const handleContactChat = (phone: string) => {
     setInternalSearch(phone);
-    setCurrentView('chat');
+    setCurrentView('privados');
   };
 
   const permissions: any = {
@@ -59,7 +61,8 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   }
 
   const menuItems = React.useMemo(() => [
-    ...(permissions.can_view_chats ? [{ id: 'chat', label: 'Conversas', icon: MessageCircle, view: 'chat' }] : []),
+    ...(permissions.can_view_chats ? [{ id: 'privados', label: 'Privados', icon: Lock, view: 'privados' }] : []),
+    ...(permissions.can_view_groups ? [{ id: 'grupos', label: 'Grupos', icon: UsersRound, view: 'grupos' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
@@ -95,14 +98,15 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     }
 
     switch (currentView) {
-      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="all" initialConversationId={selectedConversationId} /> : null;
+      case 'privados': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" initialConversationId={selectedConversationId} /> : null;
+      case 'grupos': return permissions.can_view_groups ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" initialConversationId={selectedConversationId} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
       case 'new-ticket': return permissions.can_view_chats ? (
         <NewTicket 
-          onBack={() => setCurrentView('chat')} 
+          onBack={() => setCurrentView('privados')} 
           onConversationSelect={(conv) => {
             setSelectedConversationId(conv.id);
-            setCurrentView('chat');
+            setCurrentView('privados');
           }}
         />
       ) : null;
@@ -186,7 +190,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       </div>
 
       {/* Mobile Menu - Shown only on small screens */}
-      {menuItems.length > 0 && !(currentView === 'chat' && isChatActive) && (
+      {menuItems.length > 0 && !(currentView === 'privados' && isChatActive) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
           {menuItems.map((item) => (
             <button

@@ -110,6 +110,23 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [forwardTargetSearch, setForwardTargetSearch] = useState('');
   const [forwardLoading, setForwardLoading] = useState(false);
 
+  const renderMessageText = (text: string) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        const url = part.startsWith('http') ? part : `https://${part}`;
+        return (
+          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:underline break-all font-bold">
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   // Efeito para gerenciar o contador visual de cooldown do Nudge
   useEffect(() => {
     const interval = setInterval(() => {
@@ -487,7 +504,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
   const fetchConversations = async () => {
     const companyId = currentUser?.company_id;
-    if (!companyId || !settings?.id) return;
+    if (!companyId) return;
 
     const userId = activeProfile?.id || profile?.id;
 
@@ -522,13 +539,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de Tipo (Privado / Grupo)
     if (chatTypeFilter === 'group') {
-      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%,contact_name.ilike.%Grupo%');
+      // Buscar grupos: is_group = true OU JID com @g.us
+      query = query.or('is_group.eq.true,contact_phone.ilike.%@g.us%');
     } else if (chatTypeFilter === 'private') {
-      query = query.neq('is_group', true).not('contact_phone', 'ilike', '%@g.us%');
+      // Remover grupos
+      query = query
+        .neq('is_group', true)
+        .not('contact_phone', 'ilike', '%@g.us%');
     }
     // Se for 'all', não aplica filtro e mostra ambos
 
-    const { data } = await query.order('last_message_at', { ascending: false });
+    const { data, error } = await query.order('last_message_at', { ascending: false });
+    
+    if (error) {
+      console.error('[WP] Erro ao buscar conversas:', error.message);
+    }
     
     if (data) {
       setConversations(data as WhatsAppConversationWithDetails[]);
@@ -1415,6 +1440,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               : ''
                             }`}
                             onClick={() => window.open(msg.media_url || '_blank')} 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'https://ui-avatars.com/api/?name=%3F&background=ef4444&color=fff&text=IMG+ERR';
+                              target.title = 'Erro ao carregar imagem';
+                            }}
                           />
                           <a 
                             href={msg.media_url || ''} 
@@ -1449,8 +1479,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </div>
                       ) : msg.media_type?.includes('video') ? (
                         <div className="relative group rounded-xl overflow-hidden shadow-sm">
-                          <video controls className="max-w-full h-auto">
+                          <video 
+                            controls 
+                            className="max-w-full h-auto"
+                            onError={(e) => {
+                              console.error('Erro ao carregar vídeo');
+                            }}
+                          >
                             <source src={msg.media_url || ''} type="video/mp4" />
+                            Seu navegador não suporta vídeos.
                           </video>
                         </div>
                       ) : msg.media_url ? (
@@ -1477,7 +1514,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' 
                           : ''
                         }`}>
-                          {msg.message_text}
+                          {renderMessageText(msg.message_text)}
                         </p>
                       )}
                     </div>

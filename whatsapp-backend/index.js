@@ -783,6 +783,8 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
             })
         });
 
+        console.log(`[MEDIA] Resposta da Evolution API: ${resp.status} ${resp.statusText}`);
+
         if (!resp.ok) {
             const errLog = await resp.text();
             console.error(`[MEDIA] Erro ao baixar (Status ${resp.status}):`, errLog);
@@ -790,7 +792,9 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
         }
 
         const data = await resp.json();
-        return typeof data === 'string' ? data : (data.base64 || data.data || null);
+        const base64 = typeof data === 'string' ? data : (data.base64 || data.data || null);
+        console.log(`[MEDIA] Base64 extraído com sucesso: ${base64 ? 'Sim' : 'Não'} (Tamanho: ${base64?.length || 0})`);
+        return base64;
     } catch (e) {
         console.error(`[MEDIA] Erro no download:`, e.message);
         return null;
@@ -814,6 +818,7 @@ async function uploadMediaToSupabase(base64, mediatype, companyId) {
 
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
         const filePath = `received/${companyId}/${fileName}`;
+        console.log(`[STORAGE] Fazendo upload para: ${filePath} (MIME: ${contentType})`);
         
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const buffer = Buffer.from(base64Data, 'base64');
@@ -828,6 +833,7 @@ async function uploadMediaToSupabase(base64, mediatype, companyId) {
         }
 
         const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
         return publicUrl;
     } catch (e) {
         console.error(`[STORAGE] Erro fatal no upload:`, e.message);
