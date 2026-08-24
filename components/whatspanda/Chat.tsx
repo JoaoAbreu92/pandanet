@@ -173,6 +173,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [transferType, setTransferType] = useState<'agent' | 'queue'>('agent');
   const [transferSearch, setTransferSearch] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [convToClose, setConvToClose] = useState<string | null>(null);
+  const [terminationReasons, setTerminationReasons] = useState<any[]>([]);
+  const [selectedReasonId, setSelectedReasonId] = useState<string>('');
 
   const renderMessageText = (text: string) => {
     if (!text) return null;
@@ -418,6 +422,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     fetchSettings();
     fetchConversations();
     loadFiltersData();
+    fetchTerminationReasons();
   }, []); // Run once on mount
 
   useEffect(() => {
@@ -562,6 +567,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setSettings(data[0]); // Mantém um padrão para a abertura de ticket
       setConnections(data); // Preenche os canais disponíveis para o filtro avançado
     }
+  };
+
+  const fetchTerminationReasons = async () => {
+    const companyId = activeProfile?.company_id || profile?.company_id;
+    if (!companyId) return;
+
+    const { data } = await supabase
+      .from('chat_termination_reasons')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('name');
+    
+    if (data) {
+      setTerminationReasons(data);
+    }
+  };
+
+  const handleOpenCloseModal = (conversationId: string) => {
+    setConvToClose(conversationId);
+    setSelectedReasonId('');
+    fetchTerminationReasons();
+    setIsCloseModalOpen(true);
   };
   
   const loadFiltersData = async () => {
@@ -805,7 +832,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   };
 
-  const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado', assignToMe: boolean = false) => {
+  const handleUpdateStatus = async (
+    conversationId: string, 
+    newStatus: 'aberto' | 'fechado', 
+    assignToMe: boolean = false,
+    reasonId?: string | null,
+    reasonName?: string | null
+  ) => {
     if (isGhostMode) {
       alert('Modo Auditoria: Não é permitido alterar o status do atendimento.');
       return;
@@ -832,6 +865,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.assigned_to = null;
         updateData.queue_id = null;
         updateData.chatbot_node_id = null;
+        updateData.closed_at = new Date().toISOString();
+        updateData.termination_reason_id = reasonId || null;
+        updateData.termination_reason = reasonName || null;
+      }
+
+      if (newStatus === 'aberto') {
+        updateData.termination_reason_id = null;
+        updateData.termination_reason = null;
+        updateData.closed_at = null;
       }
 
       const { error } = await supabase
@@ -2030,7 +2072,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <div className="flex gap-0.5 sm:gap-1.5 items-center">
                   {!isGhostMode && selectedConversation.status !== 'fechado' && (
                     <button
-                      onClick={() => handleUpdateStatus(selectedConversation.id, 'fechado')}
+                      onClick={() => handleOpenCloseModal(selectedConversation.id)}
                       className="p-1 sm:p-2 rounded-full hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 transition-colors"
                       title="Encerrar Atendimento"
                     >
@@ -2660,8 +2702,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               )}
             </div>
 
-            <button 
-              onClick={() => handleUpdateStatus(selectedConversation.id, selectedConversation.status === 'fechado' ? 'aberto' : 'fechado')}
+             <button 
+              onClick={() => {
+                if (selectedConversation.status === 'fechado') {
+                  handleUpdateStatus(selectedConversation.id, 'aberto');
+                } else {
+                  handleOpenCloseModal(selectedConversation.id);
+                }
+              }}
               className={`w-full flex items-center justify-center py-4 px-6 font-bold text-xs uppercase tracking-widest rounded-2xl transition-all duration-300 border ${
                 selectedConversation.status === 'fechado'
                 ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 hover:bg-indigo-500 hover:text-white'
@@ -2723,7 +2771,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 onClick={async () => {
                   const targetConv = conversations.find(c => c.id === contextMenu.conversationId);
                   if (targetConv) {
-                    await handleUpdateStatus(contextMenu.conversationId, 'fechado');
+                    handleOpenCloseModal(contextMenu.conversationId);
                   }
                   setContextMenu(null);
                 }}
@@ -2827,6 +2875,98 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Close Chat Modal with Termination Reason */}
+      {isCloseModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-transparent">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Encerrar Atendimento</h3>
+                <p className="text-xs text-slate-500 mt-1">Selecione o motivo de fechamento</p>
+              </div>
+              <button onClick={() => setIsCloseModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto p-4 space-y-2.5 custom-scrollbar">
+              {terminationReasons.map((reason) => (
+                <button
+                  key={reason.id}
+                  onClick={() => setSelectedReasonId(reason.id)}
+                  className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all duration-300 ${
+                    selectedReasonId === reason.id
+                      ? 'border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/5'
+                      : 'border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                    selectedReasonId === reason.id
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {selectedReasonId === reason.id && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white leading-snug">{reason.name}</p>
+                    {reason.description && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{reason.description}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+
+              <button
+                onClick={() => setSelectedReasonId('other')}
+                className={`w-full flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all duration-300 ${
+                  selectedReasonId === 'other'
+                    ? 'border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/5'
+                    : 'border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                  selectedReasonId === 'other'
+                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                    : 'border-slate-300 dark:border-slate-600'
+                }`}>
+                  {selectedReasonId === 'other' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-white leading-snug">Sem motivo específico / Outros</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Finalizar sem registrar um motivo padrão.</p>
+                </div>
+              </button>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end gap-3">
+              <button
+                onClick={() => setIsCloseModalOpen(false)}
+                className="px-6 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors uppercase tracking-widest"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  if (!convToClose) return;
+                  const reason = selectedReasonId === 'other' ? null : terminationReasons.find(r => r.id === selectedReasonId);
+                  await handleUpdateStatus(
+                    convToClose, 
+                    'fechado', 
+                    false, 
+                    reason?.id || null, 
+                    reason?.name || (selectedReasonId === 'other' ? 'Sem motivo específico / Outros' : null)
+                  );
+                  setIsCloseModalOpen(false);
+                }}
+                className="px-8 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-widest"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -874,6 +874,8 @@ const AppContent: React.FC = () => {
             'viewOrgChart': 'org-chart',
             'viewMeuRH': 'meu-rh',
             'viewDirectory': 'org-chart',
+            'viewForms': 'forms',
+            'viewDocuments': 'documentos',
             'viewInfoSec': 'infosec',
             'viewKPIDashboard': 'kpis',
             'viewProjects': 'projects',
@@ -928,7 +930,7 @@ const AppContent: React.FC = () => {
             case 'events': return <EventsPage initialEventId={pageContext?.eventId} />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
             case 'jobs': return <JobsPage />;
-            case 'meu-rh': return <EmployeePortal />;
+            case 'meu-rh': return canAccess('viewMeuRH') ? <EmployeePortal /> : null;
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;

@@ -392,19 +392,7 @@ const EmployeePortal: React.FC = () => {
                             <div className="p-8">
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Histórico de Pagamentos</h3>
-                                    {isAdmin && (
-                                        <>
-                                            <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                disabled={uploadingPayslip}
-                                                className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all disabled:opacity-60"
-                                            >
-                                                <PlusIcon className="w-4 h-4" />
-                                                {uploadingPayslip ? 'Enviando...' : 'Enviar Holerite'}
-                                            </button>
-                                            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg" hidden onChange={handlePayslipUpload} />
-                                        </>
-                                    )}
+                                    {/* Envio de holerite removido daqui, deve ser feito apenas pelo Painel Administrativo */}
                                 </div>
 
                                 {payslips.length === 0 ? (

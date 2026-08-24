@@ -95,6 +95,7 @@ export {
   ArrowLeftIcon,
   ListBulletIcon,
   ClipboardDocumentCheckIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 
 export const WhatsAppIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (

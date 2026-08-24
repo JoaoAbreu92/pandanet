@@ -24,7 +24,11 @@ import {
     LifebuoyIcon,
     TicketIcon,
     Cog6ToothIcon,
-    ClockIcon
+    ClockIcon,
+    BriefcaseIcon,
+    AcademicCapIcon,
+    BookOpenIcon,
+    ArrowPathIcon
 } from './icons';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
@@ -130,6 +134,13 @@ const UserFormModal: React.FC<{
             viewSurveys: user?.permissions?.viewSurveys ?? true,
             viewPolicies: user?.permissions?.viewPolicies ?? true,
             viewWellbeing: user?.permissions?.viewWellbeing ?? true,
+            viewMeuRH: user?.permissions?.viewMeuRH ?? true,
+            viewJobs: user?.permissions?.viewJobs ?? true,
+            viewOrgChart: user?.permissions?.viewOrgChart ?? true,
+            viewKPIDashboard: user?.permissions?.viewKPIDashboard ?? true,
+            manageKPIs: user?.permissions?.manageKPIs ?? false,
+            viewReservations: user?.permissions?.viewReservations ?? true,
+            viewAgenda: user?.permissions?.viewAgenda ?? true,
             viewTiDashboard: user?.permissions?.viewTiDashboard ?? false,
             openTickets: user?.permissions?.openTickets ?? true,
             openTiRequests: user?.permissions?.openTiRequests ?? true,
@@ -534,6 +545,13 @@ const UserFormModal: React.FC<{
                                         <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Gestão de Projetos" name="viewProjects" checked={formData.permissions.viewProjects} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Meu RH (Holerites e Férias)" name="viewMeuRH" checked={formData.permissions.viewMeuRH} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<BriefcaseIcon className="w-4 h-4" />} label="Vagas de Emprego" name="viewJobs" checked={formData.permissions.viewJobs} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<AcademicCapIcon className="w-4 h-4" />} label="Treinamentos" name="viewTraining" checked={formData.permissions.viewTraining} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} label="Pesquisas de Clima" name="viewSurveys" checked={formData.permissions.viewSurveys} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<ShieldCheckIcon className="w-4 h-4" />} label="Políticas Internas" name="viewPolicies" checked={formData.permissions.viewPolicies} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Organograma" name="viewOrgChart" checked={formData.permissions.viewOrgChart} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Reservas de Salas/Espaços" name="viewReservations" checked={formData.permissions.viewReservations} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     </div>
                                 </section>
                             )}
@@ -548,6 +566,9 @@ const UserFormModal: React.FC<{
                                         <PermissionToggle icon={<TicketIcon className="w-4 h-4" />} label="Meus Chamados" name="openTickets" checked={formData.permissions.openTickets} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Solicitar Equipamento" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Dashboard T.I. (Admin)" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<BookOpenIcon className="w-4 h-4" />} label="Base de Conhecimento" name="viewKnowledgeBase" checked={formData.permissions.viewKnowledgeBase} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<ArrowPathIcon className="w-4 h-4" />} label="Status de Serviços" name="viewServiceStatus" checked={formData.permissions.viewServiceStatus} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<ShieldCheckIcon className="w-4 h-4" />} label="Segurança da Informação" name="viewInfoSec" checked={formData.permissions.viewInfoSec} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     </div>
                                 </section>
                             )}
