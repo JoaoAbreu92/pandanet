@@ -150,6 +150,7 @@ export interface EmployeePermissions {
   viewMessages: boolean;
   viewCalendar: boolean;
   useMarketplace: boolean;
+  viewEmail: boolean;
 
   // Social Feed Permissions
   canPostText: boolean;

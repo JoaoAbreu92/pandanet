@@ -3,7 +3,28 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Card from './Card';
 import type { Employee, Plan } from '../types';
-import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
+import {
+    PlusIcon,
+    PencilIcon,
+    TrashIcon,
+    XCircleIcon,
+    ShieldCheckIcon,
+    IdentificationIcon,
+    ChatBubbleLeftRightIcon,
+    EnvelopeIcon,
+    SparklesIcon,
+    BuildingOfficeIcon,
+    CalendarDaysIcon,
+    UsersIcon,
+    DocumentTextIcon,
+    HeartIcon,
+    RocketLaunchIcon,
+    StarIcon,
+    FolderIcon,
+    LifebuoyIcon,
+    TicketIcon,
+    Cog6ToothIcon
+} from './icons';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -15,6 +36,34 @@ interface UserManagerProps {
     plan: Plan;
     departments: Department[];
 }
+
+const PermissionToggle: React.FC<{
+    label: string,
+    name: string,
+    checked: boolean,
+    onChange: (name: string, checked: boolean) => void,
+    icon?: React.ReactNode
+}> = ({ label, name, checked, onChange, icon }) => (
+    <div
+        onClick={() => onChange(name, !checked)}
+        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group ${checked
+                ? 'bg-emerald-50 border-emerald-100 shadow-sm'
+                : 'bg-white border-gray-100 hover:border-emerald-100'
+            }`}
+    >
+        <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg transition-colors ${checked ? 'bg-emerald-500 text-white' : 'bg-gray-50 text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500'}`}>
+                {icon}
+            </div>
+            <span className={`text-xs font-bold transition-colors ${checked ? 'text-emerald-900' : 'text-gray-500'}`}>
+                {label}
+            </span>
+        </div>
+        <div className={`w-10 h-5 rounded-full relative transition-colors ${checked ? 'bg-emerald-500' : 'bg-gray-200'}`}>
+            <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${checked ? 'right-0.5' : 'left-0.5'}`} />
+        </div>
+    </div>
+);
 
 const UserFormModal: React.FC<{
     user: Partial<Employee> | null;
@@ -38,8 +87,9 @@ const UserFormModal: React.FC<{
         department_id: user?.department_id || '',
         permissions: user?.permissions || {
             viewMessages: true,
-            openTickets: true,
             viewCalendar: true,
+            useMarketplace: true,
+            viewEmail: true,
             viewDirectory: true,
             viewForms: true,
             viewBenefits: true,
@@ -51,6 +101,7 @@ const UserFormModal: React.FC<{
             viewPolicies: true,
             viewWellbeing: true,
             viewTiDashboard: false,
+            openTickets: true,
             openTiRequests: true,
             viewKnowledgeBase: true,
             viewServiceStatus: true,
@@ -80,14 +131,6 @@ const UserFormModal: React.FC<{
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    };
-
-    const handlePermissionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            permissions: { ...prev.permissions, [name]: checked }
-        }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -129,177 +172,108 @@ const UserFormModal: React.FC<{
                         <div><label className="flex items-center space-x-2 mt-6 text-brand-text"><input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary" /><span>{t('users.admin')}</span></label></div>
                     </div>
 
-                    <div className="border-t pt-4">
-                        <h4 className="font-bold text-gray-800 mb-4">Dados de Funcionário (Confidencial)</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">RG</label><input type="text" name="rg" value={formData.rg} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">CPF</label><input type="text" name="cpf" value={formData.cpf} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Contato de Emergência (Nome)</label><input type="text" name="emergency_contact_name" value={formData.emergency_contact_name} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Contato de Emergência (Telefone)</label><input type="text" name="emergency_contact_phone" value={formData.emergency_contact_phone} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Plano de Saúde</label><input type="text" name="health_insurance" value={formData.health_insurance} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Tipo Sanguíneo</label><input type="text" name="blood_type" value={formData.blood_type} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Estado Civil</label><input type="text" name="marital_status" value={formData.marital_status} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Escolaridade</label><input type="text" name="education_level" value={formData.education_level} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                    <div className="border-t pt-6">
+                        <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <ShieldCheckIcon className="w-5 h-5 text-brand-primary" />
+                            Configurações de Acesso e Permissões
+                        </h4>
+
+                        <div className="space-y-8">
+                            {/* Grupo: Social */}
+                            <section>
+                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <SparklesIcon className="w-3 h-3" /> Redes e Comunicação
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} label="Chat & Mensagens" name="viewMessages" checked={formData.permissions.viewMessages} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<EnvelopeIcon className="w-4 h-4" />} label="E-mail Corporativo" name="viewEmail" checked={formData.permissions.viewEmail} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Texto" name="canPostText" checked={formData.permissions.canPostText} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Imagem" name="canPostImage" checked={formData.permissions.canPostImage} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Vídeo" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                </div>
+                            </section>
+
+                            {/* Grupo: Corporativo */}
+                            <section>
+                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <BuildingOfficeIcon className="w-3 h-3" /> Corporativo & RH
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Calendário" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Formulários" name="viewForms" checked={formData.permissions.viewForms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Reconhecimentos" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                </div>
+                            </section>
+
+                            {/* Grupo: Tecnologia */}
+                            <section>
+                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <LifebuoyIcon className="w-3 h-3" /> Suporte & T.I.
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle icon={<TicketIcon className="w-4 h-4" />} label="Meus Chamados" name="openTickets" checked={formData.permissions.openTickets} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Solicitar Equipamento" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Dashboard T.I. (Admin)" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                </div>
+                            </section>
+
+                            {/* Grupo: Gestão RH Crítica */}
+                            <section className="bg-red-50/50 p-4 rounded-2xl border border-red-100">
+                                <h5 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <ShieldCheckIcon className="w-3 h-3" /> Gestão Sensível (RH Admin)
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Ver Dados Confidenciais" name="viewEmployeeDetails" checked={formData.permissions.viewEmployeeDetails} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<PencilIcon className="w-4 h-4" />} label="Editar Funcionários" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<TrashIcon className="w-4 h-4" />} label="Excluir Funcionários" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aprovar/Rejeitar Férias" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                </div>
+                            </section>
                         </div>
                     </div>
-                    <div>
-                        <div className="space-y-4">
-                            {/* Feed Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Feed Social</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="canPostText" checked={formData.permissions.canPostText} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Postar Texto</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="canPostImage" checked={formData.permissions.canPostImage} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Postar Imagem</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Postar Vídeo</span>
-                                    </label>
-                                </div>
-                            </div>
 
-                            {/* General Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Geral</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewMessages" checked={formData.permissions.viewMessages} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Chat & Mensagens</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Calendário</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="useMarketplace" checked={formData.permissions.useMarketplace} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Marketplace</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Bem Estar</span>
-                                    </label>
-                                </div>
+                    <div className="border-t pt-6">
+                        <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <IdentificationIcon className="w-5 h-5 text-brand-primary" />
+                            Dados de Funcionário (Confidencial/RH)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">RG</label>
+                                <input type="text" name="rg" value={formData.rg} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
                             </div>
-
-                            {/* RH Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Recursos Humanos (RH)</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Diretório</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewForms" checked={formData.permissions.viewForms} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Formulários</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Benefícios</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Onboarding</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Reconhecimentos</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Documentos</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewTraining" checked={formData.permissions.viewTraining} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Treinamentos</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewSurveys" checked={formData.permissions.viewSurveys} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Pesquisas</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewPolicies" checked={formData.permissions.viewPolicies} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Políticas</span>
-                                    </label>
-                                </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">CPF</label>
+                                <input type="text" name="cpf" value={formData.cpf} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
                             </div>
-
-                            {/* TI Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Tecnologia da Informação (TI)</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Dashboard TI</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="openTickets" checked={formData.permissions.openTickets} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Meus Chamados</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Solicitar Equipamento</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewKnowledgeBase" checked={formData.permissions.viewKnowledgeBase} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Base de Conhecimento</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewServiceStatus" checked={formData.permissions.viewServiceStatus} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Status de Serviços</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewInfoSec" checked={formData.permissions.viewInfoSec} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Segurança da Info.</span>
-                                    </label>
-                                </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Emergência (Nome)</label>
+                                <input type="text" name="emergency_contact_name" value={formData.emergency_contact_name} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
                             </div>
-
-                            {/* Restricted Management Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-red-600 mb-2 border-b border-red-100 pb-1">Administração de RH</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewEmployeeDetails" checked={formData.permissions.viewEmployeeDetails} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Ver Dados Confidenciais</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Editar Funcionários</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Excluir Funcionários</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="viewVacationRequests" checked={formData.permissions.viewVacationRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Ver Pedidos de Férias</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Aprovar/Rejeitar Férias</span>
-                                    </label>
-                                </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Emergência (Telefone)</label>
+                                <input type="text" name="emergency_contact_phone" value={formData.emergency_contact_phone} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
                             </div>
-
-                            {/* New Permissions */}
-                            <div>
-                                <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">Permissões Especiais</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="createEvents" checked={formData.permissions.createEvents} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Criar Eventos</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-brand-text">
-                                        <input type="checkbox" name="manageMarketplace" checked={formData.permissions.manageMarketplace} onChange={handlePermissionChange} className="rounded text-brand-primary" />
-                                        <span className="text-sm">Gerenciar Marketplace</span>
-                                    </label>
-                                </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Plano de Saúde</label>
+                                <input type="text" name="health_insurance" value={formData.health_insurance} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Tipo Sanguíneo</label>
+                                <input type="text" name="blood_type" value={formData.blood_type} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Estado Civil</label>
+                                <input type="text" name="marital_status" value={formData.marital_status} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Escolaridade</label>
+                                <input type="text" name="education_level" value={formData.education_level} onChange={handleChange} className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all" />
                             </div>
                         </div>
                     </div>

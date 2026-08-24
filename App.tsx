@@ -38,10 +38,10 @@ import PoliciesPage from './components/PoliciesPage';
 import KnowledgeBasePage from './components/KnowledgeBasePage';
 import StatusPage from './components/StatusPage';
 import InfoSecPage from './components/InfoSecPage';
-import JobsPage from './components/JobsPage';
-import EmployeePortal from './components/EmployeePortal';
-import OrgChartPage from './components/OrgChartPage';
-import KPIDashboard from './components/KPIDashboard';
+import JobsPage from './components/JobsPage.tsx';
+import EmployeePortal from './components/EmployeePortal.tsx';
+import OrgChartPage from './components/OrgChartPage.tsx';
+import KPIDashboard from './components/KPIDashboard.tsx';
 import EmailPage from './components/EmailPage';
 
 const AppContent: React.FC = () => {
@@ -533,7 +533,7 @@ const AppContent: React.FC = () => {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
-            case 'email': return <EmailPage />;
+            case 'email': return <EmailPage onNavigate={handleNavigate} />;
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events} currentUser={currentUser} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
