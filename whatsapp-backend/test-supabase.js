@@ -1,74 +1,52 @@
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Try to load .env from current dir
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-console.log('=== SUPABASE CONNECTION TEST ===');
+console.log('--- SUPABASE DB CHECK SCRIPT ---');
 console.log('URL:', supabaseUrl);
-console.log('Key (first 20 chars):', supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'MISSING');
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Missing env vars: SUPABASE_URL or SUPABASE_SERVICE_KEY');
+    console.log('Ensure you are running this from the whatsapp-backend directory with a valid .env file.');
+    process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function testSupabase() {
-    const companyId = '56eaa5ed-8d1b-4879-a002-838702eeb14d';
-    
-    console.log('\n--- TEST 1: READ ---');
-    const { data: readData, error: readError } = await supabase
+const COMPANY_ID = '56eaa5ed-8d1b-4879-a002-838702eeb14d'; // ID from the screenshots
+
+async function checkSettings() {
+    console.log(`Checking settings for company: ${COMPANY_ID}`);
+    const { data, error } = await supabase
         .from('whatsapp_settings')
         .select('*')
-        .eq('company_id', companyId)
-        .single();
-    
-    console.log('READ Result:');
-    console.log('  Data:', readData);
-    console.log('  Error:', readError);
-    
-    console.log('\n--- TEST 2: UPDATE with test QR ---');
-    const testQR = 'TEST_QR_CODE_' + Date.now();
-    const { data: updateData, error: updateError } = await supabase
-        .from('whatsapp_settings')
-        .update({ 
-            qr_code: testQR,
-            updated_at: new Date().toISOString()
-        })
-        .eq('company_id', companyId)
-        .select();
-    
-    console.log('UPDATE Result:');
-    console.log('  Data:', updateData);
-    console.log('  Error:', updateError);
-    
-    if (updateData && updateData.length > 0) {
-        console.log('\n✅ UPDATE SUCCESS! QR Code was saved.');
-        console.log('  Saved QR:', updateData[0].qr_code);
+        .eq('company_id', COMPANY_ID)
+        .maybeSingle();
+
+    if (error) {
+        console.error('❌ Error fetching:', error);
+    } else if (!data) {
+        console.log('⚠️ No record found for this company ID');
     } else {
-        console.log('\n❌ UPDATE FAILED!');
-        if (updateError) {
-            console.log('  Error details:', JSON.stringify(updateError, null, 2));
+        console.log('✅ Data retrieved successfully');
+        console.log('--------------------------------------------------');
+        console.log('QR CODE:', data.qr_code ? (data.qr_code.substring(0, 50) + '...') : 'NULL');
+        console.log('IS CONNECTED:', data.is_connected);
+        console.log('UPDATED AT:', data.updated_at);
+        console.log('--------------------------------------------------');
+
+        if (data.qr_code) {
+            console.log('🎯 CONCLUSION: QR Code IS in the database.');
+        } else {
+            console.error('⚠️ CONCLUSION: QR Code is NULL in the database.');
         }
-    }
-    
-    console.log('\n--- TEST 3: READ AGAIN to verify ---');
-    const { data: verifyData, error: verifyError } = await supabase
-        .from('whatsapp_settings')
-        .select('qr_code, updated_at')
-        .eq('company_id', companyId)
-        .single();
-    
-    console.log('VERIFY Result:');
-    console.log('  QR Code:', verifyData?.qr_code);
-    console.log('  Updated At:', verifyData?.updated_at);
-    console.log('  Error:', verifyError);
-    
-    if (verifyData?.qr_code === testQR) {
-        console.log('\n🎉 SUCCESS! The QR code was saved and verified in the database!');
-    } else {
-        console.log('\n❌ VERIFICATION FAILED! The QR code was not saved properly.');
     }
 }
 
-testSupabase().catch(err => {
-    console.error('\n💥 EXCEPTION:', err);
-    process.exit(1);
-});
+checkSettings();

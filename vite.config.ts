@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         proxy: {
           '/api': {
-            target: 'http://localhost:3000', // Backend local
+            target: 'http://localhost:3001', // Backend local
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api/, '')
           }
