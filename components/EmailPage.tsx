@@ -499,6 +499,7 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                         settings: serverConfig,
                         emailData: {
                             ...newEmail,
+                            to: composeData.to,
                             body: newEmail.content
                         }
                     }
