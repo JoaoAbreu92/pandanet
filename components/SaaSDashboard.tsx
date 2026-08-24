@@ -803,13 +803,17 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     return (
         <div className="bg-gray-50/50 dark:bg-gray-900 min-h-screen flex flex-col font-sans relative">
-            <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 pt-2">
+            <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 pt-2 flex items-center justify-between">
                 <div className="flex space-x-1 overflow-x-auto no-scrollbar tracking-wide uppercase">
                     <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>DASHBOARD</button>
                     <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>EMPRESAS</button>
                     <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>PLANOS</button>
                     <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>AVISOS GLOBAIS</button>
                     <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>CONFIGURAÇÕES</button>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Versão</span>
+                    <span className="text-sm font-bold text-brand-primary">{SYSTEM_VERSION}</span>
                 </div>
             </div>
 

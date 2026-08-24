@@ -106,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>
             <div className="p-6 flex items-center justify-center bg-white border-b border-gray-100">
-                <Logo showText={isOpen} className={isOpen ? 'h-10' : 'h-8'} companyLogo={companyLogo} />
+                <Logo showText={isOpen} className={isOpen ? 'h-10' : 'h-8'} />
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
