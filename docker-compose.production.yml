@@ -13,6 +13,7 @@ services:
     environment:
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - JWT_SECRET=${JWT_SECRET}
       - COMPANY_ID=${COMPANY_ID:-1}
       - PORT=3000
     networks:
