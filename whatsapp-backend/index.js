@@ -51,7 +51,18 @@ function authMiddleware(req, res, next) {
       console.error('[auth] WhatsApp: JWT_SECRET not configured');
       throw new Error('JWT_SECRET not configured');
     }
-    jwt.verify(token, JWT_SECRET);
+    // Supabase JWT secrets are typically base64 encoded. If verification fails, try decoding.
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      if (e.message.includes('signature')) {
+        console.warn('[auth] WhatsApp: Invalid signature with string secret, trying Buffer decoding...');
+        const secretBuffer = Buffer.from(JWT_SECRET, 'base64');
+        jwt.verify(token, secretBuffer);
+      } else {
+        throw e;
+      }
+    }
     next();
   } catch (err) {
     console.error('[auth] WhatsApp: Token verification failed:', err.message);
