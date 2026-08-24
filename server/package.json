@@ -13,6 +13,6 @@
     "imapflow": "^1.0.124",
     "jsonwebtoken": "^9.0.2",
     "mailparser": "^3.6.9",
-    "nodemailer": "^6.9.1"
+    "nodemailer": "^8.0.1"
   }
 }
