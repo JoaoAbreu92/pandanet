@@ -85,24 +85,6 @@ services:
       timeout: 10s
       retries: 3
 
-# ============================================
-# Redes
-# ============================================
-networks:
-  pandanet_network:
-    driver: bridge
-  supabase_default:
-    external: true
-
-# ============================================
-# Volumes
-# ============================================
-volumes:
-  certbot_conf:
-  certbot_www:
-  evolution_instances:
-  evolution_store:
-
   # ============================================
   # Evolution API (WhatsApp)
   # ============================================
@@ -122,3 +104,21 @@ volumes:
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
+
+# ============================================
+# Redes
+# ============================================
+networks:
+  pandanet_network:
+    driver: bridge
+  supabase_default:
+    external: true
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  certbot_conf:
+  certbot_www:
+  evolution_instances:
+  evolution_store:
