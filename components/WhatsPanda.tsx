@@ -45,12 +45,12 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     permissions.can_manage_settings = true;
   }
 
-  const menuItems = [
+  const menuItems = React.useMemo(() => [
     ...(permissions.can_view_chats ? [{ id: 'chat', label: 'Conversas', icon: MessageCircle, view: 'chat' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
-  ];
+  ], [permissions.can_view_chats, permissions.can_view_contacts, permissions.can_manage_settings]);
 
   // Set default view if current is invalid
   React.useEffect(() => {
