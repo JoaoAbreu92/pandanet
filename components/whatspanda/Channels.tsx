@@ -71,6 +71,38 @@ const Channels: React.FC = () => {
     // But this file `Channels.tsx` is in `components/whatspanda/`.
     // So import path is `../../AuthContext`.
 
+    const startSession = async (companyId: string) => {
+        try {
+            await fetch(`/api/sessions/${companyId}/start`, { method: 'POST' });
+        } catch (error) {
+            console.error('Erro ao iniciar sessão:', error);
+        }
+    };
+
+    const stopSession = async (companyId: string) => {
+        try {
+            await fetch(`/api/sessions/${companyId}/stop`, { method: 'POST' });
+        } catch (error) {
+            console.error('Erro ao parar sessão:', error);
+        }
+    };
+
+    const startSession = async (companyId: string) => {
+        try {
+            await fetch(`/api/sessions/${companyId}/start`, { method: 'POST' });
+        } catch (error) {
+            console.error('Erro ao iniciar sessão:', error);
+        }
+    };
+
+    const stopSession = async (companyId: string) => {
+        try {
+            await fetch(`/api/sessions/${companyId}/stop`, { method: 'POST' });
+        } catch (error) {
+            console.error('Erro ao parar sessão:', error);
+        }
+    };
+
     const handleSaveConfig = async () => {
         if (!connectionName || !phoneNumber) {
             alert('Por favor, preencha o Nome e o Número.');
@@ -97,6 +129,8 @@ const Channels: React.FC = () => {
             console.error('Error saving settings:', error);
             alert(`Erro ao salvar configurações: ${error.message}`);
         } else {
+            // Trigger backend session start
+            await startSession(companyId);
             setStep('qr');
         }
     };
@@ -178,7 +212,7 @@ const Channels: React.FC = () => {
                             className="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 mt-4"
                         >
                             <Save className="w-5 h-5" />
-                            Salvar e Gerar QR Code
+                            Salvar e Iniciar Conexão
                         </button>
                     </div>
                 </div>
@@ -195,18 +229,29 @@ const Channels: React.FC = () => {
                         ) : (
                             <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-2">
                                 <RefreshCw className="w-8 h-8 animate-spin" />
-                                <span className="text-sm">Gerando Código...</span>
+                                    <span className="text-sm">Iniciando Sessão...</span>
                             </div>
                         )}
                     </div>
 
-                    <button 
-                        onClick={() => setStep('form')}
-                        className="text-sm text-gray-500 hover:text-gray-900 underline"
-                    >
-                        Voltar para Configurações
-                    </button>
-                 </div>
+                    <div className="flex flex-col gap-2">
+                        <button
+                            onClick={() => {
+                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                if (companyId) startSession(companyId);
+                            }}
+                            className="text-sm text-green-600 hover:text-green-800 underline font-medium"
+                        >
+                            Forçar Início de Sessão
+                        </button>
+                        <button
+                            onClick={() => setStep('form')}
+                            className="text-sm text-gray-500 hover:text-gray-900 underline"
+                        >
+                            Voltar para Configurações
+                        </button>
+                    </div>
+                </div>
             )}
 
             {step === 'connected' && (
@@ -238,15 +283,34 @@ const Channels: React.FC = () => {
                     <div className="flex gap-3">
                          <button 
                             onClick={() => setStep('form')}
-                            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            className="flex-1 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
                         >
                             Editar Config
                         </button>
                         <button 
-                            onClick={() => alert('Função de desconexão via backend necessária.')}
+                            onClick={async () => {
+                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                if (confirm('Tem certeza que deseja desconectar?')) {
+                                    await stopSession(companyId);
+                                    setStep('form');
+                                    setQrCode(null);
+                                }
+                            }}
                             className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
                         >
                             Desconectar
+                        </button>
+                    </div>
+
+                    <div className="mt-4">
+                        <button
+                            onClick={() => {
+                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                if (companyId) startSession(companyId);
+                            }}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline"
+                        >
+                            Debug: Reiniciar Conexão
                         </button>
                     </div>
                 </div>
