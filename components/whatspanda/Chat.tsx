@@ -78,6 +78,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversationWithDetails | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [selectedMedia, setSelectedMedia] = useState<{url: string, type: string} | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'fechado'>('aberto');
@@ -504,14 +505,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
    // --- Helpers ---
   const fixMediaUrl = (url?: string | null) => {
     if (!url) return '';
-    // Substitui o host interno do Docker pelo IP público acessível pelo cliente
-    const publicIp = '77.37.43.60:8000';
+    // Usa VITE_SUPABASE_URL ao invés do IP duro para evitar Mixed Content e erros de CORS
+    const supabaseBaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://77.37.43.60:8000';
     if (url.includes('supabase-kong:8000')) {
-      return url.replace('supabase-kong:8000', publicIp);
+      return url.replace('http://supabase-kong:8000', supabaseBaseUrl).replace('supabase-kong:8000', supabaseBaseUrl);
     }
-    // Se a URL começar com barra, assumimos o host base do IP público
+    // Se a URL começar com barra, assumimos o host base correto
     if (url.startsWith('/storage/v1/')) {
-        return `http://${publicIp}${url}`;
+        return `${supabaseBaseUrl}${url}`;
     }
     return url;
   };
@@ -1444,19 +1445,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   >
                     <div className="space-y-2">
                       {(msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
-                        <div className={`relative group inline-block`}>
+                        <div className={`relative group inline-block`} onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'image' })}>
                           <img 
                             src={fixMediaUrl(msg.media_url)} 
                             alt="Mídia" 
-                            className={`rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] ${
+                            className={`rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] hover:opacity-90 transition-opacity ${
                               (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
                               ? 'border-0 shadow-none bg-transparent' 
                               : ''
                             }`}
-                            onClick={() => window.open(fixMediaUrl(msg.media_url) || '_blank')} 
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              target.src = 'https://ui-avatars.com/api/?name=%3F&background=ef4444&color=fff&text=IMG+ERR';
+                              target.src = 'https://placehold.co/200x250/22c55e/ffffff?text=Falha+na+Imagem';
                               target.title = 'Erro ao carregar imagem';
                             }}
                           />
@@ -1464,6 +1464,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             href={fixMediaUrl(msg.media_url)} 
                             target="_blank" 
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                             className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Download className="w-4 h-4" />
@@ -1492,17 +1493,23 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           </audio>
                         </div>
                       ) : msg.media_type?.includes('video') ? (
-                        <div className="relative group rounded-xl overflow-hidden shadow-sm">
+                        <div className="relative group rounded-xl overflow-hidden shadow-sm cursor-pointer" onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'video' })}>
                           <video 
-                            controls 
-                            className="max-w-full h-auto"
+                            className="max-h-[250px] max-w-[200px] md:max-w-[300px] object-cover pointer-events-none"
+                            preload="metadata"
                             onError={(e) => {
-                              console.error('Erro ao carregar vídeo');
+                              console.error('Erro ao carregar miniatura do vídeo');
                             }}
                           >
                             <source src={fixMediaUrl(msg.media_url)} type="video/mp4" />
                             Seu navegador não suporta vídeos.
                           </video>
+                          {/* Botão de play estilizado no centro para indicar miniatura de vídeo */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors pointer-events-none">
+                            <div className="w-12 h-12 rounded-full bg-white/40 flex items-center justify-center backdrop-blur-md">
+                              <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-white border-b-[6px] border-b-transparent ml-1" />
+                            </div>
+                          </div>
                         </div>
                       ) : msg.media_url ? (
                         <a 
@@ -1970,6 +1977,39 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Media Modal */}
+      {selectedMedia && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onClick={() => setSelectedMedia(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={(e) => { e.stopPropagation(); setSelectedMedia(null); }}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="relative max-w-5xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
+            {selectedMedia.type === 'image' || selectedMedia.url.endsWith('.gif') ? (
+              <img src={selectedMedia.url} alt="Mídia em tamanho real" className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl" />
+            ) : selectedMedia.type === 'video' ? (
+              <video src={selectedMedia.url} controls autoPlay className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl outline-none" />
+            ) : null}
+            
+            <a 
+              href={selectedMedia.url} 
+              download 
+              target="_blank" 
+              rel="noreferrer"
+              className="absolute bottom-4 right-4 p-3 bg-emerald-500 hover:bg-emerald-600 rounded-full text-white shadow-lg transition-transform hover:scale-110 flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+            </a>
           </div>
         </div>
       )}
