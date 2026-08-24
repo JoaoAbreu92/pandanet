@@ -343,6 +343,7 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                 user_id: currentUser?.id || ''
             });
         } catch (err: any) {
+            console.error('Test Connection Error:', err);
             addNotification({
                 title: 'Erro de Conexão',
                 message: err.message || 'Não foi possível conectar ao servidor.',
@@ -539,8 +540,8 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                 </button>
             </div>
 
-            <Card noPadding hideTypeBorder className="flex-1 overflow-hidden border-gray-100/50 shadow-2xl shadow-brand-primary/5">
-                <div className="flex flex-row h-full w-full overflow-hidden">
+            <Card noPadding hideTypeBorder className="flex-1 overflow-hidden md:overflow-visible border-gray-100/50 shadow-2xl shadow-brand-primary/5">
+                <div className="flex flex-col md:flex-row h-full w-full overflow-hidden">
                     {/* Coluna 1: Barra Lateral */}
                     <div className={`w-64 shrink-0 border-r border-gray-50 flex flex-col bg-gray-50/30 ${mobileView !== 'folders' ? 'hidden md:flex' : 'flex w-full'}`}>
                         <div className="p-4 flex flex-col gap-1 flex-1">
@@ -699,10 +700,10 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                     )}
 
                 {/* Coluna 3: Leitura ou Configurações */}
-                    <div className={`flex-1 flex flex-col min-w-0 overflow-hidden bg-white ${mobileView !== 'reading' && activeTab !== 'settings' ? 'hidden md:flex' : 'flex'}`}>
+                    <div className={`flex-1 flex flex-col min-w-0 bg-white ${mobileView !== 'reading' && activeTab !== 'settings' ? 'hidden md:flex' : 'flex'}`}>
                     {activeTab === 'settings' ? (
-                            <div className="flex-1 overflow-y-auto bg-gray-50/10">
-                                <div className="p-8 pb-32 space-y-8 max-w-5xl mx-auto">
+                            <div className="flex-1 overflow-y-auto bg-gray-50/10 custom-scrollbar">
+                                <div className="p-4 md:p-8 pb-32 space-y-8 max-w-5xl mx-auto">
                                 <div className="flex items-center gap-4 mb-2">
                                     <div className="p-3 bg-brand-primary/10 rounded-2xl text-brand-primary">
                                         <Cog6ToothIcon className="w-8 h-8" />
