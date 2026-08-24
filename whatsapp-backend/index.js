@@ -549,6 +549,8 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 if (chats.length > 0) {
                     console.log(`[SYNC] ${chats.length} chats encontrados.`);
                     for (const chat of chats) {
+                        // Extrair o JID corretamente do objeto chat
+                        const jid = chat.remoteJid || chat.jid || chat.id || '';
                         // Ignorar broadcasts e @lid (IDs internos), mas PERMITIR grupos (@g.us)
                         if (!jid || jid.includes('@broadcast') || jid.includes('@lid')) continue;
                         const isGroup = jid.includes('@g.us');

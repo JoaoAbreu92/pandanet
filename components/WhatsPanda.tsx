@@ -41,7 +41,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     can_send_messages: true,
     can_send_media: true,
     can_manage_settings: false,
-    can_view_groups: false,
+    can_view_groups: true,  // Ativado por padrão para todos
     ...(profile?.whatspanda_permissions || {})
   };
 

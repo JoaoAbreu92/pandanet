@@ -75,13 +75,25 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
   const [useSignature, setUseSignature] = useState(false);
+  const [signatureText, setSignatureText] = useState('');
   
-  // Atualiza useSignature quando o perfil carrega
+  // Busca assinatura direto do banco para garantir valor atualizado
   useEffect(() => {
-    if (activeProfile?.whatsapp_signature || activeProfile?.use_whatsapp_signature) {
-      setUseSignature(true);
-    }
-  }, [activeProfile]);
+    const fetchSignature = async () => {
+      const profileId = activeProfile?.id || profile?.id;
+      if (!profileId) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('whatsapp_signature, use_whatsapp_signature')
+        .eq('id', profileId)
+        .single();
+      if (data) {
+        setSignatureText(data.whatsapp_signature || '');
+        setUseSignature(data.use_whatsapp_signature || false);
+      }
+    };
+    fetchSignature();
+  }, [activeProfile?.id, profile?.id]);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false); // Added loading state for messages
@@ -212,21 +224,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
   const scrollToBottom = (force = false) => {
     if (force) {
+      // Força scroll apenas quando o user abre uma nova conversa ou envia mensagem
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         setIsUserReading(false);
       }, 100);
       return;
     }
-
+    // Scroll automático apenas se já estava no fundo (não interrompe leitura de histórico)
     const container = scrollContainerRef.current;
     if (container) {
-      // Se estiver até 150px do fundo, auto-scrolla
       const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
       if (isAtBottom) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        setIsUserReading(false);
       }
+      // Se não está no fundo, não faz nada (usuário está lendo histórico)
     }
   };
 
@@ -584,16 +596,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     const messageText = type === 'text' ? newMessage : '';
     const stickerUrl = type === 'sticker' ? content : null;
     const isSticker = type === 'sticker';
-    const isEmojiOnly = /^[\p{Emoji}\s]+$/u.test(messageText.trim()) && messageText.trim().length > 0;
+
 
     let messageWithSignature = messageText;
-    const targetProfile = activeProfile || profile; // Fallback para perfil
 
-    if (messageText && useSignature && targetProfile && !isEmojiOnly && !isSticker) {
-      const signatureText = targetProfile.whatsapp_signature;
-      if (signatureText && signatureText.trim() !== '') {
-        messageWithSignature = `${messageText}\n\n${signatureText}`;
-      }
+    // Adiciona assinatura se ativada, exceto em stickers
+    if (messageText && useSignature && signatureText.trim() !== '' && !isSticker) {
+      messageWithSignature = `${messageText}\n\n${signatureText}`;
     }
 
     try {
