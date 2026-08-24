@@ -1,21 +1,39 @@
 import React from 'react';
-import { SparklesIcon, PlusIcon } from './icons';
-import type { Recognition } from '../types';
+import { SparklesIcon, TrashIcon } from './icons';
+import type { Recognition, Employee } from '../types';
+import { supabase } from '../supabaseClient';
 
 interface RecognitionWidgetProps {
     recognitions: Recognition[];
     onRecognize: () => void;
+    currentUser: Employee;
+    onDelete?: () => void;
 }
 
-const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onRecognize }) => {
+const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onRecognize, currentUser, onDelete }) => {
     // Show last 3, sort safely (newer first)
     const recentRecognitions = [...recognitions].sort((a, b) => {
-        // Simple comparison if IDs are strings, or try numeric if they are numbers
         if (!isNaN(Number(a.id)) && !isNaN(Number(b.id))) {
             return Number(b.id) - Number(a.id);
         }
         return b.id.toString().localeCompare(a.id.toString());
     }).slice(0, 3);
+
+    const handleRemove = async (id: string) => {
+        if (!confirm('Tem certeza que deseja remover este reconhecimento?')) return;
+        try {
+            const { error } = await supabase.from('recognitions').delete().eq('id', id);
+            if (error) throw error;
+            if (onDelete) onDelete();
+        } catch (err) {
+            console.error('Erro ao remover:', err);
+            alert('Não foi possível remover o reconhecimento.');
+        }
+    };
+
+    const isAuthorized = (rec: Recognition) => {
+        return rec.fromId === currentUser.id || currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
+    };
 
     return (
         <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
@@ -31,13 +49,21 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
 
             <div className="space-y-4">
                 {recentRecognitions.map(rec => (
-                    <div key={rec.id} className="bg-gray-50 rounded-lg p-3 relative group">
+                    <div key={rec.id} className="bg-gray-50 rounded-lg p-3 relative group transition-all">
                         <div className="flex items-start space-x-2 mb-2">
-                            <img src={rec.toAvatar} alt={rec.to} className="w-8 h-8 rounded-full border-2 border-white" />
+                            <img src={rec.toAvatar} alt={rec.to} className="w-8 h-8 rounded-full border-2 border-white object-cover" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold text-gray-800 truncate">{rec.to}</p>
                                 <p className="text-[10px] text-gray-500 truncate">De: {rec.from}</p>
                             </div>
+                            {isAuthorized(rec) && (
+                                <button
+                                    onClick={() => handleRemove(rec.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
                         <p className="text-xs text-gray-600 italic line-clamp-3 mb-2">"{rec.message}"</p>
                         <span className="inline-block px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-semibold text-gray-500">
@@ -46,6 +72,10 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
                     </div>
                 ))}
             </div>
+
+            {recentRecognitions.length === 0 && (
+                <p className="text-[11px] text-gray-400 text-center py-4 italic">Nenhum reconhecimento ainda.</p>
+            )}
 
             {recognitions.length > 3 && (
                 <button className="w-full mt-3 text-xs text-brand-primary hover:underline text-center">

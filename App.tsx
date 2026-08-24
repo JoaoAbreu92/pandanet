@@ -10,6 +10,7 @@ import { supabase } from './supabaseClient';
 import { ToastProvider } from './components/ToastContext';
 import { NotificationProvider, useNotifications } from './components/NotificationContext';
 
+
 import HomePage from './components/HomePage';
 import Messages from './components/Messages';
 import TicketPage from './components/TicketPage';

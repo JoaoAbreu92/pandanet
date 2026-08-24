@@ -213,6 +213,8 @@ export interface Task {
 
 export interface Recognition {
   id: string;
+  fromId?: string;
+  toId?: string;
   to: string;
   from: string;
   toAvatar: string;
@@ -257,7 +259,7 @@ export interface Conversation {
   admins?: string[]; // IDs de usuários
 }
 
-export type TicketStatus = 'Aberto' | 'Em Andamento' | 'Resolvido' | 'Fechado';
+export type TicketStatus = 'Aberto' | 'Em Andamento' | 'Pendente' | 'Resolvido' | 'Fechado';
 export type TicketPriority = 'Baixa' | 'Média' | 'Alta' | 'Urgente';
 
 export interface TicketComment {
@@ -287,6 +289,7 @@ export interface Ticket {
   rating?: number;
   media_urls?: string[];
   media_type?: 'image' | 'video';
+  resolution_note?: string;
 }
 
 export type CalendarEventCategory = 'Reunião' | 'Evento da Empresa' | 'Feriado' | 'Aniversário';

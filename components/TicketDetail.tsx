@@ -1,6 +1,6 @@
 import React from 'react';
 // FIX: Correcting the import path for types.
-import type { Ticket, Employee } from '../types';
+import type { Ticket, Employee, Recognition } from '../types';
 import { PaperAirplaneIcon } from './icons';
 import StarRating from './StarRating';
 
@@ -12,7 +12,15 @@ interface TicketDetailProps {
 }
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTicket, currentUser }) => {
+    const isTechOrAdmin = currentUser?.role?.toLowerCase() === 'admin' ||
+        currentUser?.role?.toLowerCase() === 'super admin' ||
+        currentUser?.team?.toUpperCase() === 'TI' ||
+        (currentUser as any).is_company_admin;
+
     const [newComment, setNewComment] = React.useState('');
+    const [showResolveModal, setShowResolveModal] = React.useState(false);
+    const [resolutionText, setResolutionText] = React.useState('');
+    const [pendingResolve, setPendingResolve] = React.useState(false); // If true, we are setting to status 'Pendente'
 
     const handleCommentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,9 +53,44 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
             case 'Aberto': return 'bg-green-100 text-green-800';
             case 'Em Andamento': return 'bg-yellow-100 text-yellow-800';
             case 'Resolvido': return 'bg-blue-100 text-blue-800';
+            case 'Pendente': return 'bg-orange-100 text-orange-800';
             case 'Fechado': return 'bg-gray-100 text-gray-800';
             default: return 'bg-gray-100 text-gray-800';
         }
+    };
+
+    const handleAction = (status: Ticket['status'], isPending: boolean) => {
+        setPendingResolve(isPending);
+        setShowResolveModal(true);
+    };
+
+    const confirmAction = () => {
+        if (!resolutionText.trim()) {
+            alert('Por favor, descreva o que foi feito.');
+            return;
+        }
+
+        const status: Ticket['status'] = pendingResolve ? 'Pendente' : 'Resolvido';
+
+        const comment = {
+            id: Date.now(),
+            author: currentUser.name,
+            authorAvatarUrl: currentUser.avatarUrl,
+            text: `[SISTEMA - ${status.toUpperCase()}]: ${resolutionText}`,
+            timestamp: new Date().toLocaleString('pt-BR')
+        };
+
+        const updatedTicket = {
+            ...ticket,
+            status,
+            resolution_note: resolutionText,
+            comments: [...ticket.comments, comment],
+            hasNotification: true
+        };
+
+        onUpdateTicket(updatedTicket);
+        setShowResolveModal(false);
+        setResolutionText('');
     };
 
     const getPriorityColor = (priority: Ticket['priority']) => {
@@ -67,8 +110,33 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
             <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="text-xl font-bold text-brand-text pr-8">Chamado #{ticket.id}: {ticket.title}</h3>
-                    <button onClick={onClose} className="text-sm font-medium text-brand-primary hover:underline">Voltar</button>
+                    <div className="flex items-center space-x-2">
+                        {isTechOrAdmin && ticket.status !== 'Resolvido' && ticket.status !== 'Fechado' && (
+                            <>
+                                <button
+                                    onClick={() => handleAction('Resolvido', false)}
+                                    className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 transition-colors"
+                                >
+                                    Resolver
+                                </button>
+                                <button
+                                    onClick={() => handleAction('Pendente', true)}
+                                    className="px-3 py-1 bg-orange-500 text-white text-xs font-bold rounded hover:bg-orange-600 transition-colors"
+                                >
+                                    Pendente
+                                </button>
+                            </>
+                        )}
+                        <button onClick={onClose} className="text-sm font-medium text-brand-primary hover:underline ml-2">Voltar</button>
+                    </div>
                 </div>
+
+                {ticket.resolution_note && (
+                    <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+                        <h4 className="text-sm font-bold text-blue-800 mb-1">Nota de Resolução:</h4>
+                        <p className="text-sm text-blue-700 italic">{ticket.resolution_note}</p>
+                    </div>
+                )}
 
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -171,6 +239,39 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                     </div>
                 </div>
             </div>
+
+            {showResolveModal && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-fade-in-up">
+                        <h4 className="text-lg font-bold text-brand-text mb-4">
+                            {pendingResolve ? 'Marcar como Pendente' : 'Resolver Chamado'}
+                        </h4>
+                        <p className="text-sm text-gray-500 mb-4">
+                            Descreva brevemente o que foi feito ou o motivo da pendência:
+                        </p>
+                        <textarea
+                            value={resolutionText}
+                            onChange={(e) => setResolutionText(e.target.value)}
+                            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-brand-primary min-h-[120px] text-sm"
+                            placeholder="Digite aqui..."
+                        />
+                        <div className="flex justify-end space-x-3 mt-6">
+                            <button
+                                onClick={() => setShowResolveModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmAction}
+                                className={`px-4 py-2 text-sm font-bold text-white rounded-lg ${pendingResolve ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+                            >
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

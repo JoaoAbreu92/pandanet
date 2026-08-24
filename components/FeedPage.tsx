@@ -304,8 +304,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             const formatted: Recognition[] = data.map((item: any) => ({
                 id: item.id,
+                fromId: item.from_id,
+                toId: item.to_id,
                 from: item.from_profile?.full_name || 'Desconhecido',
-                to: item.to_profile?.full_name || 'Desconhecido', // Mapping name to 'to' property for display
+                to: item.to_profile?.full_name || 'Desconhecido',
                 fromAvatar: item.from_profile?.avatar_url || 'https://via.placeholder.com/150',
                 toAvatar: item.to_profile?.avatar_url || 'https://via.placeholder.com/150',
                 message: item.message,
@@ -537,34 +539,38 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         <div className="max-w-full mx-auto py-8 px-4 lg:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    <Card title="" className="text-center pb-6">
-                        <div className="relative mb-4">
+                    <Card title="" noPadding hideTypeBorder className="text-center pb-6 overflow-hidden">
+                        <div className="relative mb-14">
                             {currentUser.coverUrl ? (
-                                <img src={currentUser.coverUrl} alt="Capa" className="h-20 w-full object-cover rounded-t-xl -mx-6 -mt-6 mb-16" />
+                                <img src={currentUser.coverUrl} alt="Capa" className="h-24 w-full object-cover" />
                             ) : (
-                                <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-16"></div>
+                                <div className="h-24 bg-brand-primary"></div>
                             )}
-                            <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white absolute left-1/2 -translate-x-1/2 top-10 shadow-md object-cover" />
+                            <div className="absolute left-1/2 -translate-x-1/2 -bottom-10">
+                                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md object-cover" />
+                            </div>
                         </div>
-                        <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
-                        <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
-                        <hr className="mb-4" />
-                        <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-5 mt-2">
-                            <div className="flex flex-col items-center">
-                                <span className="font-bold text-brand-text text-xl">{(currentUser.following || []).length}</span>
-                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Seguidores</span>
-                            </div>
-                            <div className="flex flex-col items-center border-x border-gray-100">
-                                <span className="font-bold text-brand-text text-xl">{allEmployees.length}</span>
-                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Usuários</span>
-                            </div>
-                            <div className="flex flex-col items-center">
-                                <span className="font-bold text-brand-text text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
-                                <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Interações</span>
+                        <div className="px-6 pt-2">
+                            <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
+                            <p className="text-sm text-brand-subtle-text mb-4">{currentUser.role} • {currentUser.team}</p>
+                            <hr className="mb-4" />
+                            <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-5 mt-2">
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-brand-text text-xl">{(currentUser.following || []).length}</span>
+                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Seguidores</span>
+                                </div>
+                                <div className="flex flex-col items-center border-x border-gray-100">
+                                    <span className="font-bold text-brand-text text-xl">{allEmployees.length}</span>
+                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Usuários</span>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-brand-text text-xl">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</span>
+                                    <span className="text-[9px] text-brand-subtle-text font-semibold uppercase tracking-tight mt-1">Interações</span>
+                                </div>
                             </div>
                         </div>
                     </Card>
-                    <RecognitionWidget recognitions={localRecognitions} onRecognize={() => setShowRecognitionModal(true)} />
+                    <RecognitionWidget recognitions={localRecognitions} onRecognize={() => setShowRecognitionModal(true)} currentUser={currentUser} onDelete={fetchRecognitions} />
                 </div>
 
                 <div className="lg:col-span-8 space-y-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee } from '../types';
+import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee, Recognition } from '../types';
 import Dashboard from './Dashboard';
 import UserManager from './UserManager';
 import { DepartmentManager } from './DepartmentManager';
@@ -129,6 +129,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'polls', label: 'Enquetes' },
         { id: 'bem-estar', label: 'Bem Estar', featureId: 'wellness' },
         { id: 'settings', label: 'Geral' },
+        { id: 'mural', label: 'Mural' },
     ].filter(tab => {
         if (!tab.featureId) return true;
         if (!customFeatures) return true;
@@ -248,6 +249,19 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 />;
             case 'settings':
                 return <GeneralSettings settings={company.settings} setSettings={handleSetSettings} />;
+            case 'mural':
+                return <SupabaseGenericManager<Recognition>
+                    title="Mural de Reconhecimentos"
+                    tableName="recognitions"
+                    newItemTemplate={{ message: '', type: 'Trabalho em Equipe', value: 'Trabalho em Equipe', from_id: '', to_id: '' } as any}
+                    fields={[
+                        { key: 'message', label: 'Mensagem', type: 'textarea' },
+                        { key: 'to_id', label: 'Para (ID do Usuário)', type: 'user_list', dbColumn: 'to_id' },
+                        { key: 'from_id', label: 'De (ID do Usuário)', type: 'user_list', dbColumn: 'from_id' },
+                        { key: 'type', label: 'Valor', type: 'select', options: ['Trabalho em Equipe', 'Inovação', 'Foco no Cliente', 'Qualidade'] }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{(i as any).message}</p><p className="text-sm">{(i as any).type}</p></div>}
+                />;
             default:
                 return null;
         }
