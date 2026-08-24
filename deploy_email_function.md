@@ -25,7 +25,7 @@ Se você tiver o Deno instalado no VPS, pode rodar o serviço diretamente.
     ```bash
     deno run --allow-net --allow-env --watch supabase/functions/email-handler/index.ts
     ```
-    *Isso vai iniciar a função na porta 8000 por padrão.*
+    *A função rodará na porta **9999** para evitar conflito com o Supabase.*
 
 3.  **Mantenha rodando:**
     Use `pm2` ou `systemd` para manter o processo ativo em produção.
@@ -44,8 +44,8 @@ O frontend (React) precisa saber onde a função está rodando.
 Edite o arquivo `.env` (ou `.env.local`) no servidor onde está o Frontend e adicione:
 
 ```env
-VITE_SUPABASE_FUNCTION_URL=http://localhost:8000/email-handler
+VITE_SUPABASE_FUNCTION_URL=http://localhost:9999/email-handler
 ```
-*(Substitua `http://localhost:8000` pelo IP/Porta onde você rodou a função acima)*
+*(Substitua `http://localhost:9999` pelo IP/Porta onde você rodou a função)*
 
 Se você não definir essa variável, o sistema tentará usar a URL padrão do Supabase, o que pode falhar em setups híbridos.
