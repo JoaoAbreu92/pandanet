@@ -224,6 +224,13 @@ export interface EmployeePermissions {
 
   // Agenda Permission
   viewScheduling: boolean;
+
+  // Novas Permissões de RH
+  viewTimeBank: boolean;
+  manageTimeBank: boolean;
+  viewEmployeeBenefitsAdmin: boolean;
+  viewPerformance: boolean;
+  managePerformance: boolean;
 }
 
 // WhatsApp Permissions

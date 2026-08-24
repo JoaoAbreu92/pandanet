@@ -143,6 +143,11 @@ const UserFormModal: React.FC<{
             canPostImage: true,
             canPostVideo: true,
             viewProjects: true,
+            viewTimeBank: true,
+            manageTimeBank: false,
+            viewEmployeeBenefitsAdmin: false,
+            viewPerformance: true,
+            managePerformance: false,
         },
         // Personal Data
         rg: user?.rg || '',
@@ -334,6 +339,11 @@ const UserFormModal: React.FC<{
                                     <PermissionToggle icon={<PencilIcon className="w-4 h-4" />} label="Editar Funcionários" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<TrashIcon className="w-4 h-4" />} label="Excluir Funcionários" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aprovar/Rejeitar Férias" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Visualizar Banco de Horas" name="viewTimeBank" checked={formData.permissions.viewTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Gerenciar Banco de Horas" name="manageTimeBank" checked={formData.permissions.manageTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Gerenciar Benefícios de Funcionários" name="viewEmployeeBenefitsAdmin" checked={formData.permissions.viewEmployeeBenefitsAdmin} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Visualizar Desempenho e Metas" name="viewPerformance" checked={formData.permissions.viewPerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Gerenciar Desempenho e Metas" name="managePerformance" checked={formData.permissions.managePerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                 </div>
                             </section>
                             

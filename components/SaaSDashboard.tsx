@@ -1038,6 +1038,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                 <SectionTitle title="Recursos de RH" />
                 <Toggle label="Portal Meu RH" id="meu-rh" icon={BuildingOfficeIcon} />
+                <Toggle label="Banco de Horas" id="timebank" icon={CalendarDaysIcon} />
+                <Toggle label="Avaliações e Metas" id="performance" icon={SparklesIcon} />
+                <Toggle label="Benefícios Individuais" id="employee_benefits" icon={HeartIcon} />
                 <Toggle label="Diretório / Organograma" id="org-chart" icon={UserGroupIcon} />
                 <Toggle label="Vagas e Recrutamento" id="jobs" icon={RocketLaunchIcon} />
                 <Toggle label="Treinamentos (LMS)" id="training" icon={RocketLaunchIcon} />

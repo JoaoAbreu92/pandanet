@@ -11,7 +11,7 @@ interface Employee { id: string; full_name: string; avatar_url: string | null; e
 
 const HRManager: React.FC = () => {
   const { profile } = useAuth();
-  const [tab, setTab] = useState<'vacation' | 'balance' | 'documents' | 'payslips'>('vacation');
+  const [tab, setTab] = useState<'vacation' | 'balance' | 'documents' | 'payslips' | 'timebank' | 'benefits' | 'performance'>('vacation');
   const [requests, setRequests] = useState<VacationRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +46,37 @@ const HRManager: React.FC = () => {
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
   const [viewingDocName, setViewingDocName] = useState<string | null>(null);
 
+  // Novo: Banco de Horas Admin State
+  const [timeBankEntries, setTimeBankEntries] = useState<any[]>([]);
+  const [tbEmployee, setTbEmployee] = useState('');
+  const [tbDate, setTbDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tbHours, setTbHours] = useState('');
+  const [tbDesc, setTbDesc] = useState('');
+  const [savingTb, setSavingTb] = useState(false);
+
+  // Novo: Benefícios Admin State
+  const [employeeBenefits, setEmployeeBenefits] = useState<any[]>([]);
+  const [ebEmployee, setEbEmployee] = useState('');
+  const [ebName, setEbName] = useState('');
+  const [ebValue, setEbValue] = useState('');
+  const [ebDesc, setEbDesc] = useState('');
+  const [ebStartDate, setEbStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [savingEb, setSavingEb] = useState(false);
+
+  // Novo: Metas/Desempenho Admin State
+  const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [evEmployee, setEvEmployee] = useState('');
+  const [evTitle, setEvTitle] = useState('');
+  const [evType, setEvType] = useState<'meta' | 'feedback' | 'competencia'>('feedback');
+  const [evStatus, setEvStatus] = useState<'pendente' | 'em_progresso' | 'concluido'>('em_progresso');
+  const [evProgress, setEvProgress] = useState('0');
+  const [evComm, setEvComm] = useState('5');
+  const [evQual, setEvQual] = useState('5');
+  const [evTeam, setEvTeam] = useState('5');
+  const [evProact, setEvProact] = useState('5');
+  const [evFeedbackText, setEvFeedbackText] = useState('');
+  const [savingEv, setSavingEv] = useState(false);
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3000);
   };
@@ -54,7 +85,15 @@ const HRManager: React.FC = () => {
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([fetchRequests(), fetchEmployees(), fetchDocuments(), fetchPayslips()]);
+    await Promise.all([
+      fetchRequests(),
+      fetchEmployees(),
+      fetchDocuments(),
+      fetchPayslips(),
+      fetchTimeBank(),
+      fetchEmployeeBenefits(),
+      fetchEvaluations()
+    ]);
     setLoading(false);
   };
 
@@ -85,6 +124,118 @@ const HRManager: React.FC = () => {
       .eq('company_id', profile!.company_id!)
       .order('reference_date', { ascending: false });
     if (data) setPayslips(data as any);
+  };
+
+  const fetchTimeBank = async () => {
+    const { data } = await supabase.from('hr_time_bank')
+      .select('*, profiles:employee_id(full_name)')
+      .eq('company_id', profile!.company_id!)
+      .order('date', { ascending: false });
+    if (data) setTimeBankEntries(data);
+  };
+
+  const fetchEmployeeBenefits = async () => {
+    const { data } = await supabase.from('hr_employee_benefits')
+      .select('*, profiles:employee_id(full_name)')
+      .eq('company_id', profile!.company_id!)
+      .order('name');
+    if (data) setEmployeeBenefits(data);
+  };
+
+  const fetchEvaluations = async () => {
+    const { data } = await supabase.from('hr_evaluations')
+      .select('*, profiles:employee_id(full_name)')
+      .eq('company_id', profile!.company_id!)
+      .order('created_at', { ascending: false });
+    if (data) setEvaluations(data);
+  };
+
+  const saveTimeBank = async () => {
+    if (!tbEmployee || !tbHours) { showToast('Selecione o funcionário e insira a quantidade de horas.', false); return; }
+    setSavingTb(true);
+    const { error } = await supabase.from('hr_time_bank').insert({
+      company_id: profile!.company_id!,
+      employee_id: tbEmployee,
+      date: tbDate,
+      hours_changed: parseFloat(tbHours),
+      description: tbDesc || null,
+      created_by: profile!.id
+    });
+    setSavingTb(false);
+    if (error) { showToast('Erro ao salvar horas.', false); }
+    else {
+      showToast('Lançamento de horas salvo!');
+      setTbHours(''); setTbDesc('');
+      fetchTimeBank();
+    }
+  };
+
+  const deleteTimeBank = async (id: string) => {
+    if (!confirm('Excluir este lançamento de horas?')) return;
+    const { error } = await supabase.from('hr_time_bank').delete().eq('id', id);
+    if (error) { showToast('Erro ao excluir.', false); }
+    else { showToast('Lançamento excluído.'); fetchTimeBank(); }
+  };
+
+  const saveEmployeeBenefit = async () => {
+    if (!ebEmployee || !ebName) { showToast('Selecione o funcionário e insira o nome do benefício.', false); return; }
+    setSavingEb(true);
+    const { error } = await supabase.from('hr_employee_benefits').insert({
+      company_id: profile!.company_id!,
+      employee_id: ebEmployee,
+      name: ebName,
+      value: ebValue ? parseFloat(ebValue) : null,
+      description: ebDesc || null,
+      start_date: ebStartDate || null,
+      status: 'ativo'
+    });
+    setSavingEb(false);
+    if (error) { showToast('Erro ao salvar benefício.', false); }
+    else {
+      showToast('Benefício vinculado!');
+      setEbName(''); setEbValue(''); setEbDesc('');
+      fetchEmployeeBenefits();
+    }
+  };
+
+  const deleteEmployeeBenefit = async (id: string) => {
+    if (!confirm('Excluir este benefício do funcionário?')) return;
+    const { error } = await supabase.from('hr_employee_benefits').delete().eq('id', id);
+    if (error) { showToast('Erro ao excluir.', false); }
+    else { showToast('Benefício excluído.'); fetchEmployeeBenefits(); }
+  };
+
+  const saveEvaluation = async () => {
+    if (!evEmployee || !evTitle) { showToast('Selecione o funcionário e insira o título.', false); return; }
+    setSavingEv(true);
+    const { error } = await supabase.from('hr_evaluations').insert({
+      company_id: profile!.company_id!,
+      employee_id: evEmployee,
+      title: evTitle,
+      type: evType,
+      status: evStatus,
+      progress: evType === 'meta' ? parseFloat(evProgress) : 0,
+      score_communication: evType === 'competencia' ? parseFloat(evComm) : null,
+      score_quality: evType === 'competencia' ? parseFloat(evQual) : null,
+      score_teamwork: evType === 'competencia' ? parseFloat(evTeam) : null,
+      score_proactivity: evType === 'competencia' ? parseFloat(evProact) : null,
+      feedback_text: evFeedbackText || null,
+      created_by: profile!.id
+    });
+    setSavingEv(false);
+    if (error) { showToast('Erro ao salvar avaliação.', false); }
+    else {
+      showToast('Avaliação/Meta cadastrada!');
+      setEvTitle(''); setEvProgress('0'); setEvFeedbackText('');
+      fetchEvaluations();
+    }
+  };
+
+  const deleteEvaluation = async (id: string) => {
+    if (!confirm('Excluir esta avaliação/meta?')) return;
+    const { error } = await supabase.from('hr_evaluations').delete().eq('id', id);
+    if (error) { showToast('Erro ao excluir.', false); }
+    else { showToast('Avaliação/Meta excluída.'); fetchEvaluations(); }
   };
 
   const reviewRequest = async (id: string, status: 'approved' | 'rejected') => {
@@ -188,7 +339,15 @@ const HRManager: React.FC = () => {
       )}
 
       <div className="flex gap-2 flex-wrap">
-        {[['vacation','🏖️ Férias'],['balance','📊 Saldo'],['documents','📄 Documentos'],['payslips','💰 Holerites']].map(([k, l]) => (
+        {[
+          ['vacation','🏖️ Férias'],
+          ['balance','📊 Saldo'],
+          ['documents','📄 Documentos'],
+          ['payslips','💰 Holerites'],
+          ['timebank','⏰ Banco de Horas'],
+          ['benefits','🎁 Benefícios'],
+          ['performance','📈 Avaliações/Metas']
+        ].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k as any)}
             className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${tab === k ? 'bg-brand-primary text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'}`}>
             {l}
@@ -422,6 +581,245 @@ const HRManager: React.FC = () => {
                     <button onClick={() => deletePayslip(ps.id)}
                       className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">Excluir</button>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TIMEBANK ADMIN */}
+      {tab === 'timebank' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl p-6 space-y-4 max-w-2xl">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lançar Horas Extras / Compensações</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Funcionário</label>
+                <select value={tbEmployee} onChange={e => setTbEmployee(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                  <option value="">Selecione...</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Data</label>
+                <input type="date" value={tbDate} onChange={e => setTbDate(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Horas Alteradas (positivo para extra, negativo para folga)</label>
+                <input type="number" step="0.1" value={tbHours} onChange={e => setTbHours(e.target.value)} placeholder="Ex: 2.5 ou -1.5"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Descrição / Motivo</label>
+                <input type="text" value={tbDesc} onChange={e => setTbDesc(e.target.value)} placeholder="Ex: Horas extras no Projeto Panda"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+            </div>
+            <button onClick={saveTimeBank} disabled={savingTb}
+              className="px-6 py-2 bg-brand-primary text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60">
+              {savingTb ? 'Salvando...' : 'Lançar Horas'}
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-3">Lançamentos Recentes ({timeBankEntries.length})</h3>
+            <div className="space-y-2">
+              {timeBankEntries.map(entry => {
+                const change = Number(entry.hours_changed);
+                return (
+                  <div key={entry.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl">
+                    <div>
+                      <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{entry.profiles?.full_name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-505">
+                        Data: {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')} · Motivo: {entry.description || '-'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className={`text-sm font-black ${change >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {change >= 0 ? '+' : ''}{change.toFixed(1)}h
+                      </span>
+                      <button onClick={() => deleteTimeBank(entry.id)}
+                        className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-505 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BENEFITS ADMIN */}
+      {tab === 'benefits' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl p-6 space-y-4 max-w-2xl">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Vincular Benefício ao Funcionário</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Funcionário</label>
+                <select value={ebEmployee} onChange={e => setEbEmployee(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                  <option value="">Selecione...</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Nome do Benefício</label>
+                <input value={ebName} onChange={e => setEbName(e.target.value)} placeholder="Ex: Plano de Saúde Unimed"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Valor Subsídio Mensal (R$) - Opcional</label>
+                <input type="number" step="0.01" value={ebValue} onChange={e => setEbValue(e.target.value)} placeholder="Ex: 350.00"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Data de Início</label>
+                <input type="date" value={ebStartDate} onChange={e => setEbStartDate(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Descrição</label>
+                <input value={ebDesc} onChange={e => setEbDesc(e.target.value)} placeholder="Ex: Co-participativo, enfermaria"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+            </div>
+            <button onClick={saveEmployeeBenefit} disabled={savingEb}
+              className="px-6 py-2 bg-brand-primary text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60">
+              {savingEb ? 'Salvando...' : 'Vincular Benefício'}
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-3">Benefícios Ativos ({employeeBenefits.length})</h3>
+            <div className="space-y-2">
+              {employeeBenefits.map(benefit => (
+                <div key={benefit.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl">
+                  <div>
+                    <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{benefit.profiles?.full_name} — {benefit.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Início: {benefit.start_date ? new Date(benefit.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                      {benefit.value ? ` · Subsídio: R$ ${Number(benefit.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => deleteEmployeeBenefit(benefit.id)}
+                    className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-505 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
+                    Excluir
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PERFORMANCE ADMIN */}
+      {tab === 'performance' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl p-6 space-y-4 max-w-2xl">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Cadastrar Avaliação / Meta de Desempenho</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Funcionário</label>
+                <select value={evEmployee} onChange={e => setEvEmployee(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                  <option value="">Selecione...</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Tipo de Registro</label>
+                <select value={evType} onChange={e => setEvType(e.target.value as any)}
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                  <option value="feedback">Feedback Individual</option>
+                  <option value="meta">Meta Estratégica</option>
+                  <option value="competencia">Avaliação de Competências (Notas)</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Título do Registro</label>
+                <input value={evTitle} onChange={e => setEvTitle(e.target.value)} placeholder="Ex: Metas Q1 ou Avaliação Anual"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+              </div>
+
+              {evType === 'meta' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Progresso Atual (%)</label>
+                    <input type="number" min="0" max="100" value={evProgress} onChange={e => setEvProgress(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Status da Meta</label>
+                    <select value={evStatus} onChange={e => setEvStatus(e.target.value as any)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                      <option value="em_progresso">Em Progresso</option>
+                      <option value="concluido">Concluído</option>
+                      <option value="pendente">Pendente</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {evType === 'competencia' && (
+                <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-800">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-505 block mb-1">Comunicação (1-5)</label>
+                    <input type="number" min="1" max="5" step="0.5" value={evComm} onChange={e => setEvComm(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-550 block mb-1">Qualidade (1-5)</label>
+                    <input type="number" min="1" max="5" step="0.5" value={evQual} onChange={e => setEvQual(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-550 block mb-1">Equipe (1-5)</label>
+                    <input type="number" min="1" max="5" step="0.5" value={evTeam} onChange={e => setEvTeam(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-550 block mb-1">Proatividade (1-5)</label>
+                    <input type="number" min="1" max="5" step="0.5" value={evProact} onChange={e => setEvProact(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                  </div>
+                </div>
+              )}
+
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Comentários / Descritivo do Feedback</label>
+                <textarea rows={3} value={evFeedbackText} onChange={e => setEvFeedbackText(e.target.value)} placeholder="Descreva os pontos de feedback ou critérios da meta..."
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none" />
+              </div>
+            </div>
+            <button onClick={saveEvaluation} disabled={savingEv}
+              className="px-6 py-2 bg-brand-primary text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all disabled:opacity-60">
+              {savingEv ? 'Cadastrar Registro' : 'Cadastrar Registro'}
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-3">Registros de Desempenho ({evaluations.length})</h3>
+            <div className="space-y-2">
+              {evaluations.map(ev => (
+                <div key={ev.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl">
+                  <div>
+                    <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{ev.profiles?.full_name} — {ev.title}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Tipo: <span className="font-semibold uppercase text-[10px]">{ev.type}</span>
+                      {ev.type === 'meta' && ` · Progresso: ${Number(ev.progress).toFixed(0)}%`}
+                      {ev.type === 'competencia' && ` · Notas: C:${ev.score_communication} Q:${ev.score_quality} E:${ev.score_teamwork} P:${ev.score_proactivity}`}
+                    </p>
+                  </div>
+                  <button onClick={() => deleteEvaluation(ev.id)}
+                    className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-505 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
+                    Excluir
+                  </button>
                 </div>
               ))}
             </div>

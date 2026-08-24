@@ -9,8 +9,11 @@ import {
     PlusIcon,
     CheckCircleIcon,
     ClockIcon,
-    XCircleIcon
+    XCircleIcon,
+    HeartIcon,
+    StarIcon
 } from '@heroicons/react/24/outline';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Payslip {
     id: string;
@@ -49,6 +52,36 @@ interface HRDocument {
     category: string;
 }
 
+interface TimeBankEntry {
+    id: string;
+    date: string;
+    hours_changed: number;
+    description: string | null;
+}
+
+interface EmployeeBenefit {
+    id: string;
+    name: string;
+    value: number | null;
+    description: string | null;
+    status: string;
+    start_date: string | null;
+}
+
+interface Evaluation {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    progress: number;
+    score_communication: number | null;
+    score_quality: number | null;
+    score_teamwork: number | null;
+    score_proactivity: number | null;
+    feedback_text: string | null;
+    created_at: string;
+}
+
 const statusConfig = {
     pending:   { label: 'Aguardando', color: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/30', icon: ClockIcon },
     approved:  { label: 'Aprovado',   color: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/20 dark:border-emerald-900/30', icon: CheckCircleIcon },
@@ -58,7 +91,7 @@ const statusConfig = {
 
 const EmployeePortal: React.FC = () => {
     const { profile } = useAuth();
-    const [activeSection, setActiveSection] = useState<'payroll' | 'vacation' | 'documents'>('payroll');
+    const [activeSection, setActiveSection] = useState<'payroll' | 'vacation' | 'documents' | 'timebank' | 'benefits' | 'performance'>('payroll');
     const [loading, setLoading] = useState(true);
 
     // Data states
@@ -66,6 +99,9 @@ const EmployeePortal: React.FC = () => {
     const [vacationRequests, setVacationRequests] = useState<VacationRequest[]>([]);
     const [vacationBalance, setVacationBalance] = useState<VacationBalance | null>(null);
     const [documents, setDocuments] = useState<HRDocument[]>([]);
+    const [timeBankEntries, setTimeBankEntries] = useState<TimeBankEntry[]>([]);
+    const [employeeBenefits, setEmployeeBenefits] = useState<EmployeeBenefit[]>([]);
+    const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
 
     // Vacation request form
     const [showVacationForm, setShowVacationForm] = useState(false);
@@ -89,7 +125,14 @@ const EmployeePortal: React.FC = () => {
 
     const fetchAll = async () => {
         setLoading(true);
-        await Promise.all([fetchPayslips(), fetchVacation(), fetchDocuments()]);
+        await Promise.all([
+            fetchPayslips(),
+            fetchVacation(),
+            fetchDocuments(),
+            fetchTimeBank(),
+            fetchEmployeeBenefits(),
+            fetchEvaluations()
+        ]);
         setLoading(false);
     };
 
@@ -101,6 +144,36 @@ const EmployeePortal: React.FC = () => {
             .eq('employee_id', profile.id)
             .order('reference_date', { ascending: false });
         if (data) setPayslips(data);
+    };
+
+    const fetchTimeBank = async () => {
+        if (!profile?.id) return;
+        const { data } = await supabase
+            .from('hr_time_bank')
+            .select('*')
+            .eq('employee_id', profile.id)
+            .order('date', { ascending: false });
+        if (data) setTimeBankEntries(data);
+    };
+
+    const fetchEmployeeBenefits = async () => {
+        if (!profile?.id) return;
+        const { data } = await supabase
+            .from('hr_employee_benefits')
+            .select('*')
+            .eq('employee_id', profile.id)
+            .order('name');
+        if (data) setEmployeeBenefits(data);
+    };
+
+    const fetchEvaluations = async () => {
+        if (!profile?.id) return;
+        const { data } = await supabase
+            .from('hr_evaluations')
+            .select('*')
+            .eq('employee_id', profile.id)
+            .order('created_at', { ascending: false });
+        if (data) setEvaluations(data);
     };
 
     const fetchVacation = async () => {
@@ -232,6 +305,9 @@ const EmployeePortal: React.FC = () => {
         { key: 'payroll', label: 'Holerites', icon: BanknotesIcon },
         { key: 'vacation', label: 'Férias', icon: CalendarIcon },
         { key: 'documents', label: 'Documentos', icon: DocumentIcon },
+        { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon },
+        { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon },
+        { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon },
     ] as const;
 
     const pendingDays = vacationRequests
@@ -538,6 +614,321 @@ const EmployeePortal: React.FC = () => {
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* BANCO DE HORAS */}
+                        {activeSection === 'timebank' && (
+                            <div className="p-8 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Banco de Horas</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Extrato acumulado e histórico de horas extras lançadas.</p>
+                                    </div>
+                                </div>
+
+                                {/* Saldo Acumulado */}
+                                {(() => {
+                                    const totalHours = timeBankEntries.reduce((sum, e) => sum + Number(e.hours_changed), 0);
+                                    const isPositive = totalHours >= 0;
+
+                                    // Dados para o Gráfico das últimas 7 entradas
+                                    const chartData = [...timeBankEntries]
+                                        .slice(0, 7)
+                                        .reverse()
+                                        .map(e => ({
+                                            data: new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                                            horas: Number(e.hours_changed)
+                                        }));
+
+                                    return (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {/* Card do Saldo */}
+                                            <div className={`p-6 rounded-3xl border flex flex-col justify-between shadow-sm ${
+                                                isPositive 
+                                                    ? 'bg-emerald-50/55 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30' 
+                                                    : 'bg-red-50/55 border-red-100 dark:bg-red-950/20 dark:border-red-900/30'
+                                            }`}>
+                                                <div>
+                                                    <span className="text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Saldo Geral Acumulado</span>
+                                                    <p className={`text-5xl font-black mt-2 ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {isPositive ? '+' : ''}{totalHours.toFixed(1)}h
+                                                    </p>
+                                                </div>
+                                                <p className="text-[11px] text-gray-400 mt-4">Calculado a partir de todas as compensações e horas extras registradas no seu histórico.</p>
+                                            </div>
+
+                                            {/* Gráfico de Lançamentos */}
+                                            <div className="md:col-span-2 bg-gray-50 dark:bg-slate-800/20 rounded-3xl border border-gray-100 dark:border-white/5 p-6 flex flex-col justify-between shadow-sm">
+                                                <h4 className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">Últimos Lançamentos (Horas)</h4>
+                                                {chartData.length > 0 ? (
+                                                    <div className="h-32 w-full">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <BarChart data={chartData}>
+                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
+                                                                <XAxis dataKey="data" tick={{ fontSize: 9, fill: '#94A3B8' }} />
+                                                                <YAxis tick={{ fontSize: 9, fill: '#94A3B8' }} />
+                                                                <Tooltip 
+                                                                    contentStyle={{ 
+                                                                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                                                                        border: 'none', 
+                                                                        borderRadius: '12px',
+                                                                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                                                        color: '#1E293B',
+                                                                        fontSize: 10
+                                                                    }} 
+                                                                />
+                                                                <Bar dataKey="horas" fill={isPositive ? '#10B981' : '#EF4444'} radius={[4, 4, 0, 0]} />
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-gray-400 py-6 text-center">Nenhum dado recente de ponto.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Histórico Extrato */}
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-gray-700 dark:text-gray-300 text-sm">Extrato de Lançamentos</h4>
+                                    {timeBankEntries.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-400 dark:text-gray-500">
+                                            <ClockIcon className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                                            <p className="text-sm">Nenhum lançamento no banco de horas registrado.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="border border-gray-100 dark:border-white/5 rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-white/5">
+                                            {timeBankEntries.map(entry => {
+                                                const change = Number(entry.hours_changed);
+                                                const isAdd = change >= 0;
+                                                return (
+                                                    <div key={entry.id} className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-slate-800/10 hover:bg-gray-100/50 dark:hover:bg-slate-800/20 transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-2 rounded-xl ${isAdd ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'}`}>
+                                                                <ClockIcon className="w-4 h-4" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                                                    {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                                                </p>
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500">{entry.description || 'Lançamento de banco de horas'}</p>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-sm font-extrabold ${isAdd ? 'text-emerald-600 dark:text-emerald-450' : 'text-red-600 dark:text-red-400'}`}>
+                                                            {isAdd ? '+' : ''}{change.toFixed(1)}h
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* MEUS BENEFÍCIOS */}
+                        {activeSection === 'benefits' && (
+                            <div className="p-8 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Meus Benefícios Ativos</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Benefícios corporativos atualmente concedidos a você.</p>
+                                    </div>
+                                </div>
+
+                                {employeeBenefits.length === 0 ? (
+                                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                        <HeartIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                                        <p className="font-medium">Nenhum benefício ativo cadastrado.</p>
+                                        <p className="text-sm">Seus benefícios corporativos vinculados aparecerão aqui.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {employeeBenefits.map(benefit => (
+                                            <div key={benefit.id} className="p-5 bg-white dark:bg-slate-900 border border-gray-150 dark:border-white/5 rounded-3xl shadow-sm hover:border-brand-primary transition-all flex flex-col justify-between gap-4">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-3 bg-rose-50 dark:bg-rose-950/20 text-rose-500 rounded-2xl">
+                                                            <HeartIcon className="w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-gray-900 dark:text-white text-sm">{benefit.name}</h4>
+                                                            <p className="text-xs text-gray-400 dark:text-gray-500">{benefit.description || 'Benefício ativo'}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="px-2.5 py-0.5 text-[9px] font-black uppercase rounded-full tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                                        {benefit.status}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between items-end border-t border-gray-100 dark:border-slate-800 pt-3 mt-2">
+                                                    <div>
+                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Data de Início</span>
+                                                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                                            {benefit.start_date ? new Date(benefit.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                                                        </p>
+                                                    </div>
+                                                    {benefit.value && (
+                                                        <div className="text-right">
+                                                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Subsídio Mensal</span>
+                                                            <p className="text-base font-extrabold text-brand-primary">
+                                                                R$ {benefit.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => alert('Para solicitar qualquer alteração, inclusão de dependentes ou cancelamento de benefícios, entre em contato diretamente com o gestor de RH do seu setor.')}
+                                                    className="w-full mt-2 py-2 text-center text-xs font-bold bg-slate-50 hover:bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 text-gray-505 dark:text-gray-300 rounded-xl transition-all border border-gray-150 dark:border-slate-800"
+                                                    type="button"
+                                                >
+                                                    Solicitar Alteração
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* METAS E DESEMPENHO */}
+                        {activeSection === 'performance' && (
+                            <div className="p-8 space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Metas & Avaliação de Desempenho</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Acompanhamento do seu desenvolvimento pessoal, competências e objetivos.</p>
+                                    </div>
+                                </div>
+
+                                {evaluations.length === 0 ? (
+                                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+                                        <StarIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                                        <p className="font-medium">Nenhuma avaliação ou meta cadastrada.</p>
+                                        <p className="text-sm">Suas avaliações e metas de desempenho aparecerão aqui assim que forem definidas.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        {/* Coluna 1 & 2: Metas e Feedbacks */}
+                                        <div className="lg:col-span-2 space-y-6">
+                                            {/* Metas Ativas */}
+                                            {(() => {
+                                                const metas = evaluations.filter(e => e.type === 'meta');
+                                                return (
+                                                    <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 shadow-sm space-y-4">
+                                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                                            <CheckCircleIcon className="w-5 h-5 text-brand-primary" />
+                                                            Metas Estratégicas do Trimestre
+                                                        </h4>
+                                                        {metas.length === 0 ? (
+                                                            <p className="text-xs text-gray-400 py-4">Nenhuma meta ativa cadastrada no momento.</p>
+                                                        ) : (
+                                                            <div className="space-y-4">
+                                                                {metas.map(meta => (
+                                                                    <div key={meta.id} className="space-y-2">
+                                                                        <div className="flex justify-between items-center text-xs font-semibold">
+                                                                            <span className="text-gray-700 dark:text-gray-300 font-bold">{meta.title}</span>
+                                                                            <span className="text-brand-primary">{Number(meta.progress).toFixed(0)}%</span>
+                                                                        </div>
+                                                                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                                            <div 
+                                                                                className="bg-brand-primary h-full rounded-full transition-all duration-500" 
+                                                                                style={{ width: `${meta.progress}%` }}
+                                                                            />
+                                                                        </div>
+                                                                        {meta.feedback_text && (
+                                                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">Nota: {meta.feedback_text}</p>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Feedbacks Recentes */}
+                                            {(() => {
+                                                const feedbacks = evaluations.filter(e => e.type === 'feedback');
+                                                return (
+                                                    <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 shadow-sm space-y-4">
+                                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                                            <DocumentIcon className="w-5 h-5 text-blue-500" />
+                                                            Feedbacks e Orientações Individuais
+                                                        </h4>
+                                                        {feedbacks.length === 0 ? (
+                                                            <p className="text-xs text-gray-400 py-4">Nenhum feedback lançado recentemente.</p>
+                                                        ) : (
+                                                            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                                                                {feedbacks.map(f => (
+                                                                    <div key={f.id} className="py-4 first:pt-0 last:pb-0">
+                                                                        <div className="flex justify-between items-center text-xs mb-2">
+                                                                            <span className="font-bold text-gray-700 dark:text-gray-250">{f.title}</span>
+                                                                            <span className="text-gray-400">{new Date(f.created_at).toLocaleDateString('pt-BR')}</span>
+                                                                        </div>
+                                                                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed italic bg-gray-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800">
+                                                                            "{f.feedback_text}"
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        {/* Coluna 3: Gráfico de Competências / Notas */}
+                                        {(() => {
+                                            const competencia = evaluations.find(e => e.type === 'competencia');
+                                            if (!competencia) return (
+                                                <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-3xl p-6 shadow-sm flex items-center justify-center text-center">
+                                                    <p className="text-xs text-gray-400 py-8">Nenhuma avaliação de competências do gestor lançada ainda.</p>
+                                                </div>
+                                            );
+
+                                            const radarData = [
+                                                { name: 'Comunicação', nota: Number(competencia.score_communication || 0) },
+                                                { name: 'Qualidade', nota: Number(competencia.score_quality || 0) },
+                                                { name: 'Equipe', nota: Number(competencia.score_teamwork || 0) },
+                                                { name: 'Proatividade', nota: Number(competencia.score_proactivity || 0) }
+                                            ];
+
+                                            return (
+                                                <div className="bg-white dark:bg-slate-900 border border-gray-150 dark:border-white/5 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                            <StarIcon className="w-5 h-5 text-amber-500" />
+                                                            Competências ({competencia.title})
+                                                        </h4>
+                                                        <p className="text-[10px] text-gray-400 leading-tight">Nota de desempenho atribuída pelo gestor (escala de 1 a 5).</p>
+                                                    </div>
+
+                                                    <div className="h-56 w-full flex items-center justify-center my-4">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <BarChart data={radarData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
+                                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
+                                                                <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 9, fill: '#94A3B8' }} />
+                                                                <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#94A3B8' }} />
+                                                                <Tooltip />
+                                                                <Bar dataKey="nota" fill="#F59E0B" radius={[0, 4, 4, 0]} />
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+
+                                                    {competencia.feedback_text && (
+                                                        <div className="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl text-[11px] text-gray-650 dark:text-gray-300 leading-relaxed italic mt-2">
+                                                            "{competencia.feedback_text}"
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>
