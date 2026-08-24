@@ -42,6 +42,63 @@ const ensureNumber = (val) => {
     return isNaN(num) ? 0 : num;
 };
 
+// --- IMAP Pool Management ---
+const imapPool = new Map(); // key -> { client, lastUsed }
+const POOL_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+async function getPooledClient(config) {
+    const key = `${config.imap_host}:${config.imap_user}`;
+    const now = Date.now();
+
+    if (imapPool.has(key)) {
+        const entry = imapPool.get(key);
+        if (entry.client.usable) {
+            entry.lastUsed = now;
+            console.log(`[email-server] Reusing pooled connection for ${config.imap_user}`);
+            return entry.client;
+        } else {
+            console.log(`[email-server] Pooled connection for ${config.imap_user} stale, removing.`);
+            try { await entry.client.logout(); } catch (e) { }
+            imapPool.delete(key);
+        }
+    }
+
+    console.log(`[email-server] Creating NEW connection for ${config.imap_user}`);
+    const client = new ImapFlow({
+        host: config.imap_host,
+        port: ensureNumber(config.imap_port),
+        secure: config.imap_ssl !== false,
+        auth: { user: config.imap_user, pass: config.imap_pass },
+        tls: { rejectUnauthorized: false },
+        logger: false,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000
+    });
+
+    try {
+        await client.connect();
+        imapPool.set(key, { client, lastUsed: now });
+        return client;
+    } catch (err) {
+        if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+            throw new Error(`Servidor não encontrado: ${config.imap_host}. Verifique o endereço.`);
+        }
+        throw err;
+    }
+}
+
+// Cleanup idle clients every minute
+setInterval(async () => {
+    const now = Date.now();
+    for (const [key, entry] of imapPool.entries()) {
+        if (now - entry.lastUsed > POOL_IDLE_TIMEOUT) {
+            console.log(`[email-server] Closing idle connection for ${key}`);
+            try { await entry.client.logout(); } catch (e) { }
+            imapPool.delete(key);
+        }
+    }
+}, 60000);
+
 // --- FETCH EMAILS (IMAP) ---
 app.post('/api/email/fetch', authMiddleware, async (req, res) => {
     const { config, path } = req.body;
@@ -52,17 +109,8 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
     console.log(`[email-server] FETCH LIST: ${config.imap_host}:${config.imap_port}`);
 
-    const client = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
-
     try {
-        await client.connect();
+        const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(mailboxPath);
         const emails = [];
 
@@ -108,7 +156,6 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             return res.json({ emails, total, unseen });
         } finally {
             lock.release();
-            await client.logout();
         }
     } catch (err) {
         console.error('[email-server] IMAP List Error:', err.message);
@@ -126,17 +173,8 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
     console.log(`[email-server] FETCH BODY: UID ${uid}`);
 
-    const client = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
-
     try {
-        await client.connect();
+        const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(mailboxPath);
         try {
             const message = await client.fetchOne(uid, { source: true }, { uid: true });
@@ -150,7 +188,6 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
             });
         } finally {
             lock.release();
-            await client.logout();
         }
     } catch (err) {
         console.error('[email-server] IMAP Body Error:', err.message);
@@ -163,17 +200,8 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
     const { config, uids, operation, flags } = req.body; // operation: 'add' or 'remove'
     if (!config || !uids || !operation || !flags) return res.status(400).json({ error: 'Missing parameters' });
 
-    const client = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
-
     try {
-        await client.connect();
+        const client = await getPooledClient(config);
         const lock = await client.getMailboxLock('INBOX');
         try {
             if (operation === 'add') {
@@ -186,7 +214,6 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
             return res.json({ success: true });
         } finally {
             lock.release();
-            await client.logout();
         }
     } catch (err) {
         console.error('[email-server] Flags Error:', err.message);
@@ -202,24 +229,14 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
 
     console.log(`[email-server] MOVE: UIDs ${uids.join(',')} from ${fromMailboxPath} to ${toPath}`);
 
-    const client = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
-
     try {
-        await client.connect();
+        const client = await getPooledClient(config);
         const lock = await client.getMailboxLock(fromMailboxPath);
         try {
             await client.messageMove(uids, toPath, { uid: true });
             return res.json({ success: true });
         } finally {
             lock.release();
-            await client.logout();
         }
     } catch (err) {
         console.error('[email-server] Move Error:', err.message);
@@ -234,17 +251,8 @@ app.post('/api/email/folders', authMiddleware, async (req, res) => {
 
     console.log(`[email-server] FOLDERS: Action: ${action} - Path: ${path || 'N/A'} - NewPath: ${newPath || 'N/A'}`);
 
-    const client = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
-
     try {
-        await client.connect();
+        const client = await getPooledClient(config);
         try {
             if (action === 'list') {
                 const folders = await client.list();
@@ -319,17 +327,8 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
         // 2. Append to Sent Folder (IMAP)
         // We use a separate async operation for this to valid "sent" status quickly, 
         // but it's safer to wait to ensure consistency.
-        const client = new ImapFlow({
-            host: config.imap_host,
-            port: ensureNumber(config.imap_port),
-            secure: config.imap_ssl !== false,
-            auth: { user: config.imap_user, pass: config.imap_pass },
-            tls: { rejectUnauthorized: false },
-            logger: false
-        });
-
         try {
-            await client.connect();
+            const client = await getPooledClient(config);
             // Try to find the correct Sent folder
             let sentFolder = 'INBOX.Sent'; // Default fallback
             const boxes = await client.list();
@@ -357,7 +356,6 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
             ].filter(Boolean).join('\r\n');
 
             await client.append(sentFolder, mimeMessage, ['\\Seen']);
-            await client.logout();
         } catch (imapErr) {
             console.error('[email-server] Failed to append to Sent:', imapErr);
             // Non-blocking error for the user, but logged.
@@ -399,19 +397,10 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
     console.log(`[email-server] TEST CONNECTION: IMAP: ${config.imap_host}:${config.imap_port}, SMTP: ${config.smtp_host}:${config.smtp_port}`);
 
     // Test IMAP
-    const imapClient = new ImapFlow({
-        host: config.imap_host,
-        port: ensureNumber(config.imap_port),
-        secure: config.imap_ssl !== false,
-        auth: { user: config.imap_user, pass: config.imap_pass },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
     try {
-        await imapClient.connect();
-        await imapClient.logout();
+        const imapClient = await getPooledClient(config);
         results.imap = true;
-        console.log('[email-server] IMAP test successful.');
+        console.log('[email-server] IMAP test successful (or reused).');
     } catch (err) {
         console.error('[email-server] IMAP test failed:', err.message);
     }
