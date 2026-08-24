@@ -110,7 +110,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
         fetchTemplates();
         fetchEmailAccounts();
         fetchSettings();
-    }, [currentUser]);
+    }, [currentUser, mode]);
 
     const fetchEventTypes = async () => {
         setLoading(true);
