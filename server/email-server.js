@@ -132,6 +132,113 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
     }
 });
 
+// --- MANAGE FLAGS (SEEN, FLAGGED, ETC) ---
+app.post('/api/email/flags', authMiddleware, async (req, res) => {
+    const { config, uids, operation, flags } = req.body; // operation: 'add' or 'remove'
+    if (!config || !uids || !operation || !flags) return res.status(400).json({ error: 'Missing parameters' });
+
+    const client = new ImapFlow({
+        host: config.imap_host,
+        port: ensureNumber(config.imap_port),
+        secure: config.imap_ssl !== false,
+        auth: { user: config.imap_user, pass: config.imap_pass },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
+
+    try {
+        await client.connect();
+        const lock = await client.getMailboxLock('INBOX');
+        try {
+            if (operation === 'add') {
+                await client.messageFlagsAdd(uids, flags, { uid: true });
+            } else if (operation === 'remove') {
+                await client.messageFlagsRemove(uids, flags, { uid: true });
+            } else if (operation === 'set') {
+                await client.messageFlagsSet(uids, flags, { uid: true });
+            }
+            return res.json({ success: true });
+        } finally {
+            lock.release();
+            await client.logout();
+        }
+    } catch (err) {
+        console.error('[email-server] Flags Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- MOVE EMAILS (FOLDERS/TRASH) ---
+app.post('/api/email/move', authMiddleware, async (req, res) => {
+    const { config, uids, path } = req.body;
+    if (!config || !uids || !path) return res.status(400).json({ error: 'Missing parameters' });
+
+    const client = new ImapFlow({
+        host: config.imap_host,
+        port: ensureNumber(config.imap_port),
+        secure: config.imap_ssl !== false,
+        auth: { user: config.imap_user, pass: config.imap_pass },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
+
+    try {
+        await client.connect();
+        const lock = await client.getMailboxLock('INBOX');
+        try {
+            await client.messageMove(uids, path, { uid: true });
+            return res.json({ success: true });
+        } finally {
+            lock.release();
+            await client.logout();
+        }
+    } catch (err) {
+        console.error('[email-server] Move Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// --- MANAGE FOLDERS ---
+app.post('/api/email/folders', authMiddleware, async (req, res) => {
+    const { config, action, path, newPath } = req.body; // action: 'list', 'create', 'rename', 'delete'
+    if (!config) return res.status(400).json({ error: 'Missing config' });
+
+    const client = new ImapFlow({
+        host: config.imap_host,
+        port: ensureNumber(config.imap_port),
+        secure: config.imap_ssl !== false,
+        auth: { user: config.imap_user, pass: config.imap_pass },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
+
+    try {
+        await client.connect();
+        try {
+            if (action === 'list') {
+                const folders = await client.list();
+                return res.json(folders);
+            } else if (action === 'create' && path) {
+                await client.mailboxCreate(path);
+                return res.json({ success: true });
+            } else if (action === 'rename' && path && newPath) {
+                await client.mailboxRename(path, newPath);
+                return res.json({ success: true });
+            } else if (action === 'delete' && path) {
+                await client.mailboxDelete(path);
+                return res.json({ success: true });
+            } else {
+                return res.status(400).json({ error: 'Invalid action or missing path' });
+            }
+        } finally {
+            await client.logout();
+        }
+    } catch (err) {
+        console.error('[email-server] Folders Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // --- SEND EMAIL (SMTP) ---
 app.post('/api/email/send', authMiddleware, async (req, res) => {
     const { config, payload } = req.body;

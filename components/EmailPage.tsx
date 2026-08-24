@@ -193,8 +193,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const fetchEmailBody = async (email: EmailMessage) => {
-        if (email.html || email.text) return; // Already has body
         if (!settings.imap_host) return;
+
+        // Mark as seen locally immediately
+        if (!email.flags || !email.flags.includes('\\Seen')) {
+            toggleFlag(email, '\\Seen', true);
+        }
+
+        if (email.html || email.text) return; // Already has body
 
         setLoadingBody(true);
         const { data, error } = await callEmailServer('fetch-body', { config: settings, uid: email.uid });
@@ -202,14 +208,60 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
         if (error) {
             console.error('Error fetching body:', error);
-            // Fallback to existing text if failure, or show error in UI (not implemented here)
             return;
         }
 
         if (data) {
-            // Update the email in the list with the fetched body so we don't fetch again
             setEmails(prev => prev.map(e => e.uid === email.uid ? { ...e, html: data.html, text: data.text } : e));
             setSelectedEmail(prev => prev?.uid === email.uid ? { ...prev, html: data.html, text: data.text } : prev);
+        }
+    };
+
+    const toggleFlag = async (email: EmailMessage, flag: string, add: boolean) => {
+        // Optimistic update
+        const updateFlags = (flags: string[]) => {
+            if (add) return [...flags, flag];
+            return flags.filter(f => f !== flag);
+        };
+
+        const newFlags = updateFlags(email.flags || []);
+
+        setEmails(prev => prev.map(e => e.uid === email.uid ? { ...e, flags: newFlags } : e));
+        if (selectedEmail?.uid === email.uid) {
+            setSelectedEmail(prev => prev ? { ...prev, flags: newFlags } : null);
+        }
+
+        // Call Server
+        await callEmailServer('flags', {
+            config: settings,
+            uids: [email.uid],
+            operation: add ? 'add' : 'remove',
+            flags: [flag]
+        });
+    };
+
+    const deleteEmail = async (email: EmailMessage) => {
+        if (!confirm('Tem certeza que deseja mover este e-mail para a lixeira?')) return;
+
+        // Optimistic remove
+        setEmails(prev => prev.filter(e => e.uid !== email.uid));
+        if (selectedEmail?.uid === email.uid) {
+            setSelectedEmail(null);
+            setView('inbox');
+        }
+
+        // Call Server - Try standard trash folder names
+        const trashFolder = 'Trash'; // Common default. Other candidates: 'Deleted', 'Bin', 'Lixeira'
+
+        const { error } = await callEmailServer('move', {
+            config: settings,
+            uids: [email.uid],
+            path: trashFolder
+        });
+
+        if (error) {
+            console.error('Error deleting email:', error);
+            alert('Erro ao mover para lixeira. O e-mail reaparecerá na próxima sincronização se a pasta Trash não existir.');
         }
     };
 
@@ -474,7 +526,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                             <h2 className="text-lg font-bold text-gray-800 truncate pr-4">{selectedEmail.subject}</h2>
                             <div className="flex gap-2">
-                                <button className="p-2 hover:bg-gray-200 rounded-full text-gray-500" title="Apagar (Demo)">
+                                <button onClick={() => deleteEmail(selectedEmail)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-red-500" title="Mover para Lixeira">
                                     <TrashIcon className="w-5 h-5" />
                                 </button>
                                 <div className="relative group">
