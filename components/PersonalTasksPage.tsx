@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import type { Employee } from '../types';
-import { useNotifications } from './NotificationContext';
 
 interface PersonalTasksPageProps {
     currentUser: Employee;
@@ -19,10 +18,10 @@ interface Task {
     id: string;
     user_id: string;
     title: string;
-    date: string | null; // Data no formato YYYY-MM-DD para o calendário
+    date: string | null; // Data no formato YYYY-MM-DD para o calendário (Data Final/Agendada)
     items: SubTask[];
     completed: boolean;
-    completed_at: string | null;
+    completed_at: string | null; // Data de conclusão
     created_at: string;
     updated_at: string;
 }
@@ -43,7 +42,12 @@ const PersonalTasksPage: React.FC<PersonalTasksPageProps> = ({ currentUser, isGh
     const [newSubTaskText, setNewSubTaskText] = useState('');
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const { playNotificationSound } = useNotifications();
+    const latestTaskRef = useRef<Task | null>(null);
+
+    // Sincronizar a ref com a tarefa selecionada mais recente
+    useEffect(() => {
+        latestTaskRef.current = selectedTask;
+    }, [selectedTask]);
 
     // Script SQL para exibição em caso de tabela inexistente
     const sqlInstruction = `-- CRIE A TABELA DE TAREFAS PESSOAIS NO SEU BANCO DE DADOS
@@ -83,6 +87,50 @@ WITH CHECK (
     )
 );`;
 
+    // Função para tocar um som triunfante (arpejo maior C4 -> E4 -> G4 -> C5)
+    const playVictorySound = () => {
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
+
+            const ctx = new AudioContext();
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+
+            const now = ctx.currentTime;
+            const notes = [261.63, 329.63, 392.00, 523.25]; // Frequências C4, E4, G4, C5
+            const noteLength = 0.12; // Duração de cada nota do arpejo
+
+            notes.forEach((freq, idx) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.frequency.setValueAtTime(freq, now + idx * noteLength);
+
+                if (idx === notes.length - 1) {
+                    osc.type = 'triangle'; // Timbre mais quente na última nota
+                    gain.gain.setValueAtTime(0.25, now + idx * noteLength);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * noteLength + 0.85); // Toca por 0.85s
+                    osc.start(now + idx * noteLength);
+                    osc.stop(now + idx * noteLength + 0.85);
+                } else {
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.18, now + idx * noteLength);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * noteLength + 0.25); // Toca por 0.25s
+                    osc.start(now + idx * noteLength);
+                    osc.stop(now + idx * noteLength + 0.25);
+                }
+            });
+            console.log('[PandaNet] Som de vitória executado com sucesso.');
+        } catch (err) {
+            console.error('Falha ao tocar som de vitória:', err);
+        }
+    };
+
     // 1. Carregar tarefas do Supabase
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -111,26 +159,40 @@ WITH CHECK (
         }
     };
 
+    // Efeito de carregamento e salvamento forçado no desmonte (flush)
     useEffect(() => {
         fetchTasks();
         return () => {
-            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+                // Salvar imediatamente no desmonte do componente se houver alteração pendente
+                if (latestTaskRef.current) {
+                    saveTaskToDb(latestTaskRef.current);
+                }
+            }
         };
     }, [currentUser.id]);
 
-    // Selecionar tarefa para edição e tratar redirecionamento externo
+    // Selecionar tarefa baseado no pageContext
     useEffect(() => {
         if (tasks.length > 0) {
             const targetTaskId = pageContext?.taskId;
             if (targetTaskId) {
                 const foundTask = tasks.find(t => t.id === targetTaskId);
                 if (foundTask) {
-                    selectTask(foundTask);
+                    setSelectedTask(foundTask);
+                    setEditTitle(foundTask.title);
+                    setEditDate(foundTask.date || '');
+                    setEditCompletedDate(foundTask.completed_at || '');
                     return;
                 }
             }
-            if (!selectedTask) {
-                selectTask(tasks[0]);
+            if (!latestTaskRef.current) {
+                const initialTask = tasks[0];
+                setSelectedTask(initialTask);
+                setEditTitle(initialTask.title);
+                setEditDate(initialTask.date || '');
+                setEditCompletedDate(initialTask.completed_at || '');
             }
         }
     }, [tasks, pageContext?.taskId]);
@@ -142,6 +204,28 @@ WITH CHECK (
         setEditCompletedDate(task.completed_at || '');
         setNewSubTaskText('');
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+
+    // Função síncrona que grava no Supabase
+    const saveTaskToDb = async (taskToSave: Task) => {
+        if (isGhostMode) return;
+        try {
+            const { error } = await supabase
+                .from('personal_tasks')
+                .update({
+                    title: taskToSave.title,
+                    date: taskToSave.date ? taskToSave.date : null,
+                    items: taskToSave.items,
+                    completed: taskToSave.completed,
+                    completed_at: taskToSave.completed_at ? taskToSave.completed_at : null,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', taskToSave.id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error saving task to Supabase:', err);
+        }
     };
 
     // 2. Criar nova tarefa
@@ -171,15 +255,15 @@ WITH CHECK (
             }
         } catch (err: any) {
             console.error('Error creating task:', err);
-            alert('Não foi possível criar a tarefa. Verifique se o script SQL de instalação foi executado no seu banco de dados.');
+            alert('Não foi possível criar a tarefa.');
         }
     };
 
-    // 3. Atualizar tarefa no banco (com debounce)
-    const triggerAutoSave = (updatedFields: Partial<Task>) => {
+    // 3. Gerenciador de Atualizações com controle de Debounce
+    const triggerAutoSave = (updatedFields: Partial<Task>, debounce = false) => {
         if (!selectedTask) return;
 
-        // Se houver alteração nos itens, verifica se completou tudo
+        // Lógica de cálculo de checklist automático
         let itemsToCheck = updatedFields.items ?? selectedTask.items;
         let finalCompleted = selectedTask.completed;
         let finalCompletedAt = selectedTask.completed_at;
@@ -191,8 +275,8 @@ WITH CHECK (
                 finalCompleted = true;
                 finalCompletedAt = new Date().toISOString().split('T')[0];
                 setEditCompletedDate(finalCompletedAt);
-                // Toca alerta sonoro ao completar
-                playNotificationSound('event');
+                // Executar som triunfante
+                playVictorySound();
             } else if (!allChecked && selectedTask.completed) {
                 finalCompleted = false;
                 finalCompletedAt = null;
@@ -207,38 +291,26 @@ WITH CHECK (
             completed_at: updatedFields.completed_at !== undefined ? updatedFields.completed_at : finalCompletedAt
         } as Task;
 
-        // Atualizar estado local de forma imediata para reatividade na UI
+        // Atualizar estado de forma instantânea na UI
         setSelectedTask(updatedTask);
-        setTasks(tasks.map(t => t.id === selectedTask.id ? updatedTask : t));
+        setTasks(prevTasks => prevTasks.map(t => t.id === selectedTask.id ? updatedTask : t));
 
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
         setIsSaving(true);
-        saveTimeoutRef.current = setTimeout(async () => {
-            if (isGhostMode) {
-                setIsSaving(false);
-                return;
-            }
-            try {
-                const { error } = await supabase
-                    .from('personal_tasks')
-                    .update({
-                        title: updatedTask.title,
-                        date: updatedTask.date ? updatedTask.date : null,
-                        items: updatedTask.items,
-                        completed: updatedTask.completed,
-                        completed_at: updatedTask.completed_at ? updatedTask.completed_at : null,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', selectedTask.id);
 
-                if (error) throw error;
-            } catch (err) {
-                console.error('Error auto-saving task:', err);
-            } finally {
+        if (debounce) {
+            // Salvar com debounce (para digitação rápida no teclado)
+            saveTimeoutRef.current = setTimeout(async () => {
+                await saveTaskToDb(updatedTask);
                 setIsSaving(false);
-            }
-        }, 1000);
+            }, 1000);
+        } else {
+            // Salvar imediatamente no banco (para cliques em checkbox e seletores de data)
+            saveTaskToDb(updatedTask).then(() => {
+                setIsSaving(false);
+            });
+        }
     };
 
     // 4. Excluir tarefa
@@ -273,7 +345,7 @@ WITH CHECK (
         }
     };
 
-    // 5. Adicionar nova subtarefa
+    // 5. Adicionar nova subtarefa (Salva imediatamente)
     const handleAddSubTask = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedTask || !newSubTaskText.trim()) return;
@@ -285,11 +357,11 @@ WITH CHECK (
         };
 
         const updatedItems = [...selectedTask.items, newItem];
-        triggerAutoSave({ items: updatedItems });
+        triggerAutoSave({ items: updatedItems }, false); // Salva imediatamente ao adicionar
         setNewSubTaskText('');
     };
 
-    // 6. Atualizar estado de uma subtarefa individual
+    // 6. Atualizar estado de uma subtarefa individual (Salva imediatamente)
     const handleToggleSubTask = (itemId: string, completed: boolean) => {
         if (!selectedTask) return;
 
@@ -297,18 +369,18 @@ WITH CHECK (
             item.id === itemId ? { ...item, completed } : item
         );
 
-        triggerAutoSave({ items: updatedItems });
+        triggerAutoSave({ items: updatedItems }, false); // Salva imediatamente
     };
 
-    // 7. Excluir uma subtarefa individual
+    // 7. Excluir uma subtarefa individual (Salva imediatamente)
     const handleDeleteSubTask = (itemId: string) => {
         if (!selectedTask) return;
 
         const updatedItems = selectedTask.items.filter(item => item.id !== itemId);
-        triggerAutoSave({ items: updatedItems });
+        triggerAutoSave({ items: updatedItems }, false); // Salva imediatamente
     };
 
-    // 8. Editar o texto de uma subtarefa individual (com debounce)
+    // 8. Editar o texto de uma subtarefa individual (Usa Debounce para digitação)
     const handleEditSubTaskText = (itemId: string, text: string) => {
         if (!selectedTask) return;
 
@@ -316,31 +388,26 @@ WITH CHECK (
             item.id === itemId ? { ...item, text } : item
         );
 
-        triggerAutoSave({ items: updatedItems });
+        triggerAutoSave({ items: updatedItems }, true); // Debounce ativado para digitação
     };
 
-    // 9. Concluir/Desmarcar tarefa principal manualmente
+    // 9. Concluir/Desmarcar tarefa principal manualmente (Salva imediatamente)
     const handleToggleTaskCompleted = (completed: boolean) => {
         if (!selectedTask) return;
 
         const completedAt = completed ? (editCompletedDate || new Date().toISOString().split('T')[0]) : null;
         setEditCompletedDate(completedAt || '');
 
-        // Se marcar manualmente como concluída, toca o som
         if (completed) {
-            playNotificationSound('event');
+            playVictorySound();
         }
 
-        // Se o usuário marcar manualmente a tarefa principal como concluída, mas ela tiver subtarefas pendentes,
-        // opcionalmente podemos marcar todas as subtarefas como concluídas para manter a consistência.
+        // Marcar todas as subtarefas como concluídas se fechar manualmente
         let updatedItems = [...selectedTask.items];
         if (completed) {
             updatedItems = updatedItems.map(item => ({ ...item, completed: true }));
         } else {
-            // Se desmarcar a tarefa principal, podemos desmarcar apenas o status mestre
-            // Mas as subtarefas permanecem como estavam ou desmarcamos a última para forçar status pendente.
-            // Para maior controle do usuário, mantemos os itens, mas se todos estiverem marcados,
-            // desmarcamos o primeiro item da lista para refletir a insatisfação do status mestre.
+            // Se reabrir, desmarca a primeira subtarefa para manter a pendência consistente
             const allChecked = updatedItems.length > 0 && updatedItems.every(item => item.completed);
             if (allChecked && updatedItems.length > 0) {
                 updatedItems[0] = { ...updatedItems[0], completed: false };
@@ -351,7 +418,7 @@ WITH CHECK (
             completed, 
             completed_at: completedAt,
             items: updatedItems
-        });
+        }, false); // Salva imediatamente
     };
 
     // Filtrar tarefas baseado na busca e filtros rápidos
@@ -536,7 +603,7 @@ WITH CHECK (
                                                     📅 {formatShortDate(task.date)}
                                                 </span>
                                             ) : (
-                                                <span className="italic">Sem data agendada</span>
+                                                <span className="italic">Sem prazo/data final</span>
                                             )}
                                             
                                             {totalCount > 0 ? (
@@ -589,7 +656,7 @@ WITH CHECK (
                                     value={editTitle}
                                     onChange={(e) => {
                                         setEditTitle(e.target.value);
-                                        triggerAutoSave({ title: e.target.value });
+                                        triggerAutoSave({ title: e.target.value }, true);
                                     }}
                                     placeholder="Nome da tarefa..."
                                     className={`w-full text-base sm:text-lg font-bold border-0 bg-transparent text-slate-800 dark:text-white focus:outline-none focus:ring-0 p-0 ${
@@ -599,28 +666,28 @@ WITH CHECK (
                             </div>
                         </div>
 
-                        {/* Seção 2: Metadados (Data do Calendário e Conclusão) */}
+                        {/* Seção 2: Metadados (Prazo Final e Data de Conclusão) */}
                         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/10 dark:bg-slate-900/5">
-                            {/* Data de Agendamento */}
+                            {/* Data Final / Prazo */}
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider">
-                                    📅 Exibir no Calendário
+                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                    📅 Prazo Final / Exibir no Calendário
                                 </label>
                                 <input
                                     type="date"
                                     value={editDate}
                                     onChange={(e) => {
                                         setEditDate(e.target.value);
-                                        triggerAutoSave({ date: e.target.value || null });
+                                        triggerAutoSave({ date: e.target.value || null }, false); // Salva imediatamente
                                     }}
                                     className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full"
                                 />
                             </div>
 
-                            {/* Data de Finalização */}
+                            {/* Data de Conclusão */}
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider">
-                                    ✅ Data de Finalização
+                                <label className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                    ✅ Data de Conclusão / Finalização
                                 </label>
                                 <input
                                     type="date"
@@ -628,7 +695,7 @@ WITH CHECK (
                                     disabled={!selectedTask.completed}
                                     onChange={(e) => {
                                         setEditCompletedDate(e.target.value);
-                                        triggerAutoSave({ completed_at: e.target.value || null });
+                                        triggerAutoSave({ completed_at: e.target.value || null }, false); // Salva imediatamente
                                     }}
                                     className="px-3 py-2 bg-slate-50 disabled:bg-slate-100/50 dark:bg-slate-800 dark:disabled:bg-slate-900/50 text-slate-700 dark:text-slate-200 disabled:text-slate-400 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 w-full"
                                 />
@@ -637,9 +704,11 @@ WITH CHECK (
 
                         {/* Seção 3: Checklist (Subtarefas) */}
                         <div className="p-5 flex-1 flex flex-col gap-4">
-                            <h3 className="text-xs font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                                📋 Checklist de Subtarefas
-                            </h3>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    📋 Checklist de Subtarefas (Edite os textos diretamente clicando neles)
+                                </h3>
+                            </div>
 
                             {/* Formulário para adicionar nova subtarefa */}
                             <form onSubmit={handleAddSubTask} className="flex gap-2">
@@ -684,6 +753,7 @@ WITH CHECK (
                                                     className={`w-full text-xs border-0 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-0 p-0 font-medium ${
                                                         item.completed ? 'line-through text-slate-400 dark:text-slate-500' : ''
                                                     }`}
+                                                    title="Clique para editar o texto deste item"
                                                 />
                                             </div>
                                             <button
