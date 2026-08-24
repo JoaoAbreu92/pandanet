@@ -23,6 +23,11 @@ lines.forEach(line => {
     if (line.startsWith('VITE_SUPABASE_ANON_KEY=')) SUPABASE_ANON_KEY = line.split('=')[1].trim();
 });
 
+// Forcing Localhost over docker bridge name for script on host
+if (SUPABASE_URL.includes('supabase-kong')) {
+    SUPABASE_URL = 'http://127.0.0.1:8000';
+}
+
 // Forçando keys se estiver vazio (apenas para fallback do script remoto)
 if (!SUPABASE_SERVICE_KEY) {
     SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTc5OTUzNTYwMH0.qCZ-7mxAsMtLJDBKicjET6woXEXLm32izoPLqgDHIZg';
