@@ -69,6 +69,204 @@ interface Note {
     createdAt: number;
 }
 
+// Componente para exibir mensagem citada (no input de resposta)
+const QuotedMessage: React.FC<{ message: Message; onClose: () => void }> = React.memo(({ message, onClose }) => (
+    <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg flex items-start justify-between mb-2">
+        <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-blue-700">{message.senderName}</p>
+            <p className="text-sm text-gray-700 truncate">
+                {message.file?.url && !message.text ? 
+                    (message.file.type === 'sticker' || message.file.type?.startsWith('image/') ? '🖼️ Imagem' : '📎 Anexo') 
+                    : message.text || 'Mensagem'}
+            </p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0">
+            <XCircleIcon className="w-5 h-5" />
+        </button>
+    </div>
+));
+
+interface MessageBubbleProps {
+    message: Message;
+    selectedConversation: Conversation | undefined;
+    handleReact: (messageId: string, emoji: string) => void;
+    setReplyingToMessage: (message: Message | null) => void;
+    handleDeleteMessage: (messageId: string) => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ 
+    message, 
+    selectedConversation, 
+    handleReact, 
+    setReplyingToMessage, 
+    handleDeleteMessage 
+}) => {
+    const isMe = message.sender === 'me';
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (!isMe && message.sender_deleted_at) {
+            const deletedAt = new Date(message.sender_deleted_at).getTime();
+            const now = new Date().getTime();
+            const diff = (deletedAt + 20 * 60 * 1000) - now;
+
+            if (diff > 0) {
+                setTimeLeft(Math.floor(diff / 1000));
+                const timer = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev && prev > 0) return prev - 1;
+                        clearInterval(timer);
+                        return 0;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            } else {
+                setTimeLeft(0);
+            }
+        }
+    }, [isMe, message.sender_deleted_at]);
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    if (!isMe && timeLeft === 0) return null;
+
+    return (
+        <div className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
+            <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1 object-cover" />
+            <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
+                {/* Balão informativo para o destinatário */}
+                {!isMe && message.sender_deleted_at && (
+                    <div className="bg-red-50 text-red-600 text-[10px] font-bold px-3 py-1 rounded-full mb-1 border border-red-200 animate-pulse flex items-center gap-1 shadow-sm">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        {message.senderName} apagou esta mensagem para todos. Ela sumirá permanentemente em {timeLeft ? formatTime(timeLeft) : '...'}
+                    </div>
+                )}
+
+                {/* Mostrar nome para outros usuários em grupos */}
+                {!isMe && selectedConversation?.isGroup && (
+                    <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
+                )}
+                
+                <div className="relative">
+                    {message.replied_message && (
+                        <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${
+                            isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'
+                        }`}>
+                            <p className="font-semibold text-gray-700">{message.replied_message.senderName}</p>
+                            <p className="truncate text-gray-600">
+                                {message.replied_message.file_url && !message.replied_message.text ?
+                                    (message.replied_message.file_type === 'sticker' || message.replied_message.file_type?.startsWith('image/') ? 
+                                        '🖼️ Imagem' : '📎 Anexo')
+                                    : message.replied_message.text || 'Mensagem'}
+                            </p>
+                        </div>
+                    )}
+                    
+                    <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
+                        {(() => {
+                            const isImageUrl = (text: string) => {
+                                if (!text) return false;
+                                try {
+                                    const url = new URL(text);
+                                    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url.pathname);
+                                } catch {
+                                    return false;
+                                }
+                            };
+
+                            if (message.file?.type === 'nudge') {
+                                return (
+                                    <div className="flex flex-col items-center justify-center py-2 px-4 gap-2">
+                                        <BellIcon className={`w-12 h-12 ${isMe ? 'text-white' : 'text-orange-500'} animate-bounce`} />
+                                        <p className={`font-black text-center text-sm italic uppercase tracking-tighter ${isMe ? 'text-white' : 'text-orange-600'}`}>
+                                            {isMe ? 'Você chamou a atenção!' : 'Chamou sua atenção!'}
+                                        </p>
+                                    </div>
+                                );
+                            }
+
+                            if (message.file?.type === 'sticker') {
+                                return null;
+                            }
+
+                            if (isImageUrl(message.text) && !message.file) {
+                                return (
+                                    <div className="rounded-lg overflow-hidden border bg-gray-50 bg-opacity-50">
+                                        <img
+                                            src={message.text}
+                                            alt="Imagem enviada"
+                                            className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
+                                            onClick={() => window.open(message.text)}
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.parentElement?.classList.add('hidden');
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            }
+                            return <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>;
+                        })()}
+
+                        {message.file && (message.file.type?.startsWith('image/') || message.file.type === 'sticker') ? (
+                            <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
+                                <img src={message.file.url} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => window.open(message.file?.url)} />
+                            </div>
+                        ) : message.file ? (
+                            <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
+                                <PaperClipIcon className="w-4 h-4 shrink-0" />
+                                <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
+                                    {message.file.name}
+                                </a>
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                        <div className="flex items-center p-1 space-x-0.5">
+                            {availableReactions.map(emoji => (
+                                <button
+                                    key={emoji}
+                                    onClick={() => handleReact(message.id as string, emoji)}
+                                    className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-gray-100 rounded-full"
+                                >
+                                    {emoji}
+                                </button>
+                            ))}
+                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                            <button
+                                onClick={() => setReplyingToMessage(message)}
+                                className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
+                                title="Responder"
+                            >
+                                <ArrowUturnLeftIcon className="w-4 h-4" />
+                            </button>
+                            {isMe && (
+                                <button
+                                    onClick={() => handleDeleteMessage(message.id as string)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors"
+                                    title="Apagar para mim"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center w-full">
+                    <div className={`flex gap-1 mt-1 ${isMe ? 'order-2' : ''}`}>
+                        {message.reactions.length > 0 && message.reactions.map((r, i) => (<span key={i} className="text-xs bg-gray-200 px-1.5 py-0.5 rounded-full cursor-pointer" title={r.user}>{r.emoji}</span>))}
+                    </div>
+                    <span className={`text-xs text-gray-400 mt-1 ${isMe ? 'mr-2' : 'ml-1'}`}>{message.timestamp}</span>
+                </div>
+            </div>
+        </div>
+    );
+});
+
 interface MessagesProps {
     initialConversationId?: string;
 }
@@ -1115,186 +1313,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         setNoteWarning(false);
     };
 
-    // Componente para exibir mensagem citada (no input de resposta)
-    const QuotedMessage: React.FC<{ message: Message; onClose: () => void }> = ({ message, onClose }) => (
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg flex items-start justify-between mb-2">
-            <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-blue-700">{message.senderName}</p>
-                <p className="text-sm text-gray-700 truncate">
-                    {message.file?.url && !message.text ? 
-                        (message.file.type === 'sticker' || message.file.type?.startsWith('image/') ? '🖼️ Imagem' : '📎 Anexo') 
-                        : message.text || 'Mensagem'}
-                </p>
-            </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0">
-                <XCircleIcon className="w-5 h-5" />
-            </button>
-        </div>
-    );
 
-    const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
-        const isMe = message.sender === 'me';
-        const [timeLeft, setTimeLeft] = useState<number | null>(null);
-
-        useEffect(() => {
-            if (!isMe && message.sender_deleted_at) {
-                const deletedAt = new Date(message.sender_deleted_at).getTime();
-                const now = new Date().getTime();
-                const diff = (deletedAt + 20 * 60 * 1000) - now;
-
-                if (diff > 0) {
-                    setTimeLeft(Math.floor(diff / 1000));
-                    const timer = setInterval(() => {
-                        setTimeLeft(prev => {
-                            if (prev && prev > 0) return prev - 1;
-                            clearInterval(timer);
-                            return 0;
-                        });
-                    }, 1000);
-                    return () => clearInterval(timer);
-                } else {
-                    setTimeLeft(0);
-                }
-            }
-        }, [isMe, message.sender_deleted_at]);
-
-        const formatTime = (seconds: number) => {
-            const m = Math.floor(seconds / 60);
-            const s = seconds % 60;
-            return `${m}:${s.toString().padStart(2, '0')}`;
-        };
-
-        if (!isMe && timeLeft === 0) return null;
-
-        return (
-            <div className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
-                <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1 object-cover" />
-                <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
-                    {/* Balão informativo para o destinatário */}
-                    {!isMe && message.sender_deleted_at && (
-                        <div className="bg-red-50 text-red-600 text-[10px] font-bold px-3 py-1 rounded-full mb-1 border border-red-200 animate-pulse flex items-center gap-1 shadow-sm">
-                            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                            {message.senderName} apagou esta mensagem para todos. Ela sumirá permanentemente em {timeLeft ? formatTime(timeLeft) : '...'}
-                        </div>
-                    )}
-
-                    {/* Mostrar nome para outros usuários em grupos */}
-                    {!isMe && selectedConversation?.isGroup && (
-                        <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
-                    )}
-                    
-                    <div className="relative">
-                        {message.replied_message && (
-                            <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${
-                                isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'
-                            }`}>
-                                <p className="font-semibold text-gray-700">{message.replied_message.senderName}</p>
-                                <p className="truncate text-gray-600">
-                                    {message.replied_message.file_url && !message.replied_message.text ?
-                                        (message.replied_message.file_type === 'sticker' || message.replied_message.file_type?.startsWith('image/') ? 
-                                            '🖼️ Imagem' : '📎 Anexo')
-                                        : message.replied_message.text || 'Mensagem'}
-                                </p>
-                            </div>
-                        )}
-                        
-                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
-                            {/* Check if text is a single image URL */}
-                            {(() => {
-                                const isImageUrl = (text: string) => {
-                                    if (!text) return false;
-                                    try {
-                                        const url = new URL(text);
-                                        return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url.pathname);
-                                    } catch {
-                                        return false;
-                                    }
-                                };
-
-                                if (message.file?.type === 'nudge') {
-                                    return (
-                                        <div className="flex flex-col items-center justify-center py-2 px-4 gap-2">
-                                            <BellIcon className={`w-12 h-12 ${isMe ? 'text-white' : 'text-orange-500'} animate-bounce`} />
-                                            <p className={`font-black text-center text-sm italic uppercase tracking-tighter ${isMe ? 'text-white' : 'text-orange-600'}`}>
-                                                {isMe ? 'Você chamou a atenção!' : 'Chamou sua atenção!'}
-                                            </p>
-                                        </div>
-                                    );
-                                }
-
-                                if (isImageUrl(message.text) && !message.file) {
-                                    return (
-                                        <div className="rounded-lg overflow-hidden border bg-gray-50 bg-opacity-50">
-                                            <img
-                                                src={message.text}
-                                                alt="Imagem enviada"
-                                                className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
-                                                onClick={() => window.open(message.text)}
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = 'none';
-                                                    e.currentTarget.parentElement?.classList.add('hidden');
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                }
-                                return <p className="text-sm break-words whitespace-pre-wrap">{message.text}</p>;
-                            })()}
-
-                            {message.file && (message.file.type?.startsWith('image/') || message.file.type === 'sticker') ? (
-                                <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
-                                    <img src={message.file.url} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => window.open(message.file?.url)} />
-                                </div>
-                            ) : message.file ? (
-                                <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
-                                    <PaperClipIcon className="w-4 h-4 shrink-0" />
-                                    <a href={message.file.url} className="text-sm underline truncate" target="_blank" rel="noopener noreferrer">
-                                        {message.file.name}
-                                    </a>
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
-                            <div className="flex items-center p-1 space-x-0.5">
-                                {availableReactions.map(emoji => (
-                                    <button
-                                        key={emoji}
-                                        onClick={() => handleReact(message.id as string, emoji)}
-                                        className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-gray-100 rounded-full"
-                                    >
-                                        {emoji}
-                                    </button>
-                                ))}
-                                <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                                <button
-                                    onClick={() => setReplyingToMessage(message)}
-                                    className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
-                                    title="Responder"
-                                >
-                                    <ArrowUturnLeftIcon className="w-4 h-4" />
-                                </button>
-                                {isMe && (
-                                    <button
-                                        onClick={() => handleDeleteMessage(message.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors"
-                                        title="Apagar para mim"
-                                    >
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex justify-between items-center w-full">
-                        <div className={`flex gap-1 mt-1 ${isMe ? 'order-2' : ''}`}>
-                            {message.reactions.length > 0 && message.reactions.map((r, i) => (<span key={i} className="text-xs bg-gray-200 px-1.5 py-0.5 rounded-full cursor-pointer" title={r.user}>{r.emoji}</span>))}
-                        </div>
-                        <span className={`text-xs text-gray-400 mt-1 ${isMe ? 'mr-2' : 'ml-1'}`}>{message.timestamp}</span>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
 
@@ -1656,7 +1675,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                     </button>
                                 </div>
                             )}
-                            {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
+                            {messages.map(msg => (
+                                <MessageBubble 
+                                    key={msg.id} 
+                                    message={msg} 
+                                    selectedConversation={selectedConversation}
+                                    handleReact={handleReact}
+                                    setReplyingToMessage={setReplyingToMessage}
+                                    handleDeleteMessage={handleDeleteMessage}
+                                />
+                            ))}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-2 md:p-4 bg-white/90 dark:bg-[#020617]/80 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative pb-[max(env(safe-area-inset-bottom),8px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
