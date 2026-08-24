@@ -100,12 +100,21 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     }, [isOpen, tooltipDismissed]);
 
     const fetchAgents = async () => {
-        const { data } = await supabase
-            .from('ai_agents')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: true });
-        if (data) setAgents(data);
+        try {
+            const { data, error } = await supabase
+                .from('ai_agents')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error("Supabase Error (fetchAgents):", error);
+                throw error;
+            }
+            if (data) setAgents(data);
+        } catch (err: any) {
+            console.error("Error fetching AI agents:", err);
+        }
     };
 
     const [isCreating, setIsCreating] = useState(false);
@@ -163,9 +172,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
 
             const { data, error } = await query.order('created_at', { ascending: true });
             
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase Error (fetchMessages):", error);
+                throw error;
+            }
             if (data) setMessages(data);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error fetching AI messages:", err);
         }
     };
@@ -193,11 +205,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
 
         try {
             // Save user message to DB
-            await supabase.from('ai_messages').insert({
+            const { error: insertError } = await supabase.from('ai_messages').insert({
                 user_id: currentUser.id,
                 role: 'user',
-                content: userText
+                content: userText,
+                agent_id: currentAgent?.id || null
             });
+
+            if (insertError) {
+                console.error("Supabase Error (saveMessage):", insertError);
+            }
 
             // Call API
             let aiResponseText = '';

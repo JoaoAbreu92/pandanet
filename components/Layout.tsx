@@ -54,6 +54,9 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
+    const [isDebugOpen, setDebugOpen] = useState(false);
+
+    const isMasterAdmin = currentUser.email === 'ti@grupopixel.com.br';
 
     // Initial check for mobile
     React.useEffect(() => {
@@ -81,7 +84,14 @@ const Layout: React.FC<LayoutProps> = ({
             )}
             <SystemUpdateNotification />
             <EmailNotifier />
-            <DebugPanel currentUser={currentUser} currentCompany={currentCompany} />
+            {isMasterAdmin && (
+                <DebugPanel
+                    currentUser={currentUser}
+                    currentCompany={currentCompany}
+                    isOpen={isDebugOpen}
+                    onClose={() => setDebugOpen(false)}
+                />
+            )}
             <div className="flex flex-1 w-full overflow-hidden relative">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
@@ -107,6 +117,7 @@ const Layout: React.FC<LayoutProps> = ({
                 <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
                 <Header
                     onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+                        onToggleDebug={() => setDebugOpen(!isDebugOpen)}
                     currentUser={currentUser}
                     onLogout={onLogout}
                     onNavigate={onNavigate}

@@ -70,7 +70,11 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                     company_id: currentUser.company_id
                 }]);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error inserting contract:', error);
+                toast.error(`Erro ao salvar contrato: ${error.message || 'Erro desconhecido'}`);
+                throw error;
+            }
             toast.success('Contrato criado com sucesso!');
             onSave();
             onClose();
@@ -103,7 +107,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Assunto *</label>
                             <input 
                                 required
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.subject}
                                 onChange={e => setFormData({...formData, subject: e.target.value})}
                                 placeholder="Ex: Contrato de Manutenção 2024"
@@ -116,7 +120,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                             </label>
                             <select 
                                 required
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.customer_id}
                                 onChange={e => setFormData({...formData, customer_id: e.target.value})}
                             >
@@ -144,7 +148,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                                 <TagIcon className="w-4 h-4" /> Tipo de Contrato
                             </label>
                             <select 
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.contract_type}
                                 onChange={e => setFormData({...formData, contract_type: e.target.value})}
                             >
@@ -160,7 +164,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                                 <TagIcon className="w-4 h-4" /> Status
                             </label>
                             <select 
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.status}
                                 onChange={e => setFormData({...formData, status: e.target.value})}
                             >
@@ -176,7 +180,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                             </label>
                             <input 
                                 type="date"
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.start_date}
                                 onChange={e => setFormData({...formData, start_date: e.target.value})}
                             />
@@ -188,7 +192,7 @@ const CRMContractForm: React.FC<CRMContractFormProps> = ({ onClose, onSave }) =>
                             </label>
                             <input 
                                 type="date"
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all dark:text-white"
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-primary outline-none transition-all text-gray-900 dark:text-white"
                                 value={formData.end_date}
                                 onChange={e => setFormData({...formData, end_date: e.target.value})}
                             />

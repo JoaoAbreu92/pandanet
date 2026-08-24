@@ -6,10 +6,11 @@ import type { Employee, Company } from '../types';
 interface DebugPanelProps {
     currentUser: Employee;
     currentCompany: Company;
+    isOpen: boolean;
+    onClose: () => void;
 }
 
-const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany }) => {
-    const [isOpen, setIsOpen] = useState(false);
+const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany, isOpen, onClose }) => {
     const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
     const [tables, setTables] = useState<{ name: string; count: number | null; error: boolean }[]>([]);
     const [logs, setLogs] = useState<{ type: 'info' | 'error'; msg: string; time: string }[]>([]);
@@ -60,7 +61,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany }) 
         }
     }, [isOpen]);
 
-    if (!isMasterAdmin) return null;
+    if (!isMasterAdmin || !isOpen) return null;
 
     const clearStorage = () => {
         localStorage.clear();
@@ -71,108 +72,115 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany }) 
     };
 
     return (
-        <div className="fixed top-4 right-4 z-[9999]">
-            {/* Toggle Button */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center justify-center w-12 h-12 rounded-full shadow-2xl transition-all duration-300 ${isOpen ? 'bg-red-500 rotate-90' : 'bg-brand-primary hover:scale-110 active:scale-95'}`}
-            >
-                {isOpen ? <XCircleIcon className="w-7 h-7 text-white" /> : <BugAntIcon className="w-7 h-7 text-white" />}
-            </button>
-
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
             {/* Panel */}
-            {isOpen && (
-                <div className="absolute top-16 right-0 w-[calc(100vw-3rem)] sm:w-[450px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-down">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900 border-b flex justify-between items-center">
-                        <div>
-                            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <BugAntIcon className="w-5 h-5 text-brand-primary" />
-                                Painel de Diagnóstico (Master Admin)
-                            </h3>
-                            <p className="text-[10px] text-gray-500">ID Empresa: {currentCompany.id} | Plan: {currentCompany.plan?.name || 'N/A'}</p>
+            <div className="relative w-full max-w-2xl max-h-[85dvh] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6 bg-gray-50 dark:bg-gray-900 border-b flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-brand-primary/10 rounded-xl">
+                            <BugAntIcon className="w-6 h-6 text-brand-primary" />
                         </div>
-                        <button onClick={checkDatabase} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full text-brand-primary transition-colors">
+                        <div>
+                            <h3 className="font-bold text-gray-900 dark:text-white">
+                                Painel de Diagnóstico
+                            </h3>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Acesso Restrito: Master Admin</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={checkDatabase}
+                            className="p-2.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl text-brand-primary transition-all active:scale-95"
+                            title="Recarregar Dados"
+                        >
                             <svg className={`w-5 h-5 ${dbStatus === 'checking' ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                         </button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        {/* DB Health */}
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                                Saúde do Banco (Supabase)
-                                {dbStatus === 'ok' && <CheckCircleIcon className="w-4 h-4 text-emerald-500" />}
-                                {dbStatus === 'error' && <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-2">
-                                {tables.map(t => (
-                                    <div key={t.name} className={`p-2 rounded-lg border text-xs flex justify-between items-center ${t.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-100 text-gray-700'}`}>
-                                        <span className="font-mono">{t.name}</span>
-                                        <span className="font-bold">{t.error ? 'ERRO' : t.count}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* User State */}
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estado do Usuário</h4>
-                            <div className="p-3 bg-gray-50 rounded-lg font-mono text-[11px] text-gray-600 whitespace-pre overflow-x-auto">
-                                {JSON.stringify({
-                                    id: currentUser.id,
-                                    name: currentUser.name,
-                                    role: currentUser.role,
-                                    company: currentUser.company_id,
-                                    dept: currentUser.team
-                                }, null, 2)}
-                            </div>
-                        </section>
-
-                        {/* Permissions */}
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Permissões (Flags)</h4>
-                            <div className="grid grid-cols-2 gap-1 text-[10px]">
-                                {Object.entries(currentUser.permissions || {}).map(([key, val]) => (
-                                    <div key={key} className={`flex justify-between p-1 rounded ${val ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-400'}`}>
-                                        <span>{key}</span>
-                                        <span>{val ? 'TRUE' : 'FALSE'}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Actions */}
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ações de Emergência</h4>
-                            <div className="flex gap-2">
-                                <button onClick={clearStorage} className="flex-1 flex items-center justify-center gap-2 p-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-xs font-semibold">
-                                    <TrashIcon className="w-4 h-4" />
-                                    Limpar Cache/Storage
-                                </button>
-                            </div>
-                        </section>
-
-                        {/* Recent logs */}
-                        <section className="space-y-2">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Console Interno</h4>
-                            <div className="bg-black text-emerald-400 p-3 rounded-lg font-mono text-[10px] h-32 overflow-y-auto space-y-1">
-                                {logs.length === 0 && <p className="text-gray-600 italic">Sem logs recentes...</p>}
-                                {logs.map((log, i) => (
-                                    <div key={i} className={log.type === 'error' ? 'text-red-400' : ''}>
-                                        <span className="text-gray-500">[{log.time}]</span> {log.msg}
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    </div>
-
-                    <div className="p-3 bg-gray-100 dark:bg-gray-900 text-center text-[10px] text-gray-400">
-                        PandaNet Debugger v1.0 • Apenas para usuários master.
+                        <button
+                            onClick={onClose}
+                            className="p-2.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all active:scale-95"
+                        >
+                            <XCircleIcon className="w-6 h-6" />
+                        </button>
                     </div>
                 </div>
-            )}
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                    {/* System Meta */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">ID Empresa</p>
+                            <p className="text-sm font-mono font-bold text-gray-700 dark:text-slate-300">{currentCompany.id}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Plano Atual</p>
+                            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{currentCompany.plan?.name || 'Standard'}</p>
+                        </div>
+                    </div>
+
+                    {/* DB Health */}
+                    <section className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            Saúde do Banco (Supabase)
+                            {dbStatus === 'ok' && <CheckCircleIcon className="w-4 h-4 text-emerald-500" />}
+                            {dbStatus === 'error' && <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />}
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {tables.map(t => (
+                                <div key={t.name} className={`p-3 rounded-2xl border transition-all ${t.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50/50 border-gray-100 dark:border-slate-800 text-gray-700 dark:text-slate-300'}`}>
+                                    <p className="text-[9px] font-mono opacity-60 truncate">{t.name}</p>
+                                    <p className="text-sm font-black">{t.error ? 'ERRO' : t.count}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* User State */}
+                    <section className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Estado Sensível do Usuário</h4>
+                        <div className="p-4 bg-slate-900 text-emerald-400 rounded-2xl font-mono text-[11px] whitespace-pre overflow-x-auto shadow-inner border border-slate-800">
+                            {JSON.stringify({
+                                db_id: currentUser.id,
+                                display_name: currentUser.name,
+                                system_role: currentUser.role,
+                                context_company: currentUser.company_id,
+                                context_dept: currentUser.team,
+                                auth_email: currentUser.email
+                            }, null, 2)}
+                        </div>
+                    </section>
+
+                    {/* Actions */}
+                    <section className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Ações Críticas</h4>
+                        <div className="flex gap-4">
+                            <button onClick={clearStorage} className="flex-1 flex items-center justify-center gap-3 p-4 bg-orange-50 text-orange-700 border border-orange-200 rounded-2xl hover:bg-orange-100 transition-all font-bold text-xs shadow-sm active:scale-95">
+                                <TrashIcon className="w-5 h-5" />
+                                Limpar Cache & Local Storage
+                            </button>
+                        </div>
+                    </section>
+
+                    {/* Console */}
+                    <section className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Console de Eventos</h4>
+                        <div className="bg-black text-emerald-500 p-4 rounded-2xl font-mono text-[10px] h-40 overflow-y-auto space-y-1.5 shadow-2xl border border-white/5 no-scrollbar">
+                            {logs.length === 0 && <p className="text-gray-700 italic">Aguardando telemetria...</p>}
+                            {logs.map((log, i) => (
+                                <div key={i} className={`flex gap-3 ${log.type === 'error' ? 'text-red-400' : ''}`}>
+                                    <span className="text-gray-600 flex-shrink-0">[{log.time}]</span>
+                                    <span className="flex-1 leading-relaxed">{log.msg}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-900/80 text-center text-[10px] text-gray-400 font-bold tracking-widest uppercase border-t border-gray-100 dark:border-slate-800">
+                    PandaNet Diagnostic Engine &bull; Kernel v1.2.4-GP
+                </div>
+            </div>
         </div>
     );
 };

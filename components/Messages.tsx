@@ -1300,8 +1300,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     </div>
                 </div>
                 
-                {/* Suporte VIP para qualquer usuário */}
-                {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && masterAdminId && (
+                {/* Suporte VIP para qualquer usuário - Restrito a Admins de Empresa */}
+                {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && currentUser.isAdmin && masterAdminId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
                         {/* Avatar/Name hidden per user request */}

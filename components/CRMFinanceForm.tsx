@@ -195,7 +195,11 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                 .insert([dbData])
                 .select();
 
-            if (error) throw error;
+            if (error) {
+                console.error(`Error saving ${type}:`, error);
+                toast.error(`Erro ao salvar ${type}: ${error.message || 'Erro desconhecido'}`);
+                throw error;
+            }
 
             toast.success(`${type === 'invoice' ? 'Fatura' : type === 'proposal' ? 'Proposta' : 'Estimativa'} salva com sucesso!`);
             onSuccess?.(savedData?.[0]);
@@ -203,6 +207,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
         } catch (error) {
             console.error('Error saving finance form:', error);
             toast.error('Erro ao salvar. Verifique o console.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -366,7 +372,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-2">
                                                     <select
-                                                        className="w-full bg-slate-50 dark:bg-slate-800/80 outline-none dark:text-gray-300 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 appearance-none max-w-[200px]"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800/80 outline-none text-slate-900 dark:text-gray-300 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 appearance-none max-w-[200px]"
                                                         onChange={(e) => handleSelectItem(item.id, e.target.value)}
                                                         value={item.item_id || ''}
                                                     >
@@ -376,7 +382,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
                                                         ))}
                                                     </select>
                                                     <input 
-                                                        className="w-full bg-transparent outline-none dark:text-white font-bold text-sm"
+                                                        className="w-full bg-transparent outline-none text-slate-900 dark:text-white font-bold text-sm"
                                                         placeholder="Nome do Item (ou selecione acima)"
                                                         value={item.description}
                                                         onChange={e => updateItem(item.id, 'description', e.target.value)}

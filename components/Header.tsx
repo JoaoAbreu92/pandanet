@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon, SunIcon, MoonIcon } from './icons';
+import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon, SunIcon, MoonIcon, BugAntIcon } from './icons';
 import type { Employee, Page } from '../types';
 import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
 
 interface HeaderProps {
     onToggleSidebar: () => void;
+    onToggleDebug?: () => void;
     currentUser: Employee;
     onLogout: () => void;
     onNavigate: (page: Page) => void;
@@ -20,7 +21,7 @@ interface HeaderProps {
 
 import { useLanguage } from './LanguageContext';
 
-const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme }) => {
+const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const { language, setLanguage, t } = useLanguage();
     const { testNotifications, availableSounds, selectedSound, changeSound } = useNotifications();
@@ -93,6 +94,28 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             >
                                 <Cog6ToothIcon className="w-5 h-5 text-blue-400" />
                             </button>
+
+                            {/* Diagnóstico Master Admin - Agora no Header */}
+                            {currentUser.email === 'ti@grupopixel.com.br' && (
+                                <button
+                                    onClick={onToggleDebug}
+                                    className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all active:scale-95 group"
+                                    title="Painel de Diagnóstico"
+                                >
+                                    <BugAntIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                                </button>
+                            )}
+
+                            {/* Botão de Verificação (Engrenagem) - Redireciona para página de diagnóstico */}
+                            {(currentUser.role === 'admin' || currentUser.email === 'ti@grupopixel.com.br') && (
+                                <button
+                                    onClick={() => onNavigate('diagnostics' as Page)}
+                                    className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all active:scale-95 group"
+                                    title="Página de Diagnóstico"
+                                >
+                                    <Cog6ToothIcon className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                                </button>
+                            )}
                             <button
                                 onClick={() => window.location.reload()}
                                 className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
