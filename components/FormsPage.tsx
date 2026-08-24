@@ -290,6 +290,64 @@ const DocRequestModal: React.FC<{
     );
 };
 
+const DataChangeRequestModal: React.FC<{
+    onClose: () => void;
+    onSubmit: (data: { address: string, phone: string, maritalStatus: string, observations: string }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
+    const [address, setAddress] = useState('');
+    const [phone, setPhone] = useState('');
+    const [maritalStatus, setMaritalStatus] = useState('');
+    const [observations, setObservations] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ address, phone, maritalStatus, observations });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Alteração de Dados</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Novo Endereço Completo</label>
+                        <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Rua, Número, Bairro, Cidade - UF, CEP" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Novo Telefone / Celular</label>
+                            <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(00) 00000-0000" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Estado Civil</label>
+                            <select value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)} className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2">
+                                <option value="">Selecione...</option>
+                                <option value="Solteiro(a)">Solteiro(a)</option>
+                                <option value="Casado(a)">Casado(a)</option>
+                                <option value="Divorciado(a)">Divorciado(a)</option>
+                                <option value="Viúvo(a)">Viúvo(a)</option>
+                                <option value="União Estável">União Estável</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Outras Observações / Mudanças</label>
+                        <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={3} placeholder="Descreva qualquer outra alteração cadastral necessária..." className="mt-1 w-full border-gray-355 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2"></textarea>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const FormsPage: React.FC = () => {
     const { t } = useLanguage();
     const { currentUser } = useAuth();
@@ -300,6 +358,7 @@ const FormsPage: React.FC = () => {
     const [isEpiModalOpen, setEpiModalOpen] = useState(false);
     const [isUniformModalOpen, setUniformModalOpen] = useState(false);
     const [isDocModalOpen, setDocModalOpen] = useState(false);
+    const [isDataChangeModalOpen, setDataChangeModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const fetchSubmissions = async () => {
@@ -514,6 +573,39 @@ const FormsPage: React.FC = () => {
         }
     };
 
+    const handleDataChangeRequest = async (data: { address: string, phone: string, maritalStatus: string, observations: string }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            const details = [];
+            if (data.address) details.push(`Endereço: ${data.address}`);
+            if (data.phone) details.push(`Telefone: ${data.phone}`);
+            if (data.maritalStatus) details.push(`Estado Civil: ${data.maritalStatus}`);
+            if (data.observations) details.push(`Obs: ${data.observations}`);
+
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Alteração Cadastral',
+                    status: 'Pendente',
+                    reason: details.join(' | ') || 'Solicitação de alteração de dados cadastrais.'
+                }]);
+
+            if (error) throw error;
+
+            setDataChangeModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting Data Change request:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const getStatusColor = (status: FormStatus) => {
         switch (status) {
             case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400';
@@ -531,69 +623,69 @@ const FormsPage: React.FC = () => {
                 <h1 className="text-3xl font-bold text-brand-text dark:text-white">{t('forms.title')}</h1>
                 <Card title={t('forms.available')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div onClick={() => setVacationModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                        <div onClick={() => setVacationModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">{t('forms.vacation')}</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">{t('forms.vacation_desc')}</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>{t('forms.start_request')}</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
                         
-                        <div onClick={() => setLeaveModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                        <div onClick={() => setLeaveModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Ausência / Folga</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite folgas ou envie atestados médicos diretamente ao RH.</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar Ausência</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
 
-                        <div onClick={() => setEpiModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                        <div onClick={() => setEpiModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de EPI</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite Equipamentos de Proteção Individual necessários para sua função.</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar EPI</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
 
-                        <div onClick={() => setUniformModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                        <div onClick={() => setUniformModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de Uniforme</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite novas peças de uniforme ou substituições por tamanho/desgaste.</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar Uniforme</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
 
-                        <div onClick={() => setDocModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-48">
+                        <div onClick={() => setDocModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de Documentos</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite declarações de trabalho, cópias de contratos ou outros documentos ao RH.</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar Documentos</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
 
-                        <div onClick={() => alert('Em breve')} className="p-6 bg-gray-50 dark:bg-slate-900 rounded-2xl opacity-60 border dark:border-white/5 cursor-not-allowed text-center flex flex-col justify-between h-48">
+                        <div onClick={() => setDataChangeModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
                             <div>
-                                <h3 className="font-bold text-lg text-brand-text dark:text-white">{t('forms.data_change')}</h3>
+                                <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">{t('forms.data_change')}</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">{t('forms.data_change_desc')}</p>
                             </div>
-                            <button disabled className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-300 dark:bg-gray-800 text-white dark:text-gray-500 rounded-xl cursor-not-allowed font-bold">
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>{t('forms.start_request')}</span>
+                                <span>Solicitar</span>
                             </button>
                         </div>
                     </div>
@@ -645,6 +737,7 @@ const FormsPage: React.FC = () => {
             {isEpiModalOpen && <EpiRequestModal onClose={() => setEpiModalOpen(false)} onSubmit={handleEpiRequest} submitting={submitting} />}
             {isUniformModalOpen && <UniformRequestModal onClose={() => setUniformModalOpen(false)} onSubmit={handleUniformRequest} submitting={submitting} />}
             {isDocModalOpen && <DocRequestModal onClose={() => setDocModalOpen(false)} onSubmit={handleDocRequest} submitting={submitting} />}
+            {isDataChangeModalOpen && <DataChangeRequestModal onClose={() => setDataChangeModalOpen(false)} onSubmit={handleDataChangeRequest} submitting={submitting} />}
         </>
     );
 };
