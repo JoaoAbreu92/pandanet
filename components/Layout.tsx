@@ -46,18 +46,36 @@ const Layout: React.FC<LayoutProps> = ({
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
 
+    // Initial check for mobile
+    React.useEffect(() => {
+        if (window.innerWidth < 768) {
+            setSidebarOpen(false);
+        }
+    }, []);
+
     return (
         <div className="flex h-screen w-full bg-brand-secondary dark:bg-gray-900">
+            {/* Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             <Sidebar
                 isOpen={isSidebarOpen}
-                onNavigate={onNavigate}
+                onNavigate={(page) => {
+                    onNavigate(page);
+                    if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
+                }}
                 currentPage={currentPage}
                 currentUser={currentUser}
                 companyName={companySettings.companyName}
                 companyLogo={companySettings.logoUrl}
                 isImpersonating={isImpersonating}
             />
-            <div className="flex-1 flex flex-col overflow-hidden relative min-w-0 w-full">
+            <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300 ${isSidebarOpen ? 'md:pl-0' : 'md:pl-0'}`}>
                 <Header
                     onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
                     currentUser={currentUser}

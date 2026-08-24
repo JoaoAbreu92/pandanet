@@ -86,11 +86,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-300 ${isOpen ? 'w-64' : 'w-20'} flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700`}>
-            <div className="flex items-center justify-center h-20 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700">
+        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700
+            fixed md:relative z-50 h-full
+            ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
+        `}>
+            <div className={`flex items-center justify-center h-20 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'md:flex-col md:space-y-0'}`}>
                 <Logo showText={isOpen} />
             </div>
-            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
                 <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} />
                 <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" />
@@ -109,9 +112,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" />
                     <NavItem page="documentos" label={t('sidebar.documents')} icon={FolderIcon} permission="viewDocuments" />
                     {/* New RH Menus */}
-                    <NavItem page="training" label="Treinamentos" icon={RocketLaunchIcon} permission="viewTraining" />
+                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
                     <NavItem page="surveys" label="Pesquisas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
-                    <NavItem page="policies" label="Políticas" icon={ShieldCheckIcon} permission="viewPolicies" />
+                    <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" />
                 </NavMenu>
 
                 <NavMenu label="T.I." icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
@@ -119,8 +122,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
                     {/* New TI Menus */}
-                    <NavItem page="knowledge-base" label="Base de Conhecimento" icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" />
-                    <NavItem page="service-status" label="Status de Serviço" icon={ArrowPathIcon} permission="viewServiceStatus" />
+                    <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" />
+                    <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
                     <NavItem page="infosec" label="Segurança da Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
                 </NavMenu>
 
@@ -151,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     </a>
                 )}
             </nav>
-            <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden'}`}>
+            <div className={`p-4 border-t border-gray-200 text-center bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
                     <img src={companyLogo} alt={companyName} className="h-10 mx-auto mb-2 object-contain dark:filter dark:brightness-0 dark:invert dark:opacity-80" />
                 )}

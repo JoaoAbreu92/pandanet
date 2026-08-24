@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from './LanguageContext';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from './icons';
 import type { TrainingModule } from '../types';
 
@@ -8,6 +9,7 @@ interface TrainingManagerProps {
 }
 
 const TrainingManager: React.FC<TrainingManagerProps> = ({ trainings, setTrainings }) => {
+    const { t } = useLanguage();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<TrainingModule | null>(null);
     const [formData, setFormData] = useState<Partial<TrainingModule>>({});
@@ -34,15 +36,15 @@ const TrainingManager: React.FC<TrainingManagerProps> = ({ trainings, setTrainin
     };
 
     const handleDelete = (id: number) => {
-        if (confirm('Tem certeza?')) setTrainings(trainings.filter(t => t.id !== id));
+        if (confirm(t('generic.delete_confirm'))) setTrainings(trainings.filter(t => t.id !== id));
     };
 
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold">Gerenciar Treinamentos</h3>
+                <h3 className="text-lg font-bold">{t('training.manage') || 'Gerenciar Treinamentos'}</h3>
                 <button onClick={() => handleOpenModal()} className="flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg">
-                    <PlusIcon className="w-5 h-5 mr-2" /> Novo Treinamento
+                    <PlusIcon className="w-5 h-5 mr-2" /> {t('generic.new_item')}
                 </button>
             </div>
 
@@ -50,9 +52,9 @@ const TrainingManager: React.FC<TrainingManagerProps> = ({ trainings, setTrainin
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('training.title_col') || 'Título'}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('training.category_col') || 'Categoria'}</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('generic.actions') || 'Ações'}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -74,15 +76,27 @@ const TrainingManager: React.FC<TrainingManagerProps> = ({ trainings, setTrainin
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md">
                         <div className="flex justify-between mb-4">
-                            <h3 className="text-lg font-bold">{editingItem ? 'Editar' : 'Novo'} Treinamento</h3>
+                            <h3 className="text-lg font-bold">{editingItem ? t('generic.edit_item') : t('generic.new_item')}</h3>
                             <button onClick={() => setIsModalOpen(false)}><XMarkIcon className="w-6 h-6" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <input className="w-full border p-2 rounded" placeholder="Título" value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
-                            <input className="w-full border p-2 rounded" placeholder="Duração (ex: 30 min)" value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })} required />
-                            <input className="w-full border p-2 rounded" placeholder="Categoria" value={formData.category || ''} onChange={e => setFormData({ ...formData, category: e.target.value })} />
-                            <input className="w-full border p-2 rounded" placeholder="URL da Thumbnail" value={formData.thumbnail || ''} onChange={e => setFormData({ ...formData, thumbnail: e.target.value })} />
-                            <button type="submit" className="w-full bg-brand-primary text-white py-2 rounded">Salvar</button>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">{t('training.title_col') || 'Título'}</label>
+                                <input className="w-full border p-2 rounded mt-1" value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">{t('training.duration_col') || 'Duração'}</label>
+                                <input className="w-full border p-2 rounded mt-1" placeholder="Ex: 30 min" value={formData.duration || ''} onChange={e => setFormData({ ...formData, duration: e.target.value })} required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">{t('training.category_col') || 'Categoria'}</label>
+                                <input className="w-full border p-2 rounded mt-1" value={formData.category || ''} onChange={e => setFormData({ ...formData, category: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">{t('training.thumbnail') || 'URL da Imagem'}</label>
+                                <input className="w-full border p-2 rounded mt-1" placeholder="https://..." value={formData.thumbnail || ''} onChange={e => setFormData({ ...formData, thumbnail: e.target.value })} />
+                            </div>
+                            <button type="submit" className="w-full bg-brand-primary text-white py-2 rounded">{t('generic.save')}</button>
                         </form>
                     </div>
                 </div>

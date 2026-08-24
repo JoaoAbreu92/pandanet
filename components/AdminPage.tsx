@@ -78,8 +78,14 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Base de Conhecimento"
                     items={company.data.kbArticles}
                     setItems={(i) => handleSetData('kbArticles', i)}
-                    newItemTemplate={{ id: 0, title: '', category: 'Geral', content: '', views: 0 }}
-                    fields={[{ key: 'title', label: 'Título' }, { key: 'category', label: 'Categoria' }, { key: 'content', label: 'Conteúdo' }]}
+                    newItemTemplate={{ id: 0, title: '', category: 'Geral', content: '', views: 0, mediaUrl: '', mediaType: 'image' }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'category', label: 'Categoria' },
+                        { key: 'content', label: 'Conteúdo', type: 'textarea' },
+                        { key: 'mediaUrl', label: 'URL da Mídia (Imagem/Vídeo)', type: 'text' },
+                        { key: 'mediaType', label: 'Tipo de Mídia', type: 'select', options: ['image', 'video'] }
+                    ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;
             case 'status':
@@ -87,9 +93,22 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Status de Serviços"
                     items={company.data.services}
                     setItems={(i) => handleSetData('services', i)}
-                    newItemTemplate={{ id: 0, name: '', status: 'operational', uptime: '99%' }}
-                    fields={[{ key: 'name', label: 'Serviço' }, { key: 'status', label: 'Status (operational/maintenance/outage)', type: 'select', options: ['operational', 'maintenance', 'outage'] }, { key: 'uptime', label: 'Uptime' }]}
-                    renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className={`text-sm ${i.status === 'operational' ? 'text-green-600' : 'text-red-600'}`}>{i.status}</p></div>}
+                    newItemTemplate={{ id: 0, name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
+                    fields={[
+                        { key: 'name', label: 'Serviço' },
+                        { key: 'status', label: 'Status', type: 'select', options: ['operational', 'maintenance', 'outage'] },
+                        { key: 'uptime', label: 'Uptime' },
+                        { key: 'imageUrl', label: 'URL do Ícone/Imagem', type: 'text' }
+                    ]}
+                    renderItem={(i) => (
+                        <div className="flex items-center">
+                            {i.imageUrl && <img src={i.imageUrl} alt="" className="w-8 h-8 rounded-full mr-2 object-cover" />}
+                            <div>
+                                <p className="font-bold">{i.name}</p>
+                                <p className={`text-sm ${i.status === 'operational' ? 'text-green-600' : 'text-red-600'}`}>{i.status}</p>
+                            </div>
+                        </div>
+                    )}
                 />;
             case 'infosec':
                 return <GenericManager<SecurityAlert>
@@ -97,18 +116,21 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     items={company.data.securityAlerts}
                     setItems={(i) => handleSetData('securityAlerts', i)}
                     newItemTemplate={{ id: 0, title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
-                    fields={[{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descrição' }, { key: 'level', label: 'Nível (info/warning/critical)', type: 'select', options: ['info', 'warning', 'critical'] }, { key: 'date', label: 'Data' }]}
+                    fields={[{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descrição', type: 'textarea' }, { key: 'level', label: 'Nível', type: 'select', options: ['info', 'warning', 'critical'] }, { key: 'date', label: 'Data' }]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
                 />;
             case 'policies':
-                // Filter to only show policy documents? Or just manage all documents? Let's use documents but maybe add filtering later. For now, simple document manager.
-                // Actually PoliciesPage uses 'documents'. Let's reuse GenericManager but for documents.
                 return <GenericManager<ResourceDocument>
                     title="Documentos e Políticas"
                     items={company.data.documents}
                     setItems={(i) => handleSetData('documents', i)}
                     newItemTemplate={{ id: 0, title: '', category: 'RH', type: 'PDF', url: '#', updatedAt: new Date().toISOString().split('T')[0] }}
-                    fields={[{ key: 'title', label: 'Título' }, { key: 'category', label: 'Categoria' }, { key: 'type', label: 'Tipo' }, { key: 'url', label: 'URL' }]}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'category', label: 'Categoria' },
+                        // Type is auto-detected, removed from manual fields
+                        { key: 'url', label: 'Arquivo (Anexo)', type: 'file' }
+                    ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category} - {i.type}</p></div>}
                 />;
             case 'polls':

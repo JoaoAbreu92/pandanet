@@ -6,13 +6,16 @@ interface TrainingPageProps {
     trainings: TrainingModule[];
 }
 
+import { useLanguage } from './LanguageContext';
+
 const TrainingPage: React.FC<TrainingPageProps> = ({ trainings }) => {
+    const { t } = useLanguage();
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                 <RocketLaunchIcon className="w-8 h-8 mr-2 text-brand-primary" />
-                Treinamentos e Desenvolvimento
+                {t('training.title')}
             </h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {trainings.map(training => (
@@ -27,7 +30,7 @@ const TrainingPage: React.FC<TrainingPageProps> = ({ trainings }) => {
                         <div className="p-4">
                             <h3 className="font-bold text-gray-800 group-hover:text-brand-primary transition-colors">{training.title}</h3>
                             <button className="mt-3 w-full py-2 bg-gray-50 text-brand-primary font-medium rounded-lg hover:bg-brand-primary hover:text-white transition-colors text-sm">
-                                Iniciar Curso
+                                {t('training.start')}
                             </button>
                         </div>
                     </div>

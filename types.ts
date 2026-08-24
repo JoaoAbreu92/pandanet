@@ -109,6 +109,8 @@ export interface KBArticle {
   category: string;
   views: number;
   content: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
 }
 
 export interface ServiceStatusItem {
@@ -116,6 +118,7 @@ export interface ServiceStatusItem {
   name: string;
   status: 'operational' | 'maintenance' | 'outage';
   uptime: string;
+  imageUrl?: string;
 }
 
 export interface SecurityAlert {
@@ -169,6 +172,8 @@ export interface Employee {
   password?: string; // Should not be stored in frontend state in a real app
   role: string;
   team: string;
+  sectorManager?: string; // Gestor do Setor
+  employeeManager?: string; // Gerente do Funcionário
   avatarUrl: string;
   coverUrl?: string;
   joinDate: string; // YYYY-MM-DD
@@ -314,6 +319,8 @@ export interface FormSubmission {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   reason?: string;
+  sectorManager?: string; // New field
+  employeeManager?: string; // New field
 }
 
 export type TIRequestStatus = 'Pendente' | 'Em Análise' | 'Aprovado' | 'Pedido Realizado' | 'Entregue' | 'Rejeitado';

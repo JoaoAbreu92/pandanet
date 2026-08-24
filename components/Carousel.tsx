@@ -3,10 +3,33 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Banner } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 
+// Importing local banner images
+import bannerPersonalDev from '../assets/banners/personal_development.png';
+import bannerSecurity from '../assets/banners/internet_security.png';
+import bannerWellbeing from '../assets/banners/wellbeing.png';
+
 const banners: Banner[] = [
-    { id: 1, imageUrl: 'https://picsum.photos/id/1018/1200/400', title: 'Explore Nossos Novos Benefícios', subtitle: 'Programas de bem-estar e desenvolvimento profissional para você.', link: '#' },
-    { id: 2, imageUrl: 'https://picsum.photos/id/1025/1200/400', title: 'Reunião Geral do Q3', subtitle: 'Participe e fique por dentro das metas e conquistas da empresa.', link: '#' },
-    { id: 3, imageUrl: 'https://picsum.photos/id/1043/1200/400', title: 'Inovação em Foco', subtitle: 'Conheça os projetos que estão moldando o nosso futuro.', link: '#' },
+    {
+        id: 1,
+        imageUrl: bannerPersonalDev,
+        title: 'Desenvolvimento Pessoal & Carreira',
+        subtitle: 'Invista no seu futuro com nossos programas de mentoria e cursos exclusivos. O seu crescimento é a nossa prioridade.',
+        link: '/training'
+    },
+    {
+        id: 2,
+        imageUrl: bannerSecurity,
+        title: 'Segurança na Internet',
+        subtitle: 'Proteja seus dados e navegue com confiança. Aprenda as melhores práticas de cibersegurança e mantenha-se seguro.',
+        link: '/infosec'
+    },
+    {
+        id: 3,
+        imageUrl: bannerWellbeing,
+        title: 'Bem-Estar & Equilíbrio',
+        subtitle: 'Priorize sua saúde mental e física. Descubra dicas, atividades e recursos para uma vida mais equilibrada e feliz.',
+        link: '/bem-estar'
+    },
 ];
 
 const Carousel: React.FC = () => {
@@ -25,7 +48,7 @@ const Carousel: React.FC = () => {
     }, [currentIndex]);
 
     useEffect(() => {
-        const slideInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds
+        const slideInterval = setInterval(nextSlide, 6000); // Change slide every 6 seconds for better readability
         return () => clearInterval(slideInterval);
     }, [nextSlide]);
 
@@ -34,35 +57,48 @@ const Carousel: React.FC = () => {
     };
 
     return (
-        <div className="relative w-full h-64 md:h-80 group">
+        <div className="relative w-full h-[400px] group overflow-hidden rounded-2xl shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20">
+            {/* Main Image Background */}
             <div
                 style={{ backgroundImage: `url(${banners[currentIndex].imageUrl})` }}
-                className="w-full h-full rounded-xl bg-center bg-cover duration-500"
+                className="w-full h-full bg-center bg-cover duration-700 ease-in-out transform transition-transform"
             >
-                <div className="absolute inset-0 bg-black/50 rounded-xl flex flex-col justify-center items-center text-center p-4">
-                    <h2 className="text-white text-3xl md:text-4xl font-bold drop-shadow-lg">{banners[currentIndex].title}</h2>
-                    <p className="text-gray-200 mt-2 text-lg drop-shadow-md">{banners[currentIndex].subtitle}</p>
-                     <a href={banners[currentIndex].link} className="mt-4 px-6 py-2 bg-brand-primary text-white font-semibold rounded-full hover:bg-emerald-600 transition-colors">
-                        Saiba Mais
-                    </a>
+                {/* Gradient Overlay for Text Readability */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex flex-col justify-center items-start text-left p-12 md:p-16">
+                    <div className="max-w-2xl transform transition-all duration-700 translate-y-0 opacity-100 animate-fade-in-up">
+                        <h2 className="text-white text-5xl md:text-7xl font-extrabold drop-shadow-lg mb-6 tracking-tight leading-tight">
+                            {banners[currentIndex].title}
+                        </h2>
+                        <p className="text-gray-100 text-2xl md:text-3xl font-light drop-shadow-md mb-8 leading-relaxed border-l-4 border-brand-primary pl-4">
+                            {banners[currentIndex].subtitle}
+                        </p>
+                    </div>
                 </div>
             </div>
-            
+
             {/* Left Arrow */}
-            <div onClick={prevSlide} className="hidden group-hover:block absolute top-1/2 -translate-y-1/2 left-5 text-2xl rounded-full p-2 bg-black/20 text-white cursor-pointer">
-                <ChevronLeftIcon className="w-6 h-6" />
+            <div onClick={prevSlide} className="hidden group-hover:flex absolute top-1/2 -translate-y-1/2 left-6 text-white cursor-pointer hover:scale-110 transition-transform duration-200">
+                <div className="bg-white/10 backdrop-blur-md p-3 rounded-full border border-white/20 hover:bg-white/20">
+                    <ChevronLeftIcon className="w-8 h-8" />
+                </div>
             </div>
             {/* Right Arrow */}
-            <div onClick={nextSlide} className="hidden group-hover:block absolute top-1/2 -translate-y-1/2 right-5 text-2xl rounded-full p-2 bg-black/20 text-white cursor-pointer">
-                <ChevronRightIcon className="w-6 h-6" />
+            <div onClick={nextSlide} className="hidden group-hover:flex absolute top-1/2 -translate-y-1/2 right-6 text-white cursor-pointer hover:scale-110 transition-transform duration-200">
+                <div className="bg-white/10 backdrop-blur-md p-3 rounded-full border border-white/20 hover:bg-white/20">
+                    <ChevronRightIcon className="w-8 h-8" />
+                </div>
             </div>
 
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex justify-center py-2 space-x-2">
+            {/* Indicators */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-3">
                 {banners.map((_, slideIndex) => (
                     <div
                         key={slideIndex}
                         onClick={() => goToSlide(slideIndex)}
-                        className={`w-3 h-3 rounded-full cursor-pointer transition-colors ${currentIndex === slideIndex ? 'bg-white' : 'bg-white/50'}`}
+                        className={`transition-all duration-300 cursor-pointer rounded-full shadow-sm ${currentIndex === slideIndex
+                            ? 'w-8 h-2 bg-brand-primary'
+                            : 'w-2 h-2 bg-white/60 hover:bg-white'
+                            }`}
                     ></div>
                 ))}
             </div>

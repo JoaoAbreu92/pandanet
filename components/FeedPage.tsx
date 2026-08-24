@@ -20,6 +20,7 @@ export const PostCard: React.FC<{
 }> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare }) => {
     const [commentText, setCommentText] = useState('');
     const [showReactionMenu, setShowReactionMenu] = useState(false);
+    const timeoutRef = useRef<any>(null); // Ref for the timeout
 
     const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 
@@ -29,6 +30,17 @@ export const PostCard: React.FC<{
             onSubmitComment(post.id, commentText);
             setCommentText('');
         }
+    };
+
+    const handleMouseEnter = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setShowReactionMenu(true);
+    };
+
+    const handleMouseLeave = () => {
+        timeoutRef.current = setTimeout(() => {
+            setShowReactionMenu(false);
+        }, 1200); // Keeps visible for 1.2s after leaving
     };
 
     const userReaction = post.reactions.find(r => r.userId === currentUser.id);
@@ -88,9 +100,13 @@ export const PostCard: React.FC<{
 
             {/* Actions */}
             <div className="flex justify-around py-1 relative">
-                <div className="relative flex-1" onMouseEnter={() => setShowReactionMenu(true)} onMouseLeave={() => setShowReactionMenu(false)}>
+                <div className="relative flex-1" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
                     {showReactionMenu && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-full p-2 flex space-x-2 border animate-fade-in-up z-20">
+                        <div
+                            className="absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-full p-2 flex space-x-2 border animate-fade-in-up z-20"
+                            onMouseEnter={handleMouseEnter} // Also keep open if hovering the menu itself
+                            onMouseLeave={handleMouseLeave}
+                        >
                             {reactions.map(emoji => (
                                 <button
                                     key={emoji}

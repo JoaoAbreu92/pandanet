@@ -184,7 +184,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                             <p className="text-sm break-words">{message.text}</p>
                             {message.file && (<div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2"> <PaperClipIcon className="w-4 h-4" /> <a href={message.file.url} className="text-sm underline" target="_blank" rel="noopener noreferrer">{message.file.name}</a> </div>)}
                         </div>
-                        <div className={`absolute top-0 -mt-4 flex items-center bg-white shadow-md rounded-full border transition-opacity opacity-0 group-hover:opacity-100 delay-500 duration-200 ${isMe ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'}`}>
+                        <div className={`absolute top-0 -mt-4 flex items-center bg-white shadow-md rounded-full border transition-all duration-300 opacity-0 delay-1000 group-hover:opacity-100 group-hover:delay-0 ${isMe ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'}`}>
                             <div className="flex items-center p-0.5">
                                 {availableReactions.map(emoji => (<button key={emoji} onClick={() => handleReact(message.id, emoji)} className="p-1 text-lg hover:scale-125 transition-transform">{emoji}</button>))}
                             </div>

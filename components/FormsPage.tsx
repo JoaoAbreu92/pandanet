@@ -9,42 +9,57 @@ interface FormsPageProps {
     currentUser: Employee;
 }
 
+import { useLanguage } from './LanguageContext';
+
 const VacationRequestModal: React.FC<{
     onClose: () => void;
     onSubmit: (data: Omit<FormSubmission, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt' | 'formType'>) => void;
 }> = ({ onClose, onSubmit }) => {
+    const { t } = useLanguage();
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [reason, setReason] = useState('');
+    const [sectorManager, setSectorManager] = useState('');
+    const [employeeManager, setEmployeeManager] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit({ startDate, endDate, reason });
+        onSubmit({ startDate, endDate, reason, sectorManager, employeeManager });
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">Solicitar Férias</h3>
+                <h3 className="text-xl font-bold text-brand-text mb-4">{t('forms.vacation')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text">Data de Início</label>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.manager_sector')}</label>
+                            <input type="text" value={sectorManager} onChange={e => setSectorManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.manager_employee')}</label>
+                            <input type="text" value={employeeManager} onChange={e => setEmployeeManager(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.start_date')}</label>
                             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text">Data de Fim</label>
+                            <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.end_date')}</label>
                             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Motivo (Opcional)</label>
+                        <label className="block text-sm font-medium text-brand-subtle-text">{t('forms.reason')}</label>
                         <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea>
                     </div>
                     <div className="flex justify-end space-x-3 pt-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">Enviar Solicitação</button>
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">{t('generic.cancel')}</button>
+                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">{t('forms.submit')}</button>
                     </div>
                 </form>
             </div>
@@ -53,6 +68,7 @@ const VacationRequestModal: React.FC<{
 };
 
 const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, currentUser }) => {
+    const { t } = useLanguage();
     const [isModalOpen, setModalOpen] = useState(false);
 
     const handleNewRequest = (data: Omit<FormSubmission, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt' | 'formType'>) => {
@@ -62,7 +78,7 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
             requesterId: currentUser.id,
             requesterName: currentUser.name,
             requesterAvatarUrl: currentUser.avatarUrl,
-            formType: 'Solicitação de Férias',
+            formType: 'Solicitação de Férias', // Could also be localized or kept as internal ID
             status: 'Pendente',
             submittedAt: new Date().toISOString().split('T')[0],
         };
@@ -84,44 +100,44 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
     return (
         <>
             <div className="space-y-6">
-                <h1 className="text-3xl font-bold text-brand-text">Central de Formulários</h1>
-                <Card title="Formulários Disponíveis">
+                <h1 className="text-3xl font-bold text-brand-text">{t('forms.title')}</h1>
+                <Card title={t('forms.available')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div onClick={() => setModalOpen(true)} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
-                            <h3 className="font-bold text-lg text-brand-text">Solicitação de Férias</h3>
-                            <p className="text-sm text-brand-subtle-text mt-1">Planeje e envie seu pedido de férias.</p>
+                            <h3 className="font-bold text-lg text-brand-text">{t('forms.vacation')}</h3>
+                            <p className="text-sm text-brand-subtle-text mt-1">{t('forms.vacation_desc')}</p>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Iniciar Solicitação</span>
+                                <span>{t('forms.start_request')}</span>
                             </button>
                         </div>
-                        <div onClick={() => alert('Em breve: Formulário de Reembolso')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
-                            <h3 className="font-bold text-lg text-brand-text">Reembolso de Despesas</h3>
-                            <p className="text-sm text-brand-subtle-text mt-1">Envie comprovantes para reembolso.</p>
+                        <div onClick={() => alert('Em breve/Coming Soon')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
+                            <h3 className="font-bold text-lg text-brand-text">{t('forms.reimbursement')}</h3>
+                            <p className="text-sm text-brand-subtle-text mt-1">{t('forms.reimbursement_desc')}</p>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar Reembolso</span>
+                                <span>{t('forms.start_request')}</span>
                             </button>
                         </div>
-                        <div onClick={() => alert('Em breve: Alteração de Dados Cadastrais')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
-                            <h3 className="font-bold text-lg text-brand-text">Alteração de Dados</h3>
-                            <p className="text-sm text-brand-subtle-text mt-1">Atualize endereço, telefone, etc.</p>
+                        <div onClick={() => alert('Em breve/Coming Soon')} className="p-6 bg-gray-50 rounded-lg hover:bg-emerald-50 border hover:border-emerald-300 cursor-pointer transition-colors text-center">
+                            <h3 className="font-bold text-lg text-brand-text">{t('forms.data_change')}</h3>
+                            <p className="text-sm text-brand-subtle-text mt-1">{t('forms.data_change_desc')}</p>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
                                 <PlusIcon className="w-4 h-4" />
-                                <span>Solicitar Alteração</span>
+                                <span>{t('forms.start_request')}</span>
                             </button>
                         </div>
                     </div>
                 </Card>
 
-                <Card title="Minhas Solicitações">
+                <Card title={t('forms.my_requests')}>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left text-gray-500">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                 <tr>
                                     <th scope="col" className="px-6 py-3">Tipo</th>
                                     <th scope="col" className="px-6 py-3">Período</th>
-                                    <th scope="col" className="px-6 py-3">Data de Envio</th>
+                                    <th scope="col" className="px-6 py-3">Data</th>
                                     <th scope="col" className="px-6 py-3">Status</th>
                                 </tr>
                             </thead>
@@ -138,7 +154,7 @@ const FormsPage: React.FC<FormsPageProps> = ({ submissions, setSubmissions, curr
                                 ))}
                             </tbody>
                         </table>
-                        {userSubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">Você ainda não enviou nenhuma solicitação.</p>}
+                        {userSubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">...</p>}
                     </div>
                 </Card>
             </div>
