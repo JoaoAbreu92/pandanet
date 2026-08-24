@@ -3,15 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Edge Function 'email-handler' V14 (Power TLS Bypass) iniciada.");
-
-// Tentativa de forçar o bypass no nível do processo Deno/Node emulation
-try {
-  Deno.env.set('NODE_TLS_REJECT_UNAUTHORIZED', '0');
-  console.log("NODE_TLS_REJECT_UNAUTHORIZED definido como '0'.");
-} catch (e) {
-  console.warn("Não foi possível definir NODE_TLS_REJECT_UNAUTHORIZED via código:", e.message);
-}
+console.log("Edge Function 'email-handler' V15 (IP & Blank SNI) iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,7 +13,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function email-handler Online (V14). TLS Power Bypass Active.' 
+      message: 'Edge Function email-handler Online (V15). IP Resolution & SNI Bypass active.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -39,7 +31,7 @@ Deno.serve(async (req) => {
       throw new Error("Ação (action) não informada no corpo da requisição.");
     }
 
-    console.log(`[V14] Executando ação: ${action}`);
+    console.log(`[V15] Executando ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações (settings) não fornecidas.");
@@ -47,62 +39,74 @@ Deno.serve(async (req) => {
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
-      // Teste SMTP com Bypass Agressivo
+      // Tenta resolver o IP para contornar problemas de DNS/Hostname Mismatch no Deno
+      let smtpIp = settings.smtp_host;
+      let imapIp = settings.imap_host;
+
       try {
-        console.log(`[SMTP] Iniciando transporte para ${settings.smtp_host}:${settings.smtp_port}`);
+        const ipsSmtp = await Deno.resolveDns(settings.smtp_host, "A").catch(() => []);
+        if (ipsSmtp.length > 0) {
+          smtpIp = ipsSmtp[0];
+          console.log(`[V15] SMTP: ${settings.smtp_host} -> ${smtpIp}`);
+        }
+
+        const ipsImap = await Deno.resolveDns(settings.imap_host, "A").catch(() => []);
+        if (ipsImap.length > 0) {
+          imapIp = ipsImap[0];
+          console.log(`[V15] IMAP: ${settings.imap_host} -> ${imapIp}`);
+        }
+      } catch (dnsErr) {
+        console.warn("[V15] Falha ao resolver DNS (usando hostnames originais):", dnsErr.message);
+      }
+
+      // Teste SMTP
+      try {
+        console.log(`[SMTP] Conectando a ${smtpIp}:${settings.smtp_port}`);
         const transporter = nodemailer.default.createTransport({
-          host: settings.smtp_host,
+          host: smtpIp, // Usando IP se resolvido
           port: settings.smtp_port,
           secure: settings.smtp_port === 465,
           auth: {
             user: settings.user,
             pass: settings.pass,
           },
-          debug: true,
-          logger: true,
           tls: { 
             rejectUnauthorized: false,
-            servername: settings.smtp_host,
-            checkServerIdentity: (hostname, cert) => {
-              console.log(`[TLS] Ignorando verificação de identidade para: ${hostname}`);
+            servername: "",
+            checkServerIdentity: () => {
+              console.log("[TLS] checkServerIdentity ignorado (V15)");
               return undefined;
             }
-          },
-          requireTLS: settings.smtp_port === 465
+          }
         })
-
         await transporter.verify();
-        console.log("[SMTP] Sucesso na verificação.");
+        console.log("[SMTP] OK");
       } catch (e: any) {
         console.error("[SMTP ERROR]", e);
-        let msg = e.message;
-        if (msg.includes('NotValidForName')) {
-          msg += " (Dica: O Deno é rígido com certificados. Tente usar o endereço IP do servidor SMTP se o hostname falhar).";
-        }
-        throw new Error(`Erro no Servidor de Envio (SMTP): ${msg}`);
+        throw new Error(`Erro no Servidor de Envio (SMTP): ${e.message}`);
       }
 
-      // Teste IMAP com Bypass Agressivo
+      // Teste IMAP
       try {
-        console.log(`[IMAP] Conectando a ${settings.imap_host}:${settings.imap_port}`);
+        console.log(`[IMAP] Conectando a ${imapIp}:${settings.imap_port}`);
         const client = new ImapFlow({
-          host: settings.imap_host,
+          host: imapIp,
           port: settings.imap_port,
           secure: true,
           auth: {
             user: settings.user,
             pass: settings.pass,
           },
-          logger: true,
+          logger: false,
           tls: { 
             rejectUnauthorized: false,
-            servername: settings.imap_host,
+            servername: "",
             checkServerIdentity: () => undefined
           }
         })
         await client.connect();
         await client.logout();
-        console.log("[IMAP] Sucesso na conexão.");
+        console.log("[IMAP] OK");
       } catch (e: any) {
         console.error("[IMAP ERROR]", e);
         throw new Error(`Erro no Servidor de Recebimento (IMAP): ${e.message}`);
@@ -110,7 +114,7 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conexão estabelecida com sucesso na V14 (Bypass Ativo)!'
+        message: 'Conexão estabelecida com sucesso na V15!'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -118,13 +122,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Ação '${action}' na V14.`
+      message: `Ação '${action}' recebida na V15.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error: any) {
-    console.error(`[RUNTIME ERROR V14]`, error.message);
+    console.error("[RUNTIME ERROR V15]", error.message);
     return new Response(JSON.stringify({
       success: false,
       error: error.message
