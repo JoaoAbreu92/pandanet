@@ -30,4 +30,9 @@ echo "📧 Reiniciando serviço de e-mail..."
 chmod +x run_email_service.sh
 ./run_email_service.sh
 
+# 4. Limpeza profunda da VPS
+echo "🧹 Executando limpeza profunda da VPS..."
+chmod +x limpar_vps.sh
+./limpar_vps.sh
+
 echo "✨ Atualização concluída com SUCESSO! ✨"

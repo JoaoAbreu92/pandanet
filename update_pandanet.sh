@@ -20,8 +20,10 @@ echo "🔧 Aplicando correções RLS no banco de dados..."
 chmod +x scratch/apply_rls.sh
 ./scratch/apply_rls.sh
 
-# 3. Limpeza rápida
-docker image prune -f
+# 3. Limpeza profunda da VPS
+echo "🧹 Executando limpeza profunda da VPS..."
+chmod +x limpar_vps.sh
+./limpar_vps.sh
 
 echo "✅ Atualização da PandaNet concluída!"
 docker ps | grep pandanet

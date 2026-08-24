@@ -11,18 +11,30 @@ echo "📊 Espaço em disco ANTES da limpeza:"
 df -h /
 echo "----------------------------------------"
 
-# 2. Limpar cache do Docker Builder (BuildKit)
+# 2. Parar e remover containers do Perfex CRM (Ayla)
+# Como não utilizaremos mais o Perfex, removemos os containers para que suas imagens/volumes fiquem órfãos e possam ser limpos.
+echo "🐳 1. Parando e removendo containers antigos do Perfex CRM (Ayla)..."
+if command -v docker >/dev/null 2>&1; then
+    docker ps -a --format '{{.Names}}' | grep -E "perfex|ayla" | xargs -I {} docker rm -f {} 2>/dev/null || true
+fi
+
+# 3. Limpar cache do Docker Builder (BuildKit)
 # O Docker armazena cache de todas as etapas de build que foram feitas. 
 # Ao reconstruir containers repetidas vezes, isso facilmente acumula dezenas de GBs de lixo.
-echo "🐳 1. Limpando cache de compilação do Docker (BuildKit)..."
+echo "🐳 2. Limpando cache de compilação do Docker (BuildKit)..."
 docker builder prune -a -f
 
-# 3. Limpar containers parados, redes não utilizadas e imagens suspensas (dangling)
-echo "🐳 2. Executando limpeza geral de recursos parados no Docker..."
+# 4. Limpar containers parados, redes não utilizadas e imagens suspensas (dangling)
+echo "🐳 3. Executando limpeza geral de recursos parados no Docker..."
 docker system prune -f
 
-# 4. Limpar imagens antigas não utilizadas por nenhum container ativo
-echo "🐳 3. Removendo imagens antigas/redundantes do Docker..."
+# 5. Limpar volumes não utilizados (como os volumes órfãos do Perfex CRM)
+# Remove volumes locais órfãos. É seguro porque o PandaNet e o Supabase estarão em execução.
+echo "🐳 4. Removendo volumes de dados órfãos do Docker..."
+docker volume prune -f
+
+# 6. Limpar imagens antigas não utilizadas por nenhum container ativo
+echo "🐳 5. Removendo imagens antigas/redundantes do Docker..."
 docker image prune -a -f
 
 # 5. Limpar os arquivos de logs acumulados do Docker

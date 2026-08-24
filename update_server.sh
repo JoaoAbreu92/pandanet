@@ -8,11 +8,11 @@ git pull origin main
 
 # 2. Descer os containers ativos e remover órfãos
 echo "🧹 Limpando containers antigos..."
-docker compose -f docker-compose.production.yml -f docker-compose.perfex.yml down --remove-orphans
+docker compose -f docker-compose.production.yml down --remove-orphans
 
 # 3. Subir e reconstruir usando as configurações oficiais
 echo "🚀 Reconstruindo e iniciando o sistema..."
-docker compose -f docker-compose.production.yml -f docker-compose.perfex.yml up -d --build
+docker compose -f docker-compose.production.yml up -d --build
 
 # 4. Aguardar o banco estar acessível (com retry)
 echo "🗄️ Aguardando o banco de dados ficar pronto..."
@@ -45,6 +45,11 @@ npm run build
 # 7. Atualizar e reiniciar processos do PM2
 echo "🔄 Reiniciando processos PM2..."
 pm2 restart all --update-env
+
+# 8. Limpeza profunda da VPS
+echo "🧹 Executando limpeza profunda da VPS..."
+chmod +x limpar_vps.sh
+./limpar_vps.sh
 
 echo "✅ Atualização concluída com sucesso!"
 docker ps | grep -E "pandanet|supabase"
