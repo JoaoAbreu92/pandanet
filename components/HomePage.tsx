@@ -16,7 +16,10 @@ interface HomePageProps {
     currentUser: Employee;
 }
 
+import { useLanguage } from './LanguageContext';
+
 const Birthdays: React.FC<{ employees: Employee[] }> = ({ employees }) => {
+    const { t } = useLanguage();
     const currentMonth = new Date().getMonth() + 1;
     const upcomingBirthdays = employees.filter(e => {
         const birthMonth = new Date(e.birthDate).getUTCMonth() + 1;
@@ -24,15 +27,15 @@ const Birthdays: React.FC<{ employees: Employee[] }> = ({ employees }) => {
     }).sort((a, b) => new Date(a.birthDate).getUTCDate() - new Date(b.birthDate).getUTCDate());
 
     return (
-        <Card title="Aniversariantes do Mês">
+        <Card title={t('home.birthdays_title') || 'Aniversariantes do Mês'}>
             {upcomingBirthdays.length > 0 ? (
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
                     {upcomingBirthdays.map(employee => (
-                        <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50">
+                        <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <img src={employee.avatarUrl} alt={employee.name} className="w-10 h-10 rounded-full" />
                             <div>
-                                <p className="font-semibold text-sm text-brand-text">{employee.name}</p>
-                                <p className="text-xs text-brand-subtle-text">
+                                <p className="font-semibold text-sm text-brand-text dark:text-gray-100">{employee.name}</p>
+                                <p className="text-xs text-brand-subtle-text dark:text-gray-400">
                                     <GiftIcon className="w-3 h-3 inline-block mr-1" />
                                     {new Date(employee.birthDate).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', timeZone: 'UTC' })}
                                 </p>
@@ -41,29 +44,30 @@ const Birthdays: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     ))}
                 </div>
             ) : (
-                <p className="text-sm text-brand-subtle-text">Nenhum aniversário este mês.</p>
+                    <p className="text-sm text-brand-subtle-text dark:text-gray-500">{t('home.birthdays_none') || 'Nenhum aniversário este mês.'}</p>
             )}
         </Card>
     );
 };
 
 const NewHires: React.FC<{ employees: Employee[] }> = ({ employees }) => {
+    const { t } = useLanguage();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const newHires = employees.filter(e => new Date(e.joinDate) >= thirtyDaysAgo).sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
 
     return (
-        <Card title="Boas-vindas!">
+        <Card title={t('home.welcome_title') || 'Boas-vindas!'}>
             {newHires.length > 0 ? (
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
                     {newHires.map(employee => (
-                        <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50">
+                        <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <img src={employee.avatarUrl} alt={employee.name} className="w-10 h-10 rounded-full" />
                             <div>
-                                <p className="font-semibold text-sm text-brand-text">{employee.name}</p>
-                                <p className="text-xs text-brand-subtle-text">{employee.role}, {employee.team}</p>
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="font-semibold text-sm text-brand-text dark:text-gray-100">{employee.name}</p>
+                                <p className="text-xs text-brand-subtle-text dark:text-gray-400">{employee.role}, {employee.team}</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                     <UserPlusIcon className="w-3 h-3 inline-block mr-1" />
                                     Entrou em {new Date(employee.joinDate).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', timeZone: 'UTC' })}
                                 </p>
@@ -72,7 +76,7 @@ const NewHires: React.FC<{ employees: Employee[] }> = ({ employees }) => {
                     ))}
                 </div>
             ) : (
-                <p className="text-sm text-brand-subtle-text">Nenhum novo colaborador recentemente.</p>
+                    <p className="text-sm text-brand-subtle-text dark:text-gray-500">{t('home.welcome_none') || 'Nenhum novo colaborador recentemente.'}</p>
             )}
         </Card>
     );

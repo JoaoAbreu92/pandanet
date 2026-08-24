@@ -60,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             return null;
         }
         return (
-            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'} ${isOpen ? '' : 'justify-center'}`} title={label}>
+            <button type="button" onClick={() => onNavigate(page)} className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === page ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white'} ${isOpen ? '' : 'justify-center'}`} title={label}>
                 <Icon className="w-6 h-6 flex-shrink-0" />
                 {isOpen && <span className="ml-4 truncate">{label}</span>}
             </button>
@@ -77,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         return (
             <div>
-                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'}`}>
+                <button onClick={() => toggleMenu(menuKey)} className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${isActive ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white'}`}>
                     <div className="flex items-center">
                         <Icon className="w-6 h-6 flex-shrink-0" />
                         {isOpen && <span className="ml-4 truncate font-semibold">{label}</span>}
@@ -101,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700 premium-card
+        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800 premium-card
             fixed md:relative z-50 h-full
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>
@@ -110,43 +110,42 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
-                <NavItem page="whatspanda" label="WhatsPanda" icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
+                <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
                 <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
-                <NavItem page="email" label="PandaMail" icon={EnvelopeIcon} permission="viewEmail" />
+                <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" />
                 <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
-                <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
+                <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
 
-                <hr className="my-2 border-gray-100 dark:border-gray-700" />
+                <hr className="my-2 border-gray-100 dark:border-gray-800" />
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
                 <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
-                <NavItem page="kpi-dashboard" label="Métricas Grupo" icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
+                <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
 
-                <NavMenu label="RH & Gestão" icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
-                    <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
-                    <NavItem page="org-chart" label="Organograma" icon={ArrowPathIcon} permission="viewOrgChart" featureId="org-chart" />
-                    <NavItem page="meu-rh" label="Portal Meu RH" icon={BuildingOfficeIcon} permission="viewMeuRH" featureId="meu-rh" />
-                    <NavItem page="jobs" label="Portal de Vagas" icon={RocketLaunchIcon} permission="viewJobs" featureId="jobs" />
-                    <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" featureId="training" />
-                    <NavItem page="surveys" label="Pesquisas Internas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" featureId="surveys" />
+                <NavMenu label={t('sidebar.rh_gestao')} icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
+                    <NavItem page="directory" label={t('users.title')} icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
+                    <NavItem page="org-chart" label={t('sidebar.org_chart')} icon={ArrowPathIcon} permission="viewOrgChart" featureId="org-chart" />
+                    <NavItem page="meu-rh" label={t('sidebar.meu_rh')} icon={BuildingOfficeIcon} permission="viewMeuRH" featureId="meu-rh" />
+                    <NavItem page="jobs" label={t('sidebar.jobs')} icon={RocketLaunchIcon} permission="viewJobs" featureId="jobs" />
+                    <NavItem page="training" label={t('sidebar.training')} icon={RocketLaunchIcon} permission="viewTraining" featureId="training" />
+                    <NavItem page="surveys" label={t('sidebar.surveys_internal')} icon={ChatBubbleLeftRightIcon} permission="viewSurveys" featureId="surveys" />
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
                     <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
-                    <NavItem page="documentos" label="Biblioteca Corp." icon={FolderIcon} permission="viewDocuments" />
+                    <NavItem page="documentos" label={t('sidebar.library')} icon={FolderIcon} permission="viewDocuments" />
                     <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
                 </NavMenu>
 
-                <NavMenu label="T.I. & Suporte" icon={LifebuoyIcon} menuKey="ti" permission={hasTiAccess}>
+                <NavMenu label={t('sidebar.ti_suporte')} icon={LifebuoyIcon} menuKey="ti" permission={hasTiAccess}>
                     <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" featureId="tickets" />
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" featureId="equip" />
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
-                    <NavItem page="manual-usuario" label="Manual do Usuário" icon={PlayIcon} permission={true} />
+                    <NavItem page="manual-usuario" label={t('sidebar.user_manual')} icon={PlayIcon} permission={true} />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
                     <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
-
                 </NavMenu>
 
                 {/* SaaS Super Admin Button */}
@@ -159,7 +158,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                         title="Painel SaaS"
                     >
                         <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
-                        {isOpen && <span className="ml-4 truncate font-bold">Painel SaaS</span>}
+                        {isOpen && <span className="ml-4 truncate font-bold">{t('sidebar.saas_panel')}</span>}
                     </button>
                 )}
 
@@ -180,7 +179,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 {companyLogo && (
                     <img src={companyLogo} alt={companyName} className="h-10 mx-auto object-contain" />
                 )}
-                <p className="text-sm font-bold text-gray-800 dark:text-white truncate mt-2">{companyName}</p>
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate mt-2">{companyName}</p>
             </div>
         </aside>
     );

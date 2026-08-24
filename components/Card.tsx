@@ -11,10 +11,10 @@ interface CardProps {
 
 const Card: React.FC<CardProps> = ({ title, children, className = '', headerAction, noPadding = false, hideTypeBorder = false }) => {
   return (
-    <div className={`premium-card ${hideTypeBorder ? '' : 'border-t-4 border-emerald-500'} ${noPadding ? '' : 'p-6'} dark:bg-gray-800 dark:border-gray-700 ${className}`}>
+    <div className={`premium-card ${hideTypeBorder ? '' : 'border-t-4 border-emerald-500'} ${noPadding ? '' : 'p-6'} dark:bg-gray-900 dark:border-gray-800 ${className}`}>
       {title && (
-        <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2 dark:border-gray-700">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white">{title}</h3>
+        <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2 dark:border-gray-800">
+          <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">{title}</h3>
           {headerAction}
         </div>
       )}

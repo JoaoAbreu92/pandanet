@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
     };
 
     return (
-        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-gray-800 dark:border-gray-700 premium-card">
+        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-gray-900 dark:border-gray-800 premium-card">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -163,7 +163,13 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-lg hover:bg-gray-200 transition-all dark:bg-gray-700 dark:hover:bg-gray-600"
                         title={t('language.select')}
                     >
-                        {language === 'pt' ? '🇧🇷' : language === 'en' ? '🇺🇸' : '🇪🇸'}
+                        {language === 'pt' ? (
+                            <img src="https://flagcdn.com/w40/br.png" alt="Brasil" className="w-5 h-auto rounded-sm shadow-sm" />
+                        ) : language === 'en' ? (
+                            <img src="https://flagcdn.com/w40/us.png" alt="USA" className="w-5 h-auto rounded-sm shadow-sm" />
+                        ) : (
+                            <img src="https://flagcdn.com/w40/es.png" alt="Spain" className="w-5 h-auto rounded-sm shadow-sm" />
+                        )}
                     </button>
 
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
@@ -178,7 +184,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         <button onClick={() => setDropdownOpen(!isDropdownOpen)} className="flex items-center space-x-2">
                             <img src={currentUser.avatarUrl} alt="User" className="w-10 h-10 rounded-full" />
                             <div className="hidden lg:block text-left">
-                                <p className="font-semibold text-sm text-brand-text dark:text-gray-200">{currentUser.name}</p>
+                                <p className="font-semibold text-sm text-brand-text dark:text-gray-100">{currentUser.name}</p>
                                 <p className="text-xs text-brand-subtle-text dark:text-gray-400">{currentUser.role}</p>
                             </div>
                         </button>
