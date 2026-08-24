@@ -360,25 +360,37 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         }
 
         if (contacts.length > 0) {
-            console.log(`[SYNC] ${contacts.length} contatos encontrados via ${successEndpoint}`);
+            console.log(`[SYNC] ${contacts.length} contatos encontrados via ${successEndpoint}. Processando batch upsert...`);
+            
+            const batchSize = 100;
+            const contactsToUpsert = [];
+
             for (const c of contacts) {
                 const jid = c.id || c.remoteJid;
                 const phone = jid?.split('@')[0];
                 if (phone && !jid.includes('@g.us')) {
                     const name = c.name || c.pushName || c.notify || phone;
-                    
-                    console.log(`[SYNC] Upserting contact: ${name} (${phone})`);
-                    const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
+                    contactsToUpsert.push({
                         company_id: companyId,
                         phone: phone,
                         name: name,
                         updated_at: new Date().toISOString()
-                    }, { onConflict: 'company_id,phone' });
-                    
-                    if (upsertErr) console.error('[SYNC] Erro upsert contato:', upsertErr.message);
+                    });
                 }
             }
-            console.log(`[SYNC] Sincronização de ${contacts.length} contatos finalizada.`);
+
+            // Executar em lotes para não sobrecarregar a query
+            for (let i = 0; i < contactsToUpsert.length; i += batchSize) {
+                const batch = contactsToUpsert.slice(i, i + batchSize);
+                const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert(batch, { onConflict: 'company_id,phone' });
+                if (upsertErr) {
+                    console.error(`[SYNC] Erro no lote ${i / batchSize}:`, upsertErr.message);
+                } else {
+                    console.log(`[SYNC] Lote ${i / batchSize + 1} processado (${batch.length} contatos).`);
+                }
+            }
+            
+            console.log(`[SYNC] Sincronização de ${contactsToUpsert.length} contatos finalizada.`);
         } else {
             console.warn('[SYNC] Nenhum contato retornado pelos endpoints testados.');
         }

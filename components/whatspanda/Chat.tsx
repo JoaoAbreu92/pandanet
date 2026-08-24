@@ -85,7 +85,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, payload => {
         fetchConversations(); 
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[WP-DEBUG] Realtime Status (Conversas): ${status}`);
+        if (status === 'TIMED_OUT' || status === 'CLOSED') {
+           console.log('[WP-DEBUG] Tentando reconectar subscrição de conversas...');
+           // A lib do Supabase tenta reconectar sozinha, mas o log ajuda a monitorar
+        }
+      });
 
     return () => {
       supabase.removeChannel(convSubscription);
@@ -98,11 +104,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
 
     const msgSubscription = supabase
       .channel(`whatsapp_messages_changes_${selectedConversation.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_messages', filter: `conversation_id=eq.${selectedConversation.id}` }, payload => {
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'whatsapp_messages', 
+        filter: `conversation_id=eq.${selectedConversation.id}` 
+      }, payload => {
+        console.log('[WP-DEBUG] Nova mensagem recebida via Realtime');
         const newMsg = payload.new as WhatsAppMessage;
         setMessages(prev => [...prev, newMsg]);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[WP-DEBUG] Realtime Status (Mensagens): ${status}`);
+      });
 
     return () => {
       supabase.removeChannel(msgSubscription);
@@ -176,7 +190,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     const { data } = await query
       .order('last_message_at', { ascending: false });
     
-    if (data) setConversations(data as WhatsAppConversationWithDetails[]);
+    if (data) {
+      setConversations(data as WhatsAppConversationWithDetails[]);
+      // Se não tem nada na aba atual mas tem pendentes, avise ou mude se for o caso
+      const hasPending = (data as any[]).some(c => c.status === 'pendente');
+      const hasOpen = (data as any[]).some(c => c.status === 'aberto');
+      if (hasPending && !hasOpen && activeTab === 'aberto') {
+         console.log('[WP-DEBUG] Sugerindo mudar para aba Pendente');
+      }
+    }
     setLoading(false);
   };
 
