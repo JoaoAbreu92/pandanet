@@ -60,9 +60,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (!isAdmin && !hasPermission) {
             return null;
         }
-        // Check if feature is disabled by company custom_features
-        if (featureId && customFeatures && customFeatures[featureId] === false) {
-            return null;
+        // Se a feature não foi aprovada pelo SaaS (explicitamente ou ausente), não exibir (especialmente CRM)
+        if (featureId && customFeatures) {
+            if (customFeatures[featureId] === false || (featureId === 'crm' && typeof customFeatures[featureId] === 'undefined')) {
+                return null;
+            }
         }
 
         // --- Notification Badge Logic ---
@@ -130,12 +132,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'crm'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
-        // If feature is explicitly disabled for the company, don't show the menu at all (even for admins)
-        if (featureId && customFeatures && customFeatures[featureId] === false) {
-            return null;
+        // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito como o crm
+        if (featureId) {
+            const isExplicitlyDisabled = customFeatures && customFeatures[featureId] === false;
+            const isImplicitlyDisabled = customFeatures && typeof customFeatures[featureId] === 'undefined' && featureId === 'crm';
+            if (isExplicitlyDisabled || isImplicitlyDisabled) {
+                return null;
+            }
         }
 
-        if (!permission && !isAdmin) return null;
+        if (!isAdmin && !permission) return null;
 
         const isActive = React.Children.toArray(children).some(child =>
             React.isValidElement(child) && (child.props as any).page === currentPage

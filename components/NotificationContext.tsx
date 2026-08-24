@@ -279,20 +279,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (currentUser?.id) {
             console.log('--- TESTE REALTIME: Iniciando para usuário:', currentUser.id);
             const channel = supabase
-                .channel(`notifications-global`) // Nome genérico para teste
+                .channel(`notifications-global`) // Nome genérico
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'notifications'
-                    // Removido o filtro temporariamente para garantir recepção total
+                    table: 'notifications',
+                    filter: `user_id=eq.${currentUser.id}`
                 }, (payload) => {
                     console.log('--- REALTIME EVENTO RECEBIDO ---', payload);
-                    // Verificamos se o registro pertence ao usuário atual no frontend
                     const newNotif = payload.new as any;
                     if (newNotif && newNotif.user_id === currentUser.id) {
                         console.log('Aviso: Notificação pertence a este usuário. Atualizando...');
 
-                        // Action on new notification
                         if (payload.eventType === 'INSERT') {
                             playNotificationSound(newNotif.type as NotificationType);
                             showDesktopNotification(newNotif.title, newNotif.description, newNotif.avatar_url);
@@ -324,26 +322,29 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .subscribe();
 
             // --- REALTIME: WhatsPanda Conversations ---
-            const whatsappChannel = supabase
-                .channel('realtime-whatsapp-count')
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'whatsapp_conversations',
-                    filter: `company_id=eq.${currentUser.company_id}`
-                }, () => {
-                    fetchNotifications();
-                })
-                .subscribe();
+            let whatsappChannel: any = null;
+            if (currentUser.company_id) {
+                whatsappChannel = supabase
+                    .channel('realtime-whatsapp-count')
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'whatsapp_conversations',
+                        filter: `company_id=eq.${currentUser.company_id}`
+                    }, () => {
+                        fetchNotifications();
+                    })
+                    .subscribe();
+            }
 
             return () => {
                 console.log('Finalizando Realtime');
                 supabase.removeChannel(channel);
                 supabase.removeChannel(messagesChannel);
-                supabase.removeChannel(whatsappChannel);
+                if (whatsappChannel) supabase.removeChannel(whatsappChannel);
             };
         }
-    }, [currentUser?.id, fetchNotifications, playNotificationSound, showDesktopNotification]);
+    }, [currentUser?.id, currentUser?.company_id, fetchNotifications, playNotificationSound, showDesktopNotification]);
 
     const markAsRead = async (id: string) => {
         if (isGhostMode) return; // Ghost mode blocks marking as read

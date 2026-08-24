@@ -46,6 +46,8 @@ const CRMCustomerDetail: React.FC<CRMCustomerDetailProps> = ({ customer, onClose
     const [invoices, setInvoices] = useState<any[]>([]);
     const [projects, setProjects] = useState<any[]>([]);
     const [tasks, setTasks] = useState<any[]>([]);
+    const [newTaskName, setNewTaskName] = useState('');
+    const [addingTask, setAddingTask] = useState(false);
     const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
@@ -106,6 +108,54 @@ const CRMCustomerDetail: React.FC<CRMCustomerDetailProps> = ({ customer, onClose
             showToast('Erro ao atualizar cliente', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAddTask = async () => {
+        if (!newTaskName.trim()) return;
+        try {
+            setAddingTask(true);
+            const { data, error } = await supabase
+                .from('crm_tasks')
+                .insert({
+                    customer_id: customer.id,
+                    name: newTaskName,
+                    status: 'pending',
+                    priority: 'medium',
+                    company_id: (customer as any).company_id // Assumed from customer object
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            setTasks([data, ...tasks]);
+            setNewTaskName('');
+            showToast('Tarefa adicionada');
+        } catch (error) {
+            console.error('Error adding task:', error);
+            showToast('Erro ao adicionar tarefa', 'error');
+        } finally {
+            setAddingTask(false);
+        }
+    };
+
+    const toggleTaskStatus = async (task: any) => {
+        const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+        try {
+            // Optimistic update
+            setTasks(tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+
+            const { error } = await supabase
+                .from('crm_tasks')
+                .update({ status: newStatus })
+                .eq('id', task.id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error toggling task:', error);
+            showToast('Erro ao atualizar tarefa', 'error');
+            // Revert on error
+            setTasks(tasks);
         }
     };
 
@@ -331,26 +381,73 @@ const CRMCustomerDetail: React.FC<CRMCustomerDetailProps> = ({ customer, onClose
                         )}
 
                         {(activeTab === 'tasks') && (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4">Tarefas do Cliente</h3>
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-bold text-gray-800 dark:text-white">Tarefas do Cliente</h3>
+                                    <span className="text-[10px] font-black bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded uppercase tracking-widest">{tasks.length} total</span>
+                                </div>
+
+                                {/* Add Task Input */}
+                                <div className="relative group">
+                                    <input
+                                        type="text"
+                                        placeholder="Adicionar nova tarefa..."
+                                        value={newTaskName}
+                                        onChange={(e) => setNewTaskName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                                        className="w-full bg-gray-50/50 dark:bg-slate-800/30 border border-gray-100 dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400 dark:text-white"
+                                    />
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                        {addingTask ? (
+                                            <ArrowPathIcon className="w-5 h-5 text-blue-500 animate-spin" />
+                                        ) : (
+                                            <PencilSquareIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={handleAddTask}
+                                        disabled={!newTaskName.trim() || addingTask}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-black uppercase rounded-lg opacity-0 group-hover:opacity-100 disabled:opacity-0 transition-opacity"
+                                    >
+                                        Adicionar
+                                    </button>
+                                </div>
+
                                 {loadingData ? (
                                     <div className="flex justify-center p-12"><ArrowPathIcon className="w-8 h-8 animate-spin text-blue-500" /></div>
                                 ) : tasks.length > 0 ? (
                                     <div className="space-y-2">
                                         {tasks.map(task => (
-                                            <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-800 hover:border-blue-200 transition-colors">
-                                                <div className={`p-2 rounded-lg ${task.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                    <CheckCircleIcon className="w-4 h-4" />
+                                            <div
+                                                key={task.id}
+                                                onClick={() => toggleTaskStatus(task)}
+                                                className={`flex items-center gap-3 p-4 rounded-2xl border transition-all cursor-pointer group ${task.status === 'completed' ? 'bg-gray-50/50 dark:bg-slate-800/10 border-transparent opacity-60' : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800 hover:border-blue-200 hover:shadow-lg shadow-blue-500/5'}`}
+                                            >
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'border-gray-200 group-hover:border-blue-400'}`}>
+                                                    {task.status === 'completed' && <CheckCircleIcon className="w-4 h-4 text-white" />}
                                                 </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-xs font-bold ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-slate-200'}`}>{task.name}</p>
-                                                    <p className="text-[10px] text-gray-400">Prioridade: {task.priority}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-bold tracking-tight transition-all ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-slate-200'}`}>{task.name}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${task.priority === 'high' ? 'bg-red-100 text-red-500' : task.priority === 'medium' ? 'bg-orange-100 text-orange-500' : 'bg-blue-100 text-blue-500'}`}>
+                                                            {task.priority || 'Normal'}
+                                                        </span>
+                                                        {task.duedate && (
+                                                            <span className="text-[10px] text-gray-400 font-medium tracking-tight">Vence {new Date(task.duedate).toLocaleDateString()}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-center py-12 text-gray-400">Nenhuma tarefa encontrada.</p>
+                                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                                <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                                                    <CheckCircleIcon className="w-8 h-8 text-gray-200" />
+                                                </div>
+                                                <h4 className="text-sm font-bold text-gray-400">Nenhuma tarefa ativa</h4>
+                                                <p className="text-xs text-gray-300">Crie sua primeira tarefa acima para começar.</p>
+                                            </div>
                                 )}
                             </div>
                         )}

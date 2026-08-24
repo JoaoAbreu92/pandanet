@@ -175,8 +175,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     // --- Refs ---
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-    // --- State: Context Menu (Moved to proper location) ---
+    // --- State: Context Menu ---
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, email: EmailMessage } | null>(null);
+    const [selectedEmailUids, setSelectedEmailUids] = useState<string[]>([]);
 
     // --- Actions: Context Menu ---
     const handleContextMenu = (e: React.MouseEvent, email: EmailMessage) => {
@@ -592,43 +593,59 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     };
 
     const deleteEmail = async (email: EmailMessage) => {
+        const trashFolder = folders.find((f: any) => f.specialUse === '\\Trash' || f.path.toLowerCase().includes('trash') || f.path.toLowerCase().includes('lixeira'))?.path || 'INBOX.Trash';
+
         openConfirm(
             'Lixeira',
             'Tem certeza que deseja mover este e-mail para a lixeira?',
             async () => {
                 closeConfirm();
-
-                // Optimistic remove
-                setEmails(prev => prev.filter(e => e.uid !== email.uid));
+                await moveEmail([email.uid], trashFolder);
                 if (selectedEmail?.uid === email.uid) {
-                    setSelectedEmail(null);
                     setView('inbox');
-                }
-
-                // Detect Trash Folder
-                const trashFolderObj = folders.find((f: any) => f.specialUse === '\\Trash') ||
-                    folders.find((f: any) => ['Trash', 'Bin', 'Lixeira', 'Deleted', 'Itens Excluídos'].includes(f.path));
-
-                const trashPath = trashFolderObj ? trashFolderObj.path : 'Trash';
-
-                const { error } = await callEmailServer('move', {
-                    config: settings,
-                    uids: [email.uid],
-                    fromPath: currentFolder,
-                    toPath: trashPath
-                });
-
-                if (error) {
-                    console.error('Error deleting email:', error);
-                    showToast(`Erro ao mover para lixeira (${trashPath}). O e-mail reaparecerá se a pasta não existir.`, 'error');
-                    fetchFolders(); // Retry fetching folders in case they changed
-                } else {
-                    showToast('E-mail movido para a lixeira.', 'success');
+                    setSelectedEmail(null);
                 }
             },
             'danger'
         );
     };
+
+    const deleteSelectedEmails = async () => {
+        if (selectedEmailUids.length === 0) return;
+        const trashFolder = folders.find((f: any) => f.specialUse === '\\Trash' || f.path.toLowerCase().includes('trash') || f.path.toLowerCase().includes('lixeira'))?.path || 'INBOX.Trash';
+
+        openConfirm(
+            'Excluir Selecionados',
+            `Deseja mover ${selectedEmailUids.length} e-mails para a lixeira?`,
+            async () => {
+                closeConfirm();
+                await moveEmail(selectedEmailUids, trashFolder);
+                setSelectedEmailUids([]);
+                if (selectedEmail && selectedEmailUids.includes(selectedEmail.uid)) {
+                    setView('inbox');
+                    setSelectedEmail(null);
+                }
+                showToast(`${selectedEmailUids.length} e-mails movidos para a lixeira.`, 'success');
+            },
+            'danger'
+        );
+    };
+
+    const toggleEmailSelection = (uid: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedEmailUids(prev =>
+            prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedEmailUids.length === filteredEmails.length) {
+            setSelectedEmailUids([]);
+        } else {
+            setSelectedEmailUids(filteredEmails.map(e => e.uid));
+        }
+    };
+
 
 
     const fetchEmails = async (isBackground = false, forceRefresh = false) => {
@@ -1049,14 +1066,35 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     {/* Toolbar for List */}
                     <div className="p-4 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-white/50 dark:bg-[#020617]/60 backdrop-blur-xl z-20 sticky top-0">
                         <div className="flex items-center justify-between">
-                            <h2 className="font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>
-                            <button
-                                onClick={markAllAsRead}
-                                className="text-[10px] font-black text-brand-primary hover:text-emerald-500 uppercase tracking-widest transition-colors"
-                                title="Marcar todos como lidos"
-                            >
-                                Lidos
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedEmailUids.length > 0 && selectedEmailUids.length === filteredEmails.length}
+                                    onChange={toggleSelectAll}
+                                    className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all"
+                                    title="Selecionar todos"
+                                />
+                                <h2 className="font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {selectedEmailUids.length > 0 && (
+                                    <button
+                                        onClick={deleteSelectedEmails}
+                                        className="p-1 px-2 text-red-500 hover:bg-red-50 rounded-lg flex items-center gap-1 transition-all"
+                                        title="Excluir selecionados"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">{selectedEmailUids.length}</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={markAllAsRead}
+                                    className="text-[10px] font-black text-brand-primary hover:text-emerald-500 uppercase tracking-widest transition-colors"
+                                    title="Marcar todos como lidos"
+                                >
+                                    Lidos
+                                </button>
+                            </div>
                         </div>
                         <div className="relative">
                             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -1087,33 +1125,43 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     onContextMenu={(e) => handleContextMenu(e, email)}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, email)}
-                                    className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-1 relative border mb-1 group ${selectedEmail?.uid === email.uid
+                                    className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 flex items-start gap-3 relative border mb-1 group ${selectedEmail?.uid === email.uid
                                         ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
                                         : 'border-transparent hover:bg-white dark:hover:bg-white/5'} ${!(email.flags || []).includes('\\Seen') ? 'bg-emerald-50/40 dark:bg-brand-primary/10' : ''}`}
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div className={`text-sm truncate pr-2 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
-                                            {email.from}
+                                    <div className="flex flex-col mt-0.5" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedEmailUids.includes(email.uid)}
+                                            onChange={() => toggleEmailSelection(email.uid)}
+                                            className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all transition-opacity duration-200"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                        <div className="flex justify-between items-start">
+                                            <div className={`text-sm truncate pr-2 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                {email.from}
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 font-medium whitespace-nowrap opacity-60">
+                                                {new Date(email.date).toLocaleDateString()}
+                                            </div>
                                         </div>
-                                        <div className="text-[10px] text-gray-400 font-medium whitespace-nowrap opacity-60">
-                                            {new Date(email.date).toLocaleDateString()}
-                                    </div>
-                                    </div>
-                                    <div className={`text-sm line-clamp-1 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
-                                        {email.subject}
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 opacity-70 group-hover:opacity-100 transition-opacity">
-                                        {email.snippet || t('email.no_preview')}
-                                    </div>
-                                    {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-2">
-                                            {email.metadata.tags.map(t => (
-                                                <span key={t.label} className="text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border" style={{ borderColor: `${t.color}40`, backgroundColor: `${t.color}10`, color: t.color }}>
-                                                    {t.label}
-                                                </span>
-                                            ))}
+                                        <div className={`text-sm line-clamp-1 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-200'}`}>
+                                            {email.subject}
                                         </div>
-                                    )}
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 opacity-70 group-hover:opacity-100 transition-opacity">
+                                            {email.snippet || t('email.no_preview')}
+                                        </div>
+                                        {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {email.metadata.tags.map(t => (
+                                                    <span key={t.label} className="text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border" style={{ borderColor: `${t.color}40`, backgroundColor: `${t.color}10`, color: t.color }}>
+                                                        {t.label}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))
                         )}
