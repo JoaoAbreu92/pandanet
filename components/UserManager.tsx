@@ -72,6 +72,20 @@ const UserFormModal: React.FC<{
     onSave: (user: Omit<Employee, 'id'> | Employee) => void;
 }> = ({ user, departments, onClose, onSave }) => {
     const { t } = useLanguage();
+    const { profile } = useAuth();
+    const [channels, setChannels] = useState<any[]>([]);
+
+    React.useEffect(() => {
+        if (profile?.company_id) {
+            supabase.from('whatsapp_settings')
+                .select('id, instance_name, phone_number')
+                .eq('company_id', profile.company_id)
+                .then(({ data }) => {
+                    if (data) setChannels(data);
+                });
+        }
+    }, [profile?.company_id]);
+
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
@@ -282,47 +296,112 @@ const UserFormModal: React.FC<{
                             </section>
 
                             {/* Grupo: WhatsPanda */}
-                            <section className="bg-emerald-50/50 p-4 rounded-2xl border border-blue-100">
-                                <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <section className={`p-4 rounded-2xl border transition-all ${formData.is_whatsapp_agent ? 'bg-emerald-50/50 border-emerald-200' : 'bg-gray-50/50 border-gray-100'}`}>
+                                <h5 className={`text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 ${formData.is_whatsapp_agent ? 'text-emerald-600' : 'text-gray-400'}`}>
                                     <ChatBubbleLeftRightIcon className="w-3 h-3" /> WhatsPanda (Atendimento)
                                 </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle 
-                                        icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} 
-                                        label="Agente WhatsPanda" 
-                                        name="is_whatsapp_agent" 
-                                        checked={formData.is_whatsapp_agent} 
-                                        onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
-                                    />
-                                    <div className="p-3 bg-white/50 rounded-xl border border-dashed border-blue-200">
-                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Define se o usuário aparece como agente. Permissões detalhadas:</p>
-                                        <div className="grid grid-cols-1 gap-1.5">
-                                            {[
-                                                { key: 'can_view_contacts', label: 'Ver Contatos' },
-                                                { key: 'can_edit_contacts', label: 'Editar Contatos' },
-                                                { key: 'can_view_chats', label: 'Ver Chats' },
-                                                { key: 'can_send_messages', label: 'Enviar Mensagens' },
-                                                { key: 'can_send_media', label: 'Enviar Mídia' },
-                                                { key: 'can_manage_settings', label: 'Gerenciar Configs' },
-                                            ].map(perm => (
-                                                <label key={perm.key} className="flex items-center space-x-2 text-[10px] text-gray-600">
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="max-w-md">
+                                        <PermissionToggle 
+                                            icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} 
+                                            label="Agente WhatsPanda" 
+                                            name="is_whatsapp_agent" 
+                                            checked={formData.is_whatsapp_agent} 
+                                            onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                        />
+                                    </div>
+
+                                    {formData.is_whatsapp_agent && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
+                                            {/* Permissões Gerais */}
+                                            <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Permissões do Agente</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {[
+                                                        { key: 'can_view_contacts', label: 'Ver Contatos' },
+                                                        { key: 'can_edit_contacts', label: 'Editar Contatos' },
+                                                        { key: 'can_view_chats', label: 'Ver Chats' },
+                                                        { key: 'can_send_messages', label: 'Enviar Mensagens' },
+                                                        { key: 'can_send_media', label: 'Enviar Mídia' },
+                                                        { key: 'can_manage_settings', label: 'Gerenciar Configs' },
+                                                    ].map(perm => (
+                                                        <label key={perm.key} className="flex items-center space-x-2 text-[11px] text-gray-600 bg-gray-50 p-1.5 rounded-lg border border-transparent hover:border-emerald-100 cursor-pointer transition-colors">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={(formData.whatspanda_permissions as any)?.[perm.key]} 
+                                                                onChange={(e) => setFormData(prev => ({
+                                                                    ...prev,
+                                                                    whatspanda_permissions: {
+                                                                        ...(prev.whatspanda_permissions as any),
+                                                                        [perm.key]: e.target.checked
+                                                                    }
+                                                                }))}
+                                                                className="rounded text-emerald-500 w-3.5 h-3.5"
+                                                            />
+                                                            <span className="font-medium">{perm.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Conexões (Canais Permitidos) */}
+                                            <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm flex flex-col gap-3">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Canais Vinculados</p>
+                                                    <p className="text-[10px] text-gray-400 leading-tight">Escolha quais números este agente pode acessar e responder.</p>
+                                                </div>
+                                                
+                                                <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                                                    {channels.map(ch => (
+                                                        <label key={ch.id} className="flex items-center space-x-3 p-2 border border-gray-100 rounded-lg hover:bg-emerald-50 cursor-pointer transition-colors">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={((formData.whatspanda_permissions as any)?.allowed_channels || []).includes(ch.id)}
+                                                                onChange={(e) => {
+                                                                    const current = (formData.whatspanda_permissions as any)?.allowed_channels || [];
+                                                                    const updated = e.target.checked ? [...current, ch.id] : current.filter((id: string) => id !== ch.id);
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        whatspanda_permissions: {
+                                                                            ...(prev.whatspanda_permissions as any),
+                                                                            allowed_channels: updated
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                className="rounded text-emerald-500 focus:ring-emerald-500" 
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-gray-700">{ch.instance_name || 'Instância sem nome'}</span>
+                                                                <span className="text-[10px] text-gray-500">{ch.phone_number || 'Sem número'}</span>
+                                                            </div>
+                                                        </label>
+                                                    ))}
+                                                    {channels.length === 0 && (
+                                                        <span className="text-[11px] text-red-500 bg-red-50 p-2 rounded border border-red-100">Nenhum WhatsApp conectado na empresa.</span>
+                                                    )}
+                                                </div>
+
+                                                <label className="flex items-start space-x-3 p-2 bg-blue-50/50 border border-blue-100 rounded-lg cursor-pointer mt-auto">
                                                     <input 
                                                         type="checkbox" 
-                                                        checked={(formData.whatspanda_permissions as any)?.[perm.key]} 
+                                                        checked={(formData.whatspanda_permissions as any)?.can_connect_own_whatsapp || false}
                                                         onChange={(e) => setFormData(prev => ({
-                                                            ...prev,
+                                                            ...prev, 
                                                             whatspanda_permissions: {
-                                                                ...(prev.whatspanda_permissions as any),
-                                                                [perm.key]: e.target.checked
+                                                                ...(prev.whatspanda_permissions as any), 
+                                                                can_connect_own_whatsapp: e.target.checked
                                                             }
                                                         }))}
-                                                        className="rounded text-blue-500 w-3 h-3"
+                                                        className="rounded text-blue-500 mt-0.5" 
                                                     />
-                                                    <span>{perm.label}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[11px] font-bold text-blue-800">Conectar o Próprio WhatsApp</span>
+                                                        <span className="text-[10px] text-blue-600/70 leading-tight">O usuário poderá escanear o QR Code de seu celular pessoal ou corporativo no painel.</span>
+                                                    </div>
                                                 </label>
-                                            ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </section>
 

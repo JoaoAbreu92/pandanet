@@ -3,33 +3,45 @@
 === CHECKING ACRILIGHT (6323c46c-f0d1-49af-886a-912efb3c6f41) ===
 RECENT MESSAGES: [
   {
-    "id": "89ada5b6-6cbf-4362-8706-0445161df61d",
-    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
-    "message_text": "Teste",
-    "is_from_customer": false,
-    "created_at": "2026-03-13T15:28:48.546415+00:00"
+    "id": "4f6910f8-2abd-4b7f-82f4-ca8b402efead",
+    "conversation_id": "c91ab58c-f958-455e-840a-ad56488d0476",
+    "message_text": "Ou",
+    "is_from_customer": true,
+    "created_at": "2026-05-03T03:16:08+00:00"
   },
   {
-    "id": "0e925eb3-9ce9-462f-baf5-31739b78116e",
-    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
-    "message_text": "Teste",
-    "is_from_customer": false,
-    "created_at": "2026-03-13T15:25:55.321552+00:00"
+    "id": "6634e22d-4b1d-4909-802e-f454f4014351",
+    "conversation_id": "c91ab58c-f958-455e-840a-ad56488d0476",
+    "message_text": "Se eu comprar um anão ele cresce",
+    "is_from_customer": true,
+    "created_at": "2026-05-03T02:10:46+00:00"
   },
   {
-    "id": "2fecf85e-ca25-4df2-bc70-1c654c84fd31",
-    "conversation_id": "cd60245e-9fe1-4353-95ce-a8f05b3cb13f",
-    "message_text": "teste\n",
-    "is_from_customer": false,
-    "created_at": "2026-03-13T13:29:04.40055+00:00"
+    "id": "3c31a716-153a-422e-8712-95f08d328036",
+    "conversation_id": "c91ab58c-f958-455e-840a-ad56488d0476",
+    "message_text": "Mas esse fds tá foda",
+    "is_from_customer": true,
+    "created_at": "2026-05-03T02:10:32+00:00"
   }
 ]
 RECENT CONTACTS: [
   {
-    "id": "ad2af137-1f6d-4460-b7a1-fa83b5f05465",
-    "name": "Joao",
-    "phone": "5541984727828",
-    "created_at": "2026-03-11T16:50:19.785547+00:00"
+    "id": "098fac78-eea8-4198-bee1-c154f810e3a6",
+    "name": "+55 11 4004-4828",
+    "phone": "551140044828",
+    "created_at": "2026-05-03T17:58:03.109333+00:00"
+  },
+  {
+    "id": "cb473022-029e-4bf5-b05c-f9aa12bed6b7",
+    "name": "Brian",
+    "phone": "554188239072",
+    "created_at": "2026-05-02T18:52:26.437855+00:00"
+  },
+  {
+    "id": "549d6724-9890-4e6f-ab67-080baadbfcf1",
+    "name": "Felipe Mattuella",
+    "phone": "554195097584",
+    "created_at": "2026-05-02T16:27:46.761625+00:00"
   }
 ]
 SETTINGS: [
@@ -44,33 +56,47 @@ SETTINGS: [
 === CHECKING PIXEL (56eaa5ed-8d1b-4879-a002-838702eeb14d) ===
 RECENT MESSAGES: [
   {
-    "id": "de5ffd4a-3fc3-47aa-a61b-48d6cd421729",
-    "conversation_id": "d8211afd-3c25-45f0-b46a-155b96b965a5",
-    "message_text": "boa noite\n",
-    "is_from_customer": false,
-    "created_at": "2026-03-13T23:57:18.289345+00:00"
+    "id": "2ffe56e2-5e8f-4b1b-8d86-a6bac43d97ac",
+    "conversation_id": "6043e44b-1fcb-429f-84f9-71a7b3118566",
+    "message_text": "[Mídia: image]",
+    "is_from_customer": true,
+    "created_at": "2026-04-27T23:47:32+00:00"
+  },
+  {
+    "id": "ae903b10-7c3e-4ce4-9e28-66858c57c9c8",
+    "conversation_id": "6043e44b-1fcb-429f-84f9-71a7b3118566",
+    "message_text": "[Mídia: video]",
+    "is_from_customer": true,
+    "created_at": "2026-04-27T23:47:12+00:00"
+  },
+  {
+    "id": "e3c862e3-41da-4966-9962-9c26d3bf39fa",
+    "conversation_id": "6043e44b-1fcb-429f-84f9-71a7b3118566",
+    "message_text": "[Mídia: image]",
+    "is_from_customer": true,
+    "created_at": "2026-04-27T23:29:37+00:00"
   }
 ]
 RECENT CONTACTS: [
   {
-    "id": "3b663b1c-4d25-4cd4-9a0c-3e95d96238c5",
-    "name": "CONTATO TESTE ANTIGRAVITY",
-    "phone": "1234567890",
-    "created_at": "2026-03-13T14:02:31.979282+00:00"
+    "id": "c27f8da9-5686-464e-bbc0-6bc95e8d0cc0",
+    "name": "😎Deivid",
+    "phone": "554195162463",
+    "created_at": "2026-04-24T11:13:15.884152+00:00"
   },
   {
-    "id": "d55be6a9-3a5d-4610-9a29-94ff25af5d2a",
-    "name": "João Henrique",
-    "phone": "5541984727828",
-    "created_at": "2026-03-11T22:04:29.786822+00:00"
+    "id": "dc30d14a-cd71-4761-a719-aaf4294d8023",
+    "name": "Joao Rebouças",
+    "phone": "554184727828",
+    "created_at": "2026-04-01T13:09:18.265186+00:00"
   }
 ]
 SETTINGS: [
   {
-    "id": "271ca3fd-3bc2-4f68-8da5-b4de56132588",
+    "id": "22d2b817-d0e1-4bfa-a776-de5cff57710d",
     "phone_number": "5541984826972",
-    "is_connected": true,
-    "connection_name": "Whats Empresa"
+    "is_connected": false,
+    "connection_name": "Panda Net"
   }
 ]
 
