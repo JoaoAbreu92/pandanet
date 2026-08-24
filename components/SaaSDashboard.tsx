@@ -582,8 +582,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 return;
             }
 
-            console.log("[SaaS] Chamando RPC create_company_with_admin...");
-            const { data: rpcData, error: rpcError } = await supabase.rpc('create_company_with_admin', {
+            console.log("[SaaS] Chamando RPC create_company_with_admin_final...");
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_company_with_admin_final', {
                 p_company_name: formData.name,
                 p_company_domain: formData.domain,
                 p_company_cnpj: formData.cnpj || '',
@@ -594,13 +594,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             });
 
             if (rpcError) {
-                showToast('Erro ao criar empresa e admin: ' + rpcError.message, 'error');
-                console.error("RPC Error:", rpcError);
+                const errorMsg = `Erro RPC: ${rpcError.message} (Código: ${rpcError.code})`;
+                showToast(errorMsg, 'error');
+                console.error("RPC Error Details:", rpcError);
                 return;
             }
 
             if (rpcData && !rpcData.success) {
-                showToast('Erro interno: ' + rpcData.error, 'error');
+                const errorMsg = `Erro no Banco: ${rpcData.error} (${rpcData.detail || ''})`;
+                showToast(errorMsg, 'error');
+                console.error("Database Business Error:", rpcData);
                 return;
             }
 
