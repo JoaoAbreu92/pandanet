@@ -96,6 +96,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 if (!AudioContext) return;
 
                 const ctx = new AudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
