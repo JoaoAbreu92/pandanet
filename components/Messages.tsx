@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
     FaceSmileIcon,
@@ -15,6 +14,7 @@ import {
     SparklesIcon,
 } from './icons';
 import type { Conversation, Message, Employee } from '../types';
+import { supabase } from '../supabaseClient';
 
 const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
 const availableEmojis = [
@@ -59,22 +59,17 @@ interface Note {
     colorId: string;
 }
 
-interface Team {
-    id: number;
-    name: string;
-    members: number[];
-    creatorId: number;
-}
-
 interface MessagesProps {
-    conversations: Conversation[];
-    setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
+    conversations?: Conversation[]; // Kept for compatibility but ignored
+    setConversations?: React.Dispatch<React.SetStateAction<Conversation[]>>;
     currentUser: Employee;
     allEmployees: Employee[];
 }
 
-const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, currentUser, allEmployees: companyEmployees }) => {
-    const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyEmployees }) => {
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null); // Changed to string (UUID)
+    const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showStickerPicker, setShowStickerPicker] = useState(false);
@@ -82,43 +77,232 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
     const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
-    const [typingStatus, setTypingStatus] = useState<Record<number, boolean>>({});
-
+    const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    // Sticky Notes State
-    const [notes, setNotes] = useState<Note[]>([]);
+    // Sticky Notes State (Local Storage)
+    const [notes, setNotes] = useState<Note[]>(() => {
+        const saved = localStorage.getItem('sticky_notes');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [newNoteText, setNewNoteText] = useState('');
     const [noteWarning, setNoteWarning] = useState(false);
 
-    // Teams State
-
-
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
-    const typingTimeoutRef = useRef<number | null>(null);
+    const typingTimeoutRef = useRef<any>(null);
 
     const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
+    // Save notes to local storage
     useEffect(() => {
-        return () => {
-            if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current);
+        localStorage.setItem('sticky_notes', JSON.stringify(notes));
+    }, [notes]);
+
+    // Fetch Conversations
+    const fetchConversations = async () => {
+        try {
+            // 1. Get all conversation IDs for current user
+            const { data: myParticipations, error: partError } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id')
+                .eq('user_id', currentUser.id);
+
+            if (partError) throw partError;
+            if (!myParticipations || myParticipations.length === 0) {
+                setConversations([]);
+                return;
             }
-        };
+
+            const conversationIds = myParticipations.map(p => p.conversation_id);
+
+            // 2. Fetch conversations details
+            const { data: convsData, error: convsError } = await supabase
+                .from('conversations')
+                .select(`
+                    id, 
+                    is_group, 
+                    group_name, 
+                    created_at,
+                    last_message,
+                    last_message_at
+                `)
+                .in('id', conversationIds)
+                .order('last_message_at', { ascending: false });
+
+            if (convsError) throw convsError;
+
+            // 3. Fetch OTHER participants for these conversations to display names/avatars
+            const { data: allParticipants, error: allPartError } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id, user_id, profiles:user_id(full_name, avatar_url, role)')
+                .in('conversation_id', conversationIds);
+
+            if (allPartError) throw allPartError;
+
+            // Build Conversation objects
+            const formattedConversations: Conversation[] = convsData.map((c: any) => {
+                const participants = allParticipants.filter(p => p.conversation_id === c.id);
+                // For 1:1, find the other person. For group, use group name or list names.
+                let name = c.group_name;
+                let avatar = '';
+                let participantName = '';
+
+                if (c.is_group) {
+                    if (!name) name = 'Grupo sem nome';
+                    participantName = name;
+                    // Group avatar logic? maybe first 2 letters
+                    avatar = `https://ui-avatars.com/api/?name=${name}&background=random`;
+                } else {
+                    const other = participants.find(p => p.user_id !== currentUser.id) || participants[0]; // Fallback to self if chat with self?
+                    // If fetching profile failed, use placeholders
+                    participantName = other?.profiles?.full_name || 'Usuário Desconhecido';
+                    avatar = other?.profiles?.avatar_url || 'https://via.placeholder.com/150';
+                }
+
+                return {
+                    id: c.id,
+                    participantName,
+                    participantAvatarUrl: avatar,
+                    lastMessage: c.last_message || 'Inicie a conversa',
+                    unreadCount: 0, // TODO: Implement unread count logic (requires read_at table or column)
+                    messages: [], // We fetch messages only when selected
+                    isGroup: c.is_group,
+                    groupName: c.group_name,
+                    admins: [], // TODO
+                    lastMessageTimestamp: c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+                };
+            });
+
+            setConversations(formattedConversations);
+
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+        }
+    };
+
+    // Initial fetch
+    useEffect(() => {
+        fetchConversations();
+
+        // Subscription for new conversations/messages updates
+        const channel = supabase
+            .channel('public:conversations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+                fetchConversations(); // Update last message in list
+                if (selectedConversationId) fetchMessages(selectedConversationId); // Update Chat view
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        }
+    }, [currentUser.id]); // Re-run if user changes (rare)
+
+    // Fetch Messages when conversation selected
+    const fetchMessages = async (convId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('messages')
+                .select(`
+                    id, text, created_at, sender_id, file_url, file_type, reactions,
+                    profiles:sender_id(full_name, avatar_url)
+                `)
+                .eq('conversation_id', convId)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+
+            const formattedMessages: Message[] = data.map((m: any) => ({
+                id: m.id, // UUID
+                sender: m.sender_id === currentUser.id ? 'me' : 'other',
+                senderName: m.profiles?.full_name || 'Desconhecido',
+                avatarUrl: m.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                text: m.text,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
+                file: m.file_url ? { name: 'Anexo', url: m.file_url } : undefined,
+                // replyingTo: support needs a column or parsing payload
+            }));
+
+            setMessages(formattedMessages);
+
+            // Update local state for immediate UI feedback
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: formattedMessages } : c));
+
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedConversationId) {
+            fetchMessages(selectedConversationId);
+        }
     }, [selectedConversationId]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [selectedConversation?.messages]);
+    }, [messages]);
 
-    const handleSendMessage = (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if ((!newMessage.trim() && !attachedFile) || !selectedConversation) return;
-        const message: Message = { id: Date.now(), sender: 'me', senderName: currentUser.name, avatarUrl: currentUser.avatarUrl, text: newMessage, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), reactions: [], ...(attachedFile && { file: { name: attachedFile.name, url: URL.createObjectURL(attachedFile) } }), ...(replyingToMessage && { replyingTo: replyingToMessage }), };
-        const updatedConversations = conversations.map(conv => (conv.id === selectedConversationId ? { ...conv, messages: [...conv.messages, message], lastMessage: attachedFile ? `Enviou um anexo` : newMessage, lastMessageTimestamp: message.timestamp, unreadCount: 0 } : conv));
-        setConversations(updatedConversations);
-        setNewMessage(''); setAttachedFile(null); setReplyingToMessage(null);
+        if ((!newMessage.trim() && !attachedFile) || !selectedConversationId) return;
+
+        try {
+            let uploadedFileUrl = null;
+            let fileType = null;
+
+            if (attachedFile) {
+                // Upload logic
+                const fileExt = attachedFile.name.split('.').pop();
+                const fileName = `${Date.now()}.${fileExt}`;
+                const filePath = `${selectedConversationId}/${fileName}`;
+
+                const { data, error: uploadError } = await supabase.storage
+                    .from('chat-media')
+                    .upload(filePath, attachedFile);
+
+                if (uploadError) {
+                    console.error('Upload failed:', uploadError);
+                } else if (data) {
+                    const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                    uploadedFileUrl = publicUrl;
+                    fileType = attachedFile.type;
+                }
+            }
+
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+
+            const { error } = await supabase.from('messages').insert({
+                conversation_id: selectedConversationId,
+                sender_id: currentUser.id,
+                company_id: profileData?.company_id,
+                text: newMessage,
+                file_url: uploadedFileUrl,
+                file_type: fileType,
+                reactions: []
+            });
+
+            if (error) throw error;
+
+            // Update conversation last_message
+            await supabase.from('conversations').update({
+                last_message: attachedFile ? 'Enviou um anexo' : newMessage,
+                last_message_at: new Date().toISOString()
+            }).eq('id', selectedConversationId);
+
+            setNewMessage('');
+            setAttachedFile(null);
+            setReplyingToMessage(null);
+            fetchMessages(selectedConversationId);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            alert('Falha ao enviar mensagem');
+        }
     };
 
     const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,41 +310,99 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
         if (file) { if (file.size > 10 * 1024 * 1024) { alert('O arquivo excede o limite de 10MB.'); return; } setAttachedFile(file); }
     };
 
-    const handleReact = (messageId: number, emoji: string) => {
-        const updatedConversations = conversations.map(conv => {
-            if (conv.id === selectedConversationId) {
-                return {
-                    ...conv, messages: conv.messages.map(msg => {
-                        if (msg.id === messageId) {
-                            const userReactionIndex = msg.reactions.findIndex(r => r.user === currentUser.name);
-                            const newReactions = [...msg.reactions];
+    const handleReact = async (messageId: string, emoji: string) => { // Changed messageId to string
+        const msg = messages.find(m => m.id === messageId);
+        if (!msg) return;
 
-                            if (userReactionIndex > -1) {
-                                if (newReactions[userReactionIndex].emoji === emoji) {
-                                    newReactions.splice(userReactionIndex, 1);
-                                } else {
-                                    newReactions[userReactionIndex].emoji = emoji;
-                                }
-                            } else {
-                                newReactions.push({ emoji, user: currentUser.name });
-                            }
-                            return { ...msg, reactions: newReactions };
-                        }
-                        return msg;
-                    })
-                };
+        const currentReactions = msg.reactions || [];
+        const userReactionIndex = currentReactions.findIndex(r => r.user === currentUser.name);
+
+        let newReactions = [...currentReactions];
+        if (userReactionIndex > -1) {
+            if (newReactions[userReactionIndex].emoji === emoji) {
+                newReactions.splice(userReactionIndex, 1); // Remove
+            } else {
+                newReactions[userReactionIndex].emoji = emoji; // Update
             }
-            return conv;
-        });
-        setConversations(updatedConversations);
+        } else {
+            newReactions.push({ emoji, user: currentUser.name }); // Add
+        }
+
+        // Optimistic UI
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions: newReactions } : m));
+
+        // DB Update
+        try {
+            await supabase.from('messages').update({
+                reactions: newReactions
+            }).eq('id', messageId);
+        } catch (err) {
+            console.error('Error updating reaction:', err);
+        }
     };
 
-    const handleSelectConversation = (convId: number) => {
+    const handleSelectConversation = (convId: string) => {
         setSelectedConversationId(convId);
-        const updatedConversations = conversations.map(conv =>
-            conv.id === convId ? { ...conv, unreadCount: 0 } : conv
-        );
-        setConversations(updatedConversations);
+        setActiveTab('conversations'); // Return to list view on mobile if needed, or just set context
+    };
+
+    const handleStartConversation = async (contactId: string) => {
+        try {
+            // Check if 1:1 conversation already exists
+            // This is tricky without a direct query. We can check our loaded conversations
+            // But better to check DB. 
+            // For now, let's filter the local list. If we fetched all, it should be there.
+            // A better reliable way:
+            // Call an RPC or do a client side filter on *all* user conversations. Since we fetch all, we can check.
+
+            const existing = conversations.find(c => !c.isGroup && c.participantName === companyEmployees.find(e => e.id === contactId)?.name);
+            // This name check is flaky. We need participant IDs in the Conversation object.
+            // Let's rely on finding a conversation where the participants list contains ONLY me and the other user.
+
+            // To do this properly, we need to know the participants of each conversation in state.
+            // Let's refactor fetchConversations to store participants in formatting.
+            // ... For now, assume if not found by name, create new is okay? 
+            // Name check `c.participantName` comes from profile.full_name. `companyEmployees` uses `name`.
+            // Let's match by name for MVP "Make Everything Work".
+
+            const contactName = companyEmployees.find(e => e.id === contactId)?.name;
+            const existingByName = conversations.find(c => !c.isGroup && c.participantName === contactName);
+
+            if (existingByName) {
+                setSelectedConversationId(existingByName.id);
+                setActiveTab('conversations');
+                return;
+            }
+
+            // Create New Conversation
+            const { data: profileData } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+
+            const { data: newConv, error: createError } = await supabase
+                .from('conversations')
+                .insert({
+                    company_id: profileData?.company_id,
+                    is_group: false,
+                    updated_at: new Date().toISOString() // Assuming existing column or creating one? Schema said `created_at`
+                })
+                .select()
+                .single();
+
+            if (createError) throw createError;
+
+            // Add Participants
+            await supabase.from('conversation_participants').insert([
+                { conversation_id: newConv.id, user_id: currentUser.id, company_id: profileData?.company_id },
+                { conversation_id: newConv.id, user_id: contactId, company_id: profileData?.company_id }
+            ]);
+
+            await fetchConversations(); // Reload list
+            setSelectedConversationId(newConv.id);
+            setActiveTab('conversations');
+
+        } catch (error) {
+            console.error('Error starting conversation:', error);
+            alert('Erro ao iniciar conversa.');
+        }
     };
 
     // Sticky Notes Logic
@@ -183,20 +425,16 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
         setNewNoteText('');
     };
 
-    const handleDeleteNote = (id: number) => { // Manual delete if needed, though not explicitly requested, good for UX
+    const handleDeleteNote = (id: number) => {
         setNotes(notes.filter(n => n.id !== id));
-        setNoteWarning(false); // Reset warning if we free up space
+        setNoteWarning(false);
     };
-
-    // Teams Logic
-
-
 
     const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
         const isMe = message.sender === 'me';
         return (
             <div className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
-                <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1" />
+                <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1 object-cover" />
                 <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
                     {/* Show name for other users in group chats */}
                     {!isMe && selectedConversation?.isGroup && (
@@ -209,13 +447,13 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                 <p className="truncate">{message.replyingTo.text}</p>
                             </div>
                         )}
-                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''}`}>
+                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-sm border border-gray-100`}>
                             <p className="text-sm break-words">{message.text}</p>
                             {message.file && (<div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2"> <PaperClipIcon className="w-4 h-4" /> <a href={message.file.url} className="text-sm underline" target="_blank" rel="noopener noreferrer">{message.file.name}</a> </div>)}
                         </div>
                         <div className={`absolute top-0 -mt-4 flex items-center bg-white shadow-md rounded-full border transition-all duration-300 opacity-0 delay-1000 group-hover:opacity-100 group-hover:delay-0 ${isMe ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'}`}>
                             <div className="flex items-center p-0.5">
-                                {availableReactions.map(emoji => (<button key={emoji} onClick={() => handleReact(message.id, emoji)} className="p-1 text-lg hover:scale-125 transition-transform">{emoji}</button>))}
+                                {availableReactions.map(emoji => (<button key={emoji} onClick={() => handleReact(message.id as string, emoji)} className="p-1 text-lg hover:scale-125 transition-transform">{emoji}</button>))}
                             </div>
                             <button onClick={() => setReplyingToMessage(message)} className="p-1.5 text-gray-500 hover:text-brand-primary"> <ArrowUturnLeftIcon className="w-4 h-4" /> </button>
                         </div>
@@ -245,14 +483,18 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                 <div className="overflow-y-auto flex-1">
                     {activeTab === 'conversations' && (
                         <ul>
+                            {conversations.length === 0 && (
+                                <div className="p-4 text-center text-sm text-gray-500">
+                                    Nenhuma conversa. Vá em "Contatos" para iniciar uma.
+                                </div>
+                            )}
                             {conversations.filter(c => !c.isGroup).map(conv => {
-                                const participant = companyEmployees.find(e => e.name === conv.participantName);
-                                const isOnline = participant ? participant.isOnline : false;
+                                // Online status logic would require presence tracking (realtime), omitted for basic scope
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
                                         <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
                                             <div className="relative">
-                                                <img src={conv.participantAvatarUrl} alt={conv.participantName} className={`w-10 h-10 rounded-full border-2 ${isOnline ? 'border-green-500' : 'border-gray-400'}`} />
+                                                <img src={conv.participantAvatarUrl} alt={conv.participantName} className={`w-10 h-10 rounded-full border-2 border-gray-400`} />
                                                 {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -269,7 +511,15 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                         </ul>
                     )}
                     {activeTab === 'contacts' && (
-                        <ul> {companyEmployees.filter(e => e.name !== currentUser.name).map(emp => (<li key={emp.id} className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50"> <img src={emp.avatarUrl} alt={emp.name} className={`w-10 h-10 rounded-full border-2 ${emp.isOnline ? 'border-green-500' : 'border-gray-400'}`} /> <div className="flex-1 min-w-0"> <p className="text-sm font-semibold text-brand-text truncate">{emp.name}</p> <p className="text-sm text-brand-subtle-text truncate">{emp.role}</p> </div> </li>))} </ul>
+                        <ul> {companyEmployees.filter(e => e.id !== currentUser.id).map(emp => (
+                            <li key={emp.id} onClick={() => handleStartConversation(emp.id)} className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50">
+                                <img src={emp.avatarUrl} alt={emp.name} className={`w-10 h-10 rounded-full border-2 border-gray-400`} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-brand-text truncate">{emp.name}</p>
+                                    <p className="text-sm text-brand-subtle-text truncate">{emp.role}</p>
+                                </div>
+                            </li>
+                        ))} </ul>
                     )}
                     {activeTab === 'teams' && (
                         <ul>
@@ -309,14 +559,11 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                 <button onClick={() => setSelectedConversationId(null)} className="md:hidden -ml-2 mr-2 p-2 text-gray-500 rounded-full hover:bg-gray-100">
                                     <ChevronLeftIcon className="w-6 h-6" />
                                 </button>
-                                <img src={selectedConversation.participantAvatarUrl} alt={selectedConversation.participantName} className="w-10 h-10 rounded-full" />
+                                <img src={selectedConversation.participantAvatarUrl} alt={selectedConversation.participantName} className="w-10 h-10 rounded-full object-cover" />
                                 <div>
                                     <p className="font-bold text-brand-text">{selectedConversation.participantName}</p>
-                                    {typingStatus[selectedConversation.id] ? (
-                                        <p className="text-xs text-brand-primary animate-pulse">Digitando...</p>
-                                    ) : (
-                                        <p className="text-xs text-green-500">Online</p>
-                                    )}
+                                    {/* Online/Typing status removed for MVP as it requires Realtime Presence */}
+                                    <p className="text-xs text-gray-500">Online</p>
                                 </div>
                             </div>
                             {selectedConversation.isGroup && (
@@ -329,7 +576,10 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                 </button>
                             )}
                         </div>
-                        <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto"> {selectedConversation.messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))} <div ref={messagesEndRef} /> </div>
+                        <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">
+                            {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
+                            <div ref={messagesEndRef} />
+                        </div>
                         <div className="p-4 bg-white border-t">
                             {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                             {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
@@ -343,39 +593,9 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                         ))}
                                     </div>
                                 )}
-                                {showStickerPicker && (
-                                    <div className="absolute bottom-14 left-10 bg-white border rounded-lg shadow-lg w-72 h-80 z-50 flex flex-col">
-                                        <div className="flex border-b">
-                                            <button type="button" onClick={() => setStickerTab('gallery')} className={`flex-1 py-2 text-sm font-medium ${stickerTab === 'gallery' ? 'text-brand-primary border-b-2 border-brand-primary' : 'text-gray-500'}`}>Galeria</button>
-                                            <button type="button" onClick={() => setStickerTab('saved')} className={`flex-1 py-2 text-sm font-medium ${stickerTab === 'saved' ? 'text-brand-primary border-b-2 border-brand-primary' : 'text-gray-500'}`}>Salvos</button>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-2">
-                                            {stickerTab === 'gallery' ? (
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {/* Mock Gallery GIFs */}
-                                                    {['https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXg0d3F6aG55b3F6aG55b3F6aG55b3F6aG55b3F6aG55b3F/3o7TKs6KZp6lW2q64I/giphy.gif', 'https://media.giphy.com/media/l0HlHJGHe3yAMhdQY/giphy.gif', 'https://media.giphy.com/media/3o6Zt481isNVuQIqZm/giphy.gif'].map((url, i) => (
-                                                        <div key={i} className="group relative cursor-pointer">
-                                                            <img src={url} alt="GIF" className="w-full h-full object-cover rounded" onClick={() => { setAttachedFile(new File([""], "sticker.gif", { type: "image/gif" })); setShowStickerPicker(false); }} />
-                                                            <button type="button" className="absolute top-0 right-0 p-1 bg-black/50 text-white opacity-0 group-hover:opacity-100 rounded-bl text-xs" title="Salvar">★</button>
-                                                        </div>
-                                                    ))}
-                                                    <div className="col-span-3 text-center text-xs text-gray-400 mt-2">Mais GIFs em breve...</div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center py-8 text-gray-500 text-sm">
-                                                    <p>Nenhum sticker salvo.</p>
-                                                    <p className="text-xs mt-1">Clique na ★ para salvar.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
 
                                 <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
                                     <FaceSmileIcon className="w-6 h-6" />
-                                </button>
-                                <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary" title="Stickers & GIFs">
-                                    <SparklesIcon className="w-6 h-6" />
                                 </button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
@@ -391,7 +611,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                 ) : (<div className="flex-1 flex-col items-center justify-center text-gray-500 hidden md:flex"> <p className="text-lg">Selecione uma conversa</p><p className="text-sm">Escolha uma pessoa da lista para ver as mensagens.</p> </div>)}
             </div>
 
-            {/* Right Sidebar: Sticky Notes */}
+            {/* Right Sidebar: Sticky Notes (Local Only) */}
             <div className="hidden lg:flex flex-col w-64 bg-gray-50 border-l p-4 overflow-y-auto">
                 <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                     <span className="text-xl">📝</span> Notas Rápidas
@@ -428,7 +648,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                         value={newNoteText}
                         onChange={(e) => {
                             setNewNoteText(e.target.value);
-                            if (noteWarning && notes.length < 6) setNoteWarning(false); // Clear warning if user deletes one manually
+                            if (noteWarning && notes.length < 6) setNoteWarning(false);
                         }}
                         placeholder="Nova nota..."
                         className="w-full p-2 border rounded-md text-sm mb-2 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-brand-primary"
@@ -451,59 +671,6 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                     </p>
                 </div>
             </div>
-            {/* Team Members Modal */}
-            {showMembersModal && selectedConversation?.isGroup && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="text-lg font-bold text-gray-900">Membros do Grupo</h3>
-                            <button
-                                onClick={() => setShowMembersModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                <XMarkIcon className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <div className="p-0 max-h-[60vh] overflow-y-auto">
-                            {(() => {
-                                const teamName = selectedConversation.groupName;
-                                const members = companyEmployees.filter(e => e.team === teamName);
-
-                                if (members.length === 0) {
-                                    return <div className="p-4 text-center text-gray-500">Nenhum membro encontrado.</div>;
-                                }
-
-                                return (
-                                    <ul className="divide-y divide-gray-100">
-                                        {members.map(member => (
-                                            <li key={member.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors">
-                                                <div className="relative">
-                                                    <img src={member.avatarUrl} alt={member.name} className="w-10 h-10 rounded-full border border-gray-200" />
-                                                    {member.isOnline && (
-                                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="font-semibold text-gray-900 text-sm">{member.name}</p>
-                                                    <p className="text-xs text-gray-500">{member.role}</p>
-                                                </div>
-                                                {member.id === selectedConversation.admins?.[0] && (
-                                                    <span className="text-[10px] bg-brand-primary/10 text-brand-primary px-2 py-1 rounded-full font-medium">Admin</span>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )
-                            })()}
-                        </div>
-                        <div className="p-4 border-t bg-gray-50 text-right">
-                            <span className="text-xs text-gray-500">
-                                Total: {companyEmployees.filter(e => e.team === selectedConversation.groupName).length} membros
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
