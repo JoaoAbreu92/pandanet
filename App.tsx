@@ -77,68 +77,77 @@ const AppContent: React.FC = () => {
                     handleNudge(newMsg.sender_id, newMsg.conversation_id);
                 }
             })
-            // LISTENER 2: Dedicated NUDGES Table (High Reliability)
+            // LISTENER 2: Dedicated NUDGES Table (High Reliability - Client Side Filtering)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'nudges',
-                filter: `receiver_id=eq.${currentUser.id}` // Filtro crucial
+                table: 'nudges'
+                // Filter removed to ensure reception, filtering manually below
             }, async (payload) => {
                 const newNudge = payload.new as any;
-                console.log('[PandaNet] DEDICATED NUDGE TABLE detectado:', newNudge);
+                console.log('[PandaNet] NUDGE TABLE EVENT (RAW):', newNudge);
 
-                // DEBUG: Force visual confirmation
-                if (localStorage.getItem('debug_nudge')) {
-                    alert(`DEBUG: Recebi Nudge de ${newNudge.sender_id}`);
+                if (newNudge.receiver_id === currentUser.id) {
+                    console.log('[PandaNet] Nudge match! Executing shake.');
+                    // DEBUG: Force visual confirmation
+                    if (localStorage.getItem('debug_nudge')) {
+                        alert(`DEBUG: Recebi Nudge de ${newNudge.sender_id}`);
+                    }
+                    handleNudge(newNudge.sender_id, newNudge.conversation_id);
+                } else {
+                    console.log(`[PandaNet] Ignoring nudge for ${newNudge.receiver_id} (I am ${currentUser.id})`);
                 }
-
-                handleNudge(newNudge.sender_id, newNudge.conversation_id);
             })
             .on('broadcast', { event: 'nudge' }, (payload) => {
                 console.log('[PandaNet] Broadcast Nudge detectado:', payload);
-                const { sender_id, conversation_id } = payload.payload; // Broadcast payload wrapper
+                const { sender_id, conversation_id, receiver_id } = payload.payload;
+
+                // Validate receiver if present in payload
+                if (receiver_id && receiver_id !== currentUser.id) {
+                    console.log(`[PandaNet] Ignoring broadcast nudge for ${receiver_id}`);
+                    return;
+                }
+
                 handleNudge(sender_id, conversation_id);
             })
             .subscribe((status) => {
                 console.log('[PandaNet] Realtime Connection Status:', status);
-                if (status === 'SUBSCRIBED') {
-                    console.log('[PandaNet] Listening for nudges (DB + Broadcast)...');
-                    // Self-test cleanup/ensure connection
-                }
-                if (status === 'CHANNEL_ERROR') {
-                    console.error('[PandaNet] Realtime Error. Check API Key or Network.');
-                }
             });
 
         const handleNudge = (senderId: string, conversationId: string) => {
             const isSender = senderId === currentUser.id;
-            console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
+            console.log(`[PandaNet] ========== NUDGE HANDLER START ==========`);
+            console.log(`[PandaNet] Sender ID: ${senderId}`);
+            console.log(`[PandaNet] Current User ID: ${currentUser.id}`);
+            console.log(`[PandaNet] Is Sender? ${isSender}`);
+            console.log(`[PandaNet] Conversation ID: ${conversationId}`);
 
             // Play sound
+            console.log(`[PandaNet] Playing nudge sound...`);
             playNotificationSound('nudge');
 
             // Force navigation only for receiver
             if (!isSender) {
-                // If we serve the navigation, we should check if we are already there to avoid reload/flicker?
-                // setCurrentPage forces update.
-                console.log("Navigating Receiver to conversation:", conversationId);
+                console.log(`[PandaNet] RECEIVER MODE: Navigating to messages page...`);
                 setCurrentPage('messages');
                 setPageContext({ conversationId: conversationId });
-                // We also need to force Messages component to re-read the ID if it's already mounted?
-                // setCurrentPage causes re-render of Layout > renderPage > Messages.
-                // If currentPage was already 'messages', might need to force context update.
-                // React state update handles this.
+            } else {
+                console.log(`[PandaNet] SENDER MODE: Skipping navigation`);
             }
 
             // TREMER A TELA (SHAKE)
-            // Reset to false then true to restart animation if already shaking?
+            console.log(`[PandaNet] Initiating shake animation...`);
+            console.log(`[PandaNet] Current isShaking state: ${isShaking}`);
             setIsShaking(false);
-            setTimeout(() => setIsShaking(true), 50);
-
-            // Stop shaking after 5s
             setTimeout(() => {
+                console.log(`[PandaNet] Setting isShaking to TRUE`);
+                setIsShaking(true);
+            }, 50);
+            setTimeout(() => {
+                console.log(`[PandaNet] Resetting isShaking to FALSE after 5s`);
                 setIsShaking(false);
-            }, 5000);
+            }, 5050);
+            console.log(`[PandaNet] ========== NUDGE HANDLER END ==========`);
         };
 
         // DEV: Allow manual triggering via console
