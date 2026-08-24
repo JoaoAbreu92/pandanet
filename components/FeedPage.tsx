@@ -99,12 +99,12 @@ export const PostCard: React.FC<{
             title="" 
             className={`pb-2 overflow-visible transition-all duration-500 ${
                 badgeData 
-                    ? 'border-2 border-amber-400 bg-slate-950 shadow-xl shadow-amber-500/5 relative overflow-hidden dark:bg-slate-950 dark:border-amber-400/60' 
+                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/40 via-white to-rose-50/40 shadow-xl shadow-amber-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-amber-400/40 rounded-3xl' 
                     : ''
             }`}
         >
             {badgeData ? (
-                <div className="py-6 px-4 flex flex-col items-center relative select-none">
+                <div className="py-6 px-5 flex flex-col md:flex-row items-center gap-6 relative select-none">
                     {/* Glowing background rays */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
                     
@@ -112,47 +112,50 @@ export const PostCard: React.FC<{
                     {isAuthor && (
                         <button 
                             onClick={() => onDelete(post.id)} 
-                            className="absolute right-0 top-0 p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10" 
                             title={t('feed.delete_post')}
                         >
                             <TrashIcon className="w-5 h-5" />
                         </button>
                     )}
 
-                    {/* Badge Icon 3D Floating */}
-                    <div className={`w-24 h-24 rounded-3xl ${badgeData.badge_color} border-2 border-white/20 flex items-center justify-center text-5xl shadow-xl shadow-slate-900/50 transform hover:scale-115 hover:rotate-6 transition-all duration-305 cursor-pointer animate-float select-none overflow-hidden`}>
-                        {badgeData.badge_icon.startsWith('http') ? (
-                            <img src={badgeData.badge_icon} className="w-full h-full object-cover rounded-3xl border border-white/10" alt="" />
-                        ) : (
-                            badgeData.badge_icon
-                        )}
+                    {/* Left Side: Large Badge */}
+                    <div className="flex-shrink-0 relative">
+                        <div className={`w-32 h-32 md:w-36 md:h-36 rounded-3xl ${badgeData.badge_color} border-2 border-white/40 flex items-center justify-center text-6xl shadow-xl shadow-slate-300/40 dark:shadow-slate-950/50 transform hover:scale-105 hover:rotate-3 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}>
+                            {badgeData.badge_icon.startsWith('http') ? (
+                                <img src={badgeData.badge_icon} className="w-full h-full object-cover rounded-3xl border border-white/10" alt="" />
+                            ) : (
+                                badgeData.badge_icon
+                            )}
+                        </div>
                     </div>
-
-                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-5 flex items-center gap-1">
-                        🏆 Nova Conquista Registrada
-                    </span>
-
-                    <h3 className="text-xl font-black text-white mt-2 leading-tight">
-                        Parabéns, {badgeData.recipient_name}! 🎉
-                    </h3>
-
-                    <p className="text-xs text-slate-300 mt-1.5 font-medium">
-                        Conquistou o selo <span className="font-bold text-white">{badgeData.badge_name}</span>
-                    </p>
-
-                    <div className="flex items-center gap-2 mt-4 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-                        <img src={badgeData.recipient_avatar} className="w-6 h-6 rounded-full object-cover border border-white/20" alt="" />
-                        <span className="text-[10px] text-slate-300 font-bold">
-                            Premiação concedida por {badgeData.awarded_by_name}
+                    
+                    {/* Right Side: Information */}
+                    <div className="flex-1 min-w-0 text-left space-y-3">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                            🏆 Nova Conquista Registrada
                         </span>
-                    </div>
-
-                    <div className="relative w-full max-w-md mt-6 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                        <span className="absolute -top-3.5 left-4 text-4xl text-brand-primary font-serif select-none">“</span>
-                        <p className="text-sm text-slate-200 italic leading-relaxed px-2 text-center font-medium">
-                            {badgeData.reason}
+                        
+                        <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+                            Parabéns, {badgeData.recipient_name}! 🎉
+                        </h3>
+                        
+                        <p className="text-sm text-slate-650 dark:text-slate-300 font-medium">
+                            Conquistou o selo <span className="font-extrabold text-brand-primary dark:text-emerald-400">{badgeData.badge_name}</span>
                         </p>
-                        <span className="absolute -bottom-7 right-4 text-4xl text-brand-primary font-serif select-none">”</span>
+                        
+                        <div className="relative w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 italic text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm leading-relaxed">
+                            <span className="absolute -top-3.5 left-4 text-3xl text-brand-primary font-serif select-none">“</span>
+                            <p className="px-2">{badgeData.reason}</p>
+                            <span className="absolute -bottom-6 right-4 text-3xl text-brand-primary font-serif select-none">”</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1 text-slate-550 dark:text-slate-400">
+                            <img src={badgeData.recipient_avatar} className="w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-700" alt="" />
+                            <span className="text-[10px] font-bold">
+                                Premiação concedida por {badgeData.awarded_by_name}
+                            </span>
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -390,6 +393,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [allCompanyBadges, setAllCompanyBadges] = useState<CompanyBadge[]>([]);
     const [earnedBadges, setEarnedBadges] = useState<UserBadge[]>([]);
     const [equippedBadges, setEquippedBadges] = useState<UserBadge[]>([]);
+
+    const recentBadgeAwards = posts.filter(post => {
+        if (!post.content.startsWith('[BADGE_AWARD]')) return false;
+        const createdDate = new Date(post.timestamp).getTime();
+        const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+        return createdDate > threeDaysAgo;
+    });
 
     const fetchUserBadgesData = async () => {
         try {
@@ -1033,6 +1043,73 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         </div>
                     ) : (
                         <div className="space-y-6">
+                            {/* Pinned Recent Badge Awards (Last 3 days) */}
+                            {recentBadgeAwards.length > 0 && (
+                                <div className="space-y-4 mb-6 bg-gradient-to-r from-amber-500/5 via-rose-500/5 to-amber-500/5 dark:from-slate-800/20 dark:via-slate-900/30 dark:to-slate-800/20 p-5 rounded-3xl border border-amber-200/40 dark:border-amber-500/10 backdrop-blur-sm shadow-sm">
+                                    <div className="flex items-center space-x-2 px-1">
+                                        <span className="text-xl">🎉</span>
+                                        <div>
+                                            <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                                                Conquistas Recentes da Empresa
+                                            </h4>
+                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                                                Destaques dos últimos 3 dias
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {recentBadgeAwards.map(post => {
+                                            let badgeData = null;
+                                            try {
+                                                badgeData = JSON.parse(post.content.replace('[BADGE_AWARD]', ''));
+                                            } catch (e) {
+                                                console.error('Failed to parse badge award json', e);
+                                            }
+                                            if (!badgeData) return null;
+                                            
+                                            return (
+                                                <div 
+                                                    key={`pinned-${post.id}`}
+                                                    className="flex flex-col md:flex-row items-center gap-5 p-5 bg-white/95 dark:bg-slate-900/95 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 relative overflow-hidden"
+                                                >
+                                                    <div className="absolute top-2.5 right-2.5 bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm animate-pulse">
+                                                        Destaque
+                                                    </div>
+
+                                                    <div className="flex-shrink-0 relative">
+                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-amber-400/25 rounded-full blur-xl -z-10 animate-pulse"></div>
+                                                        <div className={`w-20 h-20 rounded-2xl ${badgeData.badge_color} border flex items-center justify-center text-4xl shadow-md select-none transform hover:scale-105 hover:rotate-2 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}>
+                                                            {badgeData.badge_icon.startsWith('http') ? (
+                                                                <img src={badgeData.badge_icon} className="w-full h-full object-cover rounded-2xl border border-white/10" alt="" />
+                                                            ) : (
+                                                                badgeData.badge_icon
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0 text-left space-y-2">
+                                                        <h5 className="text-base font-black text-slate-800 dark:text-white leading-tight">
+                                                            {badgeData.recipient_name} recebeu o selo "{badgeData.badge_name}"!
+                                                        </h5>
+                                                        
+                                                        <p className="text-xs text-slate-600 dark:text-slate-350 italic line-clamp-2 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100/50 dark:border-slate-750/50 font-medium">
+                                                            "{badgeData.reason}"
+                                                        </p>
+                                                        
+                                                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500">
+                                                            <span>Concedido por {badgeData.awarded_by_name}</span>
+                                                            <span>•</span>
+                                                            <span>{new Date(post.timestamp).toLocaleDateString('pt-BR')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-6">
                                 {posts.map(post => (
                                     <PostCard
