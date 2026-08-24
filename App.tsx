@@ -52,6 +52,8 @@ import SupportInbox from './components/SupportInbox';
 import PersonalNotesPage from './components/PersonalNotesPage';
 import ProjectsPage from './components/ProjectsPage';
 import FloatingChatHeads from './components/FloatingChatHeads';
+import SchedulingPage from './components/SchedulingPage';
+import SchedulingBookPage from './components/SchedulingBookPage';
 
 
 
@@ -213,7 +215,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'scheduling', 'scheduling-book'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -226,6 +228,26 @@ const AppContent: React.FC = () => {
             return null;
         }
     });
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        const bookParam = searchParams.get('book');
+        
+        if (bookParam) {
+            setCurrentPage('scheduling-book');
+            setPageContext({ eventTypeId: bookParam, isPublic: true });
+        } else if (hash.startsWith('#/book/')) {
+            const parts = hash.split('/');
+            const eventId = parts[parts.length - 1];
+            setCurrentPage('scheduling-book');
+            setPageContext({ eventTypeId: eventId, isPublic: true });
+        } else if (window.location.search.includes('page=scheduling-book')) {
+            const id = searchParams.get('id');
+            setCurrentPage('scheduling-book');
+            setPageContext({ eventTypeId: id, isPublic: true });
+        }
+    }, []);
 
     const [companyData, setCompanyData] = useState<AppData | null>(null);
     const [companySettings, setCompanySettings] = useState<any>(null);
@@ -729,6 +751,8 @@ const AppContent: React.FC = () => {
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
+            case 'scheduling': return <SchedulingPage />;
+            case 'scheduling-book': return <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={false} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
         }
@@ -760,6 +784,14 @@ const AppContent: React.FC = () => {
                         <button onClick={handleLogout} className="w-full px-6 py-3 text-gray-500 font-medium hover:text-gray-700 transition-colors">Sair da Conta</button>
                     </div>
                 </div>
+            </div>
+        );
+    }
+
+    if (currentPage === 'scheduling-book' && (!session || !currentUser)) {
+        return (
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 flex items-center justify-center">
+                <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={true} />
             </div>
         );
     }

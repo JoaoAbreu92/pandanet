@@ -47,7 +47,9 @@ export type Page =
   | 'projects-list'
   | 'projects-calendar'
   | 'projects-metrics'
-  | 'whatspanda';
+  | 'whatspanda'
+  | 'scheduling'
+  | 'scheduling-book';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -840,5 +842,64 @@ export interface UserBadge {
   is_equipped: boolean;
   created_at?: string;
   company_badges?: CompanyBadge; // Quando carregado via join
+}
+
+export interface SchedulingEventType {
+  id: string;
+  company_id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  duration: number; // em minutos
+  is_paid: boolean;
+  price: number;
+  requirements: {
+    phone?: boolean;
+    cnpj?: boolean;
+    company_name?: boolean;
+  };
+  availability: {
+    days: number[]; // ex: [1, 2, 3, 4, 5]
+    startTime: string; // "09:00"
+    endTime: string; // "18:00"
+  };
+  is_active: boolean;
+  created_at?: string;
+  profiles?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
+export interface SchedulingBooking {
+  id: string;
+  company_id: string;
+  event_type_id: string;
+  host_id: string;
+  guest_name: string;
+  guest_email: string;
+  guest_phone: string;
+  guest_company_name?: string;
+  guest_cnpj?: string;
+  booking_date: string; // YYYY-MM-DD
+  booking_time: string; // HH:MM
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'free';
+  price: number;
+  notes?: string;
+  created_at?: string;
+  event_types?: SchedulingEventType;
+}
+
+export interface SchedulingTemplate {
+  id: string;
+  company_id: string;
+  owner_id: string;
+  name: string;
+  subject: string;
+  body: string;
+  is_default: boolean;
+  created_at?: string;
 }
 
