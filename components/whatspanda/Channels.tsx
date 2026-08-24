@@ -33,6 +33,9 @@ const Channels: React.FC = () => {
     const [pairingNumberInput, setPairingNumberInput] = useState('');
     const [isGeneratingPairing, setIsGeneratingPairing] = useState(false);
 
+    // Connection Mode: 'qr' = scan QR | 'code' = pairing code
+    const [connectionMode, setConnectionMode] = useState<'qr' | 'code'>('qr');
+
     // Debug State
     const [showDebug, setShowDebug] = useState(false);
     const [debugLogs, setDebugLogs] = useState<{ time: string, msg: string, type: 'info' | 'error' | 'success' }[]>([]);
@@ -143,15 +146,15 @@ const Channels: React.FC = () => {
                 if (error) {
                     addDebugLog(`Erro no polling: ${error.message}`, 'error');
                 } else if (data) {
-                    if (data.qr_code && data.qr_code !== qrCode) {
+                    // Atualiza QR apenas se o usuário está no modo QR
+                    if (connectionMode === 'qr' && data.qr_code && data.qr_code !== qrCode) {
                         addDebugLog('QR Code recebido via polling!', 'success');
                         setQrCode(data.qr_code);
-                        setPairingCode(null);
                     }
-                    if (data.pairing_code && data.pairing_code !== pairingCode) {
+                    // Atualiza pairing code apenas se o usuário está no modo código
+                    if (connectionMode === 'code' && data.pairing_code && data.pairing_code !== pairingCode) {
                         addDebugLog('Código de pareamento recebido via polling!', 'success');
                         setPairingCode(data.pairing_code);
-                        setQrCode(null);
                     }
                     if (data.is_connected) {
                         addDebugLog('Conexão detectada via polling!', 'success');
@@ -182,11 +185,15 @@ const Channels: React.FC = () => {
                     const newData = payload.new as WhatsAppSettings;
                     addDebugLog(`Realtime: Update na conexão atual! Conectado=${newData.is_connected}, QR=${!!newData.qr_code}, Pairing=${newData.pairing_code}`, 'info');
                     setIsConnected(newData.is_connected);
-                    setQrCode(newData.qr_code || null);
-                    setPairingCode(newData.pairing_code || null);
+                    // Respeitar o modo escolhido — não sobrescrever o outro
+                    if (connectionMode === 'qr') {
+                        if (newData.qr_code) setQrCode(newData.qr_code);
+                    } else {
+                        if (newData.pairing_code) setPairingCode(newData.pairing_code);
+                    }
                     if (newData.is_connected) {
                         addDebugLog('Conexão detectada via Realtime!', 'success');
-                        setTimeout(() => setView('list'), 2000); // go back to list on connect
+                        setTimeout(() => setView('list'), 2000);
                     }
                 }
             })
@@ -250,18 +257,35 @@ const Channels: React.FC = () => {
         }
     }, [view, currentId, channels]);
 
-    const generatePairingCode = async () => {
+    const generatePairingCode = async (phoneNumber?: string) => {
         if (isGhostMode) return;
-        if (!pairingNumberInput) {
+        const numberToUse = phoneNumber || pairingNumberInput;
+        if (!numberToUse) {
             alert('Por favor, digite o número do WhatsApp com o DDI (ex: 5541999999999).');
             return;
         }
+        // Limpar apenas dígitos e validar
+        const cleanNumber = numberToUse.replace(/\D/g, '');
+        if (cleanNumber.length < 10) {
+            alert('Número inválido. Use o formato internacional: 5541999999999');
+            return;
+        }
         setIsGeneratingPairing(true);
-        addDebugLog(`Solicitando Código de Pareamento para: ${pairingNumberInput}`, 'info');
+        setPairingCode(null); // Limpar código anterior
+        addDebugLog(`Solicitando Código de Pareamento para: ${cleanNumber}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
             const companyId = profile?.company_id || user?.user_metadata?.company_id;
             if (!companyId || !currentId) return;
+
+            // Primeiro: parar a sessão atual para garantir estado limpo
+            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${currentId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            }).catch(() => {});
+
+            // Aguardar 1s para o backend liberar
+            await new Promise(r => setTimeout(r, 1000));
 
             const url = `https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${currentId}`;
             const res = await fetch(url, {
@@ -270,7 +294,7 @@ const Channels: React.FC = () => {
                     'Authorization': `Bearer ${session?.access_token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ pairingNumber: pairingNumberInput })
+                body: JSON.stringify({ pairingNumber: cleanNumber })
             });
 
             const jsonResp = await res.json().catch(() => null);
@@ -278,10 +302,12 @@ const Channels: React.FC = () => {
             if (res.ok && jsonResp?.pairingCode) {
                 addDebugLog(`Código de Pareamento gerado: ${jsonResp.pairingCode}`, 'success');
                 setPairingCode(jsonResp.pairingCode);
-                setQrCode(null); // Clear QR Code since we are doing pairing code now
+                // Atualizar o número no input
+                setPairingNumberInput(cleanNumber);
             } else {
                 addDebugLog(`Erro ao gerar código de pareamento: ${JSON.stringify(jsonResp)}`, 'error');
-                alert('Erro ao gerar código de pareamento: ' + (jsonResp?.error || 'Erro desconhecido'));
+                const errMsg = jsonResp?.error || jsonResp?.message || 'Erro desconhecido';
+                alert(`Erro ao gerar código de pareamento:\n${errMsg}\n\nDica: Certifique-se que o número está no formato 5541999999999 (código do país + DDD + número, sem + ou espaços).`);
             }
         } catch (error: any) {
             addDebugLog(`Erro de rede no pareamento: ${error.message}`, 'error');
@@ -527,7 +553,7 @@ const Channels: React.FC = () => {
     };
 
     return (
-        <div className="p-8 max-w-6xl mx-auto h-full flex flex-col dark:bg-transparent transition-colors duration-500">
+        <div className="p-4 md:p-8 max-w-6xl mx-auto h-full flex flex-col dark:bg-transparent transition-colors duration-500 overflow-x-hidden font-sans">
 
             {view === 'list' && (
                 <div className="animate-in fade-in duration-500">
@@ -865,7 +891,7 @@ const Channels: React.FC = () => {
             )}
 
             {view === 'qr' && (
-                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-12 rounded-[3.5rem] shadow-2xl w-full max-w-xl text-center border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500 mx-auto">
+                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-6 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-xl text-center border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500 mx-auto overflow-y-auto max-h-[85vh]">
                     {isConnected ? (
                         <div className="py-10">
                             <div className="mb-10 flex justify-center">
@@ -873,104 +899,141 @@ const Channels: React.FC = () => {
                                     <CheckCircle className="w-14 h-14 animate-in zoom-in spin-in-90 duration-700" />
                                 </div>
                             </div>
-                            <h2 className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">WhatsApp Conectado!</h2>
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">WhatsApp Conectado!</h2>
                             <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[10px] opacity-70">Sua sessão foi iniciada com sucesso. Redirecionando...</p>
                         </div>
-                    ) : pairingCode ? (
-                        <>
-                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">Código de Pareamento</h2>
-                            <p className="text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-widest mb-8 opacity-80 leading-relaxed">
-                                Siga as instruções no seu celular para conectar o número.
-                            </p>
-
-                            <div className="bg-slate-50 dark:bg-black/20 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl mb-10 max-w-sm mx-auto">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-4">Código de Pareamento</span>
-                                <div className="font-mono text-3xl md:text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wider py-4 bg-white dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
-                                    {pairingCode.length === 8 ? `${pairingCode.slice(0, 4)}-${pairingCode.slice(4)}` : pairingCode}
-                                </div>
-                                
-                                <div className="text-left text-[11px] text-gray-500 dark:text-gray-400 font-medium space-y-3 mt-6">
-                                    <p className="font-bold text-gray-700 dark:text-gray-300">Como conectar no seu celular:</p>
-                                    <p>1. Abra o WhatsApp e vá em <b>Aparelhos Conectados</b>.</p>
-                                    <p>2. Clique em <b>Conectar um aparelho</b>.</p>
-                                    <p>3. Toque em <b>Conectar com número de telefone</b> na parte inferior.</p>
-                                    <p>4. Digite o código de 8 dígitos exibido acima.</p>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => {
-                                    setPairingCode(null);
-                                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
-                                    if (companyId && currentId) startSession(companyId, currentId);
-                                }}
-                                className="text-[10px] text-indigo-500 hover:text-indigo-400 font-bold uppercase tracking-[0.2em] transition-all bg-indigo-500/5 hover:bg-indigo-500/10 py-3 px-6 rounded-xl border border-indigo-500/10 mb-6"
-                            >
-                                Voltar para o QR Code
-                            </button>
-                        </>
                     ) : (
                         <>
-                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">Escaneie o QR Code</h2>
-                            <p className="text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-widest mb-10 opacity-80 leading-relaxed">
-                                Abra o WhatsApp em seu celular <br />
-                                <span className="text-emerald-500">Menu &gt; Aparelhos Conectados &gt; Conectar</span>
-                            </p>
+                            {/* Seletor de Modo */}
+                            <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl mb-6">
+                                <button
+                                    onClick={() => {
+                                        setConnectionMode('qr');
+                                        setPairingCode(null);
+                                    }}
+                                    className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
+                                        connectionMode === 'qr'
+                                            ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-lg'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <QrCode className="w-4 h-4" />
+                                    QR Code
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setConnectionMode('code');
+                                        setQrCode(null);
+                                    }}
+                                    className={`flex-1 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
+                                        connectionMode === 'code'
+                                            ? 'bg-white dark:bg-indigo-500 text-indigo-600 dark:text-white shadow-lg'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Key className="w-4 h-4" />
+                                    Código de Pareamento
+                                </button>
+                            </div>
 
-                            <div className="bg-white p-8 inline-block border-[12px] border-slate-900 dark:border-white/5 rounded-[3rem] shadow-2xl mb-10 transform scale-110">
-                                {qrCode ? (
-                                    <div className="rounded-2xl overflow-hidden shadow-inner">
-                                        {qrCode.length > 1000 || qrCode.startsWith('data:image/') ? (
-                                            <img src={qrCode.startsWith('data:image/') ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code" className="w-[256px] h-[256px] object-contain" />
+                            {/* Modo QR Code */}
+                            {connectionMode === 'qr' && (
+                                <>
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">Escaneie o QR Code</h2>
+                                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium mb-6">
+                                        Abra o WhatsApp → <span className="text-emerald-500 font-bold">Aparelhos Conectados → Conectar</span>
+                                    </p>
+                                    <div className="bg-white p-6 inline-block border-8 border-slate-900 dark:border-white/5 rounded-[2rem] shadow-2xl mb-6">
+                                        {qrCode ? (
+                                            <div className="rounded-xl overflow-hidden">
+                                                {qrCode.length > 1000 || qrCode.startsWith('data:image/') ? (
+                                                    <img src={qrCode.startsWith('data:image/') ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code" className="w-[220px] h-[220px] object-contain" />
+                                                ) : (
+                                                    <QRCode value={qrCode} size={220} fgColor="#0f172a" />
+                                                )}
+                                            </div>
                                         ) : (
-                                            <QRCode value={qrCode} size={256} fgColor="#0f172a" />
+                                            <div className="w-[220px] h-[220px] flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-4">
+                                                <RefreshCw className="w-8 h-8 animate-spin text-emerald-500 opacity-50" />
+                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Aguardando QR...</span>
+                                            </div>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-transparent text-gray-400 space-y-4">
-                                        <RefreshCw className="w-10 h-10 animate-spin text-emerald-500 opacity-50" />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Iniciando Sessão...</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Pairing Code Option */}
-                            <div className="border-t border-gray-100 dark:border-white/5 pt-8 mt-4 max-w-sm mx-auto">
-                                <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest mb-3">Conexão por Código (Fixo / Business)</h3>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mb-4 leading-relaxed">
-                                    Se você estiver usando telefone fixo ou não puder escanear o QR Code, gere um código de pareamento inserindo o número abaixo:
-                                </p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={pairingNumberInput}
-                                        onChange={e => setPairingNumberInput(e.target.value)}
-                                        placeholder="Ex: 5541999999999"
-                                        className="flex-1 px-4 py-2.5 bg-gray-100/50 dark:bg-black/20 border border-transparent dark:border-white/5 rounded-xl outline-none text-xs dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 transition-all font-medium"
-                                    />
                                     <button
-                                        onClick={generatePairingCode}
-                                        disabled={isGeneratingPairing}
-                                        className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 shrink-0"
+                                        onClick={() => {
+                                            setQrCode(null);
+                                            const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                            if (companyId && currentId) startSession(companyId, currentId);
+                                        }}
+                                        className="text-[10px] text-emerald-500 hover:text-emerald-400 font-bold uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-2.5 px-5 rounded-xl border border-emerald-500/10 mb-4 block mx-auto"
                                     >
-                                        {isGeneratingPairing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
-                                        Gerar Código
+                                        Gerar novo QR Code
                                     </button>
-                                </div>
-                            </div>
+                                </>
+                            )}
+
+                            {/* Modo Código de Pareamento */}
+                            {connectionMode === 'code' && (
+                                <>
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">Código de Pareamento</h2>
+                                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium mb-5">
+                                        Use o número cadastrado na linha do WhatsApp que deseja conectar.
+                                    </p>
+
+                                    <div className="bg-slate-50 dark:bg-black/20 p-5 rounded-2xl border border-gray-100 dark:border-white/5 mb-5 text-left">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Número (com DDI)</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={pairingNumberInput}
+                                                onChange={e => setPairingNumberInput(e.target.value.replace(/\D/g, ''))}
+                                                placeholder="5541999999999"
+                                                className="flex-1 px-4 py-3 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-mono dark:text-white focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all"
+                                            />
+                                            <button
+                                                onClick={() => generatePairingCode()}
+                                                disabled={isGeneratingPairing || !pairingNumberInput}
+                                                className="px-5 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 shrink-0"
+                                            >
+                                                {isGeneratingPairing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                                                {isGeneratingPairing ? 'Gerando...' : 'Gerar'}
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-2">Formato: código do país + DDD + número. Somente dígitos.</p>
+                                    </div>
+
+                                    {pairingCode && (
+                                        <div className="bg-indigo-50 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 mb-5 animate-in fade-in duration-300">
+                                            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest block mb-3">Código Gerado</span>
+                                            <div className="font-mono text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-[0.3em] py-3 bg-white dark:bg-white/5 border border-dashed border-indigo-200 dark:border-white/10 rounded-xl mb-4">
+                                                {pairingCode.length === 8 ? `${pairingCode.slice(0, 4)}-${pairingCode.slice(4)}` : pairingCode}
+                                            </div>
+                                            <div className="text-left text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                                <p className="font-bold text-gray-700 dark:text-gray-300">Como usar:</p>
+                                                <p>1. Abra o WhatsApp → <b>Aparelhos Conectados</b></p>
+                                                <p>2. Toque em <b>Conectar um aparelho</b></p>
+                                                <p>3. Selecione <b>Conectar com número de telefone</b></p>
+                                                <p>4. Digite o código acima</p>
+                                            </div>
+                                            <button
+                                                onClick={() => generatePairingCode()}
+                                                disabled={isGeneratingPairing}
+                                                className="mt-4 text-[10px] text-indigo-500 hover:text-indigo-400 font-bold uppercase tracking-widest bg-indigo-500/5 hover:bg-indigo-500/10 py-2 px-4 rounded-lg border border-indigo-500/10 transition-all"
+                                            >
+                                                Gerar novo código
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {!pairingCode && (
+                                        <p className="text-xs text-gray-400 italic mb-5">Digite o número e clique em Gerar para receber seu código.</p>
+                                    )}
+                                </>
+                            )}
                         </>
                     )}
 
-                    <div className="flex flex-col gap-4 mt-6">
-                        <button
-                            onClick={() => {
-                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
-                                if (companyId && currentId) startSession(companyId, currentId);
-                            }}
-                            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-bold uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/10"
-                        >
-                            Refazer / Forçar Início
-                        </button>
+                    <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
                         <button
                             onClick={() => setView('list')}
                             className="text-[10px] text-gray-400 hover:text-gray-200 font-bold uppercase tracking-[0.2em] py-2 transition-all"

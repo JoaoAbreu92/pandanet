@@ -1997,6 +1997,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     <CheckCheck className="w-5 h-5" />
                   </button>
                 )}
+                {/* Botão Reabrir - aparece apenas quando fechado */}
+                {!isGhostMode && selectedConversation.status === 'fechado' && (
+                  <button
+                    onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto')}
+                    className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1.5"
+                    title="Reabrir Atendimento"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Reabrir
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     onClick={handleExportPDF}
@@ -2625,17 +2636,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       </>
       )}
 
-      {/* Context Menu for Muting */}
+      {/* Context Menu for Conversations */}
       {contextMenu && (
         <>
           <div className="fixed inset-0 z-[100]" onClick={() => setContextMenu(null)} />
           <div 
-            className="fixed z-[101] bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[101] bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden py-1 min-w-[180px] animate-in fade-in zoom-in-95 duration-100 font-sans"
             style={{ top: contextMenu.y, left: contextMenu.x }}
           >
             <button 
               onClick={() => handleMuteToggle(contextMenu.conversationId, contextMenu.isMuted)}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors font-medium"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors font-medium"
             >
               {contextMenu.isMuted ? (
                 <>
@@ -2660,10 +2671,25 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   }
                   setContextMenu(null);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors font-medium border-t border-slate-100 dark:border-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-500/20 transition-colors font-medium border-t border-slate-100 dark:border-white/5"
               >
                 <CornerUpRight className="w-4 h-4 text-indigo-500" />
                 Transferir Atendimento
+              </button>
+            )}
+            {!isGhostMode && (
+              <button 
+                onClick={async () => {
+                  const targetConv = conversations.find(c => c.id === contextMenu.conversationId);
+                  if (targetConv) {
+                    await handleUpdateStatus(contextMenu.conversationId, 'fechado');
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors font-medium border-t border-slate-100 dark:border-white/5"
+              >
+                <CheckCheck className="w-4 h-4 text-red-500" />
+                Finalizar Atendimento
               </button>
             )}
           </div>
