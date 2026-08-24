@@ -638,7 +638,16 @@ const AppContent: React.FC = () => {
                 'viewMeuRH': 'meu-rh',
                 'viewDirectory': 'org-chart',
                 'viewInfoSec': 'infosec',
-                'viewKPIDashboard': 'kpis'
+                'viewKPIDashboard': 'kpis',
+                'crm-dashboard': 'crm',
+                'crm-customers': 'crm',
+                'crm-sales': 'crm',
+                'crm-invoices': 'crm',
+                'crm-proposals': 'crm',
+                'crm-estimates': 'crm',
+                'crm-payments': 'crm',
+                'crm-subscriptions': 'crm',
+                'crm-contracts': 'crm'
             };
 
             const featureId = featureMap[permission];
@@ -668,7 +677,6 @@ const AppContent: React.FC = () => {
             case 'crm-calendar':
                 return <CRMCalendar />;
             case 'crm-sales':
-                return <CRMSales initialTab={pageContext?.salesTab} onViewCustomer={handleViewCustomer} />;
             case 'crm-invoices':
             case 'crm-proposals':
             case 'crm-estimates':

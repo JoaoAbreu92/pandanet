@@ -127,8 +127,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'crm'; children: React.ReactNode, permission: boolean }> = ({ label, icon: Icon, menuKey, children, permission }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'crm'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
+
+        // If feature is explicitly disabled for the company, don't show the menu at all (even for admins)
+        if (featureId && customFeatures && customFeatures[featureId] === false) {
+            return null;
+        }
+
         if (!permission && !isAdmin) return null;
 
         const isActive = React.Children.toArray(children).some(child =>
@@ -241,7 +247,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>
 
-                <NavMenu label="CRM & Vendas" icon={BuildingOfficeIcon} menuKey="crm" permission={!!customFeatures?.crm}>
+                <NavMenu label="CRM & Vendas" icon={BuildingOfficeIcon} menuKey="crm" permission={!!customFeatures?.crm} featureId="crm">
                     <NavItem page="crm-dashboard" label="Dashboard CRM" icon={ChartBarIcon} permission={true} />
                     <NavItem page="crm-customers" label="Clientes" icon={UserGroupIcon} permission={true} />
                     <NavItem page="crm-proposals" label="Propostas" icon={DocumentTextIcon} permission={true} />
