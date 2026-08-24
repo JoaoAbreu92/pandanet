@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { ImapFlow } from "https://esm.sh/imapflow@1.0.124";
-import nodemailer from "https://esm.sh/nodemailer@6.9.1";
+import { ImapFlow } from "npm:imapflow@1.0.124";
+import nodemailer from "npm:nodemailer@6.9.1";
+
 
 // CORS headers
 const corsHeaders = {
