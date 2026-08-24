@@ -10,7 +10,8 @@ const path = require('path');
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Use Service Key for backend
+// Force true service key, ignoring .env that might be broken
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NzA4OTgzMTYsImV4cCI6MjA4NjI1ODMxNn0.19fFdFsT0GDfnHIKASqy9O2pUC8ZB25YUpkDgeCBEzg'; // Use Service Key for backend
 
 if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase URL or Service Key missing in .env');
