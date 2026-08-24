@@ -501,6 +501,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   };
 
+   // --- Helpers ---
+  const fixMediaUrl = (url?: string | null) => {
+    if (!url) return '';
+    // Substitui o host interno do Docker pelo IP público acessível pelo cliente
+    const publicIp = '77.37.43.60:8000';
+    if (url.includes('supabase-kong:8000')) {
+      return url.replace('supabase-kong:8000', publicIp);
+    }
+    // Se a URL começar com barra, assumimos o host base do IP público
+    if (url.startsWith('/storage/v1/')) {
+        return `http://${publicIp}${url}`;
+    }
+    return url;
+  };
 
   const fetchConversations = async () => {
     const companyId = currentUser?.company_id;
@@ -1432,14 +1446,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       {(msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
                         <div className={`relative group inline-block`}>
                           <img 
-                            src={msg.media_url || ''} 
+                            src={fixMediaUrl(msg.media_url)} 
                             alt="Mídia" 
                             className={`rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] ${
                               (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
                               ? 'border-0 shadow-none bg-transparent' 
                               : ''
                             }`}
-                            onClick={() => window.open(msg.media_url || '_blank')} 
+                            onClick={() => window.open(fixMediaUrl(msg.media_url) || '_blank')} 
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.src = 'https://ui-avatars.com/api/?name=%3F&background=ef4444&color=fff&text=IMG+ERR';
@@ -1447,7 +1461,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             }}
                           />
                           <a 
-                            href={msg.media_url || ''} 
+                            href={fixMediaUrl(msg.media_url)} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1463,7 +1477,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               <span>Áudio</span>
                             </div>
                             <a 
-                              href={msg.media_url || ''} 
+                              href={fixMediaUrl(msg.media_url)} 
                               download 
                               target="_blank" 
                               rel="noreferrer"
@@ -1473,7 +1487,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             </a>
                           </div>
                           <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity">
-                            <source src={msg.media_url || ''} />
+                            <source src={fixMediaUrl(msg.media_url)} />
                             Seu navegador não suporta áudio.
                           </audio>
                         </div>
@@ -1486,13 +1500,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               console.error('Erro ao carregar vídeo');
                             }}
                           >
-                            <source src={msg.media_url || ''} type="video/mp4" />
+                            <source src={fixMediaUrl(msg.media_url)} type="video/mp4" />
                             Seu navegador não suporta vídeos.
                           </video>
                         </div>
                       ) : msg.media_url ? (
                         <a 
-                          href={msg.media_url} 
+                          href={fixMediaUrl(msg.media_url)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-3 p-3 bg-white/10 dark:bg-white/5 rounded-xl border border-white/20 hover:border-emerald-400 transition-all group"
