@@ -344,6 +344,15 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         };
 
         if (mediaUrl) {
+            // Converter a URL pública em Base64 bruto (para contornar NAT Loopback do Docker VPS)
+            let base64Data;
+            try {
+                base64Data = await getBase64FromUrl(mediaUrl);
+            } catch (base64Err) {
+                console.error(`[SEND API] Falha ao converter mídia para base64:`, base64Err.message);
+                return res.status(500).json({ error: `Falha ao processar arquivo para envio: ${base64Err.message}` });
+            }
+
             // Se for figurinha MAS for GIF, melhor tratar como mídia imagem (Evolution converte melhor no celular)
             const isGif = mediaUrl.toLowerCase().split('?')[0].endsWith('.gif');
             const isSticker = mediaType === 'sticker' && !isGif;
@@ -362,21 +371,21 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             const body = isSticker ? {
                 number: phoneNumber,
                 stickerMessage: {
-                    sticker: mediaUrl
+                    sticker: base64Data
                 }
             } : isAudio ? {
                 number: phoneNumber,
-                audio: mediaUrl,
+                audio: base64Data,
                 ptt: true
             } : {
                 number: phoneNumber,
                 mediatype: isGif ? 'image' : getEvoMediaType(mediaType),
                 mimetype: mediaType,
-                media: mediaUrl,
+                media: base64Data,
                 fileName: fileName,
                 caption: message || ''
             };
-            console.log(`[SEND API] Enviando para Evolution: endpoint=${endpoint} | body=`, JSON.stringify(body).substring(0, 500));
+            console.log(`[SEND API] Enviando para Evolution: endpoint=${endpoint} | body length=`, JSON.stringify(body).length);
 
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 120000); // 120s timeout
@@ -477,22 +486,73 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
 
 
 
+/**
+ * Helper to fetch a file and return its content as a raw Base64 string.
+ * It rewrites public/external URLs to internal Docker URLs if needed to avoid loopback issues.
+ */
+async function getBase64FromUrl(url) {
+    try {
+        console.log(`[BASE64-FETCH] Original URL: ${url}`);
+        let targetUrl = url;
+        
+        if (supabaseUrl) {
+            const storageIndex = url.indexOf('/storage/v1/object/public/');
+            if (storageIndex !== -1) {
+                const storagePath = url.substring(storageIndex);
+                const base = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
+                targetUrl = `${base}${storagePath}`;
+                console.log(`[BASE64-FETCH] Rewrote URL to internal Supabase: ${targetUrl}`);
+            }
+        }
+
+        const resp = await fetch(targetUrl);
+        if (!resp.ok) {
+            throw new Error(`Failed to fetch media from ${targetUrl}: ${resp.status} ${resp.statusText}`);
+        }
+        
+        const buffer = await resp.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+        console.log(`[BASE64-FETCH] Successfully fetched and converted to Base64 (length: ${base64.length})`);
+        return base64;
+    } catch (err) {
+        console.error(`[BASE64-FETCH] Error fetching URL ${url}:`, err.message);
+        try {
+            console.log(`[BASE64-FETCH] Attempting fallback fetch of original URL: ${url}`);
+            const resp = await fetch(url);
+            if (resp.ok) {
+                const buffer = await resp.arrayBuffer();
+                return Buffer.from(buffer).toString('base64');
+            }
+        } catch (fallbackErr) {
+            console.error(`[BASE64-FETCH] Fallback fetch also failed:`, fallbackErr.message);
+        }
+        throw err;
+    }
+}
+
 async function updateInstanceSettings(instanceName) {
     try {
         console.log(`[SETTINGS] Configurando instância ${instanceName}...`);
-        await fetch(`${evoUrl}/settings/set/${instanceName}`, {
+        const resp = await fetch(`${evoUrl}/settings/set/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 reject_call: false,
+                msg_call: "",
                 groups_ignore: false,
                 always_online: true,
                 read_messages: false,
                 read_status: false,
-                sync_full_history: true // Importante para puxar mensagens do celular
+                sync_full_history: true,
+                wavoipToken: ""
             })
         });
-        console.log(`[SETTINGS] Configurações de ${instanceName} aplicadas.`);
+        if (resp.ok) {
+            console.log(`[SETTINGS] Configurações de ${instanceName} aplicadas com sucesso.`);
+        } else {
+            const errText = await resp.text();
+            console.error(`[SETTINGS] Erro ao aplicar configurações em ${instanceName} (${resp.status}): ${errText}`);
+        }
     } catch (e) {
         console.error(`[SETTINGS] Erro ao aplicar configurações em ${instanceName}:`, e.message);
     }
@@ -718,8 +778,20 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 headers
             });
             if (respG.ok) {
-                const rawG = await respG.json();
-                const allGroups = Array.isArray(rawG) ? rawG : (rawG.groups || rawG.data || []);
+                const textG = await respG.text();
+                let allGroups = [];
+                if (textG && textG.trim().length > 0) {
+                    try {
+                        const rawG = JSON.parse(textG);
+                        allGroups = Array.isArray(rawG) ? rawG : (rawG.groups || rawG.data || []);
+                    } catch (parseErr) {
+                        console.error(`[SYNC] Erro ao fazer parse dos grupos:`, parseErr.message);
+                        addDebugLog('SYNC_GROUPS_PARSE_ERR', `Erro ao fazer parse dos grupos: ${parseErr.message}`);
+                    }
+                } else {
+                    console.log(`[SYNC] fetchAllGroups retornou corpo vazio para ${instanceName}`);
+                    addDebugLog('SYNC_GROUPS_EMPTY', `fetchAllGroups retornou corpo vazio para ${instanceName}`);
+                }
                 console.log(`[SYNC] Encontrados ${allGroups.length} grupos no total.`);
                 addDebugLog('SYNC_GROUPS_RAW', `Encontrados ${allGroups.length} grupos no total.`);
 

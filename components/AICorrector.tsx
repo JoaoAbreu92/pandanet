@@ -40,7 +40,7 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
                         return;
                     }
                 }
-                
+
                 // Evitar grudar no próprio input de busca do corretor se criarmos um
                 if (target.id === 'ai-corrector-search') return;
 
@@ -55,9 +55,9 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
             setTimeout(() => {
                 const active = document.activeElement as HTMLElement | null;
                 if (
-                    !active || 
-                    (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA' && active.contentEditable !== 'true' && 
-                     !active.closest('#ai-corrector-widget') && !active.closest('#ai-corrector-trigger'))
+                    !active ||
+                    (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA' && active.contentEditable !== 'true' &&
+                        !active.closest('#ai-corrector-widget') && !active.closest('#ai-corrector-trigger'))
                 ) {
                     // Só fecha se o novo elemento focado também não for um input válido
                     setActiveElement(null);
@@ -106,7 +106,7 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
     const updatePosition = (el: HTMLElement) => {
         if (!el) return;
         const rect = el.getBoundingClientRect();
-        
+
         // Posiciona acima do topo do campo, alinhado ao canto direito dele
         const top = rect.top - 32;
         const left = rect.right - 28;
@@ -129,11 +129,11 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
 
         if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
             const inputEl = activeElement as HTMLInputElement | HTMLTextAreaElement;
-            
+
             // Truque de Native Value Setter do React para forçar a atualização do estado do componente
             const prototype = Object.getPrototypeOf(inputEl);
             const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
-            
+
             if (valueSetter) {
                 valueSetter.call(inputEl, corrected);
             } else {
@@ -146,7 +146,7 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
         // Dispara eventos de mudança para atualizar os bindings do React/React Hook Form
         activeElement.dispatchEvent(new Event('input', { bubbles: true }));
         activeElement.dispatchEvent(new Event('change', { bubbles: true }));
-        
+
         setIsOpen(false);
         setActiveElement(null);
     };
@@ -185,7 +185,7 @@ const AICorrector: React.FC<AICorrectorProps> = ({ currentUser, isAIEnabled }) =
 
             const data = await response.json();
             const output = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            
+
             if (output) {
                 // Remover possíveis aspas externas que a IA possa ter colocado
                 let cleaned = output.trim();
