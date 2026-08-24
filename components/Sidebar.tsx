@@ -99,7 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             fixed md:relative z-50 h-full
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>
-            <div className={`flex items-center justify-center h-20 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'md:flex-col md:space-y-0'}`}>
+            <div className={`flex items-center justify-center h-28 border-b border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 ${isOpen ? '' : 'md:flex-col md:space-y-0'}`}>
                 <Logo showText={isOpen} />
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
