@@ -463,11 +463,9 @@ const Scheduler: React.FC = () => {
 
         if (uploadErr) throw uploadErr;
 
-        const { data: urlData } = supabase.storage
-          .from('chat-media')
-          .getPublicUrl(filePath);
-
-        finalImageUrl = urlData.publicUrl;
+        finalImageUrl = await getSignedStorageUrl(
+      `https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`
+    );
       }
 
       // 1. Criar a campanha

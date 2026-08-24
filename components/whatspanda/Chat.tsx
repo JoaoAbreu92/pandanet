@@ -1775,7 +1775,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+      const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
       setCustomStickers(prev => [...prev, publicUrl]);
     } catch (err) {
       console.error('Erro no upload do GIF:', err);
@@ -2007,7 +2007,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           alert(`Erro ao subir arquivo: ${uploadError.message}`);
           return;
         } else if (uploadData) {
-          const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+          const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
           uploadedFileUrl = publicUrl;
           fileType = attachedFile.type;
           console.log(`[SEND] Upload OK. URL: ${publicUrl} | MIME: ${fileType}`);

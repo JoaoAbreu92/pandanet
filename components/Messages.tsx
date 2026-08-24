@@ -18,7 +18,7 @@ import {
     ChevronDownIcon,
 } from './icons';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
-import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile, getSignedStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { usePresence } from './PresenceContext';
@@ -619,7 +619,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
 
             if (error) throw error;
 
-            const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+            const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
             setCustomStickers(prev => [...prev, publicUrl]);
         } catch (err) {
             console.error('Erro no upload do GIF:', err);
@@ -1094,7 +1094,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     setIsSending(false);
                     return; // ABORTA O ENVIO SE O UPLOAD FALHAR
                 } else if (data) {
-                    const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                    const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
                     uploadedFileUrl = publicUrl;
                     fileType = attachedFile.type;
                 }
