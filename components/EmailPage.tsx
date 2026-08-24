@@ -721,6 +721,31 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         else if (type === 'bcc') setBccTags(bccTags.filter(t => t !== email));
     };
 
+    const saveDraft = async (showNotification = true) => {
+        setLoading(true);
+        try {
+            const { data, error } = await callEmailServer('save-draft', {
+                config: settings,
+                payload: {
+                    to: toTags.join(', '),
+                    subject: composeSubject,
+                    text: composeBody.replace(/<[^>]*>?/gm, ''),
+                    html: composeBody
+                }
+            });
+
+            if (error) throw error;
+            if (data.error) throw new Error(data.error);
+
+            if (showNotification) showToast('Rascunho salvo com sucesso!', 'success');
+        } catch (err: any) {
+            console.error("Save Draft Error:", err);
+            if (showNotification) showToast('Erro ao salvar rascunho: ' + err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const sendEmail = async () => {
         setLoading(true);
         try {
@@ -760,19 +785,15 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setView('inbox');
         } catch (err: any) {
             console.error("Send Email Error:", err);
-            showToast('Erro ao enviar o e-mail: Verifique se as configurações de SMTP (porta e host) estão corretas em Configurações.', 'error');
-            showToast('Sua mensagem foi mantida na tela como Rascunho para você não perdê-la.', 'info');
-            // We do NOT clear the state so the user doesn't lose their draft.
-            // Attempt to save to IMAP Drafts folder as backup
-            callEmailServer('save-draft', {
-                config: settings,
-                payload: {
-                    to: toTags.join(', '),
-                    subject: composeSubject,
-                    text: composeBody.replace(/<[^>]*>?/gm, ''),
-                    html: composeBody
-                }
-            }).catch(() => { }); // silently fail if server doesn't support save-draft yet
+            if (err.message?.includes('413')) {
+                showToast('Erro: O e-mail é muito grande (imagens ou anexos). Tente reduzir o tamanho.', 'error');
+            } else {
+                showToast('Erro ao enviar o e-mail: Verifique se as configurações de SMTP estão corretas.', 'error');
+            }
+            showToast('Sua mensagem está sendo salva em Rascunhos para segurança.', 'info');
+
+            // Backup save as draft
+            saveDraft(false).catch(() => { });
         } finally {
             setLoading(false);
         }
@@ -1528,6 +1549,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     </span>
                                     <div className="flex gap-2">
                                         <button onClick={() => setView('inbox')} className="px-4 py-2 text-gray-400 hover:text-gray-600 rounded-md font-bold text-sm transition-colors">{t('generic.cancel')}</button>
+                                        <button
+                                            onClick={() => saveDraft()}
+                                            disabled={loading}
+                                            className="px-4 py-2 bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-white/10 transition-all flex items-center gap-2 border border-gray-100 dark:border-white/5"
+                                        >
+                                            <PencilSquareIcon className="w-4 h-4" />
+                                            Salvar rascunho
+                                        </button>
                                         <button
                                             onClick={sendEmail}
                                             disabled={loading}

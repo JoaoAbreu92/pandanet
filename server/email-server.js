@@ -32,15 +32,16 @@ app.use(hpp());    // Prevent HTTP Parameter Pollution
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    max: 500, // Limit each IP to 500 requests per windowMs (Higher for internal use)
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { error: 'Muitas requisições deste IP. Tente novamente em 15 minutos.' }
 });
 
 app.use(limiter);
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // --- JWT Auth Middleware ---
 function authMiddleware(req, res, next) {
@@ -501,6 +502,41 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error('[email-server] SMTP Error:', err.message);
         return res.status(500).json({ error: `SMTP Error: ${err.message}` });
+    }
+});
+
+// --- SAVE DRAFT (IMAP) ---
+app.post('/api/email/save-draft', authMiddleware, async (req, res) => {
+    const { config, payload } = req.body;
+    if (!config || !payload) return res.status(400).json({ error: 'Missing config or payload' });
+
+    console.log(`[email-server] SAVE DRAFT: ${config.imap_host} -> Subject: ${payload.subject}`);
+
+    try {
+        const client = await getPooledClient(config);
+
+        // Detect Drafts Folder
+        let draftFolder = 'INBOX.Drafts'; // Default
+        const boxes = await client.list();
+        const draftBox = boxes.find(b => b.specialUse === '\\Drafts') ||
+            boxes.find(b => ['Drafts', 'Rascunhos', 'Brouillons'].some(name => b.path.toLowerCase().includes(name.toLowerCase())));
+
+        if (draftBox) draftFolder = draftBox.path;
+
+        const mimeMessage = [
+            `To: ${payload.to}`,
+            `Subject: ${payload.subject}`,
+            `Date: ${new Date().toUTCString()}`,
+            `Content-Type: text/html; charset=utf-8`,
+            '',
+            payload.html || payload.text
+        ].filter(Boolean).join('\r\n');
+
+        await client.append(draftFolder, mimeMessage, ['\\Draft']);
+        return res.json({ success: true, folder: draftFolder });
+    } catch (err) {
+        console.error('[email-server] Save Draft Error:', err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 
