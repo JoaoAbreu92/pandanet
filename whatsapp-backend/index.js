@@ -12,12 +12,12 @@ const pushService = require('./utils/pushService');
 
 // Robust .env loading
 dotenv.config(); // Default
-dotenv.config({ path: path.join(__dirname, '.env'), override: true });
-dotenv.config({ path: path.join(__dirname, '../.env'), override: true });
-dotenv.config({ path: path.join(__dirname, '../.env.local'), override: true });
-dotenv.config({ path: '/root/pandanet/.env', override: true });
+dotenv.config({ path: path.join(__dirname, '.env'), override: false });
+dotenv.config({ path: path.join(__dirname, '../.env'), override: false });
+dotenv.config({ path: path.join(__dirname, '../.env.local'), override: false });
+dotenv.config({ path: '/root/pandanet/.env', override: false });
 if (!process.env.JWT_SECRET) {
-  dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: true });
+  dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: false });
 }
 
 // Ignorar erros de certificado SSL expirado/inválido em conexões internas/HTTPs
