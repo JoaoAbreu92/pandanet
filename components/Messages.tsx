@@ -95,6 +95,8 @@ const Messages: React.FC<MessagesProps> = () => {
     const stickerTimeoutRef = useRef<any>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const stickerUploadRefHeader = useRef<HTMLInputElement>(null);
+    const stickerUploadRefInput = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const typingTimeoutRef = useRef<any>(null);
 
@@ -112,13 +114,58 @@ const Messages: React.FC<MessagesProps> = () => {
         }, 1500); // Increased stay time
     };
 
-    const stickers = [
-        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
-        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
-        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
-        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
-        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif'
-    ];
+    const [customStickers, setCustomStickers] = useState<string[]>(() => {
+        const saved = localStorage.getItem('custom_stickers');
+        return saved ? JSON.parse(saved) : [
+            'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+            'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+            'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+            'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
+            'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif'
+        ];
+    });
+
+    useEffect(() => {
+        localStorage.setItem('custom_stickers', JSON.stringify(customStickers));
+    }, [customStickers]);
+
+    const handleAddManualGif = () => {
+        const url = prompt('Cole o link do GIF (URL):');
+        if (url && url.trim()) {
+            setCustomStickers(prev => [...prev, url.trim()]);
+        }
+    };
+
+    const handleUploadGif = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.includes('gif') && !file.type.includes('image')) {
+            alert('Por favor, selecione um GIF ou imagem.');
+            return;
+        }
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}.${fileExt}`;
+            const filePath = `stickers/${currentUser.id}/${fileName}`;
+
+            const { data, error } = await supabase.storage
+                .from('chat-media')
+                .upload(filePath, file);
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+            setCustomStickers(prev => [...prev, publicUrl]);
+        } catch (err) {
+            console.error('Erro no upload do GIF:', err);
+            alert('Falha ao subir o GIF.');
+        }
+    };
+
+    const removeSticker = (url: string) => {
+        setCustomStickers(prev => prev.filter(s => s !== url));
+    };
 
     const handleSendSticker = (url: string) => {
         handleSendMessage(undefined, 'sticker', url);
@@ -785,15 +832,42 @@ const Messages: React.FC<MessagesProps> = () => {
                                                     <button onClick={() => setShowStickerPicker(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
                                                 </div>
                                                 <div className="grid grid-cols-4 gap-2">
-                                                    {stickers.map((url, i) => (
-                                                        <button
-                                                            key={i}
-                                                            onClick={() => handleSendSticker(url)}
-                                                            className="hover:scale-110 transition-transform p-1 rounded hover:bg-gray-50"
-                                                        >
-                                                            <img src={url} alt="Sticker" className="w-full h-auto" />
-                                                        </button>
+                                                    {customStickers.map((url, i) => (
+                                                        <div key={i} className="relative group aspect-square">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSendSticker(url)}
+                                                                className="w-full h-full hover:scale-110 transition-transform p-1 rounded hover:bg-gray-50 flex items-center justify-center overflow-hidden"
+                                                            >
+                                                                <img src={url} alt="Sticker" className="max-w-full max-h-full object-contain" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); removeSticker(url); }}
+                                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <XMarkIcon className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
                                                     ))}
+                                                    <div className="flex flex-col gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddManualGif}
+                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                            title="Adicionar por Link"
+                                                        >
+                                                            <PlusIcon className="w-5 h-5 text-gray-400" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => stickerUploadRefHeader.current?.click()}
+                                                            className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors aspect-square"
+                                                            title="Subir GIF"
+                                                        >
+                                                            <PaperClipIcon className="w-5 h-5 text-gray-400" />
+                                                        </button>
+                                                        <input type="file" ref={stickerUploadRefHeader} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
+                                                    </div>
                                                 </div>
                                                 <div className="mt-3 pt-3 border-t">
                                                     <p className="text-[10px] text-gray-400 text-center">Integração com GIPHY em breve</p>
@@ -852,12 +926,45 @@ const Messages: React.FC<MessagesProps> = () => {
                                             <h4 className="font-bold text-sm text-gray-600">Stickers e GIFs</h4>
                                             <button onClick={() => setShowStickerPicker(false)}><XMarkIcon className="w-4 h-4 text-gray-400" /></button>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                                            {stickers.map((url, i) => (
-                                                <button key={i} onClick={() => handleSendSticker(url)} className="hover:scale-110 transition-transform bg-gray-50 rounded-lg p-1">
-                                                    <img src={url} alt="sticker" className="w-full h-16 object-contain" />
-                                                </button>
+                                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                            {customStickers.map((url, i) => (
+                                                <div key={i} className="relative group aspect-square">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSendSticker(url)}
+                                                        className="w-full h-full hover:scale-110 transition-transform bg-gray-50 rounded-lg p-1 flex items-center justify-center overflow-hidden"
+                                                    >
+                                                        <img src={url} alt="sticker" className="max-w-full max-h-full object-contain" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); removeSticker(url); }}
+                                                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <XMarkIcon className="w-3 h-3" />
+                                                    </button>
+                                                </div>
                                             ))}
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddManualGif}
+                                                    className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
+                                                    title="Adicionar por Link"
+                                                >
+                                                    <PlusIcon className="w-4 h-4 text-gray-400 mr-1" />
+                                                    <span className="text-[10px] text-gray-400">Lin</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => stickerUploadRefInput.current?.click()}
+                                                    className="border-2 border-dashed border-gray-200 rounded-lg p-1 flex items-center justify-center hover:bg-gray-50 hover:border-brand-primary transition-colors h-10 w-full"
+                                                    title="Subir GIF"
+                                                >
+                                                    <PaperClipIcon className="w-4 h-4 text-gray-400 mr-1" />
+                                                    <span className="text-[10px] text-gray-400">Up</span>
+                                                </button>
+                                                <input type="file" ref={stickerUploadRefInput} hidden accept="image/gif,image/png,image/jpeg" onChange={handleUploadGif} />
+                                            </div>
                                         </div>
                                         <p className="text-[10px] text-gray-400 mt-3 text-center">Mais itens em breve!</p>
                                     </div>
