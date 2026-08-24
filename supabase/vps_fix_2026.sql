@@ -315,7 +315,7 @@ BEGIN
     -- 15. Deletar do auth.users
     DELETE FROM auth.users WHERE id = target_user_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 3. RLS FIXES
 -- Allow admins to update any profile in their company
