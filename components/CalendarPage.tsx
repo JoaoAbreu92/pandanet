@@ -25,12 +25,28 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
 const mockHolidays = [
-    { title: 'Dia do Trabalho', date: '2024-05-01' },
-    { title: 'Independência do Brasil', date: '2024-09-07' },
-    { title: 'Nossa Senhora Aparecida', date: '2024-10-12' },
-    { title: 'Finados', date: '2024-11-02' },
-    { title: 'Proclamação da República', date: '2024-11-15' },
-    { title: 'Natal', date: '2024-12-25' },
+    // Nacionais
+    { title: 'Confraternização Universal', date: '2026-01-01', scope: 'Nacional', description: 'Início do ano civil, adotado por quase todas as nações do mundo. Celebra a paz e a união entre os povos.' },
+    { title: 'Carnaval', date: '2026-02-16', scope: 'Nacional (Ponto Facultativo)', description: 'Tradicional celebração popular que antecede a Quaresma. No Brasil, é marcado por desfiles e blocos de rua.' },
+    { title: 'Paixão de Cristo', date: '2026-04-03', scope: 'Nacional', description: 'Data religiosa cristã que relembra a crucificação e morte de Jesus Cristo. Também conhecida como Sexta-feira Santa.' },
+    { title: 'Tiradentes', date: '2026-04-21', scope: 'Nacional', description: 'Homenagem a Joaquim José da Silva Xavier, o Tiradentes, mártir da Inconfidência Mineira e patrono cívico do Brasil.' },
+    { title: 'Dia do Trabalho', date: '2026-05-01', scope: 'Nacional', description: 'Celebra as conquistas históricas dos trabalhadores e a luta por melhores condições de trabalho ao redor do mundo.' },
+    { title: 'Corpus Christi', date: '2026-06-04', scope: 'Nacional (Ponto Facultativo)', description: 'Festa religiosa da Igreja Católica que celebra o mistério da Eucaristia, o sacramento do corpo e do sangue de Jesus Cristo.' },
+    { title: 'Independência do Brasil', date: '2026-09-07', scope: 'Nacional', description: 'Data que marca o grito de independência de D. Pedro I às margens do Rio Ipiranga em 1822, libertando o Brasil de Portugal.' },
+    { title: 'Nossa Senhora Aparecida', date: '2026-10-12', scope: 'Nacional', description: 'Celebra a padroeira do Brasil. A data também é popularmente comemorada como o Dia das Crianças.' },
+    { title: 'Finados', date: '2026-11-02', scope: 'Nacional', description: 'Dia dedicado à memória dos mortos, prática comum em diversas culturas e religiões para homenagear entes queridos.' },
+    { title: 'Proclamação da República', date: '2026-11-15', scope: 'Nacional', description: 'Relembra o golpe militar de 1889 que pôs fim ao período do Império e instituiu a República Federativa no Brasil.' },
+    { title: 'Consciência Negra', date: '2026-11-20', scope: 'Nacional', description: 'Homenagem a Zumbi dos Palmares, líder do quilombo mais famoso do Brasil. Celebra a resistência e a cultura afro-brasileira.' },
+    { title: 'Natal', date: '2026-12-25', scope: 'Nacional', description: 'Celebração cristã do nascimento de Jesus Cristo. É um momento de união familiar.' },
+
+    // Estaduais de destaque
+    { title: 'Aniversário de São Paulo', date: '2026-01-25', scope: 'Estadual/Municipal', origin: 'São Paulo', description: 'Data da fundação da cidade de São Paulo em 1554 pelos jesuítas Manuel da Nóbrega e José de Anchieta.' },
+    { title: 'Revolução Constitucionalista', date: '2026-07-09', scope: 'Estadual', origin: 'São Paulo', description: 'Homenagem ao levante armado de 1932 no estado de SP contra o governo de Getúlio Vargas e em prol de uma Constituição.' },
+    { title: 'São Jorge', date: '2026-04-23', scope: 'Estadual', origin: 'Rio de Janeiro', description: 'Homenagem ao santo guerreiro, muito popular no Rio de Janeiro, feriado estadual oficial desde 2008.' },
+    { title: 'Adesão do Pará', date: '2026-08-15', scope: 'Estadual', origin: 'Pará', description: 'Data que marca a adesão do estado do Pará à independência do Brasil em 1823, quase um ano após o grito do Ipiranga.' },
+    { title: 'Data Magna de Pernambuco', date: '2026-03-06', scope: 'Estadual', origin: 'Pernambuco', description: 'Relembra a Revolução Pernambucana de 1817, primeiro movimento emancipacionista que instituiu um governo próprio.' },
+    { title: 'Independência da Bahia', date: '2026-07-02', scope: 'Estadual', origin: 'Bahia', description: 'Celebra a vitória das tropas brasileiras sobre as forças portuguesas na Bahia em 1823, consolidando a independência regional.' },
+    { title: 'Revolução Farroupilha', date: '2026-09-20', scope: 'Estadual', origin: 'Rio Grande do Sul', description: 'Também chamado de Dia do Gaúcho, recorda o início do levante republicano de 1835 contra o governo imperial.' },
 ];
 
 const MONTH_THEMES: Record<number, { name: string, color: string, bg: string, border: string, text: string, phrase: string, campaign: string }> = {
@@ -77,7 +93,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         location: '',
         attendees: [] as string[],
         departmentId: '',
-        notes: ''
+        notes: '',
+        isPrivate: false
     });
 
     useEffect(() => {
@@ -100,10 +117,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
             if (depts) setDepartments(depts);
 
-            const { data: evts } = await supabase.from('events').select('*, calendar_invites(*)').eq('company_id', currentUser.company_id);
+            const { data: evts } = await supabase
+                .from('events')
+                .select('*, calendar_invites(*)')
+                .or(`company_id.eq.${currentUser.company_id},and(is_private.eq.true,creator_id.eq.${currentUser.id})`);
+
             if (evts) {
                 const empsMap = emps || [];
-                const formattedEvents: CalendarEvent[] = evts.map((e: any) => ({
+                const formattedEvents: CalendarEvent[] = evts
+                    .filter((e: any) => !e.is_private || e.creator_id === currentUser.id)
+                    .map((e: any) => ({
                     id: e.id,
                     title: e.title,
                     date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
@@ -118,6 +141,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     } as Employee)),
                     invitedIds: e.invited_ids || [],
                     notes: e.description || '',
+                        isPrivate: e.is_private,
                     invites: (e.calendar_invites || []).map((inv: any) => {
                         const invitee = empsMap.find((emp: any) => emp.id === inv.user_id);
                         return {
@@ -166,15 +190,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 category: newEventData.category,
                 location: newEventData.location,
                 attendees: [currentUser.id],
-                invited_ids: finalAttendees.filter(id => id !== currentUser.id),
-                creator_id: currentUser.id
+                invited_ids: newEventData.isPrivate ? [] : finalAttendees.filter(id => id !== currentUser.id),
+                creator_id: currentUser.id,
+                is_private: newEventData.isPrivate
             }).select();
 
             if (data && data[0]) {
                 const eventId = data[0].id;
 
-                // Criar convites na tabela calendar_invites
-                if (finalAttendees.length > 0) {
+                // Criar convites na tabela calendar_invites (apenas se não for privado)
+                if (!newEventData.isPrivate && finalAttendees.length > 0) {
                     const invites = finalAttendees
                         .filter(id => id !== currentUser.id)
                         .map(userId => ({
@@ -234,8 +259,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         })).filter(e => e.date);
 
         const holidayEvents: CalendarEvent[] = mockHolidays.map((h, i) => ({
-            id: `holiday-${i}`, title: h.title, date: h.date.replace('2024', currentDate.getFullYear().toString()),
-            startTime: '00:00', endTime: '23:59', category: 'Feriado', location: '', attendees: [], notes: ''
+            id: `holiday-${i}`,
+            title: h.title,
+            date: h.date.replace('2024', currentDate.getFullYear().toString()),
+            startTime: '00:00',
+            endTime: '23:59',
+            category: 'Feriado',
+            location: h.scope + (h.origin ? ` (${h.origin})` : ''),
+            attendees: [],
+            notes: h.description,
+            isSystem: true
         }));
 
         return [...events, ...birthdayEvents, ...holidayEvents];
@@ -447,54 +480,73 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Equipe/Departamento</label>
-                                <select
-                                    name="departmentId"
-                                    value={newEventData.departmentId}
-                                    onChange={handleInputChange}
-                                    className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none"
-                                >
-                                    <option value="">Nenhum departamento específico</option>
-                                    {departments.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
-                                    ))}
-                                </select>
+                            <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-brand-primary/20 transition-all cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    id="isPrivate"
+                                    name="isPrivate"
+                                    checked={newEventData.isPrivate}
+                                    onChange={(e) => setNewEventData(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                                    className="w-5 h-5 text-brand-primary border-slate-300 rounded focus:ring-brand-primary"
+                                />
+                                <label htmlFor="isPrivate" className="flex-1 cursor-pointer">
+                                    <div className="text-sm font-bold text-slate-800 group-hover:text-brand-primary transition-colors">Evento Privado</div>
+                                    <p className="text-[10px] text-slate-500 font-medium">Este evento aparecerá somente para você no calendário.</p>
+                                </label>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Usuários</label>
-                                <div className="bg-slate-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-transparent focus-within:ring-2 focus-within:ring-brand-primary transition-all">
-                                    {employees.filter(emp => emp.id !== currentUser?.id).map(emp => (
-                                        <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded-xl cursor-pointer transition-colors group">
-                                            <input
-                                                type="checkbox"
-                                                checked={newEventData.attendees.includes(emp.id)}
-                                                onChange={(e) => {
-                                                    const checked = e.target.checked;
-                                                    setNewEventData(prev => ({
-                                                        ...prev,
-                                                        attendees: checked
-                                                            ? [...prev.attendees, emp.id]
-                                                            : prev.attendees.filter(id => id !== emp.id)
-                                                    }));
-                                                }}
-                                                className="w-4 h-4 text-brand-primary border-slate-300 rounded focus:ring-brand-primary"
-                                            />
-                                            <div className="flex items-center space-x-2">
-                                                {emp.avatarUrl ? (
-                                                    <img src={emp.avatarUrl} className="w-6 h-6 rounded-full object-cover" />
-                                                ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                                        {emp.name?.charAt(0)}
+                            {!newEventData.isPrivate && (
+                                <>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Equipe/Departamento</label>
+                                        <select
+                                            name="departmentId"
+                                            value={newEventData.departmentId}
+                                            onChange={handleInputChange}
+                                            className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none"
+                                        >
+                                            <option value="">Nenhum departamento específico</option>
+                                            {departments.map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Usuários</label>
+                                        <div className="bg-slate-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-transparent focus-within:ring-2 focus-within:ring-brand-primary transition-all">
+                                            {employees.filter(emp => emp.id !== currentUser?.id).map(emp => (
+                                                <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded-xl cursor-pointer transition-colors group">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={newEventData.attendees.includes(emp.id)}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            setNewEventData(prev => ({
+                                                                ...prev,
+                                                                attendees: checked
+                                                                    ? [...prev.attendees, emp.id]
+                                                                    : prev.attendees.filter(id => id !== emp.id)
+                                                            }));
+                                                        }}
+                                                        className="w-4 h-4 text-brand-primary border-slate-300 rounded focus:ring-brand-primary"
+                                                    />
+                                                    <div className="flex items-center space-x-2">
+                                                        {emp.avatarUrl ? (
+                                                            <img src={emp.avatarUrl} className="w-6 h-6 rounded-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                                {emp.name?.charAt(0)}
+                                                            </div>
+                                                        )}
+                                                        <span className="text-sm font-semibold text-slate-700 group-hover:text-brand-primary transition-colors">{emp.name}</span>
                                                     </div>
-                                                )}
-                                                <span className="text-sm font-semibold text-slate-700 group-hover:text-brand-primary transition-colors">{emp.name}</span>
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setCreateModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">CANCELAR</button>
@@ -522,52 +574,76 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             {selectedEvent.location && (
                                 <div className="flex items-start space-x-3 text-slate-600 font-medium">
                                     <MapPinIcon className="w-5 h-5 text-slate-400 mt-1" />
-                                    <span>{selectedEvent.location}</span>
+                                    <div>
+                                        <span className="block">{selectedEvent.location}</span>
+                                        {selectedEvent.isSystem && (
+                                            <span className="text-[10px] text-brand-primary font-black uppercase tracking-widest bg-brand-primary/10 px-2 py-0.5 rounded-md mt-1 inline-block">
+                                                Abrangência do Feriado
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                             {selectedEvent.notes && (
-                                <div className="flex items-start space-x-3 text-slate-600 font-medium italic opacity-70">
-                                    <DocumentTextIcon className="w-5 h-5 text-slate-400 mt-1" />
-                                    <span>{selectedEvent.notes}</span>
+                                <div className="flex flex-col space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <div className="flex items-center space-x-2 text-slate-400">
+                                        <DocumentTextIcon className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">{selectedEvent.isSystem ? 'Histórico/Descrição' : 'Observações'}</span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 font-medium leading-relaxed italic opacity-80">
+                                        {selectedEvent.notes}
+                                    </p>
                                 </div>
                             )}
 
                             {/* Status dos Convidados */}
-                            <div className="space-y-3 pt-4">
-                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                                    <UsersIcon className="w-3 h-3" /> Convidados
-                                </p>
-                                <div className="space-y-2">
-                                    {selectedEvent.invites && selectedEvent.invites.length > 0 ? (
-                                        selectedEvent.invites.map(inv => (
-                                            <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                                                <div className="flex items-center gap-2">
-                                                    {inv.invitee_avatar ? (
-                                                        <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                                            {inv.invitee_name?.charAt(0)}
-                                                        </div>
-                                                    )}
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-slate-700">{inv.invitee_name}</span>
-                                                        {inv.status === 'declined' && inv.decline_reason && (
-                                                            <span className="text-[9px] text-red-500 italic">" {inv.decline_reason} "</span>
-                                                        )}
-                                                    </div>
+                            {!selectedEvent.isSystem && (
+                                <div className="space-y-3 pt-4">
+                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                        <UsersIcon className="w-3 h-3" /> Convidados
+                                    </p>
+                                    <div className="space-y-2">
+                                        {selectedEvent.isPrivate ? (
+                                            <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900 text-white shadow-lg">
+                                                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                                    <XMarkIcon className="w-5 h-5 text-white/40" />
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    {inv.status === 'accepted' && <CheckIcon className="w-4 h-4 text-emerald-500" />}
-                                                    {inv.status === 'declined' && <XMarkIcon className="w-4 h-4 text-red-500" />}
-                                                    {inv.status === 'pending' && <ClockIcon className="w-4 h-4 text-slate-300" />}
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold">Evento Privado</span>
+                                                    <span className="text-[9px] opacity-60">Visível apenas para você</span>
                                                 </div>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-[10px] text-slate-400 italic">Sem convidados externos</p>
-                                    )}
+                                        ) : selectedEvent.invites && selectedEvent.invites.length > 0 ? (
+                                            selectedEvent.invites.map(inv => (
+                                                <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                                                    <div className="flex items-center gap-2">
+                                                        {inv.invitee_avatar ? (
+                                                            <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                                {inv.invitee_name?.charAt(0)}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-bold text-slate-700">{inv.invitee_name}</span>
+                                                            {inv.status === 'declined' && inv.decline_reason && (
+                                                                <span className="text-[9px] text-red-500 italic">" {inv.decline_reason} "</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        {inv.status === 'accepted' && <CheckIcon className="w-4 h-4 text-emerald-500" />}
+                                                        {inv.status === 'declined' && <XMarkIcon className="w-4 h-4 text-red-500" />}
+                                                        {inv.status === 'pending' && <ClockIcon className="w-4 h-4 text-slate-300" />}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-[10px] text-slate-400 italic font-bold ml-1">Sem convidados externos</p>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* RSVP Action para o usuário logado */}

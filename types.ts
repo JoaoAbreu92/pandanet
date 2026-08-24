@@ -353,6 +353,8 @@ export interface CalendarEvent {
   invitedIds?: string[];
   notes: string;
   invites?: CalendarInvite[]; // Relacionados via nova tabela
+  isPrivate?: boolean;
+  isSystem?: boolean;
 }
 
 export interface ResourceDocument {
