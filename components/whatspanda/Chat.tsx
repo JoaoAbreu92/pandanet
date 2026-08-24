@@ -39,7 +39,8 @@ import {
   AlertCircle,
   Menu,
   Edit2,
-  RefreshCw
+  RefreshCw,
+  Bell
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -97,6 +98,74 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     fetchSignature();
   }, [activeProfile?.id, profile?.id]);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [nudgeCooldowns, setNudgeCooldowns] = useState<{ [key: string]: number }>({});
+  const [cooldownTimeouts, setCooldownTimeouts] = useState<{ [key: string]: number }>({});
+
+  // Efeito para gerenciar o contador visual de cooldown do Nudge
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const newTimeouts: { [key: string]: number } = {};
+      
+      Object.keys(nudgeCooldowns).forEach(convId => {
+        const lastNudge = nudgeCooldowns[convId];
+        const cooldownSeconds = activeProfile?.nudge_cooldown || 30;
+        const cooldownMs = cooldownSeconds * 1000;
+        const elapsed = now - lastNudge;
+
+        if (elapsed < cooldownMs) {
+          newTimeouts[convId] = Math.ceil((cooldownMs - elapsed) / 1000);
+        }
+      });
+
+      setCooldownTimeouts(newTimeouts);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [nudgeCooldowns, activeProfile?.nudge_cooldown]);
+
+  const handleSendNudge = async () => {
+    if (isGhostMode) return;
+    if (!selectedConversation) return;
+
+    const now = Date.now();
+    const lastNudge = nudgeCooldowns[selectedConversation.id] || 0;
+    const cooldownSeconds = activeProfile?.nudge_cooldown || 30;
+    const cooldownMs = cooldownSeconds * 1000;
+
+    if (now - lastNudge < cooldownMs) return;
+
+    try {
+      // 1. Shake Local (Optimistic)
+      if ((window as any).triggerDetectionShake) {
+        (window as any).triggerDetectionShake();
+      }
+
+      // 2. Persistir mensagem de Nudge
+      const { error } = await supabase.from('messages').insert({
+        conversation_id: selectedConversation.id,
+        sender_id: activeProfile?.id,
+        company_id: activeProfile?.company_id,
+        text: '!!! CHAMEI SUA ATENÇÃO !!!',
+        file_type: 'nudge'
+      });
+
+      if (error) throw error;
+
+      // 3. Atualizar última mensagem da conversa
+      await supabase.from('conversations').update({
+        last_message: 'Chamou sua atenção!',
+        last_message_at: new Date().toISOString()
+      }).eq('id', selectedConversation.id);
+
+      // 4. Notificação push (opcional, já integrado no Messages)
+      // Aqui poderíamos chamar addNotification se necessário.
+
+      setNudgeCooldowns(prev => ({ ...prev, [selectedConversation.id]: now }));
+    } catch (err) {
+      console.error("Erro ao enviar nudge:", err);
+    }
+  };
   
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve) => {
@@ -1448,11 +1517,35 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   <button
                     onClick={() => setUseSignature(!useSignature)}
                     className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
-                    title={useSignature ? "Assinatura Ativada" : "Assinatura Desativada"}
+                    title={useSignature ? "Assinatura Ativa" : "Sem Assinatura"}
                   >
                     <CheckCheck className={`w-3.5 h-3.5 ${useSignature ? 'opacity-100' : 'opacity-40'}`} />
                   </button>
                 </div>
+
+                {/* Botão Chamar Atenção (Nudge) */}
+                {activeProfile?.can_nudge && (
+                  <div className="flex-shrink-0 flex items-center justify-center mr-1 mb-1">
+                    <button
+                      type="button"
+                      onClick={handleSendNudge}
+                      disabled={!!cooldownTimeouts[selectedConversation?.id || '']}
+                      className={`p-2.5 rounded-2xl transition-all relative flex items-center justify-center ${
+                        cooldownTimeouts[selectedConversation?.id || '']
+                          ? 'text-slate-300 cursor-not-allowed opacity-50'
+                          : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50  active:scale-95'
+                      }`}
+                      title="Chamar Atenção (Nudge)"
+                    >
+                      <Bell className={`w-5 h-5 ${cooldownTimeouts[selectedConversation?.id || ''] ? '' : 'animate-bounce'}`} />
+                      {cooldownTimeouts[selectedConversation?.id || ''] && (
+                        <span className="absolute -top-1 -right-1 bg-orange-600 text-white text-[9px] px-1 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[18px] text-center border border-white">
+                          {cooldownTimeouts[selectedConversation?.id || '']}s
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}

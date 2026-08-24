@@ -382,13 +382,21 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
         const now = Date.now();
         const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
-        if (now - lastNudge < 5 * 60 * 1000) return; // 5 minute cooldown
+        
+        // Dynamic cooldown from profile (in seconds), fallback to 30s
+        const cooldownSeconds = profile?.nudge_cooldown || 30;
+        const cooldownMs = cooldownSeconds * 1000;
+
+        if (now - lastNudge < cooldownMs) {
+            const remaining = Math.ceil((cooldownMs - (now - lastNudge)) / 1000);
+            showToast(`Aguarde ${remaining}s para chamar a atenção novamente.`, "info");
+            return;
+        }
 
         try {
             const compId = currentUser?.company_id;
             if (!compId) return;
 
-            // OPTIMISTIC UI: Shake immediately!
             // OPTIMISTIC UI: Shake immediately!
             try {
                 if ((window as any).triggerDetectionShake) {
@@ -1773,26 +1781,28 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                         </button>
 
                                             {/* Nudge Button */}
-                                            <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSendNudge}
-                                                    disabled={!!cooldownTimeouts[selectedConversationId || '']}
-                                                    className={`p-1.5 md:p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
+                                            {profile?.can_nudge && (
+                                                <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSendNudge}
+                                                        disabled={!!cooldownTimeouts[selectedConversationId || '']}
+                                                        className={`p-1.5 md:p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
                                                             ? 'text-gray-400 cursor-not-allowed'
                                                             : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
-                                                        }`}
-                                                    title="Chamar Atenção (MSN Nudge)"
-                                                >
-                                                    <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
-                                                        }`} />
-                                                    {cooldownTimeouts[selectedConversationId || ''] && (
-                                                        <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[24px] md:min-w-[28px] text-center border border-white">
-                                                            {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            </div>
+                                                            }`}
+                                                        title="Chamar Atenção (MSN Nudge)"
+                                                    >
+                                                        <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${cooldownTimeouts[selectedConversationId || ''] ? '' : 'animate-bounce'
+                                                            }`} />
+                                                        {cooldownTimeouts[selectedConversationId || ''] && (
+                                                            <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[24px] md:min-w-[28px] text-center border border-white">
+                                                                {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
                                         <input
                                             type="text"
                                             value={newMessageText}
