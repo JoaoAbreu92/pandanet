@@ -357,6 +357,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     }, [notes]);
 
     // Buscar Funcionários (Contatos)
+    // Buscar Funcionários (Contatos)
     useEffect(() => {
         const fetchEmployees = async () => {
             if (!currentUser?.company_id) return;
@@ -367,27 +368,39 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
             if (data) {
                 // Map Supabase profile to Employee type
-                const employees: Employee[] = data.map(p => ({
-                    id: p.id,
-                    name: p.full_name,
-                    email: p.email || '',
-                    role: p.role,
-                    team: p.team,
-                    avatarUrl: p.avatar_url || `https://i.pravatar.cc/150?u=${p.email}`,
-                    joinDate: p.join_date,
-                    birthDate: p.birth_date,
-                    isAdmin: p.is_admin,
-                    isOnline: false,
-                    permissions: p.permissions || {},
-                    following: p.following || [],
-                    phone: p.phone,
-                    officeLocation: p.office_location,
-                    bio: p.bio,
-                    company_id: p.company_id,
-                    sectorManager: p.sector_manager,
-                    employeeManager: p.employee_manager,
-                    coverUrl: p.cover_url
-                }));
+                const employees: Employee[] = data.map(p => {
+                    // Helper para URL do avatar
+                    let avatarUrl = p.avatar_url;
+                    if (avatarUrl && !avatarUrl.startsWith('http')) {
+                        const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+                        avatarUrl = publicUrl.publicUrl;
+                    }
+                    if (!avatarUrl) {
+                        avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name || 'User')}&background=random`;
+                    }
+
+                    return {
+                        id: p.id,
+                        name: p.full_name,
+                        email: p.email || '',
+                        role: p.role,
+                        team: p.team,
+                        avatarUrl: avatarUrl,
+                        joinDate: p.join_date,
+                        birthDate: p.birth_date,
+                        isAdmin: p.is_admin,
+                        isOnline: onlineUsers.has(p.id),
+                        permissions: p.permissions || {},
+                        following: p.following || [],
+                        phone: p.phone,
+                        officeLocation: p.office_location,
+                        bio: p.bio,
+                        company_id: p.company_id,
+                        sectorManager: p.sector_manager,
+                        employeeManager: p.employee_manager,
+                        coverUrl: p.cover_url
+                    };
+                });
                 setCompanyEmployees(employees);
             }
         };
@@ -395,7 +408,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         if (currentUser) {
             fetchEmployees();
         }
-    }, [currentUser]);
+    }, [currentUser, onlineUsers]); // Adicionado onlineUsers como dependência
 
     // Restaurar última conversa selecionada do localStorage
     useEffect(() => {

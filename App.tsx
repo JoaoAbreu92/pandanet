@@ -9,7 +9,7 @@ import LoginPage from './components/LoginPage';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './components/ToastContext';
 import { NotificationProvider, useNotifications } from './components/NotificationContext';
-import { PresenceProvider } from './components/PresenceContext';
+import { PresenceProvider, usePresence } from './components/PresenceContext';
 
 
 import HomePage from './components/HomePage';
@@ -48,6 +48,7 @@ import WhatsPanda from './components/WhatsPanda.tsx';
 
 const AppContent: React.FC = () => {
     const { session, profile, loading, signOut } = useAuth();
+    const { onlineUsers } = usePresence();
 
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -256,21 +257,32 @@ const AppContent: React.FC = () => {
 
                             const mergedData: AppData = {
                                 ...baseData,
-                                employees: (realProfiles || []).map((p: any) => ({
-                                    id: p.id,
-                                    name: p.full_name,
-                                    email: p.email,
-                                    avatarUrl: p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name)}&background=random`,
-                                    coverUrl: p.cover_url,
-                                    role: p.role || 'Colaborador',
-                                    team: p.team || p.department || 'Geral',
-                                    isAdmin: p.is_admin || false,
-                                    isOnline: true,
-                                    company_id: p.company_id,
-                                    performance: p.performance,
-                                    following: p.following || [],
-                                    permissions: p.permissions || {}
-                                })),
+                                employees: (realProfiles || []).map((p: any) => {
+                                    // Helper para URL do avatar
+                                    let avatarUrl = p.avatar_url;
+                                    if (avatarUrl && !avatarUrl.startsWith('http')) {
+                                        const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(avatarUrl);
+                                        avatarUrl = publicUrl.publicUrl;
+                                    }
+                                    if (!avatarUrl) {
+                                        avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name)}&background=random`;
+                                    }
+                                    return {
+                                        id: p.id,
+                                        name: p.full_name,
+                                        email: p.email,
+                                        avatarUrl: avatarUrl,
+                                        coverUrl: p.cover_url,
+                                        role: p.role || 'Colaborador',
+                                        team: p.team || p.department || 'Geral',
+                                        isAdmin: p.is_admin || false,
+                                        isOnline: false, // Default to false
+                                        company_id: p.company_id,
+                                        performance: p.performance,
+                                        following: p.following || [],
+                                        permissions: p.permissions || {}
+                                    };
+                                }),
                                 announcements: baseData.announcements || [],
                                 banners: baseData.banners || [],
                                 conversations: baseData.conversations || [],
@@ -345,6 +357,23 @@ const AppContent: React.FC = () => {
         };
         loadInitialData();
     }, [profile]);
+
+    // Sync Online Status
+    useEffect(() => {
+        setCompanyData(prev => {
+            if (!prev) return null;
+            const hasChanges = prev.employees.some(e => e.isOnline !== onlineUsers.has(e.id));
+            if (!hasChanges) return prev;
+
+            return {
+                ...prev,
+                employees: prev.employees.map(e => ({
+                    ...e,
+                    isOnline: onlineUsers.has(e.id)
+                }))
+            };
+        });
+    }, [onlineUsers]);
 
     const handleLogout = async () => {
         try {

@@ -277,8 +277,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             if (!profile?.company_id) return;
 
-            const sixtyDaysAgo = new Date();
-            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            const ninetyDaysAgo = new Date();
+            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
             const { data, error } = await supabase
                 .from('posts')
@@ -289,7 +289,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
                 `)
                 .eq('company_id', profile.company_id)
-                .gte('created_at', sixtyDaysAgo.toISOString())
+                .gte('created_at', ninetyDaysAgo.toISOString())
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -708,7 +708,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3 gap-2">
                                 <div className="flex items-start space-x-2">
                                     <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
-                                    <span className="text-orange-600 font-bold leading-tight">Importante: Postagens expiram automaticamente em 60 dias para otimização de espaço.</span>
+                                    <span className="text-orange-600 font-bold leading-tight">Importante: Postagens expiram automaticamente em 90 dias para otimização de espaço.</span>
                                 </div>
                                 <span className="italic whitespace-nowrap hidden sm:inline text-right">Acervo organizado e eficiente</span>
                             </div>

@@ -108,10 +108,10 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         <button
                             onClick={testNotifications}
                             className="flex items-center justify-center gap-1.5 h-8 px-3 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-bold border-y border-l border-emerald-200"
-                            title="Testar Sons e Notificações"
+                            title="Ativar e Testar Notificações do Windows"
                         >
                             <PlayCircleIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">Ativar Toques</span>
+                            <span className="hidden sm:inline">Ativar Notificações</span>
                         </button>
                         <div
                             className="relative"
