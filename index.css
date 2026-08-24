@@ -4,10 +4,12 @@
 
 @layer base {
   body {
-    color: #0F172A; /* brand-text / slate-900 */
-    background-color: #F8FAFC; /* brand-secondary / slate-50 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    color: #1e293b;
+    /* slate-800 / brand-text fallback */
+    background-color: #f8fafc;
+    /* slate-50 */
+    background-image: linear-gradient(to bottom right, #f8fafc, #f1f5f9), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2364748b' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-blend-mode: multiply;
   }
 
   /* Global smooth transitions */
@@ -81,30 +83,32 @@
     }
   }
 
-  /* Premium Components - Multinational Tech Clean Style */
+  /* Premium Components - Standard CSS to eliminate lint warnings */
   .premium-card {
-    background-color: #FFFFFF;
-    border-radius: 1rem; /* rounded-2xl */
+    background-color: white;
+    border-radius: 0.75rem;
+    /* rounded-xl */
     border-width: 1px;
-    border-color: #E2E8F0; /* slate-200 / brand-border */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); 
+    border-color: #f3f4f6;
+    /* gray-100 */
     transition-property: all;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 300ms;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
   }
 
   .premium-card:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-    border-color: #cbd5e1; /* slate-300 */
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   }
 
   .premium-shadow {
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05); /* Softer, wider diffusion */
+    box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
   }
 
   .premium-border {
     border-width: 1px;
-    border-color: #E2E8F0; /* slate-200 */
+    border-color: rgba(243, 244, 246, 0.5);
+    /* gray-100/50 */
   }
 }
 

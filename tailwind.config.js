@@ -9,14 +9,12 @@ export default {
     theme: {
         extend: {
             colors: {
-                'brand-primary': '#10b981',      // Emerald 500 (more sophisticated/standard)
-                'brand-primary-dark': '#059669', // Emerald 600
-                'brand-secondary': '#F8FAFC',    // Slate 50 (clean background)
-                'brand-surface': '#FFFFFF',      // White surface for cards
-                'brand-border': '#E2E8F0',       // Slate 200 for thin borders
-                'brand-text': '#0F172A',         // Slate 900 for high contrast text
-                'brand-subtle-text': '#64748B',  // Slate 500 for secondary text
-                'brand-accent': '#6366f1',       // Indigo 500
+                'brand-primary': '#00d68f',      // More clear/vibrant Emerald
+                'brand-primary-dark': '#00b87a', // Darker shade for hover
+                'brand-secondary': '#F3F4F6',    // slightly cooler gray
+                'brand-text': '#111827',         // gray-900 (darker text)
+                'brand-subtle-text': '#6B7280',  // gray-500
+                'brand-accent': '#6366f1',       // Indigo-500 for fresh accents
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],

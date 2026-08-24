@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
     };
 
     return (
-        <header className="bg-white border-b flex-shrink-0 relative z-[50] dark:bg-slate-900 dark:border-slate-800 premium-border transition-colors">
+        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-slate-900 dark:border-slate-800 premium-card">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -53,17 +53,17 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                     </button>
                 </div>
             )}
-            <div className="flex items-center justify-between h-[73px] px-6">
+            <div className="flex items-center justify-between h-20 px-6">
                 <div className="flex items-center">
-                    <button onClick={onToggleSidebar} className="p-2 -ml-2 text-slate-400 rounded-lg hover:bg-slate-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800">
-                        <Bars3Icon className="w-5 h-5" />
+                    <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
+                        <Bars3Icon className="w-6 h-6" />
                     </button>
-                    <div className="relative ml-4 hidden md:block group">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 group-focus-within:text-brand-primary transition-colors" />
+                    <div className="relative ml-6 hidden md:block">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                             type="text"
                             placeholder={t('header.search_placeholder')}
-                            className="pl-9 pr-4 py-2 w-72 border border-slate-200 rounded-full bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary focus:bg-white transition-all dark:bg-gray-800 dark:border-gray-700 dark:text-white placeholder:text-slate-400 font-medium"
+                            className="pl-10 pr-4 py-2 w-64 border rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         />
                     </div>
                 </div>
@@ -172,20 +172,20 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         )}
                     </button>
 
-                    <button onClick={onToggleNotifications} className="p-2 text-slate-400 rounded-full hover:bg-slate-50 hover:text-slate-600 transition-colors relative dark:text-gray-400 dark:hover:bg-gray-800">
-                        <BellIcon className="w-[22px] h-[22px]" />
+                    <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
+                        <BellIcon className="w-6 h-6" />
                         {unreadNotificationsCount > 0 && (
-                            <span className="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[10px] font-bold min-w-[16px] h-[16px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm px-1">
+                            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm px-1">
                                 {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                             </span>
                         )}
                     </button>
                     <div className="relative">
-                        <button onClick={() => setDropdownOpen(!isDropdownOpen)} className="flex items-center space-x-2.5 p-1 rounded-full hover:bg-slate-50 transition-colors">
-                            <img src={currentUser.avatarUrl} alt="User" className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm" />
-                            <div className="hidden lg:block text-left pr-2">
-                                <p className="font-semibold text-[13px] text-brand-text dark:text-gray-100 leading-tight">{currentUser.name}</p>
-                                <p className="text-[11px] font-medium text-brand-subtle-text dark:text-gray-400 mt-0.5">{currentUser.role}</p>
+                        <button onClick={() => setDropdownOpen(!isDropdownOpen)} className="flex items-center space-x-2">
+                            <img src={currentUser.avatarUrl} alt="User" className="w-10 h-10 rounded-full" />
+                            <div className="hidden lg:block text-left">
+                                <p className="font-semibold text-sm text-brand-text dark:text-gray-100">{currentUser.name}</p>
+                                <p className="text-xs text-brand-subtle-text dark:text-gray-400">{currentUser.role}</p>
                             </div>
                         </button>
                         {isDropdownOpen && (
