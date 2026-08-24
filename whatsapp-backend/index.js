@@ -18,7 +18,8 @@ dotenv.config({ path: path.join(__dirname, '../.env.local'), override: true });
 dotenv.config({ path: '/root/pandanet/.env', override: true });
 if (!process.env.JWT_SECRET) {
   dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: true });
-}
+// Ignorar erros de certificado SSL expirado/inválido em conexões internas/HTTPs
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -990,13 +991,10 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             }
 
-            const audioSource = (savedMediaUrl && !savedMediaUrl.startsWith('data:'))
-                ? savedMediaUrl
-                : audioDataUri;
-
-            const mediaSource = (savedMediaUrl && !savedMediaUrl.startsWith('data:'))
-                ? savedMediaUrl
-                : base64Data;
+            // Para a Evolution API, enviar SEMPRE o Base64/DataURI diretamente no payload.
+            // Isso evita que a Evolution tente fazer fetch via HTTPS em URLs públicas da VPS que podem falhar com "certificate has expired".
+            const audioSource = audioDataUri;
+            const mediaSource = base64Data;
 
             // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
