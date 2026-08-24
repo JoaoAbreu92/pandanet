@@ -98,6 +98,7 @@ const EmailPage: React.FC = () => {
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [signature, setSignature] = useState('Atenciosamente,\nEquipe PandaNet');
+    const [signatureImage, setSignatureImage] = useState('https://raw.githubusercontent.com/JoaoAbreu92/pandanet/main/public/logo-pandanet.png');
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, emailId: string } | null>(null);
 
     const handleContextMenu = (e: React.MouseEvent, emailId: string) => {
@@ -313,10 +314,25 @@ const EmailPage: React.FC = () => {
                                                 <textarea
                                                     value={signature}
                                                     onChange={(e) => setSignature(e.target.value)}
-                                                    className="w-full h-32 p-3 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50 resize-none"
+                                                    className="w-full h-24 p-3 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50 resize-none mb-2"
                                                     placeholder="Digite sua assinatura aqui..."
                                                 />
-                                                <p className="text-[10px] text-gray-400 italic">Esta assinatura será adicionada automaticamente ao final de novos e-mails.</p>
+                                                <label className="text-xs font-bold text-gray-400 uppercase">URL da Imagem da Assinatura</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={signatureImage}
+                                                        onChange={(e) => setSignatureImage(e.target.value)}
+                                                        className="flex-1 p-2 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50"
+                                                        placeholder="https://exemplo.com/logo.png"
+                                                    />
+                                                </div>
+                                                {signatureImage && (
+                                                    <div className="mt-2 p-2 border border-gray-100 rounded-lg bg-white inline-block">
+                                                        <img src={signatureImage} alt="Preview" className="max-h-12 object-contain" />
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-gray-400 italic mt-1">Esta assinatura e imagem serão adicionadas automaticamente ao final de novos e-mails.</p>
                                             </div>
                                         </div>
                                     </Card>
@@ -511,12 +527,17 @@ const EmailPage: React.FC = () => {
                             <span className="text-gray-400 text-sm font-bold min-w-[60px]">Assunto:</span>
                             <input type="text" className="flex-1 border-none focus:ring-0 text-sm" placeholder="Digite o assunto" />
                         </div>
-                        <div className="flex-1 p-6">
+                        <div className="flex-1 p-6 overflow-y-auto no-scrollbar">
                             <textarea 
-                                className="w-full h-full border-none focus:ring-0 resize-none text-sm placeholder:text-gray-300" 
+                                className="w-full h-40 border-none focus:ring-0 resize-none text-sm placeholder:text-gray-300" 
                                 placeholder="Escreva sua mensagem aqui..."
                                 defaultValue={`\n\n\n--\n${signature}`}
                             />
+                            {signatureImage && (
+                                <div className="mt-4 opacity-80 grayscale hover:grayscale-0 transition-all border-t border-gray-50 pt-4">
+                                    <img src={signatureImage} alt="Assinatura" className="max-h-16 object-contain" />
+                                </div>
+                            )}
                         </div>
                         <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-2">
