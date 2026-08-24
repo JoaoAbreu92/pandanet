@@ -1,0 +1,6 @@
+--- RLS AND DB CHECK ---
+Found 1 connected settings for Acrilight.
+SETTING | ID: 60323974-89c5-4120-a7a1-9c8774e24ed8 | Company: 6323c46c-f0d1-49af-886a-912efb3c6f41 | Connected: true
+
+--- POLICIES (via SQL) ---
+Error fetching policies: Could not find the function public.get_raw_sql(sql_query) in the schema cache

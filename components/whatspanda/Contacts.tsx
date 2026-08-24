@@ -89,6 +89,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
         setSyncing(true);
         try {
             // Buscar a primeira conexão válida conectada para esta empresa
+            console.log('[SYNC] Iniciando busca de conexão para empresa:', companyId);
             const { data: settings, error: settingsError } = await supabase
                 .from('whatsapp_settings')
                 .select('id')
@@ -97,12 +98,18 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 .limit(1)
                 .maybeSingle();
 
-            if (settingsError) throw settingsError;
+            if (settingsError) {
+                console.error('[SYNC] Erro ao buscar whatsapp_settings:', settingsError);
+                throw settingsError;
+            }
+
+            console.log('[SYNC] Resultado da busca de conexão:', settings);
 
             if (settings?.id) {
                 const { data: sessionData } = await supabase.auth.getSession();
                 const token = sessionData?.session?.access_token;
                 if (token) {
+                    console.log(`[SYNC] Chamando backend: /api/whatsapp/sync/${companyId}/${settings.id}`);
                     const response = await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { 
                         method: 'POST',
                         headers: { 
@@ -115,11 +122,13 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                     if (response.ok) {
                         alert('Sincronização iniciada! Os contatos aparecerão em breve.');
                     } else {
-                        alert(`Erro ao sincronizar: ${result.error || result.details || 'Erro desconhecido'}`);
+                        console.error('[SYNC] Resposta do backend com erro:', result);
+                        alert(`Erro ao sincronizar (${response.status}): ${result.error || result.details || 'Erro desconhecido'}`);
                     }
                 }
             } else {
-                alert('Nenhuma conexão ativa encontrada para sincronizar. Por favor, conecte um WhatsApp primeiro em "Canais".');
+                console.warn('[SYNC] Nenhuma conexão ativa encontrada via RLS.');
+                alert('Nenhuma conexão ativa encontrada para sincronizar. Verifique se o WhatsApp está conectado em "Canais". Se estiver conectado e este erro persistir, pode ser um problema de permissão (RLS).');
             }
         } catch (error: any) {
             console.error('[SYNC] Erro:', error);
