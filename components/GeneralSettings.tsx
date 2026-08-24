@@ -12,8 +12,32 @@ interface GeneralSettingsProps {
 const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings }) => {
     const [tempSettings, setTempSettings] = useState<CompanySettings>(settings);
 
-    const handleSave = () => {
-        setSettings(tempSettings);
+    const handleSave = async () => {
+        let finalSettings = { ...tempSettings };
+        const newFile = (tempSettings as any)._newLogoFile;
+
+        if (newFile) {
+            try {
+                const fileExt = newFile.name.split('.').pop();
+                const fileName = `logo_${Date.now()}.${fileExt}`;
+                const filePath = `branding/${fileName}`;
+
+                const { data, error } = await supabase.storage
+                    .from('company-branding')
+                    .upload(filePath, newFile);
+
+                if (error) throw error;
+
+                const { data: { publicUrl } } = supabase.storage.from('company-branding').getPublicUrl(filePath);
+                finalSettings.logoUrl = publicUrl;
+                delete (finalSettings as any)._newLogoFile;
+            } catch (err: any) {
+                alert('Erro ao subir logotipo: ' + err.message);
+                return;
+            }
+        }
+
+        setSettings(finalSettings);
         alert('Configurações salvas!');
     };
 
@@ -21,11 +45,14 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
         setTempSettings({ ...tempSettings, [e.target.name]: e.target.value });
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const newUrl = URL.createObjectURL(file);
-            setTempSettings(prev => ({ ...prev, logoUrl: newUrl }));
+            // Upload imediato ou no handleSave? 
+            // Para melhor UX, vamos fazer no handleSave, mas mostrar preview local
+            const previewUrl = URL.createObjectURL(file);
+            (file as any).preview = previewUrl; // Hack para guardar a referência
+            setTempSettings(prev => ({ ...prev, logoUrl: previewUrl, _newLogoFile: file } as any));
         }
     };
 
@@ -49,9 +76,9 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                         className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-sm bg-white text-brand-text"
                     />
                 </div>
-                
+
                 <div>
-                     <label className="block text-sm font-medium text-brand-text mb-2">
+                    <label className="block text-sm font-medium text-brand-text mb-2">
                         Logotipo da Empresa (Canto Inferior Esquerdo)
                     </label>
                     <div className="flex items-center space-x-4">
@@ -61,8 +88,8 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                             ) : (
                                 <span className="text-xs text-gray-400">Sem Logo</span>
                             )}
-                             {tempSettings.logoUrl && (
-                                <button 
+                            {tempSettings.logoUrl && (
+                                <button
                                     onClick={handleRemoveLogo}
                                     className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                     title="Remover Logo"
@@ -72,7 +99,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                             )}
                         </div>
                         <div>
-                             <label className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary">
+                            <label className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary">
                                 <PencilIcon className="w-4 h-4 mr-2" />
                                 Alterar Logo
                                 <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
@@ -83,7 +110,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                 </div>
 
                 <div className="flex justify-end pt-2 border-t mt-6">
-                    <button 
+                    <button
                         onClick={handleSave}
                         className="px-4 py-2 text-sm font-medium text-white bg-brand-primary border border-transparent rounded-md shadow-sm hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
                     >

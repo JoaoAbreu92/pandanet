@@ -274,17 +274,17 @@ const Messages: React.FC<MessagesProps> = () => {
                     // Se não achar outro, talvez seja eu mesmo ou dados perdidos
                     const displayName = conv.is_group
                         ? conv.group_name
-                        : (otherUser?.full_name || 'Usuário Desconhecido');
+                        : (otherUser?.full_name || (otherPart ? 'Usuário Excluído' : 'Usuário Desconhecido'));
 
                     const displayAvatar = conv.is_group
                         ? `https://ui-avatars.com/api/?name=${displayName}&background=random`
-                        : (otherUser?.avatar_url || 'https://via.placeholder.com/150');
+                        : (otherUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`);
 
                     return {
                         id: conv.id,
                         participantName: displayName,
                         participantAvatarUrl: displayAvatar,
-                        participantId: otherPart?.user_id, // Added this line!
+                        participantId: otherPart?.user_id,
                         lastMessage: conv.last_message || 'Inicie a conversa',
                         unreadCount: 0,
                         messages: [],
