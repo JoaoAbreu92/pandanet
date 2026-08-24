@@ -163,9 +163,9 @@ const Layout: React.FC<LayoutProps> = ({
                                     const planVal = planFeatures[key];
                                     const customVal = customFeatures[key];
 
-                                    if (planVal === false || planVal === 'disabled') {
+                                    if (planVal === false || (planVal as any) === 'disabled') {
                                         merged[key] = false;
-                                    } else if (customVal === false || customVal === 'disabled') {
+                                    } else if (customVal === false || (customVal as any) === 'disabled') {
                                         merged[key] = false;
                                     } else {
                                         merged[key] = customVal !== undefined ? customVal : planVal;
