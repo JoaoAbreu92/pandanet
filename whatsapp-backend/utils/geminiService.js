@@ -14,7 +14,7 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const spTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
         const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -78,8 +78,16 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
         2. Transfira para um ATENDENTE (agente) específico se o cliente mencionar o nome dele explicitamente na mensagem (ex: "quero falar com o João", "me passa para a Ana") e o ID dele coincidir com a lista.
         3. Você NÃO deve transferir para um setor que esteja com status "Fechada", pois o cliente ficará sem atendimento. Se o setor correspondente estiver fechado, verifique se há outro setor aberto que possa triar ou responda que não há setores disponíveis.
         4. O retorno deve ser OBRIGATORIAMENTE um objeto JSON válido, sem markdown, no seguinte formato:
-           { "target_type": "queue" | "agent" | "none", "target_id": "ID_DO_SETOR_OU_DO_ATENDENTE" }
-        5. Se a mensagem não se encaixar em nenhum setor ou se você não tiver certeza de quem deve atender, retorne target_type "none" e target_id null.
+           { 
+             "target_type": "queue" | "agent" | "none", 
+             "target_id": "ID_DO_SETOR_OU_DO_ATENDENTE_OU_NULL",
+             "response": "Mensagem educada e amigável em português para enviar de volta ao cliente"
+           }
+        5. Se a mensagem não se encaixar em nenhum setor ou se você não tiver certeza de quem deve atender:
+           - Defina target_type como "none" e target_id como null.
+           - Em "response", escreva uma resposta em português (PT-BR) educada, prestativa e natural. Se o cliente estiver apenas cumprimentando (ex: "olá", "bom dia", "tudo bem?"), cumprimente-o de volta de forma muito calorosa, liste os setores abertos no momento para atendimento, e pergunte como pode ajudar de forma objetiva.
+        6. Se o target_type for "queue" ou "agent":
+           - Em "response", escreva uma breve mensagem simpática avisando que a conversa está sendo direcionada para aquele setor ou atendente específico (ex: "Com certeza! Vou transferir você para o setor de Comercial / Vendas agora. Um instante, por favor.").
 
         Mensagem do Cliente: "${message}"
 
@@ -98,16 +106,16 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
         
         if (parsed.target_type === 'queue') {
             const exists = queues.some(q => q.id === parsed.target_id);
-            return exists ? parsed : { target_type: 'none', target_id: null };
+            return exists ? parsed : { target_type: 'none', target_id: null, response: parsed.response || null };
         } else if (parsed.target_type === 'agent') {
             const exists = agents.some(a => a.id === parsed.target_id);
-            return exists ? parsed : { target_type: 'none', target_id: null };
+            return exists ? parsed : { target_type: 'none', target_id: null, response: parsed.response || null };
         }
 
-        return { target_type: 'none', target_id: null };
+        return { target_type: 'none', target_id: null, response: parsed.response || null };
     } catch (error) {
         console.error('[GEMINI] Erro ao analisar mensagem:', error.message);
-        return { target_type: 'none', target_id: null };
+        return { target_type: 'none', target_id: null, response: null };
     }
 }
 

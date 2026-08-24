@@ -2379,8 +2379,94 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
                         let hasTransferred = false;
 
-                        // Se o modo de triagem por IA estiver ativo e não houver fila nem agente atribuído
-                        if (chatbotMode === 'gemini' && geminiKey && !currentConv.queue_id && !currentConv.assigned_to) {
+                        // 1. Verificar transferências por palavra-chave se bot estiver ativo
+                        if (chatbotMode !== 'disabled' && !currentConv.queue_id && !currentConv.assigned_to) {
+                            try {
+                                const { data: settings } = await supabase
+                                    .from('whatsapp_settings')
+                                    .select('keyword_transfers')
+                                    .eq('id', connectionId)
+                                    .maybeSingle();
+
+                                if (settings && Array.isArray(settings.keyword_transfers) && settings.keyword_transfers.length > 0) {
+                                    const textLower = (text || "").trim().toLowerCase();
+                                    const matchedRule = settings.keyword_transfers.find(rule => {
+                                        const kw = (rule.keyword || "").trim().toLowerCase();
+                                        return kw && textLower.includes(kw);
+                                    });
+
+                                    if (matchedRule) {
+                                        console.log(`[PALAVRA-CHAVE] Mensagem casou com palavra-chave "${matchedRule.keyword}". Transferindo...`);
+                                        if (matchedRule.target_type === 'queue') {
+                                            const { data: queue } = await supabase
+                                                .from('whatsapp_queues')
+                                                .select('name')
+                                                .eq('id', matchedRule.target_id)
+                                                .maybeSingle();
+                                            
+                                            const queueName = queue?.name || "Setor Responsável";
+                                            const transferText = `Certo! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${queueName}*. Um momento, por favor.`;
+                                            
+                                            const instanceName = `conn_${connectionId}`;
+                                            await dispatchTextEvolution(instanceName, fromPhone, transferText)
+                                                .catch(e => console.error('[PALAVRA-CHAVE] Erro ao enviar notificação:', e.message));
+
+                                            await supabase.from('whatsapp_messages').insert({
+                                                company_id: companyId,
+                                                conversation_id: conversationId,
+                                                message_text: transferText,
+                                                is_from_customer: false,
+                                                sent_by: null,
+                                                queue_id: matchedRule.target_id
+                                            });
+
+                                            await supabase.from('whatsapp_conversations').update({ 
+                                                queue_id: matchedRule.target_id, 
+                                                chatbot_node_id: null,
+                                                assigned_to: null
+                                            }).eq('id', conversationId);
+
+                                            hasTransferred = true;
+                                        } else if (matchedRule.target_type === 'agent') {
+                                            const { data: profile } = await supabase
+                                                .from('profiles')
+                                                .select('full_name')
+                                                .eq('id', matchedRule.target_id)
+                                                .maybeSingle();
+                                            
+                                            const agentName = profile?.full_name || "um atendente";
+                                            const transferText = `Certo! Vou transferir seu atendimento para o consultor *${agentName}*. Um momento, por favor.`;
+                                            
+                                            const instanceName = `conn_${connectionId}`;
+                                            await dispatchTextEvolution(instanceName, fromPhone, transferText)
+                                                .catch(e => console.error('[PALAVRA-CHAVE] Erro ao enviar notificação:', e.message));
+
+                                            await supabase.from('whatsapp_messages').insert({
+                                                company_id: companyId,
+                                                conversation_id: conversationId,
+                                                message_text: transferText,
+                                                is_from_customer: false,
+                                                sent_by: null,
+                                                assigned_to: matchedRule.target_id
+                                            });
+
+                                            await supabase.from('whatsapp_conversations').update({ 
+                                                assigned_to: matchedRule.target_id, 
+                                                chatbot_node_id: null,
+                                                queue_id: null
+                                            }).eq('id', conversationId);
+
+                                            hasTransferred = true;
+                                        }
+                                    }
+                                }
+                            } catch (kwErr) {
+                                console.error('[PALAVRA-CHAVE] Erro ao processar regras de palavra-chave:', kwErr.message);
+                            }
+                        }
+
+                        // Se o modo de triagem por IA estiver ativo e não houver fila nem agente atribuído e não foi transferido por palavra-chave
+                        if (chatbotMode === 'gemini' && geminiKey && !currentConv.queue_id && !currentConv.assigned_to && !hasTransferred) {
                             try {
                                 const { data: queues } = await supabase
                                     .from('whatsapp_queues')
@@ -2411,7 +2497,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                             .eq('id', conversationId);
                                         
                                         const destQueue = queues.find(q => q.id === suggestion.target_id);
-                                        const notifyText = `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
+                                        const notifyText = suggestion.response || `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
                                         
                                         const instanceName = `conn_${connectionId}`;
                                         await dispatchTextEvolution(instanceName, fromPhone, notifyText)
@@ -2437,7 +2523,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                             .eq('id', conversationId);
                                         
                                         const destAgent = team.find(u => u.id === suggestion.target_id);
-                                        const notifyText = `Olá! Vou transferir você para o especialista *${destAgent.full_name}*. Por favor, aguarde um instante.`;
+                                        const notifyText = suggestion.response || `Olá! Vou transferir você para o especialista *${destAgent.full_name}*. Por favor, aguarde um instante.`;
                                         
                                         const instanceName = `conn_${connectionId}`;
                                         await dispatchTextEvolution(instanceName, fromPhone, notifyText)
@@ -2453,6 +2539,21 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                         });
 
                                         hasTransferred = true;
+                                    } else if (suggestion && suggestion.target_type === 'none' && suggestion.response) {
+                                        console.log(`[IA TRIAGEM] Enviando resposta conversacional do Gemini.`);
+                                        
+                                        const instanceName = `conn_${connectionId}`;
+                                        await dispatchTextEvolution(instanceName, fromPhone, suggestion.response)
+                                            .catch(e => console.error('[IA TRIAGEM] Erro ao enviar resposta conversacional:', e.message));
+
+                                        await supabase.from('whatsapp_messages').insert({
+                                            company_id: companyId,
+                                            conversation_id: conversationId,
+                                            message_text: suggestion.response,
+                                            is_from_customer: false,
+                                            sent_by: null,
+                                            queue_id: null
+                                        });
                                     }
                                 }
                             } catch (triagemErr) {

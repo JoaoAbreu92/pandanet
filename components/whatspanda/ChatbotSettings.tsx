@@ -65,7 +65,7 @@ const ChatbotSettings: React.FC = () => {
 
     const handleExportFlow = () => {
         if (!selectedFlow) return;
-        
+
         const flowData = {
             version: '1.0',
             flow: {
@@ -112,7 +112,7 @@ const ChatbotSettings: React.FC = () => {
 
                 // 1. Map old UUIDs to new UUIDs to preserve connections
                 const oldToNewIdMap: Record<string, string> = {};
-                
+
                 // First pass: generate new UUIDs
                 data.nodes.forEach((node: any) => {
                     oldToNewIdMap[node.id] = crypto.randomUUID();
@@ -178,7 +178,7 @@ const ChatbotSettings: React.FC = () => {
         const end = textarea.selectionEnd;
         const text = textarea.value;
         const selectedText = text.substring(start, end);
-        
+
         let formatted = '';
         switch (format) {
             case 'bold': formatted = `*${selectedText}*`; break;
@@ -189,7 +189,7 @@ const ChatbotSettings: React.FC = () => {
 
         const newValue = text.substring(0, start) + formatted + text.substring(end);
         setSignature(newValue);
-        
+
         setTimeout(() => {
             textarea.focus();
             const newCursorPos = start + formatted.length;
@@ -199,7 +199,7 @@ const ChatbotSettings: React.FC = () => {
 
     const renderWhatsAppMarkdown = (text: string) => {
         if (!text) return <span className="text-slate-400 dark:text-gray-500 italic">Sua assinatura aparecerá aqui...</span>;
-        
+
         let formatted = text
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -264,7 +264,7 @@ const ChatbotSettings: React.FC = () => {
             .from('whatsapp_settings')
             .update({ chatbot_mode: mode })
             .eq('company_id', companyId);
-        
+
         setLoading(false);
         if (error) {
             console.error('Erro ao atualizar modo de atendimento:', error);
@@ -372,7 +372,7 @@ const ChatbotSettings: React.FC = () => {
 
         const content = type === 'menu' ? { text: '', options: [] } : { text: '' };
         const nextSortOrder = nodes.length;
-        
+
         const { data, error } = await supabase.from('whatsapp_chatbot_nodes').insert({
             flow_id: selectedFlow.id,
             type,
@@ -448,7 +448,7 @@ const ChatbotSettings: React.FC = () => {
         setLoading(true);
         const { error } = await supabase
             .from('whatsapp_settings')
-            .update({ 
+            .update({
                 gemini_api_key: geminiKey,
                 chatbot_max_retries: chatbotMaxRetries,
                 chatbot_invalid_option_msg: chatbotInvalidOptionMsg
@@ -467,7 +467,7 @@ const ChatbotSettings: React.FC = () => {
         const profileId = activeProfile?.id;
         if (!profileId) return;
         setLoading(true);
-        const { error } = await supabase.from('profiles').update({ 
+        const { error } = await supabase.from('profiles').update({
             whatsapp_signature: signature,
             use_whatsapp_signature: useSignature
         }).eq('id', profileId);
@@ -776,7 +776,7 @@ const ChatbotSettings: React.FC = () => {
         setIsSimulating(true);
         const greeting = nodes.find(n => n.type === 'greeting');
         const first = greeting || nodes[0];
-        
+
         if (first) {
             const initialHistory: SimMessage[] = [
                 { id: '1', sender: 'bot', text: first.content.text }
@@ -1010,8 +1010,8 @@ const ChatbotSettings: React.FC = () => {
                             Chave de API do Google Gemini
                         </label>
                         <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
-                            <input 
-                                type="password" 
+                            <input
+                                type="password"
                                 placeholder="Insira sua Gemini API Key..."
                                 value={geminiKey}
                                 onChange={(e) => setGeminiKey(e.target.value)}
@@ -1026,8 +1026,8 @@ const ChatbotSettings: React.FC = () => {
                             Máximo de Tentativas (Opções Inválidas)
                         </label>
                         <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
-                            <input 
-                                type="number" 
+                            <input
+                                type="number"
                                 min={1}
                                 max={10}
                                 value={chatbotMaxRetries}
@@ -1046,7 +1046,7 @@ const ChatbotSettings: React.FC = () => {
                             Mensagem para Opção Inválida / Não Encontrada
                         </label>
                         <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
-                            <textarea 
+                            <textarea
                                 rows={2}
                                 value={chatbotInvalidOptionMsg}
                                 onChange={(e) => setChatbotInvalidOptionMsg(e.target.value)}
@@ -1061,8 +1061,8 @@ const ChatbotSettings: React.FC = () => {
                 </div>
 
                 <div className="flex justify-end pt-2">
-                    <button 
-                        onClick={handleSaveChatbotSettings} 
+                    <button
+                        onClick={handleSaveChatbotSettings}
                         disabled={loading}
                         className="flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all text-xs font-bold shadow-xl shadow-emerald-500/20 disabled:opacity-50"
                     >
@@ -1082,7 +1082,7 @@ const ChatbotSettings: React.FC = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest">
                             Texto anexado automaticamente no rodapé das suas mensagens enviadas.
                         </p>
-                        
+
                         <div className="space-y-4">
                             <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-100/50 dark:bg-black/20 rounded-xl border border-transparent dark:border-white/5 w-fit">
                                 <button type="button" onClick={() => applyFormatting('bold')} className="px-3 py-1.5 rounded-lg bg-white dark:bg-white/10 text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all font-bold text-xs shadow-sm" title="Negrito"><b>B</b></button>
@@ -1108,7 +1108,7 @@ const ChatbotSettings: React.FC = () => {
                             </div>
 
                             <div>
-                                <textarea 
+                                <textarea
                                     ref={textareaRef}
                                     placeholder={`Ex: &#10;*Att, João Silva*&#10;_Comercial Pixel_&#10;📞 (11) 99999-9999`}
                                     value={signature}
@@ -1119,8 +1119,8 @@ const ChatbotSettings: React.FC = () => {
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     id="use_signature"
                                     checked={useSignature}
                                     onChange={(e) => setUseSignature(e.target.checked)}
@@ -1149,8 +1149,8 @@ const ChatbotSettings: React.FC = () => {
                     </div>
 
                     <div className="flex items-end self-end shrink-0 w-full sm:w-auto">
-                        <button 
-                            onClick={handleSaveSignature} 
+                        <button
+                            onClick={handleSaveSignature}
                             disabled={loading}
                             className="w-full sm:w-auto justify-center flex items-center gap-2 px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl hover:opacity-90 transition-all text-xs font-bold shadow-xl"
                         >
@@ -1171,7 +1171,7 @@ const ChatbotSettings: React.FC = () => {
                         Configure árvores de automação e roteamento por setor ou agente.
                     </p>
                 </div>
-                <button 
+                <button
                     onClick={handleCreateFlow}
                     className="flex items-center gap-2 px-6 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20"
                 >
@@ -1188,7 +1188,7 @@ const ChatbotSettings: React.FC = () => {
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-white/5">
                         {flows.map(flow => (
-                            <div 
+                            <div
                                 key={flow.id}
                                 onClick={() => { setSelectedFlow(flow); fetchNodes(flow.id); setIsSimulating(false); }}
                                 className={`p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative group/flow ${selectedFlow?.id === flow.id ? 'bg-emerald-50/50 dark:bg-emerald-500/10' : ''}`}
@@ -1207,14 +1207,14 @@ const ChatbotSettings: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button 
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); handleToggleActive(flow); }}
                                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500"
                                             title={flow.is_active ? "Desativar fluxo" : "Ativar fluxo"}
                                         >
                                             {flow.is_active ? <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" /> : <Pause className="w-4 h-4 text-slate-400" />}
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); handleDeleteFlow(flow.id); }}
                                             className="opacity-0 group-hover/flow:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                                         >
@@ -1253,7 +1253,7 @@ const ChatbotSettings: React.FC = () => {
                             O arquivo importado deve conter metadados e um array de etapas (nodes).
                         </p>
                         <div className="text-[9px] bg-slate-100 dark:bg-black/30 p-2.5 rounded-xl font-mono text-slate-650 dark:text-slate-400 max-h-36 overflow-y-auto no-scrollbar whitespace-pre-wrap select-all cursor-text">
-{`{
+                            {`{
   "flow": {
     "name": "Nome do Fluxo",
     "description": "Descrição"
@@ -1331,18 +1331,18 @@ const ChatbotSettings: React.FC = () => {
                                         <button
                                             onClick={handleExportFlow}
                                             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
-                                                title="Baixar fluxo para arquivo JSON"
+                                            title="Baixar fluxo para arquivo JSON"
                                         >
                                             <Download className="w-4 h-4" />
-                                                Baixar Fluxo
+                                            Baixar Fluxo
                                         </button>
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
                                             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl hover:bg-slate-200 dark:hover:bg-white/20 transition-all text-xs font-bold shadow-md cursor-pointer"
-                                                title="Fazer upload de fluxo de arquivo JSON"
+                                            title="Fazer upload de fluxo de arquivo JSON"
                                         >
                                             <Upload className="w-4 h-4" />
-                                                Fazer Upload
+                                            Fazer Upload
                                         </button>
                                         <input
                                             type="file"
@@ -1472,7 +1472,7 @@ const ChatbotSettings: React.FC = () => {
 
                                                     {/* Action buttons */}
                                                     <div className="absolute top-4 right-4 flex gap-2 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleDeleteNode(node.id)}
                                                             className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
                                                         >
@@ -1498,7 +1498,7 @@ const ChatbotSettings: React.FC = () => {
 
                                                     <div className="space-y-4 ml-10">
                                                         {(node.type === 'greeting' || node.type === 'menu' || node.type === 'message') && (
-                                                            <textarea 
+                                                            <textarea
                                                                 value={node.content.text}
                                                                 onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
                                                                 placeholder="Digite a mensagem do robô..."
@@ -1542,7 +1542,7 @@ const ChatbotSettings: React.FC = () => {
                                                                                 );
                                                                             })}
                                                                         </select>
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => {
                                                                                 const newOpts = node.content.options.filter((_: any, i: number) => i !== optIdx);
                                                                                 handleUpdateNode(node.id, { ...node.content, options: newOpts });
@@ -1571,7 +1571,7 @@ const ChatbotSettings: React.FC = () => {
                                                                     </div>
                                                                 )}
 
-                                                                <button 
+                                                                <button
                                                                     onClick={() => {
                                                                         const newOpts = [...(node.content.options || []), { label: '', next_node: '' }];
                                                                         handleUpdateNode(node.id, { ...node.content, options: newOpts });
@@ -1585,14 +1585,14 @@ const ChatbotSettings: React.FC = () => {
 
                                                         {node.type === 'transfer_queue' && (
                                                             <div className="space-y-3">
-                                                                <textarea 
+                                                                <textarea
                                                                     value={node.content.text || ''}
                                                                     onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
                                                                     placeholder="Mensagem antes de transferir..."
                                                                     className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
                                                                     rows={2}
                                                                 />
-                                                                <select 
+                                                                <select
                                                                     value={node.content.queue_id || ''}
                                                                     onChange={(e) => handleUpdateNode(node.id, { ...node.content, queue_id: e.target.value })}
                                                                     className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
@@ -1605,14 +1605,14 @@ const ChatbotSettings: React.FC = () => {
 
                                                         {node.type === 'transfer_user' && (
                                                             <div className="space-y-3">
-                                                                <textarea 
+                                                                <textarea
                                                                     value={node.content.text || ''}
                                                                     onChange={(e) => handleUpdateNode(node.id, { ...node.content, text: e.target.value })}
                                                                     placeholder="Mensagem antes de transferir..."
                                                                     className="w-full p-4 text-sm bg-gray-50 dark:bg-black/10 border border-transparent dark:border-white/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium resize-none placeholder:text-gray-400"
                                                                     rows={2}
                                                                 />
-                                                                <select 
+                                                                <select
                                                                     value={node.content.user_id || ''}
                                                                     onChange={(e) => handleUpdateNode(node.id, { ...node.content, user_id: e.target.value })}
                                                                     className="w-full p-3.5 text-sm bg-gray-50 dark:bg-black/10 border border-transparent rounded-2xl dark:text-white font-semibold cursor-pointer"
