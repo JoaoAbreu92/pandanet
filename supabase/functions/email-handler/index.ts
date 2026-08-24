@@ -49,7 +49,7 @@ async function scanCommonPorts(host: string) {
   return results;
 }
 
-console.log("Edge Function 'email-handler' V26 (Resilient & DNS-aware) iniciada.");
+console.log("Edge Function 'email-handler' V27 (High Compatibility) iniciada.");
 
 Deno.serve(async (req) => {
   // 1. CORS Preflight
@@ -81,17 +81,20 @@ Deno.serve(async (req) => {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
 
-      // 1. VERIFICAR DNS ANTES DE TUDO
-      const hostOk = await verifyHost(settings.smtp_host);
-      if (!hostOk.ok) throw new Error(`DNS: ${hostOk.error} (${settings.smtp_host})`);
+      // 1. VERIFICAR DNS (SMTP e IMAP podem ser diferentes)
+      const smtpHostOk = await verifyHost(settings.smtp_host);
+      if (!smtpHostOk.ok) throw new Error(`DNS SMTP: ${smtpHostOk.error} (${settings.smtp_host})`);
+
+      const imapHostOk = await verifyHost(settings.imap_host);
+      if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error} (${settings.imap_host})`);
 
       // Determinar flags de SSL
       const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
       const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
 
-      console.log(`[V26] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}, SSL:${useSmtpSsl}) | IMAP(${settings.imap_host}:${settings.imap_port}, SSL:${useImapSsl})`);
+      console.log(`[V27] Testando: SMTP(${settings.smtp_host}:${settings.smtp_port}, SSL:${useSmtpSsl}) | IMAP(${settings.imap_host}:${settings.imap_port}, SSL:${useImapSsl})`);
 
-      // 2. RODAR TESTES EM PARALELO
+      // 2. RODAR TESTES EM PARALELO (Timeouts aumentados)
       const results = await Promise.allSettled([
         // Teste SMTP
         (async () => {
@@ -100,13 +103,13 @@ Deno.serve(async (req) => {
             port: settings.smtp_port,
             secure: useSmtpSsl,
             auth: { user: settings.user, pass: settings.pass },
-            tls: {
+            tls: { 
               rejectUnauthorized: false, 
               minVersion: 'TLSv1',
-              checkServerIdentity: () => undefined // Ignorar erros de hostname no cert
+              checkServerIdentity: () => undefined 
             },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000
+            connectionTimeout: 15000,
+            greetingTimeout: 15000
           });
           await transporter.verify();
           return "SMTP OK";
@@ -119,14 +122,14 @@ Deno.serve(async (req) => {
             secure: useImapSsl,
             auth: { user: settings.user, pass: settings.pass },
             logger: false,
-            tls: {
+            tls: { 
               rejectUnauthorized: false, 
               servername: settings.imap_host,
-              checkServerIdentity: () => undefined, // Ignorar erros de hostname no cert
+              checkServerIdentity: () => undefined,
               minVersion: 'TLSv1'
             },
-            connectionTimeout: 15000,
-            greetingTimeout: 15000
+            connectionTimeout: 25000,
+            greetingTimeout: 25000
           });
           await client.connect();
           await client.logout();
@@ -148,21 +151,26 @@ Deno.serve(async (req) => {
       // 4. DIAGNÓSTICO EM CASO DE FALHA
       let errorMsg = "";
       if (smtpRes.status === 'rejected') {
-        let rs = smtpRes.reason.message || "Erro desconhecido.";
+        const err = smtpRes.reason;
+        console.error("[V27 SMTP ERROR]", err);
+        let rs = err.message || "Erro desconhecido.";
         if (rs.includes("invalid peer certificate")) rs = "Certificado inválido ou incompatível.";
         errorMsg += `SMTP: ${rs}. `;
       }
 
       if (imapRes.status === 'rejected') {
-        let imapMsg = imapRes.reason.message || "Erro desconhecido.";
-        if (imapMsg.includes('Unexpected close')) imapMsg = "Conexão fechada pelo servidor (verifique porta/SSL).";
+        const err = imapRes.reason;
+        console.error("[V27 IMAP ERROR]", err);
+        let imapMsg = err.message || "Erro desconhecido.";
+        if (imapMsg.includes('Unexpected close')) imapMsg = "Conexão fechada pelo servidor (verifique porta/SSL/Timeouts).";
         if (imapMsg.includes('ENOTFOUND')) imapMsg = "Host IMAP não encontrado.";
+        if (imapMsg.includes('ETIMEDOUT')) imapMsg = "Tempo de conexão esgotado.";
         errorMsg += `IMAP: ${imapMsg}. `;
       }
 
-      // Scan opcional se tudo falhar e houver tempo
+      // Scan opcional
       let openPorts: number[] = [];
-      if (smtpRes.status === 'rejected' && imapRes.status === 'rejected' && (Date.now() - start < 20000)) {
+      if (smtpRes.status === 'rejected' && imapRes.status === 'rejected' && (Date.now() - start < 30000)) {
         openPorts = await scanCommonPorts(settings.imap_host);
       }
 
