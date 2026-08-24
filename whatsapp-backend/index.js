@@ -685,6 +685,20 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             fromPhone = remoteJid.split('@')[0];
         }
         const msgId = message.key?.id;
+        const pushName = message.pushName || message.contact?.name || message.verifiedName || null;
+
+        // Auto-criar/atualizar contato com nome e telefone real
+        // Isso resolve @lid: contatos são criados automaticamente quando mensagens chegam
+        if (!isFromMe && fromPhone) {
+            const contactName = pushName || formatPhoneDisplay(fromPhone);
+            await supabase
+                .from('whatsapp_contacts')
+                .upsert(
+                    { company_id: companyId, phone: fromPhone, name: contactName, updated_at: new Date().toISOString() },
+                    { onConflict: 'company_id,phone', ignoreDuplicates: false }
+                );
+            console.log(`[MSG] Contato upserted: ${fromPhone} | Nome: ${contactName}`);
+        }
 
         // 0. Verificar se o contato está bloqueado
         const { data: contact } = await supabase
