@@ -3,7 +3,7 @@ import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
 import { 
     Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check, RefreshCw, 
-    MessageSquare, Mail, UserPlus, Filter, ShieldOff, Shield, Ban, ListFilter
+    MessageSquare, Mail, UserPlus, Filter, ShieldOff, Shield, Ban, ListFilter, LayoutGrid
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 

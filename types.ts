@@ -700,6 +700,10 @@ export interface WhatsAppContact {
   notes?: string;
   tags?: string[]; // Array of Tag IDs or Names
   queue_id?: string;
+  is_blocked?: boolean;
+  ignore_contact?: boolean;
+  disable_transcription?: boolean;
+  disable_kanban?: boolean;
 }
 
 export interface WhatsAppSettings {
