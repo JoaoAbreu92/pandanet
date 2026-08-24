@@ -25,7 +25,7 @@ async function run() {
     // 1. Buscar as conexões ativas no Supabase
     const { data: connections, error } = await supabase
       .from('whatsapp_settings')
-      .select('id, company_id, name');
+      .select('id, company_id');
       
     if (error) {
       console.error('Erro ao buscar conexões no banco:', error.message);
