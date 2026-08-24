@@ -4,6 +4,29 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.1.9 beta teste
+03/07/2026
+🗞️ Nota de Atualização - PandaNet v1.1.9 Beta Teste
+Esta atualização traz novos recursos de privacidade, automação e sincronização para o ecossistema WhatsPanda, melhorando a segurança de dados interdepartamentais, a integridade de fluxos de encerramento e a usabilidade do painel administrativo.
+
+🚀 O que há de novo?
+
+🔒 Privacidade de Histórico & Isolamento de Setor
+- **Isolamento de Conversas**: Atendentes de um setor específico (ex: Suporte) não têm acesso ao histórico de mensagens trocadas com o mesmo contato de WhatsApp por outro setor (ex: Financeiro), garantindo sigilo absoluto de dados corporativos confidenciais.
+- **Rastreamento por Fila**: Todas as mensagens recebidas, enviadas por webhook, chatbot de triagem ou logs automáticos agora registram o `queue_id` correspondente do atendimento.
+
+🤖 Automação de Encerramento (Mensagem de Conclusão)
+- **Mensagem Automática**: Defina uma mensagem de encerramento padrão no painel de configurações gerais do WhatsPanda. Ao fechar o ticket, o sistema envia o texto automaticamente ao cliente no WhatsApp.
+- **Fechamento Inteligente (keepClosed)**: O envio automático não reabre o ticket no painel, garantindo que o status se mantenha fechado de forma consistente.
+
+⚡ Sincronização de Alta Resiliência (Short-Polling Fallback)
+- **Sincronização Ininterrupta**: Adicionado fallback de polling automatizado a cada 5 segundos para mensagens da conversa ativa e a cada 10 segundos para a lista de conversas, garantindo consistência em caso de oscilações na rede de tempo real.
+
+🎨 Polimento nos Controles de Configuração
+- **Correção de Clique nos Toggles**: Ajustados os botões de controle (checkboxes) de Rejeição de Chamadas, Atribuição Automática, Privacidade de Histórico e Mensagens de Transferência para que ativem/desativem perfeitamente ao clique em qualquer parte do card correspondente.
+
+---
+
 Versão 1.1.8 beta
 20/06/2026
 🗞️ Nota de Atualização - PandaNet v1.1.8 Beta

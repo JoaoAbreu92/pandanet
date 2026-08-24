@@ -1,1 +1,1 @@
-export const SYSTEM_VERSION = '1.1.8 beta';
+export const SYSTEM_VERSION = '1.1.9 beta teste';

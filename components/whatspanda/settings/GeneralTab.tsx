@@ -332,7 +332,7 @@ const GeneralTab: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                             <VolumeX className="w-5 h-5 text-red-500" /> Rejeição de Chamadas
                         </h4>
-                        <div className="relative inline-flex items-center cursor-pointer">
+                        <label htmlFor="reject-calls-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
                                 id="reject-calls-toggle"
@@ -341,7 +341,7 @@ const GeneralTab: React.FC = () => {
                                 className="sr-only peer cursor-pointer"
                             />
                             <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
-                        </div>
+                        </label>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Se ativado, o WhatsPanda irá rejeitar chamadas de voz ou vídeo automaticamente e responderá com o texto abaixo.</p>
                     
@@ -363,7 +363,7 @@ const GeneralTab: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                             <UserCheck className="w-5 h-5 text-indigo-500" /> Atribuição Automática
                         </h4>
-                        <div className="relative inline-flex items-center cursor-pointer">
+                        <label htmlFor="auto-assign-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
                                 id="auto-assign-toggle"
@@ -372,7 +372,7 @@ const GeneralTab: React.FC = () => {
                                 className="sr-only peer cursor-pointer"
                             />
                             <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
-                        </div>
+                        </label>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Atribui automaticamente o atendimento ao primeiro atendente que responder à conversa na aba "Aguardando".</p>
                 </div>
@@ -383,7 +383,7 @@ const GeneralTab: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                             <Sliders className="w-5 h-5 text-indigo-500" /> Privacidade de Histórico
                         </h4>
-                        <div className="relative inline-flex items-center cursor-pointer">
+                        <label htmlFor="isolate-history-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
                                 id="isolate-history-toggle"
@@ -392,7 +392,7 @@ const GeneralTab: React.FC = () => {
                                 className="sr-only peer cursor-pointer"
                             />
                             <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
-                        </div>
+                        </label>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Se ativado, as mensagens trocadas em um setor (ex: Financeiro) ficam invisíveis para atendentes de outros setores (ex: Suporte) mesmo que pertençam ao mesmo contato de WhatsApp.</p>
                 </div>
@@ -539,7 +539,7 @@ const GeneralTab: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                             <MessageSquare className="w-5 h-5 text-indigo-500" /> Mensagens de Transferência de Atendimento
                         </h4>
-                        <div className="relative inline-flex items-center cursor-pointer">
+                        <label htmlFor="send-transfer-msg-toggle" className="relative inline-flex items-center cursor-pointer">
                             <input
                                 type="checkbox"
                                 id="send-transfer-msg-toggle"
@@ -548,7 +548,7 @@ const GeneralTab: React.FC = () => {
                                 className="sr-only peer cursor-pointer"
                             />
                             <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
-                        </div>
+                        </label>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">
                         Defina o comportamento das mensagens enviadas quando um atendimento for transferido para outra fila ou atendente.
