@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PandaNet</string>
+    <string name="title_activity_main">PandaNet</string>
+    <string name="package_name">com.grupopixel.pandanet</string>
+    <string name="custom_url_scheme">com.grupopixel.pandanet</string>
+</resources>
