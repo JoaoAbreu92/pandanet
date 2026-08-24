@@ -464,6 +464,32 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 if (wpCount !== null) {
                     setModuleUnreadCount('whatspanda', wpCount);
                 }
+
+                // Privados (is_group = false ou null)
+                const { count: wpPrivateCount } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('company_id', currentUser.company_id)
+                    .gt('unread_count', 0)
+                    .neq('status', 'fechado')
+                    .or('is_group.eq.false,is_group.is.null');
+
+                if (wpPrivateCount !== null) {
+                    setModuleUnreadCount('whatspanda_private', wpPrivateCount);
+                }
+
+                // Grupos (is_group = true)
+                const { count: wpGroupCount } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('company_id', currentUser.company_id)
+                    .gt('unread_count', 0)
+                    .neq('status', 'fechado')
+                    .eq('is_group', true);
+
+                if (wpGroupCount !== null) {
+                    setModuleUnreadCount('whatspanda_group', wpGroupCount);
+                }
             }
 
         } catch (err) {

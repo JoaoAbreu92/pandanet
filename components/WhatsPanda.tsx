@@ -19,6 +19,7 @@ import { BarChart3 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 import { Loader2 } from 'lucide-react';
 
 type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard';
@@ -29,6 +30,7 @@ interface WhatsPandaProps {
 
 const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
   const { profile, currentUser } = useAuth();
+  const { moduleUnreadCounts } = useNotifications();
   const [currentView, setCurrentView] = useState<View>('privados');
   const [isChatActive, setIsChatActive] = useState(false);
   const [internalSearch, setInternalSearch] = useState(initialSearch);
@@ -240,6 +242,24 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
                 {item.label}
               </span>
 
+              {/* Badge de Notificações */}
+              {(() => {
+                let badgeCount = 0;
+                if (item.id === 'privados') {
+                  badgeCount = moduleUnreadCounts.whatspanda_private || 0;
+                } else if (item.id === 'grupos') {
+                  badgeCount = moduleUnreadCounts.whatspanda_group || 0;
+                }
+
+                if (badgeCount <= 0) return null;
+
+                return (
+                  <span className="ml-auto bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md shadow-emerald-500/20 animate-pulse">
+                    {badgeCount}
+                  </span>
+                );
+              })()}
+
               {/* Active Indicator Line */}
               {currentView === item.view && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
@@ -280,7 +300,25 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
               `}
             >
-              <item.icon className={`w-5 h-5 mb-1 ${currentView === item.view ? 'animate-bounce-slight' : ''}`} strokeWidth={currentView === item.view ? 2.5 : 2} />
+              <div className="relative">
+                <item.icon className={`w-5 h-5 mb-1 ${currentView === item.view ? 'animate-bounce-slight' : ''}`} strokeWidth={currentView === item.view ? 2.5 : 2} />
+                {(() => {
+                  let badgeCount = 0;
+                  if (item.id === 'privados') {
+                    badgeCount = moduleUnreadCounts.whatspanda_private || 0;
+                  } else if (item.id === 'grupos') {
+                    badgeCount = moduleUnreadCounts.whatspanda_group || 0;
+                  }
+
+                  if (badgeCount <= 0) return null;
+
+                  return (
+                    <span className="absolute -top-1.5 -right-2 bg-emerald-500 text-white text-[8px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center shadow-md shadow-emerald-500/20">
+                      {badgeCount}
+                    </span>
+                  );
+                })()}
+              </div>
               <span className={`text-[10px] ${currentView === item.view ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
             </button>
           ))}
