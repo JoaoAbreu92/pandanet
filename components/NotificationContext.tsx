@@ -49,8 +49,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Sound Customization
     const [selectedSound, setSelectedSound] = useState<string>(() => localStorage.getItem('pixel_notification_sound') || 'synth');
 
+    // Carregar preferência do banco ao iniciar
+    useEffect(() => {
+        if (currentUser?.id) {
+            supabase.from('profiles').select('notification_sound').eq('id', currentUser.id).single()
+                .then(({ data }) => {
+                    if (data?.notification_sound) {
+                        setSelectedSound(data.notification_sound);
+                        localStorage.setItem('pixel_notification_sound', data.notification_sound);
+                    }
+                });
+        }
+    }, [currentUser?.id]);
+
     const AVAILABLE_SOUNDS = [
-        { id: 'synth', name: 'Original (Bip)', path: null }, // Uses synthesizer
+        { id: 'synth', name: 'Original (Bip)', path: null },
         { id: 'custom1', name: 'Toque 1', path: '/sounds/custom1.mp3' },
         { id: 'custom2', name: 'Toque 2', path: '/sounds/custom2.mp3' },
         { id: 'custom3', name: 'Toque 3', path: '/sounds/custom3.mp3' },
@@ -59,19 +72,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         { id: 'custom6', name: 'Toque 6', path: '/sounds/custom6.mp3' },
     ];
 
-    // Request desktop notification permission
-    useEffect(() => {
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-    }, []);
-
     const playNotificationSound = useCallback((type: NotificationType | 'nudge', overrideSoundId?: string) => {
         const soundId = overrideSoundId || selectedSound;
         const soundDef = AVAILABLE_SOUNDS.find(s => s.id === soundId);
 
         try {
-            // Se for synth ou não encontrar o arquivo, usa o sintetizador
             if (!soundDef || !soundDef.path) {
                 const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
                 if (!AudioContext) return;
@@ -85,9 +90,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
                 const now = ctx.currentTime;
 
-                // Configuration based on type
                 if (type === 'nudge') {
-                    // Rattle / Alert sound
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(150, now);
                     osc.frequency.linearRampToValueAtTime(600, now + 0.1);
@@ -100,7 +103,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     osc.start(now);
                     osc.stop(now + 0.5);
                 } else {
-                    // Pleasant ding
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(800, now);
                     osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
@@ -113,7 +115,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 }
                 console.log(`[PandaNet] Playing synthesized sound for: ${type}`);
             } else {
-                // Toca o arquivo MP3 customizado
                 const audio = new Audio(soundDef.path);
                 audio.volume = 0.9;
                 audio.play().catch(e => console.error("Erro ao tocar MP3 customizado:", e, soundDef.path));
@@ -125,9 +126,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, [selectedSound]);
 
-    const changeSound = (soundId: string) => {
+    const changeSound = async (soundId: string) => {
         setSelectedSound(soundId);
         localStorage.setItem('pixel_notification_sound', soundId);
+
+        // Persistir no banco
+        if (currentUser?.id) {
+            await supabase.from('profiles').update({ notification_sound: soundId }).eq('id', currentUser.id);
+        }
+
         // Toca o som para testar imediatamente
         setTimeout(() => playNotificationSound('message', soundId), 100);
     };

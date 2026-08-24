@@ -86,6 +86,12 @@ const AppContent: React.FC = () => {
             }, async (payload) => {
                 const newNudge = payload.new as any;
                 console.log('[PandaNet] DEDICATED NUDGE TABLE detectado:', newNudge);
+
+                // DEBUG: Force visual confirmation
+                if (localStorage.getItem('debug_nudge')) {
+                    alert(`DEBUG: Recebi Nudge de ${newNudge.sender_id}`);
+                }
+
                 handleNudge(newNudge.sender_id, newNudge.conversation_id);
             })
             .on('broadcast', { event: 'nudge' }, (payload) => {
