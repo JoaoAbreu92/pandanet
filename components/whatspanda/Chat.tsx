@@ -297,6 +297,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   // Canal access: list of {channel_id, can_send_messages, can_send_media, force_signature}
   const [channelAccess, setChannelAccess] = useState<any[]>([]);
   const [accessibleChannelIds, setAccessibleChannelIds] = useState<string[] | null>(null); // null = all
+  const [filterPlatform, setFilterPlatform] = useState<string>('all'); // 'all' | 'whatsapp' | 'telegram' | 'instagram' | 'messenger'
 
   // Load channel access for non-admins
   useEffect(() => {
@@ -486,7 +487,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       fetchConversations();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter]);
+  }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter, filterPlatform]);
 
   useEffect(() => {
     if (type) {
@@ -597,6 +598,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         return;
       }
       query = query.in('connection_id', accessibleChannelIds);
+    }
+
+    // Plataforma selecionada: filtra pelos channel_ids daquela plataforma
+    if (filterPlatform !== 'all') {
+      const platformChannelIds = connections
+        .filter((c: any) => (c.channel_type || 'whatsapp') === filterPlatform)
+        .map((c: any) => c.id);
+      if (platformChannelIds.length > 0) {
+        query = query.in('connection_id', platformChannelIds);
+      } else {
+        // Nenhum canal dessa plataforma cadastrado
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
     }
 
     query = query.eq('status', activeTab);
@@ -1103,6 +1119,53 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             </div>
           </div>
           
+          {/* Platform Filter Pills - shown only if company has multiple platform types */}
+          {(() => {
+            const platformTypes = [...new Set(connections.map((c: any) => c.channel_type || 'whatsapp'))];
+            if (platformTypes.length <= 1) return null;
+            const platformConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+              whatsapp:  { label: 'WhatsApp',  color: 'emerald', icon: <Smartphone className="w-3 h-3" /> },
+              telegram:  { label: 'Telegram',  color: 'blue',    icon: <Send className="w-3 h-3" /> },
+              instagram: { label: 'Instagram', color: 'pink',    icon: <Instagram className="w-3 h-3" /> },
+              messenger: { label: 'Messenger', color: 'indigo',  icon: <MessageCircle className="w-3 h-3" /> },
+            };
+            return (
+              <div className="flex gap-1.5 mb-3 overflow-x-auto no-scrollbar pb-0.5">
+                <button
+                  onClick={() => setFilterPlatform('all')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${
+                    filterPlatform === 'all'
+                      ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900 dark:border-white'
+                      : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                  }`}
+                >
+                  Todos
+                </button>
+                {platformTypes.map(pt => {
+                  const cfg = platformConfig[pt] || { label: pt, color: 'gray', icon: <MessageCircle className="w-3 h-3" /> };
+                  const active = filterPlatform === pt;
+                  const colorMap: Record<string, string> = {
+                    emerald: active ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-white/5 text-emerald-600 border-emerald-200 hover:border-emerald-400',
+                    blue:    active ? 'bg-blue-500 text-white border-blue-500'       : 'bg-white dark:bg-white/5 text-blue-600 border-blue-200 hover:border-blue-400',
+                    pink:    active ? 'bg-pink-500 text-white border-pink-500'       : 'bg-white dark:bg-white/5 text-pink-600 border-pink-200 hover:border-pink-400',
+                    indigo:  active ? 'bg-indigo-500 text-white border-indigo-500'   : 'bg-white dark:bg-white/5 text-indigo-600 border-indigo-200 hover:border-indigo-400',
+                    gray:    active ? 'bg-gray-700 text-white border-gray-700'       : 'bg-white dark:bg-white/5 text-gray-600 border-gray-200 hover:border-gray-400',
+                  };
+                  return (
+                    <button
+                      key={pt}
+                      onClick={() => setFilterPlatform(active ? 'all' : pt)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap ${colorMap[cfg.color] || colorMap.gray}`}
+                    >
+                      {cfg.icon}
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
             {(['aberto', 'fechado'] as const).map((tab) => (
