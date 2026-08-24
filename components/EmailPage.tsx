@@ -409,7 +409,7 @@ const EmailPage: React.FC<EmailPageProps> = ({ onNavigate }) => {
                 email_pass: serverConfig.pass,
                 use_ssl: serverConfig.use_ssl,
                 updated_at: new Date().toISOString()
-            });
+            }, { onConflict: 'user_id' });
 
         if (!error) {
             addNotification({

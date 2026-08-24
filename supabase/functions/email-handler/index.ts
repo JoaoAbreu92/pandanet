@@ -138,7 +138,11 @@ Deno.serve(async (req) => {
     })
   } catch (error: any) {
     console.error('Edge Function Error:', error)
-    return new Response(JSON.stringify({ error: error.message || String(error) || 'Erro desconhecido na Edge Function' }), { 
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message || String(error) || 'Erro desconhecido na Edge Function',
+      details: error.stack || null
+    }), { 
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     })
