@@ -845,7 +845,15 @@ const AppContent: React.FC = () => {
     const canAccess = (permission: keyof EmployeePermissions) => {
         if (!currentUser) return false;
         if (currentUser.role === 'Super Admin') return true;
-        if (currentUser.permissions?.[permission] === false) return false;
+
+        if (permission === 'viewWhatsPanda') {
+            const hasWhatsPanda = !!currentUser.is_whatsapp_agent || 
+                (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
+                (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
+            if (!hasWhatsPanda) return false;
+        } else if (currentUser.permissions?.[permission] === false) {
+            return false;
+        }
 
         const featureMap: Record<string, string> = {
             'viewMessages': 'messages',

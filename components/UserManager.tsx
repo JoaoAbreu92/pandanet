@@ -118,6 +118,7 @@ const UserFormModal: React.FC<{
             viewCalendar: user?.permissions?.viewCalendar ?? true,
             useMarketplace: user?.permissions?.useMarketplace ?? true,
             viewEmail: user?.permissions?.viewEmail ?? true,
+            viewWhatsPanda: user?.permissions?.viewWhatsPanda ?? (user?.is_whatsapp_agent ?? false),
             viewScheduling: user?.permissions?.viewScheduling ?? true,
             viewDirectory: user?.permissions?.viewDirectory ?? true,
             viewForms: user?.permissions?.viewForms ?? true,
@@ -233,8 +234,18 @@ const UserFormModal: React.FC<{
             return;
         }
 
+        // Garante que a permissão viewWhatsPanda esteja sincronizada com o status de agente do WhatsApp
+        const updatedPermissions = {
+            ...formData.permissions,
+            viewWhatsPanda: !!formData.is_whatsapp_agent
+        };
+
         // Garante que o formData sobrescreva tudo do usuário anterior, mantendo o ID
-        const finalData = { ...user, ...formData };
+        const finalData = { 
+            ...user, 
+            ...formData,
+            permissions: updatedPermissions
+        };
         onSave(finalData as Employee);
     };
 

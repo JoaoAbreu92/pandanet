@@ -123,7 +123,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
     const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string; context?: any }> = ({ page, label, icon: Icon, permission, featureId, context }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || (isImpersonating && isMasterAdmin);
-        const hasPermission = permission === true || (isImpersonating && isMasterAdmin) || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
+        let hasPermission = permission === true || (isImpersonating && isMasterAdmin) || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
+
+        if (permission === 'viewWhatsPanda') {
+            const hasWhatsPanda = !!currentUser.is_whatsapp_agent || 
+                (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
+                (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
+            if (hasWhatsPanda) {
+                hasPermission = true;
+            }
+        }
 
         if (!isAdmin && !hasPermission) {
             return null;

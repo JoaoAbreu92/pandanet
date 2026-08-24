@@ -121,8 +121,14 @@ const UsersTab: React.FC = () => {
         if (!employee) return;
 
         // Update profile with new permissions
+        const updatedPermissions = {
+            ...(employee.permissions || {}),
+            viewWhatsPanda: true
+        };
         const updates = {
-            whatspanda_permissions: permissions
+            whatspanda_permissions: permissions,
+            is_whatsapp_agent: true,
+            permissions: updatedPermissions
         };
 
         const { error } = await supabase
@@ -142,9 +148,19 @@ const UsersTab: React.FC = () => {
     const handleRemoveAgent = async (id: string) => {
         if (!confirm('Tem certeza que deseja remover este usuário do WhatsPanda? (Isso revogará todas as permissões)')) return;
 
+        const employee = allEmployees.find(e => e.id === id);
+        const updatedPermissions = {
+            ...(employee?.permissions || {}),
+            viewWhatsPanda: false
+        };
+
         const { error } = await supabase
             .from('profiles')
-            .update({ whatspanda_permissions: null })
+            .update({ 
+                whatspanda_permissions: null,
+                is_whatsapp_agent: false,
+                permissions: updatedPermissions
+            })
             .eq('id', id);
 
         if (error) {

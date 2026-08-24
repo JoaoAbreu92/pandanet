@@ -54,6 +54,11 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser }) => {
   // Filtra as opções que o usuário de fato tem permissão para acessar
   const allowedLinks = ALL_LINKS.filter(link => {
     if (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') return true;
+    if (link.permission === 'viewWhatsPanda') {
+      return !!currentUser.is_whatsapp_agent || 
+        (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
+        (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
+    }
     return (currentUser.permissions as any)[link.permission] === true;
   });
 
