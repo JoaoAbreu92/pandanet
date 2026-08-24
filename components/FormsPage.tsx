@@ -3,7 +3,7 @@ import Card from './Card';
 import { PlusIcon, XCircleIcon } from './icons';
 import type { FormSubmission, FormStatus } from '../types';
 import { useLanguage } from './LanguageContext';
-import { supabase } from '../supabaseClient';
+import { supabase, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const VacationRequestModal: React.FC<{
@@ -822,7 +822,7 @@ const FormsPage: React.FC = () => {
                                             <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap flex items-center">
                                                 {sub.formType}
                                                 {sub.attachment_url && (
-                                                    <a href={sub.attachment_url} target="_blank" rel="noreferrer" className="ml-2 inline-block px-1.5 py-0.5 text-[9px] bg-brand-primary/10 border border-brand-primary/20 text-brand-primary rounded font-bold hover:bg-emerald-50">Comprovante 📎</a>
+                                                    <button onClick={() => downloadFile(sub.attachment_url, sub.attachment_name || 'comprovante')} className="ml-2 inline-block px-1.5 py-0.5 text-[9px] bg-brand-primary/10 border border-brand-primary/20 text-brand-primary rounded font-bold hover:bg-emerald-50">Comprovante 📎</button>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">

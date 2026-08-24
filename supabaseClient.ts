@@ -119,9 +119,20 @@ export function getCleanImageUrl(url: string | null | undefined): string {
  * Evita o redirecionamento indevido de rotas de SPA (single-page application).
  */
 export async function downloadFile(url: string, fileName: string) {
-    try {
-        const cleanUrl = getCleanImageUrl(url);
-        const response = await fetch(cleanUrl);
+try {
+const parsed = parseSupabaseStorageUrl(url);
+const sensitiveBuckets = new Set([
+    'hr-files',
+    'documents',
+    'ticket-media',
+    'message-attachments'
+]);
+
+const cleanUrl = parsed && sensitiveBuckets.has(parsed.bucket)
+    ? await getSignedStorageUrl(url)
+    : getCleanImageUrl(url);
+
+const response = await fetch(cleanUrl);
         if (!response.ok) throw new Error('Falha na resposta do servidor');
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
@@ -137,13 +148,80 @@ export async function downloadFile(url: string, fileName: string) {
     } catch (err) {
         console.error('Erro ao baixar arquivo via blob, tentando fallback direto:', err);
         // Fallback: abre a URL em uma nova aba
-        try {
-            const cleanUrl = getCleanImageUrl(url);
-            window.open(cleanUrl, '_blank');
-        } catch (e) {
-            console.error('Fallback falhou:', e);
-        }
+    try {
+        const parsed = parseSupabaseStorageUrl(url);
+        const sensitiveBuckets = new Set([
+            'hr-files',
+            'documents',
+            'ticket-media',
+            'message-attachments'
+        ]);
+
+        const fallbackUrl = parsed && sensitiveBuckets.has(parsed.bucket)
+            ? await getSignedStorageUrl(url)
+            : getCleanImageUrl(url);
+
+        window.open(fallbackUrl, '_blank');
+    } catch (e) {
+        console.error('Fallback falhou:', e);
+    }
     }
 }
 
 
+
+/**
+ * Extrai bucket e caminho de URLs antigas do Supabase Storage.
+ * Suporta URLs públicas já gravadas no banco.
+ */
+export function parseSupabaseStorageUrl(url: string): { bucket: string; path: string } | null {
+    if (!url) return null;
+
+    try {
+        const marker = '/storage/v1/object/public/';
+        const idx = url.indexOf(marker);
+
+        if (idx === -1) return null;
+
+        const remainder = url.substring(idx + marker.length);
+        const slashIndex = remainder.indexOf('/');
+
+        if (slashIndex === -1) return null;
+
+        const bucket = remainder.substring(0, slashIndex);
+        const path = decodeURIComponent(remainder.substring(slashIndex + 1));
+
+        if (!bucket || !path) return null;
+
+        return { bucket, path };
+    } catch (err) {
+        console.error('Erro ao interpretar URL do Storage:', err);
+        return null;
+    }
+}
+
+/**
+ * Gera URL assinada temporária para arquivo privado.
+ * Mantém compatibilidade com URLs públicas antigas salvas no banco.
+ */
+export async function getSignedStorageUrl(
+    url: string,
+    expiresIn: number = 3600
+): Promise<string> {
+    const parsed = parseSupabaseStorageUrl(url);
+
+    if (!parsed) {
+        return getCleanImageUrl(url);
+    }
+
+    const { data, error } = await supabase.storage
+        .from(parsed.bucket)
+        .createSignedUrl(parsed.path, expiresIn);
+
+    if (error || !data?.signedUrl) {
+        console.error('Erro ao gerar URL assinada:', error);
+        return getCleanImageUrl(url);
+    }
+
+    return getCleanImageUrl(data.signedUrl);
+}

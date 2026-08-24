@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import type { FormSubmission, FormStatus } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
 const FormSubmissionsManager: React.FC = () => {
@@ -110,9 +110,9 @@ const FormSubmissionsManager: React.FC = () => {
                                             <span className="font-bold text-gray-850 dark:text-gray-200">{sub.formType}</span>
                                             {sub.reason && <span className="text-xs text-gray-400 leading-tight mt-0.5">{sub.reason}</span>}
                                             {sub.attachment_url && (
-                                                <a href={sub.attachment_url} target="_blank" rel="noreferrer" className="text-xs text-brand-primary font-bold hover:underline mt-1 flex items-center gap-1">
+                                                <button onClick={() => downloadFile(sub.attachment_url, sub.attachment_name || 'comprovante')} className="text-xs text-brand-primary font-bold hover:underline mt-1 flex items-center gap-1">
                                                     📎 Atestado / Comprovante
-                                                </a>
+                                                </button>
                                             )}
                                         </div>
                                     </td>

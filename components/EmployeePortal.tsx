@@ -283,7 +283,7 @@ const EmployeePortal: React.FC = () => {
             const { error: uploadErr } = await supabase.storage.from('hr-files').upload(path, file);
             if (uploadErr) throw uploadErr;
 
-            const { data: { publicUrl } } = supabase.storage.from('hr-files').getPublicUrl(path);
+            const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/hr-files/${path}`;
 
             const now = new Date();
             const monthName = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile, getSignedStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import HRCalculatorAI from './HRCalculatorAI';
 
@@ -53,6 +53,32 @@ const HRManager: React.FC = () => {
 
   // Viewer state
   const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
+  const [viewingSignedUrl, setViewingSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const prepareViewingUrl = async () => {
+      if (!viewingDocUrl) {
+        if (active) setViewingSignedUrl(null);
+        return;
+      }
+
+      try {
+        const signed = await getSignedStorageUrl(viewingDocUrl);
+        if (active) setViewingSignedUrl(signed);
+      } catch (err) {
+        console.error('Erro ao preparar visualização segura:', err);
+        if (active) setViewingSignedUrl(null);
+      }
+    };
+
+    prepareViewingUrl();
+
+    return () => {
+      active = false;
+    };
+  }, [viewingDocUrl]);
   const [viewingDocName, setViewingDocName] = useState<string | null>(null);
 
   // Novo: Banco de Horas Admin State
@@ -407,7 +433,7 @@ const HRManager: React.FC = () => {
       const path = `documents/${profile!.company_id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('hr-files').upload(path, docFile);
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from('hr-files').getPublicUrl(path);
+      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/hr-files/${path}`;
       const { error } = await supabase.from('hr_documents').insert({
         company_id: profile!.company_id!,
         ...docForm,
@@ -447,7 +473,7 @@ const HRManager: React.FC = () => {
       const path = `payslips/${profile!.company_id}/${psEmployee}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('hr-files').upload(path, psFile);
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from('hr-files').getPublicUrl(path);
+      const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/hr-files/${path}`;
       const refDate = new Date();
       const { error } = await supabase.from('hr_payslips').insert({
         company_id: profile!.company_id!, employee_id: psEmployee, month: psMonth,
@@ -1656,7 +1682,7 @@ const HRManager: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 bg-gray-100 dark:bg-slate-950 relative">
-              <iframe src={getCleanImageUrl(viewingDocUrl)} className="w-full h-full border-0 bg-white dark:bg-slate-900" title="Visualizador de Documento" />
+              <iframe src={viewingSignedUrl || undefined} className="w-full h-full border-0 bg-white dark:bg-slate-900" title="Visualizador de Documento" />
             </div>
           </div>
         </div>

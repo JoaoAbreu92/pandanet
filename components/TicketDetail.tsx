@@ -3,6 +3,7 @@ import React from 'react';
 import type { Ticket, Employee, Recognition } from '../types';
 import { PaperAirplaneIcon } from './icons';
 import StarRating from './StarRating';
+import { getSignedStorageUrl } from '../supabaseClient';
 
 interface TicketDetailProps {
     ticket: Ticket;
@@ -22,6 +23,36 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
     const [showResolveModal, setShowResolveModal] = React.useState(false);
     const [resolutionText, setResolutionText] = React.useState('');
     const [pendingResolve, setPendingResolve] = React.useState(false); // If true, we are setting to status 'Pendente'
+    const [signedMediaUrls, setSignedMediaUrls] = React.useState<string[]>([]);
+
+    React.useEffect(() => {
+        let active = true;
+
+        const loadSignedMedia = async () => {
+            if (!ticket.media_urls?.length) {
+                if (active) setSignedMediaUrls([]);
+                return;
+            }
+
+            const urls = await Promise.all(
+                ticket.media_urls.map(async (url) => {
+                    try {
+                        return await getSignedStorageUrl(url);
+                    } catch {
+                        return '';
+                    }
+                })
+            );
+
+            if (active) setSignedMediaUrls(urls);
+        };
+
+        loadSignedMedia();
+
+        return () => {
+            active = false;
+        };
+    }, [ticket.media_urls]);
 
     const handleCommentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -172,7 +203,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                         <div>
                             <h4 className="font-semibold text-brand-text mb-2">Anexos ({ticket.media_type === 'image' ? 'Fotos' : 'Vídeo'})</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {ticket.media_urls.map((url, idx) => (
+                                {signedMediaUrls.map((url, idx) => (
                                     <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-50">
                                         {ticket.media_type === 'image' ? (
                                             <a href={url} target="_blank" rel="noopener noreferrer">
