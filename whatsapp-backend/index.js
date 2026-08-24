@@ -193,10 +193,22 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         if (contactRes && contactRes.ok) {
             const contacts = await contactRes.json();
             if (Array.isArray(contacts)) {
-                contacts.forEach(c => {
+                console.log(`[SYNC] ${contacts.length} contatos encontrados. Salvando no banco...`);
+                for (const c of contacts) {
                     const jid = c.id || c.remoteJid;
-                    if (jid) contactsMap[jid] = c.name || c.pushName || c.notify;
-                });
+                    const phone = jid?.split('@')[0];
+                    if (phone && !jid.includes('@g.us')) {
+                        const name = c.name || c.pushName || c.notify || phone;
+                        contactsMap[jid] = name;
+                        
+                        // Upsert contact
+                        await supabase.from('whatsapp_contacts').upsert({
+                            company_id: companyId,
+                            phone: phone,
+                            name: name
+                        }, { onConflict: 'company_id,phone' }).catch(e => console.error('[SYNC] Erro upsert contato:', e.message));
+                    }
+                }
             }
         }
 
@@ -253,11 +265,15 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 if (msgRes && msgRes.ok) {
                     const messages = await msgRes.json();
                     if (Array.isArray(messages)) {
+                        console.log(`[SYNC] ${messages.length} mensagens encontradas para ${fromPhone}.`);
                         for (const msg of messages) {
                             await processInboundMessage(msg, companyId, connectionId, true); // true = historical
                         }
+                    } else {
+                        console.log(`[SYNC] Nenhuma mensagem encontrada para ${fromPhone}.`);
                     }
                 }
+                console.log(`[SYNC] Finalizado chat ${fromPhone}.`);
             }
         }
         console.log(`[SYNC] Sincronização da instância ${instanceName} concluída!`);
@@ -338,7 +354,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         // 2. Inserir a mensagem
         if (conversationId) {
-            await supabase.from('whatsapp_messages').insert({
+            const { error: insErr } = await supabase.from('whatsapp_messages').insert({
                 company_id: companyId,
                 conversation_id: conversationId,
                 message_text: text,
@@ -346,11 +362,16 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 whatsapp_message_id: msgId,
                 media_url: mediaUrl,
                 media_type: mediaType,
-                created_at: new Date(message.messageTimestamp * 1000).toISOString()
+                created_at: message.messageTimestamp ? new Date(message.messageTimestamp * 1000).toISOString() : new Date().toISOString()
             });
+            if (insErr) {
+                console.error(`[MSG] Erro ao inserir msg ${msgId}:`, insErr.message);
+            } else {
+                if (!isHistorical) console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
+            }
         }
     } catch (err) {
-        console.error('[MSG] Erro ao processar mensagem:', err.message);
+        console.error('[MSG] Erro fatal:', err.message);
     }
 }
 

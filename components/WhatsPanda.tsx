@@ -50,11 +50,11 @@ const WhatsPanda: React.FC = () => {
 
   // Set default view if current is invalid
   React.useEffect(() => {
-    const validViews = menuItems.map(item => item.view);
+    const validViews = [...menuItems.map(item => item.view), 'new-ticket'];
     if (!validViews.includes(currentView) && validViews.length > 0) {
       setCurrentView(validViews[0] as View);
     }
-  }, [permissions, currentView]);
+  }, [menuItems, currentView]);
 
   const renderView = () => {
     if (menuItems.length === 0) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
 import { Search, Plus, User, Tag, Layers, MoreVertical, Edit2, Trash2, X, Check, RefreshCw } from 'lucide-react';
+import { useAuth } from '../AuthContext';
 const Contacts: React.FC = () => {
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,11 +27,17 @@ const Contacts: React.FC = () => {
         fetchAuxData();
     }, []);
 
+    const { profile, user } = useAuth();
+    
     const fetchContacts = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
         setLoading(true);
         const { data, error } = await supabase
             .from('whatsapp_contacts')
             .select('*')
+            .eq('company_id', companyId)
             .order('name', { ascending: true });
         
         if (error) {
@@ -104,9 +111,10 @@ const Contacts: React.FC = () => {
                 .eq('id', editingContact.id);
             error = updateError;
         } else {
+            const companyId = profile?.company_id || user?.user_metadata?.company_id;
             const { error: insertError } = await supabase
                 .from('whatsapp_contacts')
-                .insert({ ...contactData, company_id: '15d38706-59a6-43b8-9366-2371904d90ce' }); // Hardcoded for MVP
+                .insert({ ...contactData, company_id: companyId });
             error = insertError;
         }
 
