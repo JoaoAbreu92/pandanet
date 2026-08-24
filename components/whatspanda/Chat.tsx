@@ -1415,11 +1415,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 if (!confirm(`Deseja fechar TODOS os ${filteredConversations.length} atendimentos visíveis?\n\nEles irão para a aba "Fechados".`)) return;
                 try {
                   const ids = filteredConversations.map(c => c.id);
-                  const { error } = await supabase
-                    .from('whatsapp_conversations')
-                    .update({ status: 'fechado' })
-                    .in('id', ids);
-                  if (error) throw error;
+                  // Dividir em blocos de 50 IDs para evitar erro 414 do Nginx
+                  const chunkSize = 50;
+                  for (let i = 0; i < ids.length; i += chunkSize) {
+                    const chunk = ids.slice(i, i + chunkSize);
+                    const { error } = await supabase
+                      .from('whatsapp_conversations')
+                      .update({ status: 'fechado' })
+                      .in('id', chunk);
+                    if (error) throw error;
+                  }
                   setConversations([]);
                   setSelectedConversation(null);
                 } catch (err: any) {
@@ -1448,10 +1453,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     
                     const ids = (closedConvs || []).map(c => c.id);
                     if (ids.length > 0) {
-                      await supabase.from('whatsapp_messages').delete().in('conversation_id', ids);
-                      await supabase.from('whatsapp_conversation_tags').delete().in('conversation_id', ids);
-                      await supabase.from('whatsapp_contact_notes').delete().in('conversation_id', ids);
-                      await supabase.from('whatsapp_conversations').delete().in('id', ids);
+                      // Dividir em blocos de 50 IDs para evitar erro 414 do Nginx
+                      const chunkSize = 50;
+                      for (let i = 0; i < ids.length; i += chunkSize) {
+                        const chunk = ids.slice(i, i + chunkSize);
+                        await supabase.from('whatsapp_messages').delete().in('conversation_id', chunk);
+                        await supabase.from('whatsapp_conversation_tags').delete().in('conversation_id', chunk);
+                        await supabase.from('whatsapp_contact_notes').delete().in('conversation_id', chunk);
+                        await supabase.from('whatsapp_conversations').delete().in('id', chunk);
+                      }
                     }
                     setConversations([]);
                     setSelectedConversation(null);

@@ -527,6 +527,13 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         // Garantir settings corretos (ex: sync_full_history)
         await updateInstanceSettings(instanceName);
         
+        const { data: channelSettings } = await supabase
+            .from('whatsapp_settings')
+            .select('phone_number')
+            .eq('id', connectionId)
+            .maybeSingle();
+        const channelPhone = channelSettings?.phone_number ? channelSettings.phone_number.replace(/\D/g, '') : '';
+        
         const processedJids = new Set();
         const contactsToUpsert = [];
         
@@ -556,12 +563,19 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     const jid = c.remoteJid || c.jid || c.id || '';
                     if (!jid || jid.includes('@g.us')) continue;
                     const phone = jid.split('@')[0];
+                    
+                    // Ignorar se for o próprio telefone da conexão
+                    const cleanPhone = phone.replace(/\D/g, '');
+                    if (channelPhone && (cleanPhone === channelPhone || cleanPhone.endsWith(channelPhone) || channelPhone.endsWith(cleanPhone))) {
+                        continue;
+                    }
+                    
                     if (!processedJids.has(phone)) {
                         processedJids.add(phone);
                         contactsToUpsert.push({ 
                             company_id: companyId, 
                             phone, 
-                            name: c.pushName || c.verifiedName || c.name || c.notify || formatPhoneDisplay(phone), 
+                            name: c.pushName || c.pushname || c.verifiedName || c.name || c.notify || formatPhoneDisplay(phone), 
                             is_group: false,
                             updated_at: new Date().toISOString() 
                         });
@@ -594,12 +608,19 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     const jid = chat.remoteJid || chat.jid || chat.id || '';
                     if (!jid || jid.includes('@g.us') || jid.includes('@broadcast')) continue;
                     const phone = jid.split('@')[0];
+                    
+                    // Ignorar se for o próprio telefone da conexão
+                    const cleanPhone = phone.replace(/\D/g, '');
+                    if (channelPhone && (cleanPhone === channelPhone || cleanPhone.endsWith(channelPhone) || channelPhone.endsWith(cleanPhone))) {
+                        continue;
+                    }
+                    
                     if (!processedJids.has(phone)) {
                         processedJids.add(phone);
                         contactsToUpsert.push({
                             company_id: companyId,
                             phone,
-                            name: chat.pushName || chat.name || chat.verifiedName || formatPhoneDisplay(phone),
+                            name: chat.pushName || chat.pushname || chat.name || chat.verifiedName || formatPhoneDisplay(phone),
                             is_group: false,
                             updated_at: new Date().toISOString()
                         });
@@ -891,10 +912,6 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
         // CORREÇÃO: Forçar URL Pública
         const publicBase = process.env.PUBLIC_SUPABASE_URL || 'http://77.37.43.60:8000'; 
         if (publicUrl.includes('supabase-kong:8000')) {
-            publicUrl = publicUrl.replace('http://supabase-kong:8000', publicBase);
-            console.log(`[STORAGE] URL Interna corrigida para: ${publicUrl}`);
-        }
-
         console.log(`[STORAGE] Upload concluído! URL: ${publicUrl}`);
         return publicUrl;
     } catch (e) {
@@ -902,6 +919,8 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
         return null;
     }
 }
+
+const activeCreations = new Map(); // key: `${companyId}_${fromPhone}` -> Promise<conversationId>
 
 async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
     try {
@@ -911,9 +930,6 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         // Ignorar broadcasts mas permitir grupos e @lid
         if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@g.us')) return;
         const isGroup = false;
-        
-        console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
-        addDebugLog('MSG_PROCESS', `Processando mensagem: ${message.key?.id} | De: ${remoteJid} | fromMe: ${isFromMe} | Histórico: ${isHistorical}`);
         
         // extrair telefone real
         let fromPhone;
@@ -930,8 +946,27 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             fromPhone = remoteJid.split('@')[0];
         }
 
+        if (!fromPhone) return;
+
+        // Buscar dados do canal para saber o próprio número e ignorá-lo
+        const { data: channelSettings } = await supabase
+            .from('whatsapp_settings')
+            .select('phone_number')
+            .eq('id', connectionId)
+            .maybeSingle();
+        
+        const channelPhone = channelSettings?.phone_number ? channelSettings.phone_number.replace(/\D/g, '') : '';
+        const cleanFromPhone = fromPhone.replace(/\D/g, '');
+        if (channelPhone && (cleanFromPhone === channelPhone || cleanFromPhone.endsWith(channelPhone) || channelPhone.endsWith(cleanFromPhone))) {
+            console.log(`[MSG] Ignorando mensagem do próprio número da conexão: ${fromPhone}`);
+            return;
+        }
+
+        console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
+        addDebugLog('MSG_PROCESS', `Processando mensagem: ${message.key?.id} | De: ${remoteJid} | fromMe: ${isFromMe} | Histórico: ${isHistorical}`);
+
         const msgId = message.key?.id;
-        const pushName = message.pushName || message.contact?.name || message.verifiedName || null;
+        const pushName = message.pushName || message.pushname || message.contact?.name || message.verifiedName || null;
 
         // Auto-criar contato para indivíduos (não grupos)
         if (fromPhone && !isGroup) {
@@ -1000,7 +1035,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         }
 
         // --- EXTRAÇÃO ROBUSTA DE CONTEÚDO ---
-        // Função auxiliar para extrair a mensagem real de wrappers (ephemeral, viewOnce, etc)
+        // Auxiliar para extrair a mensagem real de wrappers (ephemeral, viewOnce, etc)
         const getRealMessage = (m) => {
             if (!m) return {};
             if (m.ephemeralMessage) return getRealMessage(m.ephemeralMessage.message);
@@ -1048,8 +1083,6 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             
             // DOWNLOAD E UPLOAD DE MÍDIA
             const instanceName = `conn_${connectionId}`;
-            // Passamos o 'message' original mas o 'm' (real message content) pode ser necessário dependendo da versão
-            // Na v1/v2 da Evolution, getBase64 costuma querer o 'message' completo com keys
             try {
                 const base64 = await downloadEvolutionMedia(instanceName, message, mediaType);
                 if (base64) {
@@ -1069,37 +1102,69 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         if (!text && !mediaMsg) return;
 
-        // 1. Localizar ou Criar Conversa
-        let { data: conv } = await supabase
-            .from('whatsapp_conversations')
-            .select('*')
-            .eq('company_id', companyId)
-            .eq('contact_phone', fromPhone)
-            .maybeSingle();
+        // 1. Localizar ou Criar Conversa (Evitando condições de corrida concorrente)
+        const creationKey = `${companyId}_${fromPhone}`;
+        let conv;
+        let conversationId;
+        let isNewConversation = false;
 
-        let conversationId = conv?.id;
-        if (!conv) {
-            // Se for grupo, abre direto como "aberto" (sem pendente individual)
-            const initialStatus = 'aberto';
-            const resolvedGroupName = message?.subject || 'Grupo (Sem Nome)';
-            const { data: newConv, error: createErr } = await supabase
+        if (activeCreations.has(creationKey)) {
+            conversationId = await activeCreations.get(creationKey);
+            const { data: existingConv } = await supabase
                 .from('whatsapp_conversations')
-                .insert({
-                    company_id: companyId,
-                    contact_phone: fromPhone,
-                    contact_name: isGroup ? resolvedGroupName : (pushName || formatPhoneDisplay(fromPhone)),
-                    status: initialStatus,
-                    unread_count: isHistorical ? 0 : 1,
-                    connection_id: connectionId,
-                    is_group: isGroup,
-                    last_message_at: new Date().toISOString()
-                }).select().single();
-            
-            if (createErr) throw createErr;
-            conv = newConv;
-            conversationId = newConv.id;
+                .select('*')
+                .eq('id', conversationId)
+                .single();
+            conv = existingConv;
         } else {
-            conversationId = conv.id;
+            const creationPromise = (async () => {
+                let { data: existing } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('*')
+                    .eq('company_id', companyId)
+                    .eq('contact_phone', fromPhone)
+                    .maybeSingle();
+
+                if (existing) {
+                    return existing.id;
+                }
+
+                isNewConversation = true;
+                const initialStatus = 'aberto';
+                const resolvedGroupName = message?.subject || 'Grupo (Sem Nome)';
+                const { data: newConv, error: createErr } = await supabase
+                    .from('whatsapp_conversations')
+                    .insert({
+                        company_id: companyId,
+                        contact_phone: fromPhone,
+                        contact_name: isGroup ? resolvedGroupName : (pushName || formatPhoneDisplay(fromPhone)),
+                        status: initialStatus,
+                        unread_count: isHistorical ? 0 : 1,
+                        connection_id: connectionId,
+                        is_group: isGroup,
+                        last_message_at: new Date().toISOString()
+                    }).select().single();
+                
+                if (createErr) throw createErr;
+                return newConv.id;
+            })();
+
+            activeCreations.set(creationKey, creationPromise);
+            try {
+                conversationId = await creationPromise;
+                const { data: loadedConv } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('*')
+                    .eq('id', conversationId)
+                    .single();
+                conv = loadedConv;
+            } finally {
+                activeCreations.delete(creationKey);
+            }
+        }
+
+        // Se a conversa já existia antes desta mensagem, atualiza contatos/status
+        if (conv && !isNewConversation) {
             if (!isHistorical) {
                 // Reabrir se estiver fechada
                 let nextStatus = conv.status;
@@ -1113,7 +1178,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         unread_count: isFromMe ? (conv.unread_count || 0) : ((conv.unread_count || 0) + 1), 
                         last_message_at: new Date().toISOString(),
                         status: nextStatus,
-                        contact_name: isGroup ? conv.contact_name : (pushName || conv.contact_name)
+                        contact_name: isGroup ? conv.contact_name : (pushName || conv.contact_name || formatPhoneDisplay(fromPhone))
                     }).eq('id', conversationId);
             }
         }
