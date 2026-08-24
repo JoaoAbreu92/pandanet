@@ -1,0 +1,3 @@
+--- AUTH USERS CHECK ---
+
+Error listing users: Database error finding users
