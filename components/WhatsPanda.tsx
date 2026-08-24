@@ -13,11 +13,13 @@ import Contacts from './whatspanda/Contacts';
 import NewTicket from './whatspanda/NewTicket';
 import Channels from './whatspanda/Channels';
 import Settings from './whatspanda/Settings';
+import WhatsPandaDashboard from './whatspanda/WhatsPandaDashboard';
+import { BarChart3 } from 'lucide-react';
 
 import { useAuth } from './AuthContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'privados' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
+type View = 'privados' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -61,6 +63,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     ...(permissions.can_view_chats ? [{ id: 'privados', label: 'Privados', icon: Lock, view: 'privados' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
+    ...(isAdmin ? [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3, view: 'dashboard' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
   ], [permissions.can_view_chats, permissions.can_view_contacts, permissions.can_manage_settings]);
 
@@ -106,6 +109,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
         />
       ) : null;
       case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
+      case 'dashboard': return isAdmin ? <WhatsPandaDashboard /> : null;
       case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
       default: return null;
     }

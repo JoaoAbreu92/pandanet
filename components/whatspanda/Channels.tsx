@@ -592,7 +592,11 @@ const Channels: React.FC = () => {
                                                                     </div>
                                                                     <button
                                                                         onClick={() => toggleChannelUser(channel.id, u.id, hasAccess)}
-                                                                        className={`p-1.5 rounded-lg transition-all duration-200 ${hasAccess ? 'bg-emerald-500 text-white hover:bg-red-500' : 'bg-gray-200 dark:bg-white/10 text-gray-500 hover:bg-emerald-500 hover:text-white'}`}
+                                                                        className={`p-1.5 rounded-lg transition-all duration-300 shadow-sm ${
+                                                                            hasAccess 
+                                                                                ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
+                                                                                : 'bg-gray-300 dark:bg-slate-700 text-gray-500 dark:text-gray-400 opacity-60'
+                                                                        }`}
                                                                         title={hasAccess ? 'Remover acesso' : 'Dar acesso'}
                                                                     >
                                                                         {hasAccess ? <UserMinus className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}

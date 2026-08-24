@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase } from '../../supabaseClient';
 import { 
   WhatsAppConversation, 
@@ -795,6 +797,63 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       .eq('id', conversationId);
   };
 
+  const handleExportPDF = () => {
+    if (!selectedConversation || !messages.length) return;
+
+    const doc = new jsPDF();
+    const contactName = selectedConversation.contact_name || selectedConversation.contact_phone;
+    const date = new Date().toLocaleDateString('pt-BR');
+    const time = new Date().toLocaleTimeString('pt-BR');
+
+    // Cabeçalho do PDF
+    doc.setFontSize(20);
+    doc.setTextColor(16, 185, 129); // Emerald 500
+    doc.text('Relatório de Atendimento - WhatsPanda', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Gerado em: ${date} às ${time}`, 14, 30);
+
+    // Informações do Contato
+    autoTable(doc, {
+      startY: 40,
+      head: [['Campo', 'Informação']],
+      body: [
+        ['Cliente', contactName],
+        ['Telefone', selectedConversation.contact_phone],
+        ['Canal', selectedConversation.channel?.connection_name || 'WhatsApp'],
+        ['Atendente', selectedConversation.assigned_user?.full_name || 'Não atribuído'],
+        ['Setor', selectedConversation.department?.name || 'Geral'],
+        ['Status', selectedConversation.status === 'open' ? 'Aberto' : 'Finalizado'],
+      ],
+      theme: 'striped',
+      headStyles: { fillColor: [16, 185, 129] },
+    });
+
+    // Histórico de Mensagens
+    const messageBody = messages.map(msg => [
+      new Date(msg.created_at).toLocaleString('pt-BR'),
+      msg.is_from_customer ? 'Cliente' : 'Atendente',
+      msg.message_text || (msg.media_url ? '[Arquivo/Mídia]' : '')
+    ]);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 15,
+      head: [['Data/Hora', 'Remetente', 'Mensagem']],
+      body: messageBody,
+      theme: 'grid',
+      headStyles: { fillColor: [100, 116, 139] }, // Slate 500
+      columnStyles: {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 'auto' }
+      },
+      styles: { fontSize: 9 }
+    });
+
+    doc.save(`atendimento-${contactName}-${date}.pdf`);
+  };
+
   const fetchContactNotes = async (conversationId: string) => {
     const { data } = await supabase
       .from('whatsapp_contact_notes')
@@ -1511,6 +1570,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     <div className="flex gap-2 items-center">
                       <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-1" />
                       <div className="flex gap-1.5">
+                {isAdmin && (
+                  <button
+                    onClick={handleExportPDF}
+                    className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+                    title="Exportar Relatório PDF"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={() => setShowContactSidebar(!showContactSidebar)}
                   className={`p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
