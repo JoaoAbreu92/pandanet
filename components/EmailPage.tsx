@@ -25,7 +25,7 @@ import {
     ArrowRightOnRectangleIcon,
     ExclamationTriangleIcon, XMarkIcon,
     PaperClipIcon, ArrowDownTrayIcon,
-    Bars3Icon, ChevronDownIcon, ChevronRightIcon
+    Bars3Icon, ChevronDownIcon, ChevronRightIcon, CheckIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
@@ -771,8 +771,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             if (filterTag && !isSearchingGlobal) {
                 const { data: allMeta } = await supabase.from('email_metadata').select('id, message_id, tags, notes').eq('user_id', currentUser.id);
                 const taggedIds = (allMeta || [])
-                    .filter(m => Array.isArray(m.tags) && m.tags.some((t: any) => t.label === filterTag))
-                    .map(m => m.message_id);
+                    .filter(m => Array.isArray(m.tags) && m.tags.some((t: any) => t.label?.toLowerCase() === filterTag?.toLowerCase()))
+                    .map(m => m.message_id)
+                    .filter(Boolean);
 
                 if (taggedIds.length === 0) {
                     setEmails([]);
@@ -1083,8 +1084,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // --- Helpers ---
 
-    const handleAddTag = async (email: EmailMessage, label: string, color: string) => {
-        const newTags = [...(email.metadata?.tags || []), { label, color }];
+    const handleToggleTag = async (email: EmailMessage, label: string, color: string) => {
+        const currentTags = email.metadata?.tags || [];
+        const hasTag = currentTags.some(t => t.label === label);
+        
+        let newTags;
+        if (hasTag) {
+            newTags = currentTags.filter(t => t.label !== label);
+        } else {
+            newTags = [...currentTags, { label, color }];
+        }
 
         // Optimistic Update
         const updatedEmails = emails.map(e => e.uid === email.uid ? { ...e, metadata: { ...e.metadata, tags: newTags } } : e);
@@ -1115,7 +1124,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         const matchesSearch =
             subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
             from.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesTag = filterTag ? (email.metadata?.tags || []).some(t => t.label === filterTag) : true;
+        const matchesTag = filterTag ? (email.metadata?.tags || []).some(t => t.label?.toLowerCase() === filterTag?.toLowerCase()) : true;
         return matchesSearch && matchesTag;
     });
 
@@ -1433,11 +1442,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 {availableTags.length > 0 ? availableTags.map(tag => (
                                     <button
                                         key={tag.id}
-                                        onClick={() => { handleAddTag(contextMenu.email, tag.label, tag.color); closeContextMenu(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                                        onClick={() => { handleToggleTag(contextMenu.email, tag.label, tag.color); closeContextMenu(); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-between transition-colors"
                                     >
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
-                                        {tag.label}
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
+                                            {tag.label}
+                                        </div>
+                                        {(contextMenu.email.metadata?.tags || []).some(t => t.label === tag.label) && (
+                                            <CheckIcon className="w-4 h-4 text-emerald-500" />
+                                        )}
                                     </button>
                                 )) : (
                                         <div className="px-4 py-2 text-xs text-gray-400 italic">{t('email.no_tags')}</div>
