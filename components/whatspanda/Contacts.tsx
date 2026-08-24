@@ -330,7 +330,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1e2335]">
+                        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#11141d]">
                             {[
                                 { id: 'dados', label: 'DADOS CONTATO', icon: User },
                                 { id: 'kanban', label: 'KANBAN', icon: LayoutGrid },
@@ -493,7 +493,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                             </button>
                             <button 
                                 onClick={handleSave}
-                                className="px-8 py-2.5 bg-[#161a27] dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all border border-gray-700 dark:border-transparent shadow-lg"
+                                className="px-8 py-2.5 bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all shadow-lg"
                             >
                                 <Check className="w-4 h-4" /> {editingContact ? 'Salvar Alterações' : 'Criar Contato'}
                             </button>

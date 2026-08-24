@@ -308,14 +308,18 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         contactsMap[jid] = name;
                         
                         // Upsert contact com empresa garantida e atualização de campos
-                        const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
+                        const { data: upsertData, error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
                             company_id: companyId,
                             phone: phone,
                             name: name,
                             updated_at: new Date().toISOString()
-                        }, { onConflict: 'company_id,phone' });
+                        }, { onConflict: 'company_id,phone' }).select();
                         
-                        if (upsertErr) console.error('[SYNC] Erro upsert contato:', upsertErr.message);
+                        if (upsertErr) {
+                            console.error('[SYNC] Erro upsert contato:', upsertErr.message, upsertErr.details);
+                        } else {
+                            console.log(`[SYNC] Contato ${name} (${phone}) sincronizado com sucesso.`);
+                        }
                     }
                 }
             }
