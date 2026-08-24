@@ -1421,7 +1421,7 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
 
         const cx = 256;
         const cy = 256;
-        const outerRadius = 220; 
+        const outerRadius = 190; 
         const innerRadius = outerRadius - ringThickness;
 
         // 1. Draw Glow Shadow using canvas shadow API
@@ -1438,6 +1438,35 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
             ctx.closePath();
             ctx.fillStyle = color2;
             ctx.fill();
+            ctx.restore();
+        }
+
+        // 1.5. Draw connecting bridge between ring and badge frame
+        if (showBadgeFrame) {
+            const bx = 458;
+            const by = 458;
+            ctx.save();
+            if (glowBlur > 0) {
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = glowBlur;
+            }
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(bx, by);
+            ctx.strokeStyle = color2;
+            ctx.lineWidth = ringThickness * 0.8;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(bx, by);
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = ringThickness * 0.8 + borderWidth;
+            ctx.lineCap = 'round';
+            ctx.stroke();
             ctx.restore();
         }
 

@@ -153,7 +153,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     return (
       <div className={`relative inline-block select-none ${sizeClasses[size]} ${className}`}>
         {/* Avatar interno com preenchimento para caber dentro da moldura */}
-        <div className="absolute inset-0 flex items-center justify-center p-[10%]">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ padding: '16.5%' }}>
           {renderInnerAvatar()}
         </div>
         
