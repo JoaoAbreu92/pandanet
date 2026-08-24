@@ -545,15 +545,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         console.log(`[UserManager] Iniciando backup e deleção: ${userName} (${userId})`);
 
         try {
-            const pdfSuccess = await generatePDFHistory(userId, userName);
-
-            if (!pdfSuccess) {
-                if (!window.confirm("Não foi possível gerar o PDF automaticamente. Deseja prosseguir com a exclusão definitiva mesmo assim?")) {
-                    return;
-                }
-            }
-
-            console.log("[UserManager] Deletando no Supabase...");
+            console.log(`[UserManager] Deletando usuário no Supabase: ${userId}`);
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
 
             if (error) {
@@ -566,7 +558,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             alert("Usuário excluído com sucesso.");
         } catch (err: any) {
             console.error("[UserManager] Erro fatal:", err);
-            alert("Erro ao excluir: " + (err.message || "Verifique o console"));
+            alert("Erro ao excluir: " + (err.message || "Erro desconhecido."));
         }
     };
 
