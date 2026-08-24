@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RocketLaunchIcon, PlayCircleIcon, XMarkIcon } from './icons';
-import { supabase, getCleanImageUrl } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import { useToast } from './ToastContext';
@@ -109,7 +109,7 @@ const TrainingPage: React.FC = () => {
                         participants: t.participants || [],
                         startDate: t.start_date || '',
                         endDate: t.end_date || '',
-                        pdfUrl: t.pdf_url || '',
+                        pdfUrl: getCleanImageUrl(t.pdf_url),
                         quiz: t.quiz || []
                     }));
 
@@ -298,14 +298,12 @@ const TrainingPage: React.FC = () => {
                             <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-xl space-y-4 border dark:border-white/5">
                                 <h3 className="font-bold text-gray-900 dark:text-white">Material de Apoio</h3>
                                 {selectedTraining.pdfUrl ? (
-                                    <a
-                                        href={selectedTraining.pdfUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 shadow transition-colors text-sm"
+                                    <button
+                                        onClick={() => downloadFile(selectedTraining.pdfUrl!, selectedTraining.title || 'material_apoio')}
+                                        className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 shadow transition-colors text-sm cursor-pointer"
                                     >
-                                        <span>Acessar Material de Apoio</span>
-                                    </a>
+                                        <span>Baixar Material de Apoio</span>
+                                    </button>
                                 ) : (
                                     <p className="text-sm text-gray-500">Nenhum material de apoio disponível.</p>
                                 )}

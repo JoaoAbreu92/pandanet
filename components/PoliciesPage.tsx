@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheckIcon, DocumentTextIcon, ArrowDownTrayIcon } from './icons';
 import type { ResourceDocument } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
@@ -35,7 +35,7 @@ const PoliciesPage: React.FC = () => {
                         title: doc.title,
                         category: doc.category,
                         type: doc.type as any,
-                        url: doc.url,
+                        url: getCleanImageUrl(doc.url),
                         updatedAt: new Date(doc.created_at).toISOString().split('T')[0]
                     }));
                     setPolicies(formattedPolicies);
@@ -71,9 +71,13 @@ const PoliciesPage: React.FC = () => {
                                     <h3 className="font-semibold text-gray-900 truncate">{policy.title}</h3>
                                     <p className="text-sm text-gray-500 truncate">{policy.category} • {new Date(policy.updatedAt).toLocaleDateString('pt-BR')} • {policy.type}</p>
                                 </div>
-                                <a href={policy.url} target="_blank" rel="noreferrer" className="p-2 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-lg transition-all ml-2 flex-shrink-0" title={t('policies.download')}>
+                                <button
+                                    onClick={() => downloadFile(policy.url, policy.title || 'documento')}
+                                    className="p-2 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-lg transition-all ml-2 flex-shrink-0 cursor-pointer"
+                                    title={t('policies.download')}
+                                >
                                     <ArrowDownTrayIcon className="w-5 h-5" />
-                                </a>
+                                </button>
                             </div>
                         ))
                     ) : (
