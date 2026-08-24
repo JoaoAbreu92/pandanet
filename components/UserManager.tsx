@@ -304,30 +304,26 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
 
         try {
             if ('id' in userData && userData.id.length > 15) { // UUID is long, local id (Date.now()) is shorter
-                // UPDATE
-                const { error } = await supabase
-                    .from('profiles')
-                    .update({
-                        full_name: userData.name,
-                        email: userData.email,
-                        role: userData.role,
-                        team: userData.team,
-                        is_admin: userData.isAdmin,
-                        is_company_admin: userData.isAdmin,
-                        permissions: userData.permissions,
-                        avatar_url: userData.avatarUrl || null,
-                        department_id: (userData as any).department_id || null,
-                        rg: (userData as any).rg || null,
-                        cpf: (userData as any).cpf || null,
-                        emergency_contact_name: (userData as any).emergency_contact_name || null,
-                        emergency_contact_phone: (userData as any).emergency_contact_phone || null,
-                        health_insurance: (userData as any).health_insurance || null,
-                        blood_type: (userData as any).blood_type || null,
-                        marital_status: (userData as any).marital_status || null,
-                        education_level: (userData as any).education_level || null,
-                        status: 'active'
-                    })
-                    .eq('id', userData.id);
+                // UPDATE via RPC (SECURITY DEFINER) to bypass RLS auth context issue
+                const { data: updateResult, error } = await supabase.rpc('update_user_profile', {
+                    p_user_id: userData.id,
+                    p_full_name: userData.name,
+                    p_role: userData.role,
+                    p_team: userData.team,
+                    p_department_id: (userData as any).department_id || null,
+                    p_is_admin: userData.isAdmin,
+                    p_is_company_admin: userData.isAdmin,
+                    p_permissions: userData.permissions,
+                    p_avatar_url: userData.avatarUrl || null,
+                    p_rg: (userData as any).rg || null,
+                    p_cpf: (userData as any).cpf || null,
+                    p_emergency_contact_name: (userData as any).emergency_contact_name || null,
+                    p_emergency_contact_phone: (userData as any).emergency_contact_phone || null,
+                    p_health_insurance: (userData as any).health_insurance || null,
+                    p_blood_type: (userData as any).blood_type || null,
+                    p_marital_status: (userData as any).marital_status || null,
+                    p_education_level: (userData as any).education_level || null
+                });
 
                 if (error) throw error;
                 setUsers(users.map(u => u.id === userData.id ? userData : u));
