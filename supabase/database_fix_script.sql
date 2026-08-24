@@ -620,12 +620,28 @@ BEGIN
         SELECT tablename 
         FROM pg_tables 
         WHERE schemaname = 'public' 
-        AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings')
+        AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings', 'email_settings')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I', t);
-        EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
-                        USING (company_id = get_user_company_id()) 
-                        WITH CHECK (company_id = get_user_company_id())', t);
+        
+        -- Apenas criar política se a tabela possuir a coluna company_id
+        IF EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+              AND table_name = t 
+              AND column_name = 'company_id'
+        ) THEN
+            EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
+                            USING (company_id = public.get_user_company_id() OR EXISTS (
+                                SELECT 1 FROM public.profiles 
+                                WHERE id = auth.uid() AND is_admin = TRUE
+                            )) 
+                            WITH CHECK (company_id = public.get_user_company_id() OR EXISTS (
+                                SELECT 1 FROM public.profiles 
+                                WHERE id = auth.uid() AND is_admin = TRUE
+                            ))', t);
+        END IF;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -636,14 +652,14 @@ SELECT apply_tenant_policies();
 
 -- PROFILES: Users can view everyone in their company, but only update themselves.
 DROP POLICY IF EXISTS profile_view_policy ON public.profiles;
-CREATE POLICY profile_view_policy ON public.profiles FOR SELECT USING (company_id = get_user_company_id());
+CREATE POLICY profile_view_policy ON public.profiles FOR SELECT USING (company_id = public.get_user_company_id());
 
 DROP POLICY IF EXISTS profile_update_policy ON public.profiles;
 CREATE POLICY profile_update_policy ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
 -- COMPANIES: Admins can view/edit their own company.
 DROP POLICY IF EXISTS company_view_policy ON public.companies;
-CREATE POLICY company_view_policy ON public.companies FOR SELECT USING (id = get_user_company_id());
+CREATE POLICY company_view_policy ON public.companies FOR SELECT USING (id = public.get_user_company_id());
 
 --------------------------------------------------------------------------------
 -- 10. RPC FUNCTIONS
