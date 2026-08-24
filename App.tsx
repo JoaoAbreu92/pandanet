@@ -101,6 +101,20 @@ const AppContent: React.FC = () => {
                         });
                         setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
                     }
+                } else if (profile.email === 'ti@acrilight.com.br') {
+                    // Fallback for Master Admin if profile is not linked yet
+                    const { data: company } = await supabase
+                        .from('companies')
+                        .select('*, plan:plans(*)')
+                        .eq('domain', 'grupopixel.com.br')
+                        .single();
+
+                    if (company) {
+                        const mappedCompany = company as unknown as Company;
+                        setCurrentCompany(mappedCompany);
+                        setCompanyData(mappedCompany.data || { employees: [] } as any);
+                        setCompanySettings(mappedCompany.settings || { companyName: 'Grupo Pixel' });
+                    }
                 }
             } else {
                 setCurrentUser(null);
@@ -417,11 +431,12 @@ const AppContent: React.FC = () => {
             if (!session.user.email) return;
 
             // 1. Find Company
-            const domain = session.user.email.split('@')[1];
-            // Search by domain OR search by responsible email (for master admins)
+            const isMaster = session.user.email.toLowerCase() === 'ti@acrilight.com.br';
+            const domain = isMaster ? 'grupopixel.com.br' : session.user.email.split('@')[1];
+
             const { data: companies } = await supabase.from('companies')
                 .select('id, responsible_email')
-                .or(`domain.ilike.${domain},responsible_email.eq.${session.user.email}`);
+                .eq('domain', domain);
 
             if (companies && companies.length > 0) {
                 const companyId = companies[0].id;
