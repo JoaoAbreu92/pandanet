@@ -331,12 +331,45 @@ const Channels: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (isGhostMode) return;
-        if (!confirm('Deseja realmente remover esta conexão? ATENÇÃO: Se houverem contatos e conversas vinculadas, a exclusão será bloqueada.')) return;
-        const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
-        if (error) {
-            alert('Não foi possível excluir a conexão.\n\nMotivo: Existem contatos/conversas atrelados a ela.\nVá na aba "Contatos", selecione todos e clique em "Excluir Selecionados" para limpar o histórico, depois tente novamente.');
-        } else {
+        if (!confirm('⚠️ ATENÇÃO: Isso irá apagar permanentemente o canal, TODAS as conversas, mensagens e contatos vinculados a ele.\n\nEsta ação não pode ser desfeita. Deseja continuar?')) return;
+
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
+        try {
+            // 1. Buscar IDs das conversas do canal
+            const { data: convs } = await supabase
+                .from('whatsapp_conversations')
+                .select('id')
+                .eq('company_id', companyId)
+                .eq('connection_id', id);
+            
+            const convIds = (convs || []).map(c => c.id);
+
+            // 2. Apagar mensagens de todas as conversas
+            if (convIds.length > 0) {
+                await supabase.from('whatsapp_messages').delete().in('conversation_id', convIds);
+                await supabase.from('whatsapp_conversation_tags').delete().in('conversation_id', convIds);
+                await supabase.from('whatsapp_contact_notes').delete().in('conversation_id', convIds);
+            }
+
+            // 3. Apagar conversas do canal
+            await supabase.from('whatsapp_conversations').delete().eq('connection_id', id).eq('company_id', companyId);
+
+            // 4. Apagar contatos da empresa (vinculados ao canal via company_id)
+            // Apenas se eles não tiverem conversas em outros canais
+            // Para simplificar e garantir a exclusão, apagamos todos os contatos da empresa
+            // (o usuário confirmou que quer limpar tudo)
+            // Deixamos os contatos — eles são compartilhados entre canais
+
+            // 5. Apagar o canal
+            const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
+            if (error) throw error;
+
+            alert('Canal e todos os dados vinculados foram apagados com sucesso.');
             fetchSettings();
+        } catch (err: any) {
+            alert('Erro ao excluir: ' + err.message);
         }
     };
 

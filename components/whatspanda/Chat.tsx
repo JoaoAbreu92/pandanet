@@ -1409,31 +1409,60 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               )}
             </div>
           )}
+          {isAdmin && !isGhostMode && (activeTab === 'aguardando' || activeTab === 'meus') && filteredConversations.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!confirm(`Deseja fechar TODOS os ${filteredConversations.length} atendimentos visíveis?\n\nEles irão para a aba "Fechados".`)) return;
+                try {
+                  const ids = filteredConversations.map(c => c.id);
+                  const { error } = await supabase
+                    .from('whatsapp_conversations')
+                    .update({ status: 'fechado' })
+                    .in('id', ids);
+                  if (error) throw error;
+                  setConversations([]);
+                  setSelectedConversation(null);
+                } catch (err: any) {
+                  alert('Erro: ' + err.message);
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-400 rounded-lg transition-colors border border-amber-100 dark:border-amber-500/20"
+            >
+              ✓ FECHAR TODOS OS TICKETS ({filteredConversations.length})
+            </button>
+          )}
           {isAdmin && activeTab === 'fechados' && (
             <button
               onClick={async () => {
                   if (isGhostMode) return;
+                  if (!confirm('Apagar permanentemente todos os atendimentos fechados?\n\nEsta ação não pode ser desfeita.')) return;
                   try {
                     const companyId = currentUser?.company_id;
                     if (!companyId) return;
 
-                    const { error } = await supabase
+                    const { data: closedConvs } = await supabase
                       .from('whatsapp_conversations')
-                      .delete()
+                      .select('id')
                       .eq('company_id', companyId)
                       .eq('status', 'fechado');
                     
-                    if (error) throw error;
+                    const ids = (closedConvs || []).map(c => c.id);
+                    if (ids.length > 0) {
+                      await supabase.from('whatsapp_messages').delete().in('conversation_id', ids);
+                      await supabase.from('whatsapp_conversation_tags').delete().in('conversation_id', ids);
+                      await supabase.from('whatsapp_contact_notes').delete().in('conversation_id', ids);
+                      await supabase.from('whatsapp_conversations').delete().in('id', ids);
+                    }
                     setConversations([]);
                     setSelectedConversation(null);
-                    alert('Atendimentos fechados limpos com sucesso.');
+                    alert('Atendimentos fechados apagados com sucesso.');
                   } catch (err: any) {
                     alert('Erro ao limpar: ' + err.message);
                   }
               }}
               className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
             >
-              LIMPAR ATENDIMENTOS (FECHADOS)
+              🗑 APAGAR PERMANENTEMENTE (FECHADOS)
             </button>
           )}
         </div>
