@@ -448,6 +448,20 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 {day && (
                                     <>
                                          <span className={`text-sm font-black absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-lg transition-all ${isToday ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'}`}>{day.getDate()}</span>
+                                         {(() => {
+                                             const hasPendingInvite = evs.some(e => 
+                                                 e.invites?.some(inv => inv.user_id === currentUser?.id && inv.status === 'pending')
+                                             );
+                                             if (hasPendingInvite) {
+                                                 return (
+                                                     <div className="absolute top-2 left-9 flex h-2 w-2" title="Você tem um convite pendente para este dia!">
+                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                                     </div>
+                                                 );
+                                             }
+                                             return null;
+                                         })()}
                                         <div className="mt-8 space-y-1 overflow-y-auto max-h-[calc(100%-2rem)]">
                                             {evs.map(e => (
                                                 <button key={e.id} onClick={() => { setSelectedEvent(e); setDetailModalOpen(true); }} className={`w-full text-left p-1.5 rounded-lg text-[9px] font-bold truncate border shadow-sm transition-all hover:scale-[1.02] ${getCategoryColor(e.category)}`}>

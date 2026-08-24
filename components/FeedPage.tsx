@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
+import { triggerEmojiAnimation } from './utils/emojiAnimation';
 import RecognitionWidget from './RecognitionWidget';
 import RecognitionModal from './RecognitionModal';
 import { supabase } from '../supabaseClient';
@@ -84,7 +85,7 @@ export const PostCard: React.FC<{
     const isAuthor = currentUser.id === post.authorId;
 
     return (
-        <Card title="" className="pb-2 overflow-visible">
+        <Card title="" className="pb-2 overflow-visible no-hover-transform">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
                     <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
@@ -142,13 +143,23 @@ export const PostCard: React.FC<{
                 <div onMouseEnter={isGhostMode ? undefined : handleMouseEnter} onMouseLeave={isGhostMode ? undefined : handleMouseLeave} className="flex-1">
                     <button 
                         disabled={isGhostMode}
+                        onClick={(e) => {
+                            if (isGhostMode) return;
+                            const myReaction = post.reactions.find(r => r.userId === currentUser.id);
+                            if (myReaction) {
+                                onToggleReaction(post.id, myReaction.emoji);
+                            } else {
+                                triggerEmojiAnimation('👍', e);
+                                onToggleReaction(post.id, '👍');
+                            }
+                        }}
                         className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
                         <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
                             {reactions.map(emoji => (
-                                <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform duration-200 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
+                                <button key={emoji} onClick={(e) => { triggerEmojiAnimation(emoji, e); onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform duration-200 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
                                     {emoji}
                                 </button>
                             ))}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { triggerEmojiAnimation } from './utils/emojiAnimation';
 import {
     FaceSmileIcon,
     PaperClipIcon,
@@ -231,7 +232,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                             {availableReactions.map(emoji => (
                                 <button
                                     key={emoji}
-                                    onClick={() => handleReact(message.id as string, emoji)}
+                                    onClick={(e) => {
+                                        triggerEmojiAnimation(emoji, e);
+                                        handleReact(message.id as string, emoji);
+                                    }}
                                     className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-gray-100 rounded-full"
                                 >
                                     {emoji}

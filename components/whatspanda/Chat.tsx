@@ -53,6 +53,7 @@ import { useAuth } from '../AuthContext';
 import { useNotifications } from '../NotificationContext';
 import ContactSidebar from './ContactSidebar';
 import KanbanBoard from './KanbanBoard';
+import { triggerEmojiAnimation } from '../utils/emojiAnimation';
 
 interface ChatProps {
   onConversationSelect?: (isActive: boolean) => void;
@@ -774,6 +775,36 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     
     if (data) setMessages(data);
     setLoadingMessages(false);
+  };
+
+  const handleReactWhatsApp = async (messageId: string, emoji: string, event: React.MouseEvent) => {
+    if (isGhostMode) return;
+    triggerEmojiAnimation(emoji, event);
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+    const currentReactions = Array.isArray(msg.reactions) ? msg.reactions : [];
+    const userName = currentUser?.name || profile?.full_name || 'Usuário';
+    const userReactionIndex = currentReactions.findIndex((r: any) => r.user === userName);
+    let newReactions = [...currentReactions];
+    if (userReactionIndex > -1) {
+      if (newReactions[userReactionIndex].emoji === emoji) {
+        newReactions.splice(userReactionIndex, 1);
+      } else {
+        newReactions[userReactionIndex].emoji = emoji;
+      }
+    } else {
+      newReactions.push({ emoji, user: userName });
+    }
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions: newReactions } : m));
+    try {
+      const { error } = await supabase
+        .from('whatsapp_messages')
+        .update({ reactions: newReactions })
+        .eq('id', messageId);
+      if (error) console.error('Erro ao salvar reação no banco:', error);
+    } catch (err) {
+      console.error('Erro ao salvar reação:', err);
+    }
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
@@ -1683,8 +1714,23 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
+                  className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'} group relative`}
                 >
+                  {!isGhostMode && (
+                    <div className={`absolute top-0 -mt-8 flex items-center bg-white dark:bg-slate-800 shadow-lg rounded-full border border-slate-200 dark:border-white/5 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${msg.is_from_customer ? 'left-4' : 'right-4'}`}>
+                      <div className="flex items-center p-1 space-x-0.5">
+                        {['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'].map(emoji => (
+                          <button
+                            key={emoji}
+                            onClick={(e) => handleReactWhatsApp(msg.id, emoji, e)}
+                            className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-slate-100 dark:hover:bg-white/10 rounded-full"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div
                     className={`p-3 md:p-4 rounded-2xl shadow-sm border ${
                       msg.is_from_customer
@@ -1813,6 +1859,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         <Share2 className="w-3 h-3 text-slate-400" />
                       </button>
                     </div>
+                    {msg.reactions && Array.isArray(msg.reactions) && msg.reactions.length > 0 && (
+                      <div className={`flex gap-1 mt-1.5 flex-wrap ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}>
+                        {msg.reactions.map((r: any, i: number) => (
+                          <span 
+                            key={i} 
+                            className="text-xs bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full cursor-pointer hover:scale-105 transition-transform select-none" 
+                            title={r.user}
+                          >
+                            {r.emoji}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
