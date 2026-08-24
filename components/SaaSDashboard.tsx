@@ -1256,6 +1256,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             <span>{t('dashboard.capacity')} <strong>{plan.userLimit} {t('dashboard.users_plural')}</strong></span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                            <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-500" />
+                                            <span>Limite WhatsApp: <strong>{plan.whatsappLimit || 1} canais</strong></span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                             <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
                                             <span>{Object.values(plan.features || {}).filter(v => v === true).length} {t('dashboard.active_features')}</span>
                                         </div>

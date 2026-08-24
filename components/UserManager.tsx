@@ -128,6 +128,7 @@ const UserFormModal: React.FC<{
         education_level: user?.education_level || '',
         can_nudge: user?.can_nudge ?? true,
         nudge_cooldown: user?.nudge_cooldown ?? 30,
+        is_whatsapp_agent: user?.is_whatsapp_agent ?? false,
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,6 +263,25 @@ const UserFormModal: React.FC<{
                                     </div>
                                 </div>
                             </section>
+
+                            {/* Grupo: WhatsPanda */}
+                            <section className="bg-emerald-50/50 p-4 rounded-2xl border border-blue-100">
+                                <h5 className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <ChatBubbleLeftRightIcon className="w-3 h-3" /> WhatsPanda (Atendimento)
+                                </h5>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <PermissionToggle 
+                                        icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} 
+                                        label="Agente WhatsPanda" 
+                                        name="is_whatsapp_agent" 
+                                        checked={formData.is_whatsapp_agent} 
+                                        onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                    />
+                                    <div className="p-3 bg-white/50 rounded-xl border border-dashed border-blue-200 flex items-center">
+                                        <p className="text-[10px] text-gray-500 leading-tight">Define se o usuário aparece como agente disponível para atendimento no WhatsPanda.</p>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </div>
 
@@ -355,8 +375,22 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_marital_status: (userData as any).marital_status || null,
                     p_education_level: (userData as any).education_level || null,
                     p_can_nudge: !!(userData as any).can_nudge,
-                    p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30
+                    p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
+                    p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent
                 });
+
+                // Manual password update if field is provided
+                if ((userData as any).password) {
+                    console.log("[UserManager] Updating password manually...");
+                    const { error: resetError } = await supabase.rpc('admin_reset_user_password', {
+                        p_user_id: userData.id,
+                        p_new_password: (userData as any).password
+                    });
+                    if (resetError) {
+                        console.error("Password Reset Error during save:", resetError);
+                        alert("Perfil atualizado, mas erro ao mudar senha: " + resetError.message);
+                    }
+                }
 
                 if (error) {
                     console.error("RPC Update Error:", error);
@@ -388,7 +422,8 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_rg: (userData as any).rg || null,
                         p_cpf: (userData as any).cpf || null,
                         p_can_nudge: !!(userData as any).can_nudge,
-                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30
+                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) ?? 30,
+                        p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent
                     });
 
                     if (error) {

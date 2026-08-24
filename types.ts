@@ -280,6 +280,7 @@ export interface Employee {
   use_whatsapp_signature?: boolean;
   can_nudge?: boolean;
   nudge_cooldown?: number; // In seconds
+  is_whatsapp_agent?: boolean;
 }
 
 export interface AIMessage {
