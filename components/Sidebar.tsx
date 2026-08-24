@@ -28,7 +28,8 @@ import {
     PlayIcon,
     ChartBarIcon,
     BanknotesIcon,
-    CurrencyDollarIcon
+    CurrencyDollarIcon,
+    ClipboardDocumentCheckIcon
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
@@ -244,6 +245,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
+                <NavItem page="projects" label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
 
                 <hr className="my-2 border-gray-100 dark:border-slate-800" />
 

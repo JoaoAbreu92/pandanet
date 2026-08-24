@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewTiDashboard: true, openTickets: true, openTiRequests: true,
                             viewTraining: true, viewSurveys: true, viewPolicies: true,
                             viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                            createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true,
+                            createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true, viewProjects: true,
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
                             viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
@@ -143,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     viewTiDashboard: true, openTickets: true, openTiRequests: true,
                     viewTraining: true, viewSurveys: true, viewPolicies: true,
                     viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                    createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true,
+                    createEvents: true, manageMarketplace: true, viewEmail: true, viewWhatsPanda: true, viewProjects: true,
                     viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                     viewVacationRequests: true, manageVacationRequests: true,
                     viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true

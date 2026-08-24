@@ -41,13 +41,8 @@ export type Page =
   | 'org-chart'
   | 'kpi-dashboard'
   | 'job-manager'
-  | 'whatspanda'
   | 'manual-usuario'
-  | 'org-chart'
-  | 'kpi-dashboard'
-  | 'job-manager'
-  | 'whatspanda'
-  | 'manual-usuario';
+  | 'projects';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -214,6 +209,7 @@ export interface EmployeePermissions {
   createEvents: boolean;
   manageMarketplace: boolean;
   viewWhatsPanda: boolean;
+  viewProjects: boolean;
 
   // AI Assistant Config
   ai_assistant: boolean;

@@ -38,7 +38,8 @@ import {
     SparklesIcon,
     NewspaperIcon,
     PlayIcon,
-    PlayCircleIcon
+    PlayCircleIcon,
+    ClipboardDocumentCheckIcon
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon, ChatBubbleLeftRightIcon as HeroChatBubbleLeftRightIcon, MegaphoneIcon as HeroMegaphoneIcon, ArrowRightOnRectangleIcon as HeroArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { Ghost } from 'lucide-react';
@@ -995,6 +996,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Módulo CRM (Perfex)" id="crm" icon={BuildingOfficeIcon} />
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
+                <Toggle label="Gestão de Projetos" id="projects" icon={ClipboardDocumentCheckIcon} />
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />
                 <Toggle label="WhatsPanda (CRM)" id="whatspanda" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Assistente IA (Panda)" id="ai_assistant" icon={SparklesIcon} />

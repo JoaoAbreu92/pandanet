@@ -50,6 +50,7 @@ import AICorrector from './components/AICorrector';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
 import PersonalNotesPage from './components/PersonalNotesPage';
+import ProjectsPage from './components/ProjectsPage';
 
 
 const AppContent: React.FC = () => {
@@ -615,7 +616,8 @@ const AppContent: React.FC = () => {
             'viewMeuRH': 'meu-rh',
             'viewDirectory': 'org-chart',
             'viewInfoSec': 'infosec',
-            'viewKPIDashboard': 'kpis'
+            'viewKPIDashboard': 'kpis',
+            'viewProjects': 'projects'
         };
 
         const featureId = featureMap[permission];
@@ -665,6 +667,7 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
+            case 'projects': return canAccess('viewProjects') ? <ProjectsPage /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;

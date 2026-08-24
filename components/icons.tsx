@@ -92,4 +92,7 @@ export {
   PhoneIcon,
   GlobeAsiaAustraliaIcon,
   QueueListIcon,
+  ArrowLeftIcon,
+  ListBulletIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';

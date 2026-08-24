@@ -133,6 +133,7 @@ const UserFormModal: React.FC<{
             canPostText: true,
             canPostImage: true,
             canPostVideo: true,
+            viewProjects: true,
         },
         // Personal Data
         rg: user?.rg || '',
@@ -242,6 +243,7 @@ const UserFormModal: React.FC<{
                                     <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Reconhecimentos" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Gestão de Projetos" name="viewProjects" checked={formData.permissions.viewProjects} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                 </div>
