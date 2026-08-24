@@ -879,7 +879,7 @@ router.post('/sync-history/:companyId/:connectionId', authMiddleware, async (req
         const instanceName = `conn_${connectionId}`;
         
         // Disparar sincronização de histórico em background
-        syncEvolutionData(instanceName, companyId, connectionId).catch(err => {
+        syncEvolutionData(instanceName, companyId, connectionId, startDate, endDate).catch(err => {
             console.error(`[SYNC-HISTORY-API] Erro em background para ${instanceName}:`, err.message);
         });
         
@@ -1348,14 +1348,17 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
 
             try {
                 const { data, error } = await supabase.storage.from(bucket).download(filePath);
-                if (!error && data) {
+                if (error) {
+                    console.error(`[MEDIA-PROXY] Supabase SDK retornou erro no download: ${error.message}`);
+                }
+                if (data) {
                     const arrayBuffer = await data.arrayBuffer();
                     fileBuffer = Buffer.from(arrayBuffer);
                     if (data.type) contentType = data.type;
                     console.log(`[MEDIA-PROXY] Download via Supabase SDK OK (${fileBuffer.length} bytes)`);
                 }
             } catch (e) {
-                console.warn(`[MEDIA-PROXY] Supabase SDK download falhou: ${e.message}`);
+                console.error(`[MEDIA-PROXY] Supabase SDK download falhou com exceção: ${e.message}`);
             }
 
             // 2. Se o SDK falhou, tentar lista de URLs candidatas (Docker interno + público)
@@ -1420,7 +1423,7 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
         }
 
         if (!fileBuffer) {
-            console.error(`[MEDIA-PROXY] Todas as tentativas de buscar o arquivo falharam para ${rawUrl}`);
+            console.error(`[MEDIA-PROXY] Todas as tentativas de buscar o arquivo falharam para ${rawUrl}. URL decodificada: ${rawUrl}`);
             return res.status(404).json({ error: 'Arquivo não encontrado ou inacessível no servidor.' });
         }
 
@@ -1497,7 +1500,7 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 // WEBHOOKS DA EVOLUTION API E SYNC
 // ============================================
 
-async function syncEvolutionData(instanceName, companyId, connectionId) {
+async function syncEvolutionData(instanceName, companyId, connectionId, startDate = null, endDate = null) {
     try {
         console.log(`[SYNC] Iniciando sincronização total para ${instanceName}...`);
         
@@ -1657,7 +1660,17 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                             addDebugLog('SYNC_GROUP_INSERT_ERR', `Erro ao importar grupo ${groupName}: ${insertErr.message}`);
                         } else {
                             console.log(`[SYNC] Grupo importado com sucesso: ${groupName} (${phone})`);
+                            
+                            // Se for sincronização de histórico por data, importar mensagens
+                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
+                            if (createdConv?.data && startDate && endDate) {
+                                console.log(`[SYNC] Importando mensagens do grupo recém-criado: ${groupName}`);
+                                await importHistoricalMessages(createdConv.data, instanceName, startDate, endDate);
+                            }
                         }
+                    } else if (convExists && startDate && endDate) {
+                        console.log(`[SYNC] Importando mensagens do grupo existente: ${chat.name || phone}`);
+                        await importHistoricalMessages(convExists, instanceName, startDate, endDate);
                     }
                 }
             }
@@ -1715,7 +1728,17 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                             addDebugLog('SYNC_GROUP_FETCHALL_INSERT_ERR', `Erro ao importar grupo ${groupName}: ${insertErr.message}`);
                         } else {
                             console.log(`[SYNC] Grupo importado via fetchAllGroups: ${groupName} (${phone})`);
+                            
+                            // Se for sincronização de histórico por data, importar mensagens
+                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
+                            if (createdConv?.data && startDate && endDate) {
+                                console.log(`[SYNC] Importando mensagens do grupo recém-criado via fetchAllGroups: ${groupName}`);
+                                await importHistoricalMessages(createdConv.data, instanceName, startDate, endDate);
+                            }
                         }
+                    } else if (convExists && startDate && endDate) {
+                        console.log(`[SYNC] Importando mensagens do grupo existente via fetchAllGroups: ${g.subject || phone}`);
+                        await importHistoricalMessages(convExists, instanceName, startDate, endDate);
                     }
                 }
             } else {
@@ -1796,17 +1819,28 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
                         if (insertErr) {
                             console.error(`[SYNC] Erro ao importar chat histórico para ${phone}:`, insertErr.message);
-                        } else if (newConv && lastMessageText) {
-                            // Inserir última mensagem para dar contexto
-                            await supabase.from('whatsapp_messages').insert({
-                                company_id: companyId,
-                                conversation_id: newConv.id,
-                                message_text: lastMessageText,
-                                is_from_customer: !isFromMe,
-                                sent_by: null,
-                                created_at: lastMessageTime
-                            });
+                        } else {
+                            const targetConv = newConv || convExists;
+                            if (targetConv) {
+                                if (startDate && endDate) {
+                                    console.log(`[SYNC] Importando histórico completo para o contato recém-criado ${phone}...`);
+                                    await importHistoricalMessages(targetConv, instanceName, startDate, endDate);
+                                } else if (lastMessageText) {
+                                    // Inserir última mensagem para dar contexto caso não seja sync por data
+                                    await supabase.from('whatsapp_messages').insert({
+                                        company_id: companyId,
+                                        conversation_id: targetConv.id,
+                                        message_text: lastMessageText,
+                                        is_from_customer: !isFromMe,
+                                        sent_by: null,
+                                        created_at: lastMessageTime
+                                    });
+                                }
+                            }
                         }
+                    } else if (convExists && startDate && endDate) {
+                        console.log(`[SYNC] Importando histórico completo para o contato existente ${phone}...`);
+                        await importHistoricalMessages(convExists, instanceName, startDate, endDate);
                     }
                 }
             } else {
@@ -1862,7 +1896,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 // Função separada do processInboundMessage pois não precisa dos filtros de bot,
 // permissões, webhooks, etc. Apenas salva as mensagens que faltam no banco.
 // =========================================================================
-async function importHistoricalMessages(conv, instanceName) {
+async function importHistoricalMessages(conv, instanceName, startDate = null, endDate = null) {
     const { id: conversationId, company_id: companyId, connection_id: connectionId, contact_phone, is_group, queue_id } = conv;
 
     // Montar o JID correto para consulta na Evolution API
@@ -1892,10 +1926,41 @@ async function importHistoricalMessages(conv, instanceName) {
 
     for (const remoteJid of jidVariants) {
         // Tentar diferentes endpoints e estruturas de payload da Evolution API
+        const startUnix = startDate ? Math.floor(new Date(startDate).getTime() / 1000) : null;
+        const endUnix = endDate ? Math.floor(new Date(endDate).getTime() / 1000) : null;
+
         const attempts = [
-            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } }, limit: 100 }) },
-            { url: `${evoUrl}/chat/findMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { remoteJid }, limit: 100 }) },
-            { url: `${evoUrl}/chat/getMessages/${instanceName}`, method: 'POST', body: JSON.stringify({ where: { key: { remoteJid } } }) },
+            { 
+                url: `${evoUrl}/chat/findMessages/${instanceName}`, 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    where: { 
+                        key: { remoteJid },
+                        ...(startUnix && endUnix ? {
+                            messageTimestamp: {
+                                gte: startUnix,
+                                lte: endUnix
+                            }
+                        } : {})
+                    }, 
+                    limit: startDate ? 500 : 100 
+                }) 
+            },
+            { 
+                url: `${evoUrl}/chat/findMessages/${instanceName}`, 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    where: { remoteJid }, 
+                    limit: startDate ? 500 : 100 
+                }) 
+            },
+            { 
+                url: `${evoUrl}/chat/getMessages/${instanceName}`, 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    where: { key: { remoteJid } } 
+                }) 
+            },
         ];
 
         for (const attempt of attempts) {
@@ -1911,7 +1976,15 @@ async function importHistoricalMessages(conv, instanceName) {
                 else if (raw.data && Array.isArray(raw.data)) list = raw.data;
 
                 if (list.length > 0) {
-                    console.log(`[HIST-IMPORT] ${list.length} mensagens encontradas para ${remoteJid} via ${attempt.url}`);
+                    // Filtragem manual por data no JS para garantir robustez total
+                    if (startUnix && endUnix) {
+                        list = list.filter(m => {
+                            const ts = Number(m.messageTimestamp);
+                            return !isNaN(ts) && ts >= startUnix && ts <= endUnix;
+                        });
+                    }
+
+                    console.log(`[HIST-IMPORT] ${list.length} mensagens válidas encontradas para ${remoteJid} no período`);
                     allMessages = [...allMessages, ...list];
                     break;
                 }
