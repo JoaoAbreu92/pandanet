@@ -581,54 +581,47 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 }
                 setUsers(users.map(u => u.id === userData.id ? userData : u));
             } else {
-                // INSERT via Edge Function (uses Supabase Admin API - the correct approach)
+                // CREATE USER via RPC (SECURITY DEFINER - corrected version)
                 if (users.length >= plan.userLimit) {
                     alert(`Atenção: Sua empresa excedeu o limite de ${plan.userLimit} usuários do seu plano atual (${plan.name}). Por favor, contate o suporte para mudar o plano e liberar novos acessos.`);
                     return;
                 }
 
                 try {
-                    const { data: fnData, error: fnError } = await supabase.functions.invoke('create-user-admin', {
-                        body: {
-                            p_email: userData.email,
-                            p_password: (userData as any).password || 'PandaNet123',
-                            p_full_name: userData.name,
-                            p_role: userData.role,
-                            p_team: userData.team,
-                            p_company_id: targetCompanyId,
-                            p_is_admin: !!userData.isAdmin,
-                            p_is_company_admin: !!userData.isAdmin,
-                            p_permissions: userData.permissions,
-                            p_avatar_url: userData.avatarUrl || null,
-                            p_department_id: (userData as any).department_id || null,
-                            p_rg: (userData as any).rg || null,
-                            p_cpf: (userData as any).cpf || null,
-                            p_can_nudge: !!(userData as any).can_nudge,
-                            p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30,
-                            p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
-                            p_whatspanda_permissions: (userData as any).whatspanda_permissions || {},
-                            p_email_permissions: (userData as any).email_permissions || {}
-                        }
+                    const { data: newId, error } = await supabase.rpc('create_user_admin', {
+                        p_email: userData.email,
+                        p_password: (userData as any).password || 'PandaNet123',
+                        p_full_name: userData.name,
+                        p_role: userData.role,
+                        p_team: userData.team,
+                        p_company_id: targetCompanyId,
+                        p_is_admin: !!userData.isAdmin,
+                        p_is_company_admin: !!userData.isAdmin,
+                        p_permissions: userData.permissions,
+                        p_avatar_url: userData.avatarUrl || null,
+                        p_department_id: (userData as any).department_id || null,
+                        p_rg: (userData as any).rg || null,
+                        p_cpf: (userData as any).cpf || null,
+                        p_can_nudge: !!(userData as any).can_nudge,
+                        p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30,
+                        p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
+                        p_whatspanda_permissions: (userData as any).whatspanda_permissions || {},
+                        p_email_permissions: (userData as any).email_permissions || {}
                     });
 
-                    if (fnError) {
-                        console.error("Edge Function Error:", fnError);
-                        throw new Error(`Erro ao criar usuário: ${fnError.message}`);
+                    if (error) {
+                        console.error("RPC Create Error:", error);
+                        throw new Error(`Erro ao criar usuário: ${error.message}`);
                     }
 
-                    if (fnData?.error) {
-                        console.error("Edge Function returned error:", fnData.error);
-                        throw new Error(fnData.error);
-                    }
-
-                    if (fnData?.id) {
-                        const newUser = { ...userData, id: fnData.id } as Employee;
+                    if (newId) {
+                        const newUser = { ...userData, id: newId } as Employee;
                         setUsers([newUser, ...users]);
                         alert(`Usuário criado com sucesso!\nSenha temporária: ${(userData as any).password || 'PandaNet123'}`);
                     }
-                } catch (fnErr: any) {
-                    console.error("Falha ao criar usuário:", fnErr);
-                    throw new Error("Falha ao criar usuário: " + fnErr.message);
+                } catch (rpcErr: any) {
+                    console.error("Falha ao criar usuário via RPC:", rpcErr);
+                    throw new Error("Falha ao criar usuário: " + rpcErr.message);
                 }
             }
 
