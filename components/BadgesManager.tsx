@@ -108,9 +108,13 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         
         setIsUploadingIcon(true);
         try {
+            if (!profile?.id) {
+                alert('Erro: Usuário não autenticado.');
+                return;
+            }
             const fileExt = file.name.split('.').pop();
             const fileName = `badge-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-            const filePath = `company_badges/${fileName}`;
+            const filePath = `${profile.id}/company_badges/${fileName}`;
             
             const { error: uploadError } = await supabase.storage
                 .from('feed-media')
