@@ -23,9 +23,13 @@ Se você tiver o Deno instalado no VPS, pode rodar o serviço diretamente.
 2.  **Rode a função:**
     Navegue até a pasta do projeto e execute:
     ```bash
+    # Opção A: Usando o comando direto (se estiver no PATH)
     deno run --allow-net --allow-env --watch supabase/functions/email-handler/index.ts
+
+    # Opção B: Usando o caminho absoluto (Recomendado se der erro "command not found")
+    /root/.deno/bin/deno run --allow-net --allow-env --watch supabase/functions/email-handler/index.ts
     ```
-    *A função rodará na porta **9999** para evitar conflito com o Supabase.*
+    *A função rodará na porta **9999**.*
 
 3.  **Mantenha rodando:**
     Use `pm2` ou `systemd` para manter o processo ativo em produção.
