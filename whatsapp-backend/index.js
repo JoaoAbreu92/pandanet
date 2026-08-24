@@ -116,9 +116,8 @@ app.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req,
             instanceName,
             qrcode: true,
             integration: "WHATSAPP-BAILEYS",
-            webhook: true,
-            webhookUrl: webhookUrl,
-            webhookEvents: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT']
+            webhook: webhookUrl,
+            events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT']
         })
     });
     
