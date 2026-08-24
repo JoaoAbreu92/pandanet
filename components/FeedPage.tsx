@@ -261,8 +261,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             const formattedPosts: Post[] = data.map((item: any) => ({
                 id: item.id,
                 authorId: item.author_id,
-                authorName: item.profiles?.full_name || 'Desconhecido',
-                authorAvatar: item.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                authorName: item.profiles?.full_name || 'Usuário Excluído',
+                authorAvatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'Usuario Excluido')}&background=random`,
                 content: item.content,
                 mediaUrl: item.media_url,
                 mediaType: item.media_type as 'image' | 'video',
@@ -275,8 +275,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 comments: item.comments.map((c: any) => ({
                     id: c.id,
                     authorId: c.author_id,
-                    authorName: c.profiles?.full_name || 'Desconhecido',
-                    authorAvatar: c.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                    authorName: c.profiles?.full_name || 'Usuário Excluído',
+                    authorAvatar: c.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.profiles?.full_name || 'Usuario Excluido')}&background=random`,
                     text: c.content,
                     timestamp: c.created_at
                 })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -306,10 +306,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 id: item.id,
                 fromId: item.from_id,
                 toId: item.to_id,
-                from: item.from_profile?.full_name || 'Desconhecido',
-                to: item.to_profile?.full_name || 'Desconhecido',
-                fromAvatar: item.from_profile?.avatar_url || 'https://via.placeholder.com/150',
-                toAvatar: item.to_profile?.avatar_url || 'https://via.placeholder.com/150',
+                from: item.from_profile?.full_name || 'Usuário Excluído',
+                to: item.to_profile?.full_name || 'Usuário Excluído',
+                fromAvatar: item.from_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.from_profile?.full_name || 'Usuario Excluido')}&background=random`,
+                toAvatar: item.to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.to_profile?.full_name || 'Usuario Excluido')}&background=random`,
                 message: item.message,
                 value: item.type as any
             }));
@@ -374,13 +374,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 const filePath = `${currentUser.id}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
-                    .from('posts')
+                    .from('chat-media')
                     .upload(filePath, mediaFile.file);
 
                 if (uploadError) throw uploadError;
 
                 const { data: { publicUrl } } = supabase.storage
-                    .from('posts')
+                    .from('chat-media')
                     .getPublicUrl(filePath);
 
                 if (publicUrl) uploadedMediaUrl = publicUrl;

@@ -69,7 +69,7 @@ const TicketPage: React.FC = () => {
                     description: t.description,
                     status: t.status as TicketStatus,
                     priority: t.priority,
-                    requester: t.requester?.full_name || 'Desconhecido',
+                    requester: t.requester?.full_name || 'Usuário Excluído',
                     requester_id: t.requester_id, // Guardar o ID do solicitante para filtragem
                     assignedTo: t.assignee?.full_name, // Can be null
                     assignedToId: t.assigned_to_id, // Helper for updates

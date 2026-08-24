@@ -237,7 +237,7 @@ const MarketplacePage: React.FC = () => {
                     description: item.description,
                     status: item.status,
                     reservedBy: item.reserver?.full_name,
-                    seller: item.seller?.full_name || 'Desconhecido',
+                    seller: item.profiles?.full_name || 'Usuário Excluído',
                     listedBy: item.listed_by,
                     listedAt: new Date(item.created_at).toLocaleDateString('pt-BR')
                 }));

@@ -86,9 +86,9 @@ const RecognitionWall: React.FC = () => {
                 } else if (recognitionsData) {
                     const formattedRecognitions: Recognition[] = recognitionsData.map((r: any) => ({
                         id: r.id,
-                        from: (r.from as any)?.full_name || 'Desconhecido',
+                        from: (r.from as any)?.full_name || 'Usuário Excluído',
                         fromAvatar: (r.from as any)?.avatar_url || 'https://via.placeholder.com/150',
-                        to: (r.to as any)?.full_name || 'Desconhecido',
+                        to: (r.to as any)?.full_name || 'Usuário Excluído',
                         toAvatar: (r.to as any)?.avatar_url || 'https://via.placeholder.com/150',
                         message: r.message,
                         value: r.type as any,

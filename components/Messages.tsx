@@ -343,8 +343,8 @@ const Messages: React.FC<MessagesProps> = () => {
             const formattedMessages: Message[] = data.map((m: any) => ({
                 id: m.id, // UUID
                 sender: m.sender_id === currentUser.id ? 'me' : 'other',
-                senderName: (m.profiles as any)?.full_name || 'Desconhecido',
-                avatarUrl: (m.profiles as any)?.avatar_url || 'https://via.placeholder.com/150',
+                senderName: (m.profiles as any)?.full_name || 'Usuário Excluído',
+                avatarUrl: (m.profiles as any)?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((m.profiles as any)?.full_name || 'Usuario Excluido')}&background=random`,
                 text: m.text,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
@@ -730,7 +730,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                 </div>
                             ) : null}
                         </div>
-                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-40 hover:opacity-100 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
                             <div className="flex items-center p-1 space-x-0.5">
                                 {availableReactions.map(emoji => (
                                     <button
