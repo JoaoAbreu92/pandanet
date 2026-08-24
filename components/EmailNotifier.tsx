@@ -15,9 +15,12 @@ const EmailNotifier: React.FC = () => {
         const loadAccounts = async () => {
             let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
             const perms = currentUser.email_permissions;
-            if (!currentUser.isCompanyAdmin && perms && !perms.can_view_all_accounts) {
-                if (perms.allowed_accounts && perms.allowed_accounts.length > 0) {
-                    query = query.in('id', perms.allowed_accounts);
+            const isSuperOrMaster = currentUser.role === 'Super Admin' || currentUser.email === 'ti@grupopixel.com.br';
+            const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true;
+            
+            if (!canViewAll) {
+                if (perms?.allowed_accounts && perms.allowed_accounts.length > 0) {
+                    query = query.or(`user_id.eq.${currentUser.id},id.in.(${perms.allowed_accounts.join(',')})`);
                 } else {
                     query = query.eq('user_id', currentUser.id);
                 }

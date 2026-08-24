@@ -455,13 +455,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         
         let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
         
-        // Se não for admin e não tiver permissão de ver tudo, filtrar pelas contas permitidas
         const perms = currentUser.email_permissions;
-        if (!currentUser.is_company_admin && perms && !perms.can_view_all_accounts) {
-            if (perms.allowed_accounts && perms.allowed_accounts.length > 0) {
-                query = query.in('id', perms.allowed_accounts);
+        const isSuperOrMaster = currentUser.role === 'Super Admin' || currentUser.email === 'ti@grupopixel.com.br';
+        const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true;
+        
+        if (!canViewAll) {
+            if (perms?.allowed_accounts && perms.allowed_accounts.length > 0) {
+                query = query.or(`user_id.eq.${currentUser.id},id.in.(${perms.allowed_accounts.join(',')})`);
             } else {
-                // Se não tem permissão explícita, ele só vê a dele (legado) ou nada
                 query = query.eq('user_id', currentUser.id);
             }
         }
