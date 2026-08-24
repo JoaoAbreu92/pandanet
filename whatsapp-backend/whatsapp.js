@@ -84,6 +84,7 @@ async function connectToWhatsApp(companyId) {
             console.log('opened connection for company', companyId);
             await updateCompanySettings(companyId, { is_connected: true, qr_code: null });
             sessions.set(companyId, sock);
+        }
     });
 
     sock.ev.on('creds.update', saveCreds);
