@@ -166,21 +166,30 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         }
     };
 
-    const invokeFunction = async (functionName: string, body: any) => {
-        const customUrl = import.meta.env.VITE_SUPABASE_FUNCTION_URL;
-        if (customUrl) {
-            const url = customUrl.endsWith('/') ? `${customUrl}${functionName}` : `${customUrl}/${functionName}`;
-            const response = await fetch(url, {
+    // Calls the Node.js email server (bypasses Deno edge function which cannot do TLS/IMAP)
+    const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
+        `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
+
+    const callEmailServer = async (action: string, body: any) => {
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token;
+        try {
+            const response = await fetch(`${EMAIL_SERVER_URL}/${action}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(body)
             });
             const data = await response.json();
-            if (!response.ok) return { data: null, error: { message: data.error || 'Request failed' } };
+            if (!response.ok) return { data: null, error: { message: data.error || 'Servidor de email indisponível' } };
             return { data, error: null };
+        } catch (err: any) {
+            return { data: null, error: { message: err.message || 'Falha ao conectar ao servidor de email' } };
         }
-        return await supabase.functions.invoke(functionName, { body });
     };
+
 
     const fetchEmails = async (isBackground = false) => {
         if (!settings.imap_user) return;
@@ -188,7 +197,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         else setRefreshing(true);
 
         try {
-            const { data, error } = await invokeFunction('email-handler', { action: 'fetch', config: settings });
+            const { data, error } = await callEmailServer('fetch', { config: settings });
             if (error) throw error;
             if (data.error) throw new Error(data.error);
 
@@ -223,13 +232,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             // Append Signature
             const fullBody = `${composeBody}<br/><br/>--<br/>${settings.signature || ''}`;
 
-            const { data, error } = await invokeFunction('email-handler', {
-                action: 'send',
+            const { data, error } = await callEmailServer('send', {
                 config: settings,
                 payload: {
                     to: composeTo,
                     subject: composeSubject,
-                    text: composeBody, // Plain text fallback
+                    text: composeBody,
                     html: fullBody
                 }
             });
