@@ -168,6 +168,7 @@ export interface EmployeePermissions {
 
 export interface Employee {
   id: string;
+  company_id?: string;
   name: string;
   email: string;
   password?: string; // Não deve ser armazenado no estado do frontend em um app real

@@ -95,7 +95,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     phone: data.phone || '',
                     officeLocation: data.office_location || '',
                     bio: data.bio || '',
-                    isCompanyAdmin: data.is_company_admin || false
+                    isCompanyAdmin: data.is_company_admin || false,
+                    company_id: data.company_id
                 };
                 setProfile(employee);
             }

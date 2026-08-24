@@ -87,6 +87,7 @@ const AppContent: React.FC = () => {
                 setCompanyLoading(true);
 
                 try {
+                    console.log("Loading company for profile:", profile.email, "CompanyID:", profile.company_id);
                     if (profile.company_id) {
                         const { data: company, error } = await supabase
                             .from('companies')
@@ -94,8 +95,11 @@ const AppContent: React.FC = () => {
                             .eq('id', profile.company_id)
                             .single();
 
+                        if (error) console.error("Error fetching company by ID:", error);
+
                         if (!error && company) {
                             const mappedCompany = company as unknown as Company;
+                            console.log("Company loaded by ID:", mappedCompany.name);
                             setCurrentCompany(mappedCompany);
                             setCompanyData(mappedCompany.data || {
                                 employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
@@ -106,16 +110,25 @@ const AppContent: React.FC = () => {
                         }
                     } else if (profile.email === 'ti@acrilight.com.br') {
                         // Fallback for Master Admin if profile is not linked yet
-                        const { data: company } = await supabase
+                        console.log("Master Admin fallback company search...");
+                        const { data: company, error } = await supabase
                             .from('companies')
                             .select('*, plan:plans(*)')
                             .eq('domain', 'grupopixel.com.br')
                             .single();
 
+                        if (error) console.error("Error fetching Master company:", error);
+
                         if (company) {
                             const mappedCompany = company as unknown as Company;
+                            console.log("Master company loaded:", mappedCompany.name);
                             setCurrentCompany(mappedCompany);
-                            setCompanyData(mappedCompany.data || { employees: [] } as any);
+                            const defaultData = {
+                                employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
+                                formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
+                                events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                            };
+                            setCompanyData(mappedCompany.data || defaultData as any);
                             setCompanySettings(mappedCompany.settings || { companyName: 'Grupo Pixel' });
                         }
                     }
