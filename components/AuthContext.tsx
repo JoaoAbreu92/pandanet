@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('*, company:companies(*, plan:plans(*))')
                 .eq('id', userId)
                 .single();
 
@@ -118,7 +118,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         ai_provider: data?.ai_provider || null,
                         ai_behavior: data?.ai_behavior || null,
                         can_nudge: true,
-                        nudge_cooldown: 30
+                        nudge_cooldown: 30,
+                        email_permissions: {
+                            can_manage_accounts: true,
+                            can_view_all_accounts: true,
+                            account_limit: 100
+                        },
+                        plan_email_limit: 100,
+                        plan_whatsapp_limit: 100
                     };
                     setProfile(masterAdmin);
                     return;
@@ -141,6 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     viewVacationRequests: true, manageVacationRequests: true,
                     viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true
                 };
+
+                const planEmailLimit = data.company?.plan?.email_limit;
+                const planWhatsappLimit = data.company?.plan?.whatsapp_limit;
 
                 const employee: Employee = {
                     id: data.id,
@@ -173,6 +183,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     whatspanda_permissions: data.whatspanda_permissions || null,
                     can_nudge: data.can_nudge ?? true,
                     nudge_cooldown: data.nudge_cooldown ?? 30,
+                    email_permissions: data.email_permissions || {
+                        can_manage_accounts: isMasterAdmin || data.is_company_admin || false,
+                        can_view_all_accounts: isMasterAdmin || data.is_company_admin || false,
+                        account_limit: isMasterAdmin ? 100 : (planEmailLimit || 1)
+                    },
+                    plan_email_limit: isMasterAdmin ? 100 : planEmailLimit,
+                    plan_whatsapp_limit: isMasterAdmin ? 100 : planWhatsappLimit
                 };
                 setProfile(employee);
             }
