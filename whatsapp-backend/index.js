@@ -605,7 +605,7 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
 // API: Enviar Mensagem
 router.post('/messages/send/:conversationId', authMiddleware, async (req, res) => {
     const { conversationId } = req.params;
-    const { message, mediaUrl, mediaType } = req.body;
+    const { message, mediaUrl, mediaType, keepClosed } = req.body;
     const userId = req.user?.id; // from authMiddleware
 
     if (!message && !mediaUrl) {
@@ -793,7 +793,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 media_type: mediaType || undefined,
                 is_from_customer: false,
                 sent_by: userId,
-                whatsapp_message_id: sendRes?.key?.id || undefined
+                whatsapp_message_id: sendRes?.key?.id || undefined,
+                queue_id: conv.queue_id || null
             })
             .select()
             .single();
@@ -803,12 +804,22 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         }
         
         // 4. Update conversation timestamp
+        const nextStatus = keepClosed 
+            ? 'fechado' 
+            : ((conv.status === 'fechado' || conv.status === 'pendente') ? 'aberto' : conv.status);
+        const nextAssignedTo = keepClosed 
+            ? null 
+            : ((!conv.assigned_to || conv.status === 'fechado') ? userId : conv.assigned_to);
+
         await supabase
             .from('whatsapp_conversations')
             .update({ 
                 last_message_at: new Date().toISOString(),
-                status: (conv.status === 'fechado' || conv.status === 'pendente') ? 'aberto' : conv.status,
-                assigned_to: (!conv.assigned_to || conv.status === 'fechado') ? userId : conv.assigned_to
+                status: nextStatus,
+                assigned_to: nextAssignedTo,
+                queue_id: keepClosed ? null : conv.queue_id,
+                chatbot_node_id: keepClosed ? null : conv.chatbot_node_id,
+                closed_at: keepClosed ? new Date().toISOString() : conv.closed_at
             })
             .eq('id', conversationId);
 
@@ -1274,7 +1285,8 @@ async function sendBotMessage(text, conversation, companyId, connectionId) {
             conversation_id: conversation.id,
             message_text: text,
             is_from_customer: false,
-            sent_by: null // null indica bot
+            sent_by: null, // null indica bot
+            queue_id: conversation.queue_id || null
         });
     } catch (e) {
         console.error('[CHATBOT] Erro ao salvar msg no banco:', e.message);
@@ -2082,7 +2094,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 media_type: mediaType,
                 sender_phone: senderPhone,
                 sender_name: senderName,
-                created_at: parseMessageTimestamp(message.messageTimestamp)
+                created_at: parseMessageTimestamp(message.messageTimestamp),
+                queue_id: conv ? conv.queue_id : null
             });
 
             if (insertErr) {
@@ -2120,7 +2133,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                 conversation_id: conversationId,
                                 message_text: awayMessage,
                                 is_from_customer: false,
-                                sent_by: null
+                                sent_by: null,
+                                queue_id: conv ? conv.queue_id : null
                             });
                         }
                     } else {
@@ -2182,7 +2196,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                                                 conversation_id: conversationId,
                                                 message_text: notifyText,
                                                 is_from_customer: false,
-                                                sent_by: null
+                                                sent_by: null,
+                                                queue_id: suggestedQueueId
                                             });
 
                                             hasTransferred = true;

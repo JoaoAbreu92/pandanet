@@ -18,6 +18,8 @@ interface WhatsAppSettingsData {
     transfer_message_agent?: string;
     send_transfer_message_to_client?: boolean;
     keyword_transfers?: any[];
+    close_message?: string;
+    isolate_chat_history?: boolean;
 }
 
 const DAYS_OF_WEEK = [
@@ -41,9 +43,11 @@ const GeneralTab: React.FC = () => {
     const [businessHoursStart, setBusinessHoursStart] = useState('08:00');
     const [businessHoursEnd, setBusinessHoursEnd] = useState('18:00');
     const [awayMessage, setAwayMessage] = useState('');
+    const [closeMessage, setCloseMessage] = useState('');
     const [rejectCalls, setRejectCalls] = useState(false);
     const [rejectionMessage, setRejectionMessage] = useState('');
     const [autoAssign, setAutoAssign] = useState(false);
+    const [isolateChatHistory, setIsolateChatHistory] = useState(false);
     
     // Transfer Settings State
     const [transferMessageClient, setTransferMessageClient] = useState('Seu atendimento foi transferido para {target}. Por favor, aguarde.');
@@ -75,7 +79,7 @@ const GeneralTab: React.FC = () => {
             // Fetch WhatsApp connection settings
             const { data: settingsData, error: settingsError } = await supabase
                 .from('whatsapp_settings')
-                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers')
+                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers, close_message, isolate_chat_history')
                 .eq('company_id', companyId);
 
             if (settingsError) throw settingsError;
@@ -115,9 +119,11 @@ const GeneralTab: React.FC = () => {
         setBusinessHoursEnd(conn.business_hours_end?.slice(0, 5) || '18:00');
         setBusinessHours(conn.business_hours || { general: {}, queues: {} });
         setAwayMessage(conn.away_message || '');
+        setCloseMessage(conn.close_message || '');
         setRejectCalls(!!conn.reject_calls);
         setRejectionMessage(conn.rejection_message || '');
         setAutoAssign(!!conn.auto_assign);
+        setIsolateChatHistory(!!conn.isolate_chat_history);
         setTransferMessageClient(conn.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.');
         setTransferMessageAgent(conn.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.');
         setSendTransferMessageToClient(conn.send_transfer_message_to_client !== false);
@@ -197,9 +203,11 @@ const GeneralTab: React.FC = () => {
             business_hours_end: businessHoursEnd ? `${businessHoursEnd}:00` : null,
             business_hours: businessHours,
             away_message: awayMessage,
+            close_message: closeMessage,
             reject_calls: rejectCalls,
             rejection_message: rejectionMessage,
             auto_assign: autoAssign,
+            isolate_chat_history: isolateChatHistory,
             transfer_message_client: transferMessageClient,
             transfer_message_agent: transferMessageAgent,
             send_transfer_message_to_client: sendTransferMessageToClient,
@@ -300,6 +308,24 @@ const GeneralTab: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Close Message */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-emerald-500" /> Mensagem de Encerramento
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes no WhatsApp assim que o atendimento for encerrado pelo atendente.</p>
+                    
+                    <div>
+                        <textarea
+                            value={closeMessage}
+                            onChange={(e) => setCloseMessage(e.target.value)}
+                            rows={3}
+                            placeholder="Seu atendimento foi concluído. Obrigado pelo contato!"
+                            className="w-full px-5 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm resize-none font-medium placeholder:text-gray-400"
+                        />
+                    </div>
+                </div>
+
                 {/* Call Rejection */}
                 <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
                     <div className="flex justify-between items-start">
@@ -349,6 +375,26 @@ const GeneralTab: React.FC = () => {
                         </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Atribui automaticamente o atendimento ao primeiro atendente que responder à conversa na aba "Aguardando".</p>
+                </div>
+
+                {/* Isolate Chat History */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                    <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            <Sliders className="w-5 h-5 text-indigo-500" /> Privacidade de Histórico
+                        </h4>
+                        <div className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="isolate-history-toggle"
+                                checked={isolateChatHistory}
+                                onChange={(e) => setIsolateChatHistory(e.target.checked)}
+                                className="sr-only peer cursor-pointer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 cursor-pointer" />
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Se ativado, as mensagens trocadas em um setor (ex: Financeiro) ficam invisíveis para atendentes de outros setores (ex: Suporte) mesmo que pertençam ao mesmo contato de WhatsApp.</p>
                 </div>
 
                 {/* Keyword Transfers Configuration */}

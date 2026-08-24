@@ -474,6 +474,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         console.log('[WP-DEBUG] Nova mensagem/update recebida via Realtime', payload);
         const newMsg = payload.new as any; // Cast as any to avoid TS errors with missing type definitions
         
+        // Aplicar filtro de privacidade do setor em tempo real
+        const conn = connections.find(c => c.id === selectedConversation?.connection_id) || settings;
+        if (conn?.isolate_chat_history && !isAdmin) {
+          const allowedQueues = permissions.assigned_queues || [];
+          if (newMsg && newMsg.queue_id !== null && !allowedQueues.includes(newMsg.queue_id)) {
+            return;
+          }
+        }
+
         if (payload.eventType === 'INSERT') {
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id || (newMsg.whatsapp_message_id && (m as any).whatsapp_message_id === newMsg.whatsapp_message_id))) return prev;
@@ -621,6 +630,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       fetchConversations();
     }, 300);
     return () => clearTimeout(timer);
+  }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter, filterPlatform]);
+
+  // Polling fallback para sincronização de lista de conversas (a cada 10 segundos)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchConversations();
+    }, 10000);
+    return () => clearInterval(interval);
   }, [searchTerm, activeTab, filterConnection, filterQueue, filterAssignee, chatTypeFilter, filterPlatform]);
 
   useEffect(() => {
@@ -879,12 +896,40 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.closed_at = null;
       }
 
-      const { error } = await supabase
-        .from('whatsapp_conversations')
-        .update(updateData)
-        .eq('id', conversationId);
+      // Enviar mensagem de encerramento se configurado no canal
+      const targetConv = conversations.find(c => c.id === conversationId) || selectedConversation;
+      const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
+      const closeMsg = conn?.close_message;
 
-      if (error) throw error;
+      if (newStatus === 'fechado' && closeMsg && closeMsg.trim()) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const res = await fetch(`/api/whatsapp/messages/send/${conversationId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+              message: closeMsg.trim(),
+              keepClosed: true
+            })
+          });
+          if (!res.ok) {
+            throw new Error('Falha ao enviar mensagem de encerramento automática pelo servidor.');
+          }
+        } else {
+          throw new Error('Usuário não autenticado.');
+        }
+      } else {
+        const { error } = await supabase
+          .from('whatsapp_conversations')
+          .update(updateData)
+          .eq('id', conversationId);
+
+        if (error) throw error;
+      }
 
       // Remove da lista atual (mudou de aba) e atualiza o objeto selecionado
       setConversations(prev => prev.filter(c => c.id !== conversationId));
@@ -942,12 +987,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       if (error) throw error;
 
       // 4. Inserir log interno no chat
+      const logQueueId = type === 'queue' ? targetId : selectedConversation.queue_id;
       await supabase.from('whatsapp_messages').insert({
         conversation_id: selectedConversation.id,
         company_id: currentUser?.company_id || profile?.company_id,
         message_text: formattedAgent,
         is_from_customer: false,
-        sent_by: activeProfile?.id || profile?.id
+        sent_by: activeProfile?.id || profile?.id,
+        queue_id: logQueueId || null
       });
 
       // 5. Enviar mensagem de transferência ao cliente via WhatsApp
@@ -978,20 +1025,34 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
   };
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = async (conversationId: string, silent: boolean = false) => {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
 
-    setLoadingMessages(true);
-    const { data, error } = await supabase
+    if (!silent) setLoadingMessages(true);
+    
+    let query = supabase
       .from('whatsapp_messages')
       .select('*')
       .eq('conversation_id', conversationId)
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: true });
+      .eq('company_id', companyId);
+
+    // Filtrar mensagens por privacidade de setor (se isolate_chat_history estiver ativo e o usuário não for Admin)
+    const conn = connections.find(c => c.id === selectedConversation?.connection_id) || settings;
+    if (conn?.isolate_chat_history && !isAdmin) {
+      const allowedQueues = permissions.assigned_queues || [];
+      if (allowedQueues.length > 0) {
+        const allowedQueuesStr = allowedQueues.map((id: string) => `"${id}"`).join(',');
+        query = query.or(`queue_id.is.null,queue_id.in.(${allowedQueuesStr})`);
+      } else {
+        query = query.is('queue_id', null);
+      }
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: true });
     
     if (data) setMessages(data);
-    setLoadingMessages(false);
+    if (!silent) setLoadingMessages(false);
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
@@ -1042,6 +1103,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [selectedConvTags, setSelectedConvTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+    }
+  }, [selectedConversation?.id]);
+
+  // Polling fallback para sincronização de novas mensagens na conversa ativa (a cada 5 segundos)
+  useEffect(() => {
+    if (!selectedConversation?.id) return;
+    const interval = setInterval(() => {
+      fetchMessages(selectedConversation.id, true); // silent = true para não exibir spinner
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedConversation?.id]);
 
   useEffect(() => {
     if (selectedConversation) {
