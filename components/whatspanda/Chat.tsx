@@ -715,7 +715,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (chatTypeFilter === 'group') {
       query = query.eq('is_group', true);
     } else if (chatTypeFilter === 'private') {
-      query = query.neq('is_group', true);
+      query = query.or('is_group.eq.false,is_group.is.null');
     }
 
     const { data, error } = await query.order('last_message_at', { ascending: false });
@@ -1967,6 +1967,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       )}
                       <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-1" />
                       <div className="flex gap-1.5">
+                {!isGhostMode && selectedConversation.status !== 'fechado' && (
+                  <button
+                    onClick={() => handleUpdateStatus(selectedConversation.id, 'fechado')}
+                    className="p-2 rounded-full hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 transition-colors"
+                    title="Encerrar Atendimento"
+                  >
+                    <CheckCheck className="w-5 h-5" />
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     onClick={handleExportPDF}

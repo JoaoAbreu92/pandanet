@@ -140,7 +140,8 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     unread_count: 0,
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
-                    queue_id: selectedQueue || null
+                    queue_id: selectedQueue || null,
+                    is_group: false
                 })
                 .select()
                 .single();
@@ -159,7 +160,8 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                     status: 'aberto', 
                     last_message_at: new Date().toISOString(),
                     connection_id: selectedChannel,
-                    queue_id: selectedQueue || null
+                    queue_id: selectedQueue || null,
+                    is_group: false
                 })
                 .eq('id', conversationId);
         }
@@ -196,7 +198,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
                 .select(`
                     *,
                     assigned_user:profiles!assigned_to(id, full_name, avatar_url),
-                    queue:departments(id, name),
+                    queue:whatsapp_queues!queue_id(id, name, color),
                     channel:whatsapp_settings!connection_id(channel_type, connection_name)
                 `)
                 .eq('id', conversationId)
