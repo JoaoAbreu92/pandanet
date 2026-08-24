@@ -126,15 +126,8 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             alert(`Erro na solicitação de sincronização: ${error.message}`);
         } finally {
             setSyncing(false);
-        }
-            setTimeout(() => {
-                fetchContacts();
-                setSyncing(false);
-                alert('Sincronização solicitada! Os contatos aparecerão em alguns instantes.');
-            }, 5000);
-        } catch (error) {
-            console.error('Error syncing:', error);
-            setSyncing(false);
+            // Pequeno delay para recarregar a lista caso a Evolution seja rápida
+            setTimeout(fetchContacts, 3000);
         }
     };
 
