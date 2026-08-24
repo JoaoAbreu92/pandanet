@@ -22,8 +22,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution-api:8080';
-const evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
+let evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution-api:8080';
+let evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
 // Public URL or internal Docker network URL so Evolution can reach us
 // For internal docker network:
 const backendWebhookBaseUrl = process.env.BACKEND_WEBHOOK_URL || 'http://whatsapp-backend:3000';
@@ -50,6 +50,10 @@ app.use(express.json({ limit: '50mb' })); // Evolution API webhooks can be large
 let supabaseUrl = process.env.SUPABASE_URL || '';
 if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
   supabaseUrl = supabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
+}
+
+if (evoUrl.includes('localhost') || evoUrl.includes('127.0.0.1')) {
+    evoUrl = evoUrl.replace('localhost', 'evolution-api').replace('127.0.0.1', 'evolution-api');
 }
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
@@ -327,7 +331,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         // Tentar buscar contatos de múltiplos endpoints comuns da Evolution API
         const endpoints = [
             `${evoUrl}/chat/findContacts/${instanceName}`,
-            `${evoUrl}/contact/fetchContacts/${instanceName}`
+            `${evoUrl}/chat/fetchContacts/${instanceName}`,
+            `${evoUrl}/contact/fetchContacts/${instanceName}`,
+            `${evoUrl}/instance/fetchContacts/${instanceName}`
         ];
         
         let contacts = [];
@@ -335,14 +341,18 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
         for (const url of endpoints) {
             try {
+                console.log(`[SYNC] Tentando endpoint: ${url}`);
                 const res = await fetch(url, { headers: { 'apikey': evoKey } });
+                const data = await res.json();
+
                 if (res.ok) {
-                    const data = await res.json();
                     contacts = Array.isArray(data) ? data : (data.contacts || data.data || []);
                     if (contacts.length > 0) {
                         successEndpoint = url;
                         break;
                     }
+                } else {
+                    console.warn(`[SYNC] Endpoint ${url} retornou status ${res.status}:`, data);
                 }
             } catch (e) {
                 console.warn(`[SYNC] Falha no endpoint ${url}:`, e.message);

@@ -83,7 +83,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentUser, pageContext }) => {
     const { t, language } = useLanguage();
     const { showToast } = useToast();
-    const { setModuleUnreadCount, notifications, markAsRead } = useNotifications();
+    const { setModuleUnreadCount, notifications, markAsRead, markNotificationsByLink } = useNotifications();
 
     // --- State: Confirm Modal ---
     const [confirmState, setConfirmState] = useState<{
@@ -378,6 +378,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             if (email && !(email.flags || []).includes('\\Seen')) {
                 // Background call to server, don't await to avoid blocking UI
                 toggleFlag(email, '\\Seen', true).catch(e => console.error("Error setting Seen flag:", e));
+                
+                // Also clean notification
+                markNotificationsByLink(`/email?uid=${uid}`);
             }
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
@@ -456,7 +459,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         // Update unseen count badge immediately when marking as read/unread
         if (flag === '\\Seen') {
             const wasUnread = !(email.flags || []).includes('\\Seen');
-            if (add && wasUnread) setUnseenCount(prev => Math.max(0, prev - 1));
+            if (add && wasUnread) {
+                setUnseenCount(prev => Math.max(0, prev - 1));
+                markNotificationsByLink(`/email?uid=${email.uid}`);
+            }
             else if (!add && !wasUnread) setUnseenCount(prev => prev + 1);
         }
 
@@ -1476,7 +1482,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 <div
                                                     className="prose max-w-none text-gray-800"
                                                     dangerouslySetInnerHTML={{
-                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`)
+                                                        __html: DOMPurify.sanitize(selectedEmail.html || selectedEmail.text || `<div class="text-gray-400 italic">${t('email.no_content')}</div>`).replace(/src="http:\/\//g, 'src="https://').replace(/href="http:\/\//g, 'href="https://')
                                                     }}
                                                 />
                                             </div>

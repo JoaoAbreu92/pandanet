@@ -293,9 +293,12 @@ const AppContent: React.FC = () => {
                                 .select('*')
                                 .eq('company_id', targetCompanyId);
 
+                            console.log(`[PandaNet] Sincronizando perfis para ${mappedCompany.name}. Encontrados: ${realProfiles?.length || 0}`);
+
                             const mergedData: AppData = {
                                 ...baseData,
-                                employees: (realProfiles || []).map((p: any) => {
+                                // Prioridade total para a tabela profiles. Ignora any 'employees' do JSONB legado.
+                                employees: (realProfiles && realProfiles.length > 0) ? realProfiles.map((p: any) => {
                                     // Helper para URL do avatar
                                     let avatarUrl = p.avatar_url;
                                     if (avatarUrl && !avatarUrl.startsWith('http')) {
@@ -320,7 +323,7 @@ const AppContent: React.FC = () => {
                                         following: p.following || [],
                                         permissions: p.permissions || {}
                                     };
-                                }),
+                                }) : [],
                                 announcements: baseData.announcements || [],
                                 banners: baseData.banners || [],
                                 conversations: baseData.conversations || [],

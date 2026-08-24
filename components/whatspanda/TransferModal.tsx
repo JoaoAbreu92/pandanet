@@ -30,7 +30,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
   onClose,
   onTransferComplete
 }) => {
-  const { profile } = useAuth();
+  const { profile, currentUser } = useAuth();
   const [transferType, setTransferType] = useState<'user' | 'department'>('user');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
@@ -45,11 +45,12 @@ const TransferModal: React.FC<TransferModalProps> = ({
   }, []);
 
   const fetchAgents = async () => {
+    // Busca perfis que são agentes ou administradores (fallback para garantir que a lista não fique vazia)
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, department_id')
-      .eq('is_whatsapp_agent', true)
-      .eq('company_id', profile?.company_id)
+      .select('id, full_name, avatar_url, department_id, role, is_admin')
+      .eq('company_id', currentUser?.company_id)
+      .or('is_whatsapp_agent.eq.true,role.eq.Admin,role.eq.Super Admin,is_admin.eq.true')
       .order('full_name');
 
     if (data) setAgents(data);
@@ -117,6 +118,27 @@ const TransferModal: React.FC<TransferModalProps> = ({
           title: 'Novo Atendimento Atribuído',
           description: `${profile?.name} transferiu um atendimento para você`,
           link: `/whatspanda?view=chat&id=${conversationId}`
+        });
+
+        // System message for chat history
+        await supabase.from('whatsapp_messages').insert({
+          conversation_id: conversationId,
+          company_id: profile?.company_id,
+          body: `*Atendimento transferido para:* ${agent?.full_name || 'outro atendente'}`,
+          type: 'chat',
+          from_me: true,
+          is_system_message: true // Assuming this field exists or can be used for styling
+        });
+      } else if (transferType === 'department' && selectedDepartmentId) {
+        const queue = queues.find(q => q.id === selectedDepartmentId);
+        // System message for chat history
+        await supabase.from('whatsapp_messages').insert({
+          conversation_id: conversationId,
+          company_id: profile?.company_id,
+          body: `*Atendimento transferido para o setor:* ${queue?.name || 'outro setor'}`,
+          type: 'chat',
+          from_me: true,
+          is_system_message: true
         });
       }
 

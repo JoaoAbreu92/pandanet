@@ -275,7 +275,15 @@ interface MessagesProps {
 const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const { currentUser, profile, isGhostMode } = useAuth();
     const { showToast } = useToast();
-    const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
+    const { addNotification, playNotificationSound, showDesktopNotification, markNotificationsByLink } = useNotifications();
+
+    useEffect(() => {
+        if (selectedConversationId) {
+            markNotificationsByLink('/messages');
+        }
+    }, [selectedConversationId, markNotificationsByLink]);
+
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [masterAdminId, setMasterAdminId] = useState<string>('');
@@ -302,7 +310,6 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     }, []);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams' | 'support'>('conversations');
-    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
 
     // Sync with prop for deep linking/nudges
     useEffect(() => {

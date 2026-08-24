@@ -41,6 +41,7 @@ interface NotificationContextType {
     // Module specific unread counts (for Sidebar badges)
     moduleUnreadCounts: Record<string, number>;
     setModuleUnreadCount: (module: string, count: number) => void;
+    markNotificationsByLink: (linkSnippet: string) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -361,6 +362,30 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     };
 
+    const markNotificationsByLink = async (linkSnippet: string) => {
+        if (!currentUser?.id || isGhostMode) return;
+
+        try {
+            // Find unread notifications that match the link snippet
+            const toMark = notifications.filter(n => !n.isRead && n.link?.includes(linkSnippet));
+            
+            if (toMark.length === 0) return;
+
+            const ids = toMark.map(n => n.id);
+
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', ids);
+
+            if (error) throw error;
+
+            setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, isRead: true } : n));
+        } catch (err) {
+            console.error('Error marking notifications by link:', err);
+        }
+    };
+
     const markAllAsRead = async () => {
         if (!currentUser?.id) return;
         if (isGhostMode) return; // Ghost mode blocks marking as read
@@ -474,7 +499,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             // Module Unread Counts
             moduleUnreadCounts,
-            setModuleUnreadCount
+            setModuleUnreadCount,
+            markNotificationsByLink
         }}>
             {children}
         </NotificationContext.Provider>

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
+import { useNotifications } from '../NotificationContext';
 import TransferModal from './TransferModal';
 import ContactSidebar from './ContactSidebar';
 import KanbanBoard from './KanbanBoard';
@@ -65,6 +66,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showContactSidebar, setShowContactSidebar] = useState(false);
   const canTransfer = isAdmin || activeProfile?.whatspanda_permissions?.can_transfer;
+  const { markNotificationsByLink } = useNotifications();
 
   useEffect(() => {
     if (onConversationSelect) {
@@ -110,8 +112,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
       markAsRead(selectedConversation.id);
+      
+      // Clear bell notifications for this conversation
+      markNotificationsByLink('/whatspanda');
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, markNotificationsByLink]);
 
   useEffect(() => {
     scrollToBottom();
@@ -415,15 +420,29 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                 </span>
               </div>
               <div className="flex justify-between items-center mt-2 pl-10">
-                <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-medium tracking-tight opacity-70 group-hover:opacity-100">
-                    {conv.contact_phone}
-                </p>
+                <div className="flex flex-col gap-1 min-w-0">
+                  <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-medium tracking-tight opacity-70 group-hover:opacity-100">
+                      {conv.contact_phone}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {conv.assigned_user && (
+                      <span className="text-[9px] bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-md border border-indigo-100/50 dark:border-indigo-500/20 font-bold truncate max-w-[80px]">
+                        {conv.assigned_user.full_name.split(' ')[0]}
+                      </span>
+                    )}
+                    {conv.department && (
+                      <span className="text-[9px] bg-emerald-50/50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-md border border-emerald-100/50 dark:border-emerald-500/20 font-bold truncate max-w-[80px]">
+                        {conv.department.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 {conv.unread_count > 0 ? (
-                  <span className="bg-emerald-500 text-white text-[10px] font-medium min-w-[20px] px-1.5 py-0.5 rounded-full text-center shadow-sm">
+                  <span className="bg-emerald-500 text-white text-[10px] font-medium min-w-[20px] px-1.5 py-0.5 rounded-full text-center shadow-sm flex-shrink-0">
                     {conv.unread_count > 99 ? '99+' : conv.unread_count}
                   </span>
                 ) : (
-                  selectedConversation?.id === conv.id ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : null
+                  selectedConversation?.id === conv.id ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> : null
                 )}
               </div>
             </div>
