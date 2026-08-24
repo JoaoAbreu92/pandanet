@@ -53,4 +53,20 @@ VITE_SUPABASE_FUNCTION_URL=http://localhost:9999/email-handler
 ```
 *(Substitua `http://localhost:9999` pelo IP/Porta onde você rodou a função)*
 
-Se você não definir essa variável, o sistema tentará usar a URL padrão do Supabase, o que pode falhar em setups híbridos.
+
+## Opção 3: Usando Nginx (Recomendado para Produção)
+
+Para não precisar abrir a porta 9999 no Firewall, configurei o Nginx para redirecionar `/functions/v1/email-handler`.
+
+1.  **No VPS**, rode o Deno normalmente na porta 9999.
+2.  **Atualize o Nginx** (o arquivo `nginx.conf` já foi atualizado no git):
+    ```bash
+    docker-compose restart
+    # ou se usar nginx nativo:
+    systemctl reload nginx
+    ```
+3.  **Atualize o .env do Frontend**:
+    ```env
+    VITE_SUPABASE_FUNCTION_URL=https://pandanet.grupopixel.com.br/functions/v1
+    ```
+    *Assim o frontend usa a URL segura (HTTPS) padrão.*
