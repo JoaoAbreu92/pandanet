@@ -129,8 +129,29 @@ const AppContent: React.FC = () => {
                         } else {
                             throw new Error("Dados da empresa não encontrados.");
                         }
-                    } else if (userEmail === 'ti@acrilight.com.br' || userEmail === 'ti@grupopixel.com.br') {
-                        throw new Error("Empresa Grupo Pixel (Master) não localizada no sistema.");
+                    } else if (isMaster) {
+                        // ROOT ACCESS: Se for Master e não achou empresa, carrega um contexto mock "Root"
+                        console.log("ROOT ACCESS: Master Admin sem empresa vinculada. Carregando contexto administrativo.");
+                        const rootCompany: Company = {
+                            id: 'root',
+                            name: 'Grupo Pixel (Administração)',
+                            domain: 'grupopixel.com.br',
+                            status: 'active',
+                            plan: { id: 'root-plan', name: 'Master Plan', features: profile.permissions } as any,
+                            settings: { companyName: 'Grupo Pixel' },
+                            data: {
+                                employees: [profile], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
+                                formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
+                                events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                            }
+                        };
+                        setCurrentCompany(rootCompany);
+                        setCompanyData({
+                            employees: [profile], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
+                            formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
+                            events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
+                        });
+                        setCompanySettings({ companyName: 'Grupo Pixel' });
                     } else {
                         console.log("Usuário sem empresa vinculada. Aguardando RepairProfile.");
                     }
