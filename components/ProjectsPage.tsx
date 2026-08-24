@@ -43,6 +43,7 @@ interface ProjectStage {
     project_id: string;
     name: string;
     position: number;
+    department_id?: string | null;
 }
 
 interface ProjectTask {
@@ -148,11 +149,17 @@ const ProjectsPage: React.FC = () => {
     // Calendário interno
     const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
 
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [isStageModalOpen, setIsStageModalOpen] = useState(false);
+    const [editingStage, setEditingStage] = useState<ProjectStage | null>(null);
+    const [stageForm, setStageForm] = useState({ name: '', department_id: '' });
+
     // Carregar dados iniciais
     useEffect(() => {
         if (currentUser?.company_id) {
             fetchProjects();
             fetchEmployees();
+            fetchDepartments();
         }
     }, [currentUser]);
 
@@ -209,6 +216,91 @@ const ProjectsPage: React.FC = () => {
             if (data) setEmployees(data as unknown as Employee[]);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    // Buscar departamentos da empresa
+    const fetchDepartments = async () => {
+        if (!currentUser?.company_id) return;
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('name', { ascending: true });
+            if (error) throw error;
+            setDepartments(data || []);
+        } catch (e: any) {
+            console.error('Erro ao buscar departamentos:', e);
+        }
+    };
+
+    const handleSaveStage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!stageForm.name.trim()) {
+            showToast('O nome do estágio é obrigatório.', 'warning');
+            return;
+        }
+
+        try {
+            if (editingStage) {
+                const { error } = await supabase
+                    .from('project_stages')
+                    .update({
+                        name: stageForm.name.trim(),
+                        department_id: stageForm.department_id || null
+                    })
+                    .eq('id', editingStage.id);
+
+                if (error) throw error;
+                showToast('Estágio atualizado com sucesso!', 'success');
+            } else {
+                const newPosition = stages.length > 0 ? Math.max(...stages.map(s => s.position)) + 1 : 1;
+                const { error } = await supabase
+                    .from('project_stages')
+                    .insert([{
+                        project_id: selectedProject?.id,
+                        name: stageForm.name.trim(),
+                        position: newPosition,
+                        department_id: stageForm.department_id || null
+                    }]);
+
+                if (error) throw error;
+                showToast('Estágio criado com sucesso!', 'success');
+            }
+
+            setIsStageModalOpen(false);
+            setEditingStage(null);
+            setStageForm({ name: '', department_id: '' });
+            if (selectedProject) handleSelectProject(selectedProject);
+        } catch (err: any) {
+            showToast('Erro ao salvar estágio: ' + err.message, 'error');
+        }
+    };
+
+    const handleDeleteStage = async (stageId: string) => {
+        const hasTasks = tasks.some(t => t.stage_id === stageId);
+        if (hasTasks) {
+            showToast('Não é possível excluir este estágio pois ele contém tarefas. Mova-as primeiro.', 'warning');
+            return;
+        }
+
+        if (!confirm('Deseja excluir este estágio permanentemente?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('project_stages')
+                .delete()
+                .eq('id', stageId);
+
+            if (error) throw error;
+            showToast('Estágio excluído com sucesso!', 'success');
+            setIsStageModalOpen(false);
+            setEditingStage(null);
+            setStageForm({ name: '', department_id: '' });
+            if (selectedProject) handleSelectProject(selectedProject);
+        } catch (err: any) {
+            showToast('Erro ao excluir estágio: ' + err.message, 'error');
         }
     };
 
@@ -615,6 +707,25 @@ const ProjectsPage: React.FC = () => {
         const taskId = e.dataTransfer.getData('taskId');
         if (!taskId) return;
 
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const sourceStage = stages.find(s => s.id === task.stage_id);
+
+        if (task.stage_id === targetStageId) return;
+
+        const isAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin';
+        const isProjectManager = selectedProject?.manager_id === currentUser?.id;
+
+        // Se o estágio de origem tem um departamento associado, o usuário deve pertencer a ele (ou ser admin/gerente)
+        if (sourceStage?.department_id && !isAdmin && !isProjectManager) {
+            if (currentUser?.department_id !== sourceStage.department_id) {
+                const deptName = departments.find(d => d.id === sourceStage.department_id)?.name || 'Setor Responsável';
+                showToast(`Bloqueio: Apenas colaboradores do setor "${deptName}" podem movimentar tarefas deste estágio.`, 'error');
+                return;
+            }
+        }
+
         // Atualização Otimista local
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stage_id: targetStageId } : t));
 
@@ -890,7 +1001,7 @@ const ProjectsPage: React.FC = () => {
                             <>
                                 {/* TAB 1: KANBAN BOARD */}
                                 {activeTab === 'kanban' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+                                    <div className="flex gap-6 items-start overflow-x-auto pb-4 no-scrollbar">
                                         {stages.map(stage => {
                                             const stageTasks = filteredTasks.filter(t => t.stage_id === stage.id);
                                             return (
@@ -898,15 +1009,39 @@ const ProjectsPage: React.FC = () => {
                                                     key={stage.id}
                                                     onDragOver={handleDragOver}
                                                     onDrop={(e) => handleDrop(e, stage.id)}
-                                                    className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/30 dark:shadow-none min-h-[450px] flex flex-col"
+                                                    className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/30 dark:shadow-none min-h-[450px] flex flex-col flex-shrink-0 w-80"
                                                 >
                                                     {/* Header do Estágio */}
-                                                    <div className="flex justify-between items-center mb-4 pb-2 border-b dark:border-slate-800">
-                                                        <h4 className="font-black text-slate-800 dark:text-slate-200 text-sm uppercase tracking-wider">{stage.name}</h4>
-                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-2 py-0.5 rounded-lg text-xs">
+                                                    <div className="flex justify-between items-center mb-1 pb-1 border-b dark:border-slate-800">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <h4 className="font-black text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider truncate" title={stage.name}>{stage.name}</h4>
+                                                            {(currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || selectedProject?.manager_id === currentUser?.id) && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingStage(stage);
+                                                                        setStageForm({ name: stage.name, department_id: stage.department_id || '' });
+                                                                        setIsStageModalOpen(true);
+                                                                    }}
+                                                                    className="p-1 text-slate-450 hover:text-brand-primary hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                                                                    title="Editar Estágio"
+                                                                >
+                                                                    <PencilIcon className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-2 py-0.5 rounded-lg text-xs flex-shrink-0">
                                                             {stageTasks.length}
                                                         </span>
                                                     </div>
+
+                                                    {/* Setor Responsável pelo Estágio */}
+                                                    {stage.department_id ? (
+                                                        <div className="text-[9px] font-bold text-slate-450 dark:text-slate-500 mb-3 truncate bg-slate-50 dark:bg-slate-950/50 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                            Setor: {departments.find(d => d.id === stage.department_id)?.name || 'Carregando...'}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-[9px] font-bold text-slate-400/70 mb-3 italic px-2">Setor: Livre</div>
+                                                    )}
 
                                                     {/* Cartões de Tarefa */}
                                                     <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px] pr-1">
@@ -977,6 +1112,25 @@ const ProjectsPage: React.FC = () => {
                                                 </div>
                                             );
                                         })}
+
+                                        {/* Botão de Adicionar Novo Estágio */}
+                                        {(currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || selectedProject?.manager_id === currentUser?.id) && (
+                                            <div className="bg-slate-100/40 dark:bg-slate-900/30 rounded-3xl p-4 border border-dashed border-slate-300 dark:border-slate-850 min-h-[450px] flex flex-col justify-center items-center text-center flex-shrink-0 w-80">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingStage(null);
+                                                        setStageForm({ name: '', department_id: '' });
+                                                        setIsStageModalOpen(true);
+                                                    }}
+                                                    className="flex flex-col items-center gap-2 text-slate-400 hover:text-brand-primary font-bold text-xs uppercase tracking-wider transition-colors group"
+                                                >
+                                                    <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 group-hover:scale-105 transition-transform">
+                                                        <PlusIcon className="w-5 h-5 text-slate-500 group-hover:text-brand-primary" />
+                                                    </div>
+                                                    <span>Novo Estágio</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1548,6 +1702,69 @@ const ProjectsPage: React.FC = () => {
                             <button type="button" onClick={() => setIsTaskModalOpen(false)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Fechar</button>
                             <button type="button" onClick={() => handleSaveTask()} className="px-6 py-2.5 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg shadow-emerald-100">Salvar Alterações</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL 3: GERENCIAR ESTÁGIO (COLUNAS) --- */}
+            {isStageModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in">
+                        <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                            <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">
+                                {editingStage ? 'Configurar Estágio' : 'Novo Estágio'}
+                            </h3>
+                            <button onClick={() => { setIsStageModalOpen(false); setEditingStage(null); }} className="text-slate-450 hover:text-slate-600 font-bold">✕</button>
+                        </div>
+
+                        <form onSubmit={handleSaveStage} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Nome do Estágio</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={stageForm.name}
+                                    onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+                                    placeholder="Ex: Adesivagem"
+                                    className="w-full p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Setor Responsável (Restrição de Drag)</label>
+                                <select
+                                    value={stageForm.department_id}
+                                    onChange={(e) => setStageForm({ ...stageForm, department_id: e.target.value })}
+                                    className="w-full p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
+                                >
+                                    <option value="">Livre (Qualquer pessoa do projeto)</option>
+                                    {departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-1.5 italic">
+                                    Se definido, apenas membros deste setor (ou administradores/gerente do projeto) poderão arrastar tarefas para fora deste estágio.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-4 border-t dark:border-slate-800">
+                                {editingStage ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteStage(editingStage.id)}
+                                        className="text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 px-3 py-2 rounded-xl text-xs font-bold uppercase transition-all"
+                                    >
+                                        Excluir
+                                    </button>
+                                ) : (
+                                    <div />
+                                )}
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => { setIsStageModalOpen(false); setEditingStage(null); }} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Cancelar</button>
+                                    <button type="submit" className="px-6 py-2 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg">Confirmar</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
