@@ -64,6 +64,8 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         if (!currentUser?.id) return;
 
+        console.log(`[PandaNet] 🎧 REGISTERING NUDGE LISTENER for user: ${currentUser.id}`);
+
         const channel = supabase
             .channel('global-nudges')
             .on('postgres_changes', {
