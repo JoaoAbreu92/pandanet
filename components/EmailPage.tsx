@@ -86,7 +86,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [folders, setFolders] = useState<any[]>([]);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
     
-    // --- State: Search & Filters ---
+    // --- State: Tags ---
+    const [availableTags, setAvailableTags] = useState<{ id: string, label: string, color: string }[]>([]);
+    const [showTagModal, setShowTagModal] = useState(false);
+    const [newTagLabel, setNewTagLabel] = useState('');
+    const [newTagColor, setNewTagColor] = useState('#EF4444'); // Default Red
+
     const [searchQuery, setSearchQuery] = useState('');
     const [filterTag, setFilterTag] = useState<string | null>(null);
 
@@ -134,6 +139,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             if (pollingRef.current) clearInterval(pollingRef.current);
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
             fetchFolders(); // Load folders once
+            fetchTags();    // Load tags once
         }
     }, [savedImapUser]); // Only fires when settings are loaded from DB, not when user types
 
@@ -254,6 +260,36 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         const { data, error } = await callEmailServer('folders', { config: settings, action: 'list' });
         if (data && !error) {
             setFolders(data);
+        }
+    };
+
+    const fetchTags = async () => {
+        const { data } = await supabase.from('email_tags').select('*').eq('user_id', currentUser.id);
+        if (data) setAvailableTags(data);
+    };
+
+    const createTag = async () => {
+        if (!newTagLabel) return;
+        const { data, error } = await supabase.from('email_tags').insert({
+            user_id: currentUser.id,
+            label: newTagLabel,
+            color: newTagColor
+        }).select();
+
+        if (error) alert('Erro ao criar tag: ' + error.message);
+        else if (data) {
+            setAvailableTags(prev => [...prev, data[0]]);
+            setNewTagLabel('');
+            // Optional: Close modal if intended, but keeping open for multiple adds
+        }
+    };
+
+    const deleteTag = async (tagId: string) => {
+        if (!confirm('Excluir esta tag?')) return;
+        const { error } = await supabase.from('email_tags').delete().eq('id', tagId);
+        if (error) alert('Erro ao excluir: ' + error.message);
+        else {
+            setAvailableTags(prev => prev.filter(t => t.id !== tagId));
         }
     };
 
@@ -453,18 +489,24 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </nav>
 
                     <div className="pt-4 mt-4 border-t border-gray-200">
-                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex justify-between items-center">
                             Tags rápidas
+                            <button onClick={() => setShowTagModal(true)} className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-brand-primary" title="Gerenciar Tags">
+                                <Cog6ToothIcon className="w-3 h-3" />
+                            </button>
                         </h3>
-                        {/* Demo Tags */}
-                        {['Urgente', 'Financeiro', 'Pessoal'].map(tag => (
+                        {/* User Tags */}
+                        {availableTags.length === 0 && (
+                            <p className="px-3 text-xs text-gray-400 italic">Nenhuma tag criada.</p>
+                        )}
+                        {availableTags.map(tag => (
                             <button 
-                                key={tag}
-                                onClick={() => { setView('inbox'); setFilterTag(tag); }}
-                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${filterTag === tag ? 'bg-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                                key={tag.id}
+                                onClick={() => { setView('inbox'); setFilterTag(tag.label); }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${filterTag === tag.label ? 'bg-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
                             >
-                                <span className={`w-2 h-2 rounded-full ${tag === 'Urgente' ? 'bg-red-500' : tag === 'Financeiro' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-                                {tag}
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span>
+                                {tag.label}
                             </button>
                         ))}
                     </div>
@@ -585,14 +627,16 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         <TagIcon className="w-5 h-5" />
                                     </button>
                                     <div className="absolute right-0 top-full mt-1 bg-white shadow-lg rounded-lg border border-gray-200 p-2 hidden group-hover:block min-w-[150px] z-50">
-                                        {['Urgente|#ef4444', 'Financeiro|#22c55e', 'Pessoal|#3b82f6'].map(opt => {
-                                            const [lbl, clr] = opt.split('|');
-                                            return (
-                                                <button key={lbl} onClick={() => handleAddTag(selectedEmail, lbl, clr)} className="block w-full text-left px-3 py-1 text-sm hover:bg-gray-100 rounded flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: clr }}></span> {lbl}
-                                                </button>
-                                            )
-                                        })}
+                                        {availableTags.map(tag => (
+                                            <button key={tag.id} onClick={() => handleAddTag(selectedEmail, tag.label, tag.color)} className="block w-full text-left px-3 py-1 text-sm hover:bg-gray-100 rounded flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></span> {tag.label}
+                                            </button>
+                                        ))}
+                                        <div className="border-t mt-1 pt-1">
+                                            <button onClick={() => setShowTagModal(true)} className="block w-full text-left px-3 py-1 text-xs text-brand-primary hover:bg-gray-50 rounded italic">
+                                                + Gerenciar Tags
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -762,6 +806,51 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </div>
                 ) : null}
             </div>
+
+            {/* --- Tag Management Modal --- */}
+            {showTagModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+                        <h3 className="text-lg font-bold mb-4">Gerenciar Tags</h3>
+
+                        <div className="flex gap-2 mb-4">
+                            <input
+                                className="flex-1 border rounded px-2"
+                                placeholder="Nova tag..."
+                                value={newTagLabel}
+                                onChange={e => setNewTagLabel(e.target.value)}
+                            />
+                            <input
+                                type="color"
+                                value={newTagColor}
+                                onChange={e => setNewTagColor(e.target.value)}
+                                className="w-8 h-8 rounded cursor-pointer border-none"
+                            />
+                            <button onClick={createTag} className="bg-brand-primary text-white p-2 rounded hover:bg-emerald-600">
+                                <PaperAirplaneIcon className="w-4 h-4 transform rotate-90" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {availableTags.map(tag => (
+                                <div key={tag.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }}></span>
+                                        <span>{tag.label}</span>
+                                    </div>
+                                    <button onClick={() => deleteTag(tag.id)} className="text-red-400 hover:text-red-600">
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={() => setShowTagModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
