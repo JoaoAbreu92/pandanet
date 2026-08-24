@@ -6,9 +6,17 @@ const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
-dotenv.config();
+// Robust .env loading
+dotenv.config(); // Default
+dotenv.config({ path: path.join(__dirname, '.env'), override: true });
+dotenv.config({ path: path.join(__dirname, '../.env'), override: true });
+dotenv.config({ path: '/root/pandanet/.env', override: true });
+if (!process.env.JWT_SECRET) {
+  dotenv.config({ path: '/root/supabase/supabase/docker/.env', override: true });
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -34,17 +42,24 @@ app.use(express.json());
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn('[auth] WhatsApp: Missing or invalid Authorization header');
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
   const token = authHeader.split(' ')[1];
   try {
-    if (!JWT_SECRET) throw new Error('JWT_SECRET not configured');
+    if (!JWT_SECRET) {
+      console.error('[auth] WhatsApp: JWT_SECRET not configured');
+      throw new Error('JWT_SECRET not configured');
+    }
     jwt.verify(token, JWT_SECRET);
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error('[auth] WhatsApp: Token verification failed:', err.message);
+    return res.status(401).json({ error: 'Invalid or expired token: ' + err.message });
   }
 }
+
+app.get('/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;

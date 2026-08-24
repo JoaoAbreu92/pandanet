@@ -46,7 +46,7 @@ app.use(express.json());
 function authMiddleware(req, res, next) {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.warn('[auth] Missing or invalid Authorization header');
+        console.warn('[auth] Email: Missing or invalid Authorization header');
         return res.status(401).json({ error: 'Missing or invalid Authorization header' });
     }
     const token = authHeader.split(' ')[1];
@@ -58,7 +58,7 @@ function authMiddleware(req, res, next) {
         jwt.verify(token, JWT_SECRET);
         next();
     } catch (err) {
-        console.error('[auth] Token verification failed:', err.message);
+        console.error('[auth] Email: Token verification failed:', err.message);
         return res.status(401).json({ error: 'Invalid or expired token: ' + err.message });
     }
 }
@@ -540,9 +540,9 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
 });
 
 // --- HEALTH CHECK ---
-app.get('/api/email/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/email/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
 // Also support root /health for direct testing
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
 
 app.listen(PORT, () => {
     console.log(`[email-server] Running on port ${PORT}`);
