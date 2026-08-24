@@ -38,7 +38,14 @@ async function connectToWhatsApp(companyId, connectionId) {
     console.log(`Starting WhatsApp session for connection: ${connectionId} (Company: ${companyId})`);
 
     // Create specific auth folder for this connection
-    const authPath = `auth_info_baileys/${connectionId}`;
+    const authPath = path.join(__dirname, 'auth_info_baileys', connectionId);
+
+    // Se a pasta não existe, vamos garantir que o diretório pai existe
+    const parentAuthPath = path.join(__dirname, 'auth_info_baileys');
+    if (!fs.existsSync(parentAuthPath)) {
+        fs.mkdirSync(parentAuthPath, { recursive: true });
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(authPath);
     const { version, isLatest } = await fetchLatestBaileysVersion();
     

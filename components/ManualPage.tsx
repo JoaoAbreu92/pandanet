@@ -27,11 +27,11 @@ const ManualPage: React.FC = () => {
     });
 
     const categories = customLinks.length > 0 ? customLinks : [
-        { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' },
-        { id: 'university', title: 'Universidade Panda', description: 'Implante o ERP de forma guiada.', icon: 'AcademicCapIcon', type: 'video' },
-        { id: 'ecosystem', title: 'Ecossistema Digital', description: 'Portal com soluções complementares.', icon: 'StarIcon', type: 'info' },
-        { id: 'certs', title: 'Certificações', description: 'Capacitação gratuita no sistema.', icon: 'BookOpenIcon', type: 'video' },
-        { id: 'academy', title: 'Panda Academy', description: 'Cursos, palestras e entrevistas.', icon: 'LightBulbIcon', type: 'video' },
+        // { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' },
+        // { id: 'university', title: 'Universidade Panda', description: 'Implante o ERP de forma guiada.', icon: 'AcademicCapIcon', type: 'video' },
+        // { id: 'ecosystem', title: 'Ecossistema Digital', description: 'Portal com soluções complementares.', icon: 'StarIcon', type: 'info' },
+        // { id: 'certs', title: 'Certificações', description: 'Capacitação gratuita no sistema.', icon: 'BookOpenIcon', type: 'video' },
+        // { id: 'academy', title: 'Panda Academy', description: 'Cursos, palestras e entrevistas.', icon: 'LightBulbIcon', type: 'video' },
         { id: 'guide', title: 'Guia do Usuário', description: 'Manual completo com treinamentos.', icon: 'QuestionMarkCircleIcon', type: 'info' },
     ];
     const [videos, setVideos] = useState<ManualVideo[]>([]);
@@ -274,7 +274,7 @@ const ManualPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Bottom Section: Success Cases/Promotion */}
+            {/* Bottom Section: Success Cases/Promotion - Commented Out
             <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm overflow-hidden relative">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div className="relative z-10">
@@ -295,14 +295,14 @@ const ManualPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="hidden md:block">
-                        <img 
-                            src={customPromo.image || "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop"} 
-                            alt="Sucesso" 
+                        <img
+                            src={customPromo.image || "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop"}
+                            alt="Sucesso"
                             className="rounded-2xl shadow-xl border-4 border-white max-h-72 object-cover"
                         />
                     </div>
                 </div>
-            </div>
+            </div> */}
             
             <div className="text-center py-4 text-gray-400 text-xs">
                 Carregar mais novidades ▼

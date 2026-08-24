@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Logo from './Logo';
 import {
     HomeIcon,
@@ -47,10 +47,31 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, customFeatures }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
-    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, crm: false });
+    const navRef = useRef<HTMLDivElement>(null);
 
     const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'crm') => {
-        setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
+        setOpenMenus(prev => {
+            const newState = { ...prev, [menu]: !prev[menu] };
+            // Se estamos abrindo o menu, vamos rolar para ele
+            if (newState[menu]) {
+                setTimeout(() => {
+                    const menuElement = document.getElementById(`menu-${menu}`);
+                    if (menuElement && navRef.current) {
+                        const navRect = navRef.current.getBoundingClientRect();
+                        const menuRect = menuElement.getBoundingClientRect();
+                        const relativeOffset = menuRect.top - navRect.top;
+                        const scrollTarget = navRef.current.scrollTop + relativeOffset - (navRect.height / 2) + (menuRect.height / 2);
+
+                        navRef.current.scrollTo({
+                            top: scrollTarget,
+                            behavior: 'smooth'
+                        });
+                    }
+                }, 300); // Aguarda a animação de expansão
+            }
+            return newState;
+        });
     };
 
     const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
@@ -158,7 +179,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         }
 
         return (
-            <div>
+            <div id={`menu-${menuKey}`}>
                 <button
                     onClick={(e) => {
                         e.preventDefault();
@@ -213,7 +234,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <Logo showText={isOpen} className={isOpen ? 'h-12' : 'h-10'} />
                 </div>
             </div>
-            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
+            <nav
+                ref={navRef}
+                className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar"
+            >
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
                 <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
                 <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
@@ -227,7 +251,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
                 <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
-                <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
+                {/* <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" /> */}
 
                 <NavMenu label={t('sidebar.rh_gestao')} icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
                     <NavItem page="directory" label={t('users.title')} icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />

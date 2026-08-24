@@ -31,15 +31,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const [tooltipDismissed, setTooltipDismissed] = useState(false);
 
     // Draggable state
-    const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+    const [position, setPosition] = useState({ x: window.innerWidth - 90, y: window.innerHeight - 90 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
         const handleResize = () => {
             setPosition(prev => ({
-                x: Math.min(prev.x, window.innerWidth - 80),
-                y: Math.min(prev.y, window.innerHeight - 80)
+                x: Math.max(20, Math.min(prev.x, window.innerWidth - 90)),
+                y: Math.max(20, Math.min(prev.y, window.innerHeight - 90))
             }));
         };
         window.addEventListener('resize', handleResize);

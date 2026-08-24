@@ -40,7 +40,7 @@ app.use(express.json());
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey.trim());
 
 // --- JWT Auth Middleware ---
 async function authMiddleware(req, res, next) {
@@ -75,14 +75,34 @@ app.get('/', (req, res) => {
 // Endpoint para iniciar sessão manualmente
 app.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;
-  console.log(`[POST] /sessions/${companyId}/start/${connectionId} - Recebido`); // Log de entrada
+  console.log(`[POST] /sessions/${companyId}/start/${connectionId} - Recebido`);
+
+  // Se já existe uma sessão, vamos tentar fechá-la antes de iniciar uma nova
+  // Isso ajuda a destravar sessões que ficaram em estado 'connecting' ou 'stale'
   if (sessions.has(connectionId)) {
-    return res.status(400).json({ status: 'error', message: 'Sessão já existe para esta conexão.' });
+    console.log(`[RESTART] Encerrando sessão existente para ${connectionId} antes de reiniciar...`);
+    try {
+      const oldSock = sessions.get(connectionId);
+      if (oldSock && typeof oldSock.end === 'function') {
+        oldSock.ev.removeAllListeners();
+        oldSock.end(undefined);
+      }
+    } catch (e) {
+      console.warn(`[RESTART] Erro ao fechar sessão antiga:`, e.message);
+    }
+    sessions.delete(connectionId);
   }
+
   try {
+    // Limpa qualquer timer de timeout anterior
+    if (sessions.has(connectionId + '_timer')) {
+      clearTimeout(sessions.get(connectionId + '_timer'));
+      sessions.delete(connectionId + '_timer');
+    }
+
     await connectToWhatsApp(companyId, connectionId);
     res.json({ status: 'success', message: `Iniciando sessão para conexão ${connectionId}` });
-    console.log(`[SUCCESS] Sessão iniciada para ${connectionId}`);
+    console.log(`[SUCCESS] Comando de início enviado para ${connectionId}`);
   } catch (error) {
     console.error('Erro ao iniciar sessão:', error);
     res.status(500).json({ status: 'error', message: 'Falha ao iniciar sessão' });
