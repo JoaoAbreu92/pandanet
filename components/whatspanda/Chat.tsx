@@ -311,14 +311,26 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     const msgSubscription = supabase
       .channel(`whatsapp_messages_changes_${selectedConversation.id}`)
       .on('postgres_changes', { 
-        event: 'INSERT', 
+        event: '*', 
         schema: 'public', 
         table: 'whatsapp_messages', 
         filter: `conversation_id=eq.${selectedConversation.id}` 
       }, payload => {
-        console.log('[WP-DEBUG] Nova mensagem recebida via Realtime');
-        const newMsg = payload.new as WhatsAppMessage;
-        setMessages(prev => [...prev, newMsg]);
+        console.log('[WP-DEBUG] Nova mensagem/update recebida via Realtime', payload);
+        const newMsg = payload.new as any; // Cast as any to avoid TS errors with missing type definitions
+        
+        if (payload.eventType === 'INSERT') {
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id || (newMsg.whatsapp_message_id && (m as any).whatsapp_message_id === newMsg.whatsapp_message_id))) return prev;
+            return [...prev, newMsg];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === newMsg.id);
+            if (!exists) return [...prev, newMsg];
+            return prev.map(m => m.id === newMsg.id ? newMsg : m);
+          });
+        }
       })
       .subscribe((status) => {
         console.log(`[WP-DEBUG] Realtime Status (Mensagens): ${status}`);
