@@ -32,4 +32,5 @@ services:
 
 networks:
   pandanet_network:
+    name: pandanet_pandanet_network
     external: true
