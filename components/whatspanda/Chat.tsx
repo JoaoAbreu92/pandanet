@@ -505,16 +505,40 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
    // --- Helpers ---
   const fixMediaUrl = (url?: string | null) => {
     if (!url) return '';
-    // Usa VITE_SUPABASE_URL ao invés do IP duro para evitar Mixed Content e erros de CORS
-    const supabaseBaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://77.37.43.60:8000';
-    if (url.includes('supabase-kong:8000')) {
-      return url.replace('http://supabase-kong:8000', supabaseBaseUrl).replace('supabase-kong:8000', supabaseBaseUrl);
+    let processedUrl = url;
+
+    // 1. Resolve host base para Supabase interno
+    const supabaseBaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    if (processedUrl.includes('supabase-kong:8000')) {
+      processedUrl = processedUrl.replace('http://supabase-kong:8000', supabaseBaseUrl).replace('supabase-kong:8000', supabaseBaseUrl);
     }
-    // Se a URL começar com barra, assumimos o host base correto
-    if (url.startsWith('/storage/v1/')) {
-        return `${supabaseBaseUrl}${url}`;
+    // 2. Se for path relativo
+    if (processedUrl.startsWith('/storage/v1/')) {
+        processedUrl = `${supabaseBaseUrl}${processedUrl}`;
     }
-    return url;
+
+    // 3. FIX MASTER PARA VPS / MIXED CONTENT
+    // Se o backend/DB salvou ou env de rede for HTTP (ex: http://77.37.43.60:8000), 
+    // mas o painel estiver rodando em HTTPS (https://pandanet...), o browser vai bloquear.
+    // Tenta contornar isso forçando https se for seguro ou via proxy do mesmo host!
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        // Se a url original estiver apontando para um IP via HTTP puro 
+        // e o sistema roda atrás de um proxy SSL, forçamos o path pelo mesmo host SSL
+        if (processedUrl.startsWith('http://')) {
+            // Em vez de falhar por Mixed Content pegando do IP direto,
+            // redireciona a requisição de storage para o host atual, assumindo que NGINX roteia.
+            // Extrai só a rota do storage (ex: /storage/v1/object/public/...)
+            const storagePathMatch = processedUrl.match(/(\/storage\/v1\/.+)/);
+            if (storagePathMatch) {
+               processedUrl = `${window.location.origin}${storagePathMatch[1]}`;
+            } else {
+               // Fallback: força https cegamente
+               processedUrl = processedUrl.replace('http://', 'https://');
+            }
+        }
+    }
+
+    return processedUrl;
   };
 
   const fetchConversations = async () => {
