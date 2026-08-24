@@ -668,6 +668,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (data && data.length > 0) {
       setSettings(data[0]); // Mantém um padrão para a abertura de ticket
       setConnections(data); // Preenche os canais disponíveis para o filtro avançado
+
+      // Definição padrão das conexões selecionadas nos filtros
+      const allowedConns = data.filter((c: any) => {
+        if (isAdmin) return true;
+        const allowed = permissions?.allowed_connections || [];
+        return allowed.length === 0 || allowed.includes(c.id);
+      }).map((c: any) => c.id);
+      setFilterConnection(allowedConns);
     }
   };
 
@@ -921,14 +929,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     // Filtro de filas/setores por permissão (para não administradores e apenas fora de "Meus")
     if (!isAdmin && activeTab !== 'meus') {
-      const canSeeAll = permissions.can_see_all_departments === true;
-      if (!canSeeAll) {
-        const allowedQueues = permissions.assigned_queues || [];
-        if (allowedQueues.length > 0) {
-          query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
-        } else {
-          query = query.is('queue_id', null);
-        }
+      const allowedQueues = permissions.assigned_queues || [];
+      if (allowedQueues.length > 0) {
+        query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
+      } else {
+        query = query.is('queue_id', null);
       }
     }
 
@@ -1951,7 +1956,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <div>
                   <p className="text-slate-500 mb-1">Conexão</p>
                   <div className="flex flex-wrap gap-1">
-                    {connections.map((c: any) => (
+                    {connections
+                      .filter((c: any) => {
+                        if (isAdmin) return true;
+                        const allowed = permissions?.allowed_connections || [];
+                        return allowed.length === 0 || allowed.includes(c.id);
+                      })
+                      .map((c: any) => (
                       <button
                         key={c.id}
                         onClick={() => setFilterConnection(prev =>
@@ -1977,7 +1988,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   <div className="flex flex-wrap gap-1">
                     {queues
                       .filter((q: any) => {
-                        if (isAdmin || permissions?.can_see_all_departments === true) return true;
+                        if (isAdmin) return true;
                         const allowed = permissions?.assigned_queues || [];
                         return allowed.includes(q.id);
                       })

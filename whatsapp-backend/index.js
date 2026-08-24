@@ -240,11 +240,7 @@ async function runAutoMigration() {
                       OR
                       (
                         queue_id IS NOT NULL 
-                        AND (
-                          (public.get_user_whatspanda_permissions()->>'can_see_all_departments')::boolean = true
-                          OR
-                          public.get_user_assigned_queues() ? queue_id::text
-                        )
+                        AND public.get_user_assigned_queues() ? queue_id::text
                       )
                       OR
                       (assigned_to IS NULL AND queue_id IS NULL)
@@ -264,11 +260,7 @@ async function runAutoMigration() {
                       OR
                       (
                         queue_id IS NOT NULL 
-                        AND (
-                          (public.get_user_whatspanda_permissions()->>'can_see_all_departments')::boolean = true
-                          OR
-                          public.get_user_assigned_queues() ? queue_id::text
-                        )
+                        AND public.get_user_assigned_queues() ? queue_id::text
                       )
                       OR
                       (assigned_to IS NULL AND queue_id IS NULL)
