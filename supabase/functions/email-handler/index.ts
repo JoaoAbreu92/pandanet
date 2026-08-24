@@ -4,7 +4,7 @@ const corsHeaders = {
 }
 
 // Helper para testar se uma porta TCP está aberta
-async function testConnection(host: string, port: number, timeout = 5000) {
+async function testConnection(host: string, port: number, timeout = 7000) {
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
@@ -18,7 +18,7 @@ async function testConnection(host: string, port: number, timeout = 5000) {
   }
 }
 
-console.log("Edge Function 'email-handler' V19 (Network Diagnostics) iniciada.");
+console.log("Edge Function 'email-handler' V20 (TLS Core Bypass) iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V19). Network Diagnostics active.' 
+      message: 'Edge Function Online (V20). TLS 1.2 Force & IDE Lint active.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       throw new Error("Ação (action) não informada no corpo da requisição.");
     }
 
-    console.log(`[V19] Executando ação: ${action}`);
+    console.log(`[V20] Executando ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações (settings) não fornecidas.");
@@ -55,18 +55,14 @@ Deno.serve(async (req) => {
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
       // --- DIAGNÓSTICO DE REDE ---
-      console.log(`[V19] Iniciando pré-teste de rede...`);
       const smtpReach = await testConnection(settings.smtp_host, Number(settings.smtp_port));
       const imapReach = await testConnection(settings.imap_host, Number(settings.imap_port));
 
-      console.log(`[V19] Rede SMTP (${settings.smtp_host}:${settings.smtp_port}):`, smtpReach.ok ? "ALCANÇÁVEL" : "FALHOU: " + smtpReach.error);
-      console.log(`[V19] Rede IMAP (${settings.imap_host}:${settings.imap_port}):`, imapReach.ok ? "ALCANÇÁVEL" : "FALHOU: " + imapReach.error);
-
       if (!smtpReach.ok) {
-        throw new Error(`SMTP: Servidor inacessível na porta ${settings.smtp_port}. Erro: ${smtpReach.error}`);
+        throw new Error(`SMTP (Inacessível): O servidor '${settings.smtp_host}' não responde na porta ${settings.smtp_port}. Verifique se o endereço está correto ou tente mail.${settings.smtp_host}.`);
       }
       if (!imapReach.ok) {
-        throw new Error(`IMAP: Servidor inacessível na porta ${settings.imap_port}. Erro: ${imapReach.error}`);
+        throw new Error(`IMAP (Inacessível): O servidor '${settings.imap_host}' não responde na porta ${settings.imap_port}. O erro 'os error 110' na Acrilight indica que este endereço (${settings.imap_host}) não possui serviço IMAP ativo ou o endereço está errado.`);
       }
 
       // --- TESTE SMTP ---
@@ -86,17 +82,13 @@ Deno.serve(async (req) => {
             checkServerIdentity: () => undefined
           },
           requireTLS: !isPort465, 
-          connectionTimeout: 20000, // Aumentado para 20s
-          greetingTimeout: 20000,   // Aumentado para 20s
-          debug: true,
-          logger: true
+          connectionTimeout: 20000,
+          greetingTimeout: 20000
         })
-
         await transporter.verify();
-        console.log("[SMTP] OK na V19");
+        console.log("[SMTP V20] OK");
       } catch (e: any) {
-        console.error("[SMTP ERROR V19]", e);
-        throw new Error(`SMTP: ${e.message}`);
+        throw new Error(`SMTP (Erro Protocolo): ${e.message}`);
       }
 
       // --- TESTE IMAP ---
@@ -114,27 +106,29 @@ Deno.serve(async (req) => {
           tls: { 
             rejectUnauthorized: false,
             servername: settings.imap_host,
-            checkServerIdentity: () => undefined
+            checkServerIdentity: () => undefined,
+            // Força TLS 1.2 no Deno para evitar problemas de handshake 1.3
+            minVersion: 'TLSv1.2',
+            maxVersion: 'TLSv1.2'
           },
-          clientContext: "PandaNet",
-          connectionTimeout: 30000, // Aumentado para 30s
-          greetingTimeout: 30000    // Aumentado para 30s
+          connectionTimeout: 40000,
+          greetingTimeout: 40000
         })
         await client.connect();
         await client.logout();
-        console.log("[IMAP] OK na V19");
+        console.log("[IMAP V20] OK");
       } catch (e: any) {
-        console.error("[IMAP ERROR V19]", e);
+        console.error("[IMAP ERROR V20]", e);
         let errorMsg = e.message;
         if (errorMsg.includes('Unexpected close')) {
-          errorMsg = `Conexão IMAP fechada inesperadamente. Verifique se a porta '${settings.imap_port}' é correta para o tipo de segurança usado.`;
+          errorMsg = `Conexão fechada durante o handshake. Dica para Hostinger: Certifique-se de usar imap.hostinger.com na porta 993 com SSL.`;
         }
         throw new Error(`IMAP: ${errorMsg}`);
       }
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conexão SMTP e IMAP validada com sucesso na V19!'
+        message: 'Conexão validada com sucesso na V20!'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -142,13 +136,12 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Ação '${action}' processada na V19.`
+      message: `Ação '${action}' ok na V20.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error: any) {
-    console.error(`[V19 ERROR]`, error.message);
     return new Response(JSON.stringify({
       success: false,
       error: error.message
