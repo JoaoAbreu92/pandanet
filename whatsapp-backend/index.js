@@ -389,10 +389,31 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
-        console.log(`[SYNC] Iniciando syncEvolutionData para ${instanceName}...`);
-        
-        // 1. Buscar Chats (Conversas ativas, incluindo grupos)
-        // O endpoint findChats é o mais completo para recuperar o estado atual do celular
+        // 1. Buscar TODOS os contatos da agenda para garantir que temos os nomes originais
+        const contactMap = {};
+        try {
+            console.log(`[SYNC] Buscando contatos em: ${evoUrl}/contact/findAll/${instanceName}`);
+            const contactRes = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, {
+                method: 'GET',
+                headers: { 'apikey': evoKey }
+            });
+            if (contactRes.ok) {
+                const allContacts = await contactRes.json();
+                if (Array.isArray(allContacts)) {
+                    console.log(`[SYNC] ${allContacts.length} contatos encontrados na agenda.`);
+                    for (const c of allContacts) {
+                        const jid = c.id || c.jid || c.remoteJid;
+                        if (!jid) continue;
+                        const p = jid.split('@')[0];
+                        contactMap[p] = c.pushName || c.verifiedName || c.name;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[SYNC] Erro ao buscar contatos da agenda:', e.message);
+        }
+
+        // 2. Buscar Chats para registrar contatos ativos que não estão salvos na agenda
         const chatEp = `${evoUrl}/chat/findChats/${instanceName}`;
         console.log(`[SYNC] Buscando chats via: ${chatEp}`);
         
@@ -401,90 +422,43 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) {
-            throw new Error(`Falha ao buscar chats: ${response.status}`);
-        }
-
-        const chats = await response.json();
-        
-        if (!Array.isArray(chats)) {
-            console.error(`[SYNC] Resposta inválida da Evolution (esperado array):`, JSON.stringify(chats));
-            return;
-        }
-
-        console.log(`[SYNC] ${chats.length} chats encontrados em ${instanceName}.`);
-
         const contactsToUpsert = [];
-        const conversationsToUpsert = [];
         const processedJids = new Set();
-
-        for (const chat of chats) {
-            const jid = chat.id || chat.remoteJid || chat.jid;
-            if (!jid || processedJids.has(jid)) continue;
-            processedJids.add(jid);
-
-            const isGroup = jid.includes('@g.us');
-            const phone = isGroup ? jid : jid.split('@')[0];
-            // Tenta puxar o nome preferencialmente do PushName (nome que a pessoa usa no perfil)
-            const rawName = chat.pushName || chat.verifiedName || chat.name || chat.contact?.name || chat.contact?.pushName;
-            const name = rawName ? rawName : formatPhoneDisplay(phone);
-
-            // Preparar Contato
+        
+        // Vamos sempre alimentar a lista de contatos baseada na agenda primeiro
+        for (const [phone, cName] of Object.entries(contactMap)) {
+            processedJids.add(phone);
             contactsToUpsert.push({
                 company_id: companyId,
                 phone: phone,
-                name: name,
+                name: cName || formatPhoneDisplay(phone),
                 updated_at: new Date().toISOString()
-            });
-
-            // Preparar Conversa (se houve mensagem)
-            // Se o chat tem 'lastMessage', usamos o timestamp dela
-            const lastMsgAt = chat.messageTimestamp 
-                ? new Date(chat.messageTimestamp * 1000).toISOString() 
-                : new Date().toISOString();
-
-            conversationsToUpsert.push({
-                company_id: companyId,
-                connection_id: connectionId,
-                contact_name: name,
-                contact_phone: phone,
-                status: 'aberto', // Chats sincronizados entram como abertos
-                last_message_at: lastMsgAt,
-                unread_count: chat.unreadCount || 0
             });
         }
 
+        if (response.ok) {
+            const chats = await response.json();
+            if (Array.isArray(chats)) {
+                console.log(`[SYNC] ${chats.length} chats para mapear.`);
+                for (const chat of chats) {
+                    const jid = chat.id || chat.remoteJid || chat.jid;
+                    const isGroup = jid.includes('@g.us');
+                    const phone = isGroup ? jid : jid.split('@')[0];
 
-        // 2. Fallback: Buscar Contatos se chats vierem vazios ou para garantir lista completa
-        if (chats.length === 0) {
-            console.log(`[SYNC] findChats retornou vazio. Tentando fetchContacts...`);
-            try {
-                // A Evolution v1.x costuma ter /contact/fetchContacts como POST ou GET dependendo da build
-                const contactRes = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, {
-                    method: 'GET',
-                    headers: { 'apikey': evoKey }
-                });
-                if (contactRes.ok) {
-                    const allContacts = await contactRes.json();
-                    if (Array.isArray(allContacts)) {
-                        console.log(`[SYNC] ${allContacts.length} contatos encontrados via findAll.`);
-                        for (const c of allContacts) {
-                            const jid = c.id || c.jid;
-                            if (!jid || processedJids.has(jid)) continue;
-                            processedJids.add(jid);
-                            const phone = jid.split('@')[0];
-                            const rawName = c.pushName || c.verifiedName || c.name;
-                            contactsToUpsert.push({
-                                company_id: companyId,
-                                phone: phone,
-                                name: rawName ? rawName : formatPhoneDisplay(phone),
-                                updated_at: new Date().toISOString()
-                            });
-                        }
-                    }
+                    if (!jid || processedJids.has(phone)) continue;
+                    processedJids.add(phone);
+
+                    // Tenta puxar o nome preferencialmente do PushName ou do Mapa
+                    const rawName = chat.pushName || chat.verifiedName || chat.name || contactMap[phone];
+                    const name = rawName ? rawName : formatPhoneDisplay(phone);
+
+                    contactsToUpsert.push({
+                        company_id: companyId,
+                        phone: phone,
+                        name: name,
+                        updated_at: new Date().toISOString()
+                    });
                 }
-            } catch (e) {
-                console.error('[SYNC] Erro no fallback de contatos:', e.message);
             }
         }
 
@@ -497,40 +471,10 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             if (errC) console.error('[SYNC] Erro contatos:', errC.message);
         }
 
-        // 3. Upsert de Conversas
-        if (conversationsToUpsert.length > 0) {
-            console.log(`[SYNC] Upsert de ${conversationsToUpsert.length} conversas...`);
-            // Nota: whatsapp_conversations usa company_id, connection_id e contact_phone como critério de busca
-            // Mas o upsert real depende da constraint do banco. Geralmente id ou um índice único.
-            // Para evitar duplicatas, vamos iterar e garantir que não criamos 2 conversas pro mesmo número na mesma conexão.
-            
-            for (const conv of conversationsToUpsert) {
-                // Verificar se já existe
-                const { data: existing } = await supabase
-                    .from('whatsapp_conversations')
-                    .select('id')
-                    .eq('company_id', companyId)
-                    .eq('connection_id', connectionId)
-                    .eq('contact_phone', conv.contact_phone)
-                    .maybeSingle();
-
-                if (existing) {
-                    await supabase
-                        .from('whatsapp_conversations')
-                        .update({ 
-                            last_message_at: conv.last_message_at,
-                            unread_count: conv.unread_count,
-                            contact_name: conv.contact_name
-                        })
-                        .eq('id', existing.id);
-                } else {
-                    await supabase
-                        .from('whatsapp_conversations')
-                        .insert(conv);
-                }
-            }
-        }
-
+        // A Sincronização NÃO irá mais criar conversas passadas na tela inteira.
+        // Apenas alimenta a agenda de contatos. Tickets nascem APENAS de novos atendimentos.
+        
+        console.log(`[SYNC] Concluído para ${instanceName}. Histórico limpo.`);
         console.log(`[SYNC] Sincronização de ${instanceName} concluída.`);
     } catch (err) {
         console.error(`[SYNC] Erro fatal em syncEvolutionData:`, err.message);
