@@ -55,6 +55,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [newColor, setNewColor] = useState(PRESET_GRADIENTS[0].class);
     const [newXP, setNewXP] = useState<number>(15);
     const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+    const [editingBadgeId, setEditingBadgeId] = useState<string | null>(null);
     
     // Award Badge Form State
     const [targetUserId, setTargetUserId] = useState('');
@@ -210,6 +211,25 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         }
     };
 
+    const handleEditBadge = (badge: CompanyBadge) => {
+        setEditingBadgeId(badge.id);
+        setNewName(badge.name);
+        setNewDescription(badge.description || '');
+        setNewIcon(badge.icon);
+        setNewColor(badge.color);
+        setNewXP(badge.xp || 15);
+        setActiveTab('create');
+    };
+
+    const handleCancelEdit = () => {
+        setEditingBadgeId(null);
+        setNewName('');
+        setNewDescription('');
+        setNewIcon('🏆');
+        setNewColor(PRESET_GRADIENTS[0].class);
+        setNewXP(15);
+    };
+
     const handleCreateBadge = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newName.trim() || !newIcon.trim() || !newColor) {
@@ -218,28 +238,43 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         }
 
         try {
-            const { error } = await supabase
-                .from('company_badges')
-                .insert({
-                    company_id: company.id,
-                    name: newName,
-                    description: newDescription,
-                    icon: newIcon,
-                    color: newColor,
-                    xp: newXP
-                });
+            const badgePayload = {
+                company_id: company.id,
+                name: newName,
+                description: newDescription,
+                icon: newIcon,
+                color: newColor,
+                xp: newXP
+            };
 
-            if (error) throw error;
+            if (editingBadgeId) {
+                const { error } = await supabase
+                    .from('company_badges')
+                    .update(badgePayload)
+                    .eq('id', editingBadgeId);
 
-            alert('Selo criado com sucesso!');
+                if (error) throw error;
+                alert('Selo atualizado com sucesso!');
+                setEditingBadgeId(null);
+            } else {
+                const { error } = await supabase
+                    .from('company_badges')
+                    .insert(badgePayload);
+
+                if (error) throw error;
+                alert('Selo criado com sucesso!');
+            }
+
             setNewName('');
             setNewDescription('');
             setNewIcon('🏆');
             setNewXP(15);
+            setNewColor(PRESET_GRADIENTS[0].class);
             fetchCompanyBadges();
+            fetchAwardHistory();
         } catch (error: any) {
-            console.error('Error creating badge:', error);
-            alert('Erro ao criar selo: ' + error.message);
+            console.error('Error saving badge:', error);
+            alert('Erro ao salvar selo: ' + error.message);
         }
     };
 
@@ -482,7 +517,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
             {activeTab === 'create' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1">
-                        <Card title="Criar Novo Selo" className="bg-white dark:bg-slate-800 shadow-sm">
+                        <Card title={editingBadgeId ? "Editar Selo" : "Criar Novo Selo"} className="bg-white dark:bg-slate-800 shadow-sm">
                             <form onSubmit={handleCreateBadge} className="space-y-4 mt-2">
                                 {/* Interactive Preview Card */}
                                 <div className="flex items-center space-x-4 mb-4 bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -604,13 +639,22 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                     </div>
                                 </div>
 
-                                <div className="pt-2">
+                                <div className="pt-2 space-y-2">
                                     <button
                                         type="submit"
                                         className="w-full py-2.5 bg-brand-primary hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-md active:scale-98 text-sm"
                                     >
-                                        Criar Selo da Empresa
+                                        {editingBadgeId ? 'Salvar Alterações' : 'Criar Selo da Empresa'}
                                     </button>
+                                    {editingBadgeId && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelEdit}
+                                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-700 dark:text-gray-250 font-bold rounded-xl transition-all active:scale-98 text-xs"
+                                        >
+                                            Cancelar Edição
+                                        </button>
+                                    )}
                                 </div>
                             </form>
                         </Card>
@@ -641,12 +685,18 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex justify-end mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                                            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                                                <button
+                                                    onClick={() => handleEditBadge(badge)}
+                                                    className="text-xs font-bold text-slate-500 hover:text-brand-primary px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                                >
+                                                    Editar
+                                                </button>
                                                 <button
                                                     onClick={() => handleDeleteBadge(badge.id)}
-                                                    className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
+                                                    className="text-xs font-bold text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                                 >
-                                                    Excluir Selo
+                                                    Excluir
                                                 </button>
                                             </div>
                                         </div>
