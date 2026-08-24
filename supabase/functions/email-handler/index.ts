@@ -3,7 +3,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("Edge Function 'email-handler' V13 (Deep Debug) iniciada.");
+console.log("Edge Function 'email-handler' V14 (Power TLS Bypass) iniciada.");
+
+// Tentativa de forçar o bypass no nível do processo Deno/Node emulation
+try {
+  Deno.env.set('NODE_TLS_REJECT_UNAUTHORIZED', '0');
+  console.log("NODE_TLS_REJECT_UNAUTHORIZED definido como '0'.");
+} catch (e) {
+  console.warn("Não foi possível definir NODE_TLS_REJECT_UNAUTHORIZED via código:", e.message);
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,7 +21,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function email-handler Online (V13). Debug Mode Active.'
+      message: 'Edge Function email-handler Online (V14). TLS Power Bypass Active.' 
     }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
@@ -31,7 +39,7 @@ Deno.serve(async (req) => {
       throw new Error("Ação (action) não informada no corpo da requisição.");
     }
 
-    console.log(`[V13] Executando ação: ${action}`);
+    console.log(`[V14] Executando ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações (settings) não fornecidas.");
@@ -39,7 +47,7 @@ Deno.serve(async (req) => {
       const nodemailer = await import("npm:nodemailer@6.9.7");
       const { ImapFlow } = await import("npm:imapflow@1.0.141");
 
-      // Teste SMTP com Debug Ativo
+      // Teste SMTP com Bypass Agressivo
       try {
         console.log(`[SMTP] Iniciando transporte para ${settings.smtp_host}:${settings.smtp_port}`);
         const transporter = nodemailer.default.createTransport({
@@ -50,22 +58,28 @@ Deno.serve(async (req) => {
             user: settings.user,
             pass: settings.pass,
           },
-          debug: true, // Habilita logs detalhados do protocolo
-          logger: true, // Exibe o log no console
+          debug: true,
+          logger: true,
           tls: { 
             rejectUnauthorized: false,
-            minVersion: 'TLSv1', // Permite versões mais antigas para compatibilidade
-            checkServerIdentity: () => null // Retorna null em vez de undefined (alguns ambientes preferem assim)
+            servername: settings.smtp_host,
+            checkServerIdentity: (hostname, cert) => {
+              console.log(`[TLS] Ignorando verificação de identidade para: ${hostname}`);
+              return undefined;
+            }
           },
-          // Garante que o Nodemailer não tente STARTTLS se a porta for 465 fixa
           requireTLS: settings.smtp_port === 465
         })
 
         await transporter.verify();
-        console.log("[SMTP] Verificação concluída com sucesso.");
+        console.log("[SMTP] Sucesso na verificação.");
       } catch (e: any) {
         console.error("[SMTP ERROR]", e);
-        throw new Error(`Erro no Servidor de Envio (SMTP): ${e.message}`);
+        let msg = e.message;
+        if (msg.includes('NotValidForName')) {
+          msg += " (Dica: O Deno é rígido com certificados. Tente usar o endereço IP do servidor SMTP se o hostname falhar).";
+        }
+        throw new Error(`Erro no Servidor de Envio (SMTP): ${msg}`);
       }
 
       // Teste IMAP com Bypass Agressivo
@@ -79,16 +93,16 @@ Deno.serve(async (req) => {
             user: settings.user,
             pass: settings.pass,
           },
-          logger: true, // Ativa logs do IMAPFlow
+          logger: true,
           tls: { 
             rejectUnauthorized: false,
-            minVersion: 'TLSv1',
-            checkServerIdentity: () => null
+            servername: settings.imap_host,
+            checkServerIdentity: () => undefined
           }
         })
         await client.connect();
         await client.logout();
-        console.log("[IMAP] Conexão concluída com sucesso.");
+        console.log("[IMAP] Sucesso na conexão.");
       } catch (e: any) {
         console.error("[IMAP ERROR]", e);
         throw new Error(`Erro no Servidor de Recebimento (IMAP): ${e.message}`);
@@ -96,7 +110,7 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        message: 'Conexão SMTP e IMAP estabelecida com sucesso na V13!'
+        message: 'Conexão estabelecida com sucesso na V14 (Bypass Ativo)!'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -104,17 +118,16 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Ação '${action}' reconhecida na V13.`
+      message: `Ação '${action}' na V14.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error: any) {
-    console.error(`[RUNTIME ERROR V13]`, error.message);
+    console.error(`[RUNTIME ERROR V14]`, error.message);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      details: error.stack // Ajuda a depurar onde exatamente no código Deno falhou
+      error: error.message
     }), {
       status: 200, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
