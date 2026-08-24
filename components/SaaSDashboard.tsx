@@ -108,6 +108,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [updateDuration, setUpdateDuration] = useState(15);
     const [updateDurationUnit, setUpdateDurationUnit] = useState<'hours' | 'days'>('hours');
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isAddingUser, setIsAddingUser] = useState(false);
+    const [newUserForm, setNewUserForm] = useState({ name: '', email: '', password: '' });
+    const [isSavingUser, setIsSavingUser] = useState(false);
 
     // --- Buscar Dados ---
     const fetchData = async () => {
@@ -446,6 +449,38 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             closeModal();
         } else {
             alert("Erro: Função de impersonate não disponível ou empresa não selecionada.");
+        }
+    };
+
+    const handleAddUserToCompany = async () => {
+        if (!selectedCompany || !selectedCompany.id) return;
+        if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
+            showToast('Preencha nome, email e senha.', 'error');
+            return;
+        }
+
+        setIsSavingUser(true);
+        try {
+            console.log("[SaaS] Adicionando usuário manualmente via RPC...");
+            const { data, error } = await supabase.rpc('create_admin_user_for_company_safe', {
+                p_company_id: selectedCompany.id,
+                p_admin_email: newUserForm.email,
+                p_admin_password: newUserForm.password,
+                p_admin_name: newUserForm.name
+            });
+
+            if (error) throw error;
+            if (data && !data.success) throw new Error(data.error);
+
+            showToast('Usuário adicionado com sucesso!', 'success');
+            setIsAddingUser(false);
+            setNewUserForm({ name: '', email: '', password: '' });
+            fetchCompanyUsers(selectedCompany.id); // Atualiza a lista
+        } catch (err: any) {
+            console.error("Erro ao adicionar usuário:", err);
+            showToast('Erro: ' + (err.message || 'Falha ao criar usuário'), 'error');
+        } finally {
+            setIsSavingUser(false);
         }
     };
 
@@ -1379,7 +1414,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 <div className="flex items-center justify-between text-xs">
                                                     <span className="text-gray-400">Data do Cadastro:</span>
                                                     <span className="text-gray-600 dark:text-gray-300">
-                                                        {new Date(user.created_at).toLocaleDateString()}
+                                                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1616,8 +1651,53 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <div className="p-6">
                         <div className="flex justify-between items-center mb-4">
                             <p className="text-sm text-gray-500">Gerencie os usuários e administradores desta empresa.</p>
-                            {/* Future: Add User Invite Button */}
-                        </div>
+                                <button
+                                    onClick={() => setIsAddingUser(!isAddingUser)}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isAddingUser ? 'bg-gray-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                                >
+                                    {isAddingUser ? 'Cancelar' : <><PlusIcon className="w-4 h-4" /> ADD</>}
+                                </button>
+                            </div>
+
+                            {isAddingUser && (
+                                <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800 rounded-xl animate-fadeIn">
+                                    <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                                        <PlusIcon className="w-4 h-4" /> Novo Administrador para {selectedCompany.name}
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input
+                                            type="text"
+                                            placeholder="Nome Completo"
+                                            value={newUserForm.name}
+                                            onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                                            className="p-2.5 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <input
+                                            type="email"
+                                            placeholder="E-mail"
+                                            value={newUserForm.email}
+                                            onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                                            className="p-2.5 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <input
+                                            type="password"
+                                            placeholder="Senha"
+                                            value={newUserForm.password}
+                                            onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                                            className="p-2.5 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            onClick={handleAddUserToCompany}
+                                            disabled={isSavingUser}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2"
+                                        >
+                                            {isSavingUser ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : 'Criar Usuário'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase font-bold text-gray-500">
