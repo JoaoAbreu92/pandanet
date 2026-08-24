@@ -520,7 +520,8 @@ const AppContent: React.FC = () => {
                 'openTickets': 'tickets',
                 'viewKnowledgeBase': 'kb',
                 'viewPolicies': 'policies',
-                'viewRecognition': 'wall'
+                'viewRecognition': 'wall',
+                'viewWhatsPanda': 'whatspanda'
             };
 
             const featureId = featureMap[permission];
@@ -566,7 +567,8 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'whatspanda': return <WhatsPanda />;
+            case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda /> : null;
+
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };

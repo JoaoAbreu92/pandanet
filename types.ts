@@ -201,6 +201,17 @@ export interface EmployeePermissions {
   // New Global Permissions
   createEvents: boolean;
   manageMarketplace: boolean;
+  viewWhatsPanda: boolean;
+}
+
+// WhatsApp Permissions
+export interface WhatsAppPermissions {
+  can_view_contacts: boolean;
+  can_edit_contacts: boolean;
+  can_view_chats: boolean;
+  can_send_messages: boolean;
+  can_send_media: boolean;
+  can_manage_settings: boolean;
 }
 
 export interface Employee {
@@ -221,6 +232,7 @@ export interface Employee {
   isCompanyAdmin?: boolean; // Changed from is_company_admin
   isOnline?: boolean;
   permissions: EmployeePermissions;
+  whatspanda_permissions?: WhatsAppPermissions; // New field
   phone?: string;
   officeLocation?: string;
   bio?: string;

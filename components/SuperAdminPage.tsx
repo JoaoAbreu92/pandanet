@@ -120,6 +120,7 @@ const CompanyFeaturesModal: React.FC<{
                            <FeatureCheckbox label="Calendário" featureKey="viewCalendar" />
                            <FeatureCheckbox label="Marketplace" featureKey="useMarketplace" />
                            <FeatureCheckbox label="Bem-Estar" featureKey="viewWellbeing" />
+                            <FeatureCheckbox label="WhatsPanda" featureKey="viewWhatsPanda" />
                         </div>
                         <div className="space-y-2">
                            <h4 className="font-semibold text-brand-text">Módulos Agrupados</h4>

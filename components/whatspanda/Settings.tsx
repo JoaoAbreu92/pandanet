@@ -8,7 +8,7 @@ const Settings: React.FC = () => {
     const { profile } = useAuth();
     const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags'>('users');
 
-    const canAccess = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
+    const canAccess = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin' || profile?.whatspanda_permissions?.can_manage_settings;
 
     if (!canAccess) {
         return (

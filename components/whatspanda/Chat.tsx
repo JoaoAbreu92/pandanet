@@ -17,7 +17,22 @@ import {
   Clock
 } from 'lucide-react';
 
+import { useAuth } from '../AuthContext';
+
 const Chat: React.FC = () => {
+  const { profile } = useAuth();
+  const permissions = profile?.whatspanda_permissions || {};
+  const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
+  const canSendMessages = isAdmin || permissions.can_send_messages !== false; // Default true if undefined? No, types say boolean. Let's assume false default if not admin.
+  // Actually, UsersTab set defaults.
+  // Let's being strict:
+  // const canSendMessages = isAdmin || !!permissions.can_send_messages;
+
+  // However, for existing users without permissions set, we might want to allow or block?
+  // Block is safer.
+
+  const canSendMedia = isAdmin || !!permissions.can_send_media;
+  const canSendMessagesResult = isAdmin || !!permissions.can_send_messages;
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
@@ -264,21 +279,27 @@ const Chat: React.FC = () => {
 
             {/* Input Area */}
             <div className="p-3 bg-white flex items-center gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
+              <button
+                className={`p-2 rounded-full ${canSendMedia ? 'hover:bg-gray-100 text-gray-500' : 'opacity-50 cursor-not-allowed text-gray-300'}`}
+                disabled={!canSendMedia}
+                title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
+              >
                 <Paperclip className="w-5 h-5" />
               </button>
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Digite uma mensagem..."
-                className="flex-1 py-2 px-4 bg-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                onKeyDown={(e) => e.key === 'Enter' && canSendMessagesResult && handleSendMessage()}
+                placeholder={canSendMessagesResult ? "Digite uma mensagem..." : "Apenas leitura"}
+                disabled={!canSendMessagesResult}
+                className="flex-1 py-2 px-4 bg-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-200 disabled:text-gray-500"
               />
               <button 
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim()}
+                disabled={!newMessage.trim() || !canSendMessagesResult}
                 className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transform transition-transform active:scale-95"
+                title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
               >
                 <Send className="w-5 h-5" />
               </button>

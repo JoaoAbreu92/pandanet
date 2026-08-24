@@ -21,23 +21,56 @@ const WhatsPanda: React.FC = () => {
   const { profile } = useAuth();
   const [currentView, setCurrentView] = useState<View>('chat');
 
-  const canManageSettings = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
+  const permissions = profile?.whatspanda_permissions || {
+    can_view_contacts: false,
+    can_edit_contacts: false,
+    can_view_chats: false,
+    can_send_messages: false,
+    can_send_media: false,
+    can_manage_settings: false
+  };
+
+  // Admin override
+  if (profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin') {
+    permissions.can_view_contacts = true;
+    permissions.can_edit_contacts = true;
+    permissions.can_view_chats = true;
+    permissions.can_send_messages = true;
+    permissions.can_send_media = true;
+    permissions.can_manage_settings = true;
+  }
 
   const menuItems = [
-    { id: 'chat', label: 'Conversas', icon: MessageCircle, view: 'chat' },
-    { id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' },
-    { id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' },
-    ...(canManageSettings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
+    ...(permissions.can_view_chats ? [{ id: 'chat', label: 'Conversas', icon: MessageCircle, view: 'chat' }] : []),
+    ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
+    ...(permissions.can_manage_settings ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
+    ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
   ];
 
+  // Set default view if current is invalid
+  React.useEffect(() => {
+    const validViews = menuItems.map(item => item.view);
+    if (!validViews.includes(currentView) && validViews.length > 0) {
+      setCurrentView(validViews[0] as View);
+    }
+  }, [permissions, currentView]);
+
   const renderView = () => {
+    if (menuItems.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500">
+          <MessageCircle className="w-12 h-12 mb-4 text-gray-300" />
+          <p>Você não tem permissão para acessar o WhatsPanda.</p>
+        </div>
+      );
+    }
+
     switch (currentView) {
-      case 'chat': return <Chat />;
-      case 'contacts': return <Contacts />;
-      case 'new-ticket': return <NewTicket />;
-      case 'channels': return <Channels />;
-      case 'settings': return <Settings />;
-      default: return <Chat />;
+      case 'chat': return permissions.can_view_chats ? <Chat /> : null;
+      case 'contacts': return permissions.can_view_contacts ? <Contacts /> : null;
+      case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
+      case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
+      default: return null;
     }
   };
 
