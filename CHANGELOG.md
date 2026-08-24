@@ -4,6 +4,31 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.1.5 beta teste
+18/06/2026
+🗞️ Nota de Atualização - PandaNet v1.1.5 Beta Teste
+Esta atualização foca em usabilidade, correções de bugs visuais no WhatsPanda, melhorias importantes de responsividade em telas menores e a nova visualização semanal no Calendário.
+
+🚀 O que há de novo?
+
+📅 Visualização Semanal (WeekView) no Calendário
+- Nova Visão Semanal: Adicionada a opção "Semana" ao cabeçalho do Calendário.
+- Navegação Avançada: Navegue semana a semana de forma fluida.
+- Distribuição Inteligente: Exibição limpa de reuniões, feriados, tarefas e aniversários distribuídos nos 7 dias da semana corrente.
+
+🎨 Melhorias Visuais e de Responsividade no WhatsPanda
+- Correção de Fontes e Bold: Removido o peso excessivo em fontes do WhatsPanda, forçando o uso da fonte padrão Arial/sans-serif. Isso elimina cortes de palavras e textos em colunas e menus de conversas.
+- Gemini API Key Sem Extravasamento: Ajustado o input e botão "Salvar Chave" do Google Gemini nas configurações do Chatbot para empilhar em telas de celular, sem quebrar o layout.
+- Tabelas Responsivas: As tabelas e modais de Usuários, Setores (Filas) e Etiquetas agora têm suporte a rolagem horizontal suave (`overflow-x-auto`) e ajuste automático de largura no mobile.
+
+🛡️ Correção do Menu de Usuário (Z-Index)
+- Visibilidade Sempre no Topo: Aumentado o z-index do menu dropdown do cabeçalho (onde estão Notas Rápidas, Tarefas, etc.) para que ele nunca fique por trás das informações do cliente no WhatsPanda ou outras janelas da intranet.
+
+⚡ Resolução de Erros do Console (Estabilidade)
+- Sem Promessas Rejeitadas (403): Adicionado tratamento de erros nas consultas à tabela `whatsapp_channel_users` e ao arquivo de som de notificações (`notification_sound`), limpando o console do desenvolvedor.
+
+---
+
 Versão 1.1.3 beta
 01/06/2026
 🗞️ Nota de Atualização - PandaNet v1.1.3 Beta
