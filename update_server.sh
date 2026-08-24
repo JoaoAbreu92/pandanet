@@ -14,7 +14,13 @@ docker compose -f docker-compose.production.yml down --remove-orphans
 echo "🚀 Reconstruindo e iniciando o sistema..."
 docker compose -f docker-compose.production.yml up -d --build
 
-# 4. Atualizar e reiniciar processos do PM2
+# 4. Aplicar correções de banco de dados (Ex: agent_id, RPCs)
+echo "🗄️ Aplicando correções de banco de dados na VPS..."
+# Aguarda o banco subir se necessário
+sleep 5
+docker exec -i supabase-db psql -U postgres -d postgres < supabase/vps_fix_2026.sql
+
+# 5. Atualizar e reiniciar processos do PM2
 echo "🔄 Reiniciando processos PM2..."
 pm2 restart all --update-env
 
