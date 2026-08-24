@@ -82,51 +82,26 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
 
 
                 <div className="flex items-center space-x-4">
-                    {(currentUser.isAdmin || currentUser.email === 'ti@grupopixel.com.br') && (
+                    {currentUser.email === 'ti@grupopixel.com.br' && (
                         <>
+                            {/* Diagnóstico Master Admin - Agora no Header */}
                             <button
-                                onClick={async () => {
-                                    const { data, error } = await supabase.from('notifications').select('id, title').order('created_at', { ascending: false }).limit(5);
-                                    const channels = (supabase as any).realtime?.channels;
-                                    const activeChannels = channels ? Object.keys(channels).length : 0;
-
-                                    if (error) {
-                                        alert(`ERRO BANCO: ${error.message}`);
-                                    } else {
-                                        if (data && data.length === 0) {
-                                            alert(`Banco OK. Canais Ativos: ${activeChannels}. Nenhuma notificação encontrada no banco.`);
-                                        } else if (data) {
-                                            alert(`Sucesso! Banco OK. Canais Ativos: ${activeChannels}. Última: ${data[0].title}`);
-                                        }
-                                    }
-                                }}
-                                className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-                                title="Verificar Diagnóstico"
+                                onClick={onToggleDebug}
+                                className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all active:scale-95 group"
+                                title="Painel de Diagnóstico Lateral"
                             >
-                                <Cog6ToothIcon className="w-5 h-5 text-blue-400" />
+                                <BugAntIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
                             </button>
 
-                            {/* Diagnóstico Master Admin - Agora no Header */}
-                            {currentUser.email === 'ti@grupopixel.com.br' && (
-                                <button
-                                    onClick={onToggleDebug}
-                                    className="p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all active:scale-95 group"
-                                    title="Painel de Diagnóstico"
-                                >
-                                    <BugAntIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                                </button>
-                            )}
-
                             {/* Botão de Verificação (Engrenagem) - Redireciona para página de diagnóstico */}
-                            {(currentUser.role === 'admin' || currentUser.email === 'ti@grupopixel.com.br') && (
-                                <button
-                                    onClick={() => onNavigate('diagnostics' as Page)}
-                                    className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all active:scale-95 group"
-                                    title="Página de Diagnóstico"
-                                >
-                                    <Cog6ToothIcon className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
-                                </button>
-                            )}
+                            <button
+                                onClick={() => onNavigate('diagnostics' as Page)}
+                                className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all active:scale-95 group"
+                                title="Página de Diagnóstico"
+                            >
+                                <Cog6ToothIcon className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                            </button>
+                            
                             <button
                                 onClick={() => window.location.reload()}
                                 className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"

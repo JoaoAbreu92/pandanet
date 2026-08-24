@@ -126,6 +126,72 @@ setInterval(async () => {
         }
     }
 }, 60000);
+// --- FETCH BY IDS ---
+app.post('/api/email/fetch-by-ids', authMiddleware, async (req, res) => {
+    const { config, messageIds } = req.body;
+    if (!config || !messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+        return res.json({ emails: [], total: 0 });
+    }
+    console.log(`[email-server] FETCH BY IDS: ${messageIds.length} ids for ${config.imap_user}`);
+    try {
+        const client = await getPooledClient(config);
+        const folders = await client.list();
+        const allResults = [];
+        
+        for (const folder of folders) {
+            const lcPath = folder.path.toLowerCase();
+            if (lcPath.includes('trash') || lcPath.includes('lixeira') || lcPath.includes('spam') || lcPath.includes('junk')) {
+                continue;
+            }
+            const lock = await client.getMailboxLock(folder.path);
+            try {
+                // Search by Message-ID (header) or IMAP UID
+                const searchPromises = messageIds.map(async (id) => {
+                    const criteria = id.includes('@') ? { header: { 'Message-ID': id } } : { uid: String(id) };
+                    return client.search(criteria).catch(() => []);
+                });
+                const uidsArrays = await Promise.all(searchPromises);
+                const uids = [...new Set(uidsArrays.flat())];
+                
+                if (uids.length > 0) {
+                    for await (const message of client.fetch(uids, { envelope: true, uid: true, source: true })) {
+                        const parsed = await simpleParser(message.source);
+                        const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
+                        allResults.push({
+                            uid: message.uid,
+                            messageId: message.envelope.messageId,
+                            subject: message.envelope.subject || '(Sem Assunto)',
+                            from: message.envelope.from?.[0]?.address || 'Desconhecido',
+                            to: (message.envelope.to || []).map(addr => addr.address).join(', '),
+                            cc: (message.envelope.cc || []).map(addr => addr.address).join(', '),
+                            to_full: (message.envelope.to || []).map(addr => ({ 
+                                address: addr.address, 
+                                name: addr.name || addr.address.split('@')[0] 
+                            })),
+                            cc_full: (message.envelope.cc || []).map(addr => ({ 
+                                address: addr.address, 
+                                name: addr.name || addr.address.split('@')[0] 
+                            })),
+                            date: message.envelope.date,
+                            flags: message.flags,
+                            snippet: snippet + (snippet.length === 100 ? '...' : ''),
+                            folder: folder.path
+                        });
+                    }
+                }
+            } catch (folderErr) {
+                console.warn(`[email-server] Fetch by IDs failed in folder ${folder.path}:`, folderErr.message);
+            } finally {
+                lock.release();
+            }
+        }
+        allResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return res.json({ emails: allResults, total: allResults.length });
+    } catch (err) {
+        console.error('[email-server] Fetch by IDs Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 // --- SEARCH EMAILS (GLOBAL) ---
 app.post('/api/email/search', authMiddleware, async (req, res) => {

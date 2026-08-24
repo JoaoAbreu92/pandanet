@@ -44,9 +44,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Validate if saved position is within current window bounds
+                const initX = typeof parsed.x === 'number' && !isNaN(parsed.x) ? parsed.x : window.innerWidth - 90;
+                const initY = typeof parsed.y === 'number' && !isNaN(parsed.y) ? parsed.y : window.innerHeight - 90;
                 return {
-                    x: Math.max(20, Math.min(parsed.x, window.innerWidth - 90)),
-                    y: Math.max(20, Math.min(parsed.y, window.innerHeight - 90))
+                    x: Math.max(20, Math.min(initX, window.innerWidth - 90)),
+                    y: Math.max(20, Math.min(initY, window.innerHeight - 90))
                 };
             }
         } catch (e) { console.error('Error loading AI position', e); }
@@ -54,6 +56,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     });
 
     const [isDragging, setIsDragging] = useState(false);
+    const [hasMoved, setHasMoved] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
     // Save position to localStorage whenever it changes
@@ -75,6 +78,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const handleMouseDown = (e: React.MouseEvent) => {
         if (isOpen) return;
         setIsDragging(true);
+        setHasMoved(false);
         setDragOffset({
             x: e.clientX - position.x,
             y: e.clientY - position.y
@@ -84,6 +88,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
+        setHasMoved(true);
         const newX = Math.max(20, Math.min(e.clientX - dragOffset.x, window.innerWidth - 80));
         const newY = Math.max(20, Math.min(e.clientY - dragOffset.y, window.innerHeight - 80));
 
@@ -574,11 +579,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     if (!isOpen) {
         return (
             <div
-                className={`fixed z-50 flex flex-col items-end gap-3 transition-transform ${isDragging ? 'scale-105 opacity-80 cursor-grabbing' : 'animate-fade-in-up'}`}
+                className={`fixed z-50 flex flex-col items-end gap-3 transition-transform ${isDragging ? 'scale-105 opacity-80 cursor-grabbing' : ''}`}
                 style={{
                     left: `${position.x}px`,
                     top: `${position.y}px`,
-                    transition: isDragging ? 'none' : 'all 0.3s ease-out'
+                    transition: isDragging ? 'none' : 'left 0.3s ease-out, top 0.3s ease-out'
                 }}
             >
                 {showTooltip && (
@@ -595,7 +600,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                     </div>
                 )}
                 <button
-                    onClick={() => { if (!isDragging) toggleOpen(); }}
+                    onClick={() => { if (!hasMoved) toggleOpen(); }}
                     onMouseDown={handleMouseDown}
                     className="w-16 h-16 rounded-full shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all duration-500 bg-white border-4 border-emerald-50/50 overflow-hidden flex items-center justify-center p-0 group cursor-grab"
                 >

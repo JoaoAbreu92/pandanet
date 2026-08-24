@@ -25,7 +25,7 @@ import {
     ArrowRightOnRectangleIcon,
     ExclamationTriangleIcon, XMarkIcon,
     PaperClipIcon, ArrowDownTrayIcon,
-    Bars3Icon
+    Bars3Icon, ChevronDownIcon, ChevronRightIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
@@ -177,6 +177,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // --- State: Contacts ---
     const [contacts, setContacts] = useState<Contact[]>([]);
+    const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+    const [expandedDomains, setExpandedDomains] = useState<Record<string, boolean>>({});
     const [showContactsModal, setShowContactsModal] = useState(false);
     const [newContactName, setNewContactName] = useState('');
     const [newContactEmail, setNewContactEmail] = useState('');
@@ -765,6 +767,53 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         else setRefreshing(true);
 
         try {
+            // Check for Tag Filter
+            if (filterTag && !isSearchingGlobal) {
+                const { data: allMeta } = await supabase.from('email_metadata').select('id, message_id, tags, notes').eq('user_id', currentUser.id);
+                const taggedIds = (allMeta || [])
+                    .filter(m => Array.isArray(m.tags) && m.tags.some((t: any) => t.label === filterTag))
+                    .map(m => m.message_id);
+
+                if (taggedIds.length === 0) {
+                    setEmails([]);
+                    setTotalEmails(0);
+                    setLoading(false);
+                    setRefreshing(false);
+                    fetchInProgress.current = false;
+                    return;
+                }
+
+                const { data, error } = await callEmailServer('fetch-by-ids', { config: settings, messageIds: taggedIds });
+                
+                if (error) {
+                    if (error.message?.includes('429')) console.warn("[EmailPage] Rate limit hit (429).");
+                    throw error;
+                }
+                if (data.error) throw new Error(data.error);
+
+                const emailList = data.emails || [];
+                const mergedEmails = emailList.map((email: any) => {
+                    const meta = allMeta?.find((m: any) => m.message_id === (email.messageId || email.uid));
+                    const isLocallySeen = locallySeenUids.has(email.uid);
+                    const currentFlags = email.flags || [];
+                    const finalFlags = isLocallySeen && !currentFlags.includes('\\Seen')
+                        ? [...currentFlags, '\\Seen']
+                        : currentFlags;
+                    return {
+                        ...email,
+                        flags: finalFlags,
+                        metadata: meta ? { id: meta.id, tags: meta.tags || [], notes: meta.notes } : { tags: [] }
+                    };
+                });
+                
+                setEmails(mergedEmails);
+                setTotalEmails(mergedEmails.length);
+                setLoading(false);
+                setRefreshing(false);
+                fetchInProgress.current = false;
+                return;
+            }
+
             const action = isSearchingGlobal ? 'search' : 'fetch';
             const payload = isSearchingGlobal 
                 ? { config: settings, query: searchQuery.trim() }
@@ -830,7 +879,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // Refresh when page or folder changes
     useEffect(() => {
         if (savedImapUser) fetchEmails();
-    }, [page, pageSize, currentFolder]);
+    }, [page, pageSize, currentFolder, filterTag]);
 
     // Handle initial email from context (notifications)
     useEffect(() => {
@@ -2086,41 +2135,105 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         </div>
 
                         {/* Contacts List */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-                            {contacts.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                                    <UsersIcon className="w-12 h-12 mb-2 opacity-20" />
-                                    <p className="text-sm font-medium">Nenhum contato encontrado</p>
-                                </div>
-                            ) : (
-                                contacts.map(contact => (
-                                    <div key={contact.id} className="flex items-center gap-3 p-3 hover:bg-emerald-50 rounded-xl border border-gray-100 hover:border-emerald-200 transition-all group">
-                                        <div className="w-10 h-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm">
-                                            {contact.name?.substring(0, 1).toUpperCase() || '?'}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+                            {(() => {
+                                if (contacts.length === 0) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                                            <UsersIcon className="w-12 h-12 mb-2 opacity-20" />
+                                            <p className="text-sm font-medium">Nenhum contato encontrado</p>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-bold text-gray-800 truncate">{contact.name}</div>
-                                            <div className="text-sm text-gray-500 truncate">{contact.email}</div>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    handleAddRecipientTag('to', contact.email);
-                                                    setShowContactsModal(false);
-                                                }}
-                                                className="bg-emerald-100 text-brand-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center gap-1"
-                                            >
-                                                <EnvelopeIcon className="w-3 h-3" />
-                                                Escrever
-                                            </button>
-                                            <button onClick={() => deleteContact(contact.id)} className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                    );
+                                }
+
+                                const grouped = contacts.reduce((acc, contact) => {
+                                    const domain = contact.email.split('@')[1] || 'Outros';
+                                    if (!acc[domain]) acc[domain] = [];
+                                    acc[domain].push(contact);
+                                    return acc;
+                                }, {} as Record<string, typeof contacts>);
+
+                                return Object.entries(grouped).sort(([d1], [d2]) => d1.localeCompare(d2)).map(([domain, domainContacts]) => (
+                                    <div key={domain} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                                        <button
+                                            onClick={() => setExpandedDomains(prev => ({ ...prev, [domain]: !prev[domain] }))}
+                                            className="w-full flex justify-between items-center p-4 hover:bg-emerald-50/50 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                                                    {domain.charAt(0)}
+                                                </div>
+                                                <div className="text-left font-bold text-gray-800 tracking-tight text-sm">{domain}</div>
+                                                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">{domainContacts.length}</span>
+                                            </div>
+                                            <div className="text-gray-400">
+                                                {expandedDomains[domain] !== false ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+                                            </div>
+                                        </button>
+                                        {expandedDomains[domain] !== false && (
+                                            <div className="px-2 pb-2 space-y-1">
+                                                {domainContacts.map(contact => (
+                                                    <div key={contact.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl transition-all group">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={selectedContacts.includes(contact.email)}
+                                                            onChange={() => {
+                                                                setSelectedContacts(prev => prev.includes(contact.email) ? prev.filter(e => e !== contact.email) : [...prev, contact.email]);
+                                                            }}
+                                                            className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                                                        />
+                                                        <div className="w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm">
+                                                            {contact.name?.substring(0, 1).toUpperCase() || '?'}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-gray-800 text-sm truncate">{contact.name}</div>
+                                                            <div className="text-[11px] text-gray-500 truncate">{contact.email}</div>
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleAddRecipientTag('to', contact.email);
+                                                                    setShowContactsModal(false);
+                                                                }}
+                                                                className="bg-emerald-100 text-brand-primary p-2 rounded-lg hover:bg-brand-primary hover:text-white transition-colors"
+                                                                title="Escrever E-mail Direto"
+                                                            >
+                                                                <EnvelopeIcon className="w-4 h-4" />
+                                                            </button>
+                                                            <button onClick={() => deleteContact(contact.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                ))
-                            )}
+                                ));
+                            })()}
                         </div>
+                        {selectedContacts.length > 0 && (
+                            <div className="p-4 bg-brand-primary/5 border-t border-brand-primary/10 flex justify-between items-center animate-fade-in-up flex-shrink-0">
+                                <span className="text-sm font-bold text-brand-primary">{selectedContacts.length} contato{selectedContacts.length > 1 ? 's' : ''} selecionado{selectedContacts.length > 1 ? 's' : ''}</span>
+                                <button
+                                    onClick={() => {
+                                        const newCcTags = [...ccTags];
+                                        selectedContacts.forEach(email => {
+                                            if (!newCcTags.includes(email)) newCcTags.push(email);
+                                        });
+                                        setCcTags(newCcTags);
+                                        setShowCc(true);
+                                        setView('compose');
+                                        setShowContactsModal(false);
+                                        setSelectedContacts([]);
+                                    }}
+                                    className="bg-brand-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-emerald-600 shrink-0 transition-transform active:scale-95 flex items-center gap-2"
+                                >
+                                    <EnvelopeIcon className="w-4 h-4" />
+                                    Criar Msg em Cópia
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
