@@ -161,12 +161,12 @@ const UsersTab: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Usuários e Permissões</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Usuários e Permissões</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Usuário
@@ -180,15 +180,15 @@ const UsersTab: React.FC = () => {
                         <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                             <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Usuário</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Permissões</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Usuário</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Permissões</th>
+                                    <th className="px-8 py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
                             </tr>
                         </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                 {agents.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-20 text-center text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
+                                        <td colSpan={3} className="px-8 py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
                                             Nenhum usuário configurado para o WhatsPanda.
                                         </td>
                                     </tr>
@@ -207,7 +207,7 @@ const UsersTab: React.FC = () => {
                                                 )}
                                             </div>
                                             <div className="ml-5">
-                                                <div className="text-base font-black text-gray-900 dark:text-white tracking-tight">{agent.name}</div>
+                                                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{agent.name}</div>
                                                 <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-70">{agent.role}</div>
                                             </div>
                                         </div>
@@ -215,12 +215,12 @@ const UsersTab: React.FC = () => {
                                     <td className="px-8 py-6 whitespace-nowrap">
                                         <div className="flex flex-wrap gap-2">
                                             {agent.whatspanda_permissions?.can_manage_settings && (
-                                                <span className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center">
+                                                <span className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center">
                                                     <Shield className="w-3.5 h-3.5 mr-2" /> Admin
                                                 </span>
                                             )}
                                             {agent.whatspanda_permissions?.can_view_chats && (
-                                                <span className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center">
+                                                <span className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center">
                                                     <MessageSquare className="w-3.5 h-3.5 mr-2" /> Chats
                                                 </span>
                                             )}
@@ -246,7 +246,7 @@ const UsersTab: React.FC = () => {
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
                     <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
                         <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                                 {editingAgent ? 'Editar Permissões' : 'Adicionar Usuário'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
@@ -257,7 +257,7 @@ const UsersTab: React.FC = () => {
                         <div className="p-8 overflow-y-auto space-y-10 custom-scrollbar">
                             {/* User Select */}
                              <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Funcionário</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Funcionário</label>
                                 <select 
                                     className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium appearance-none"
                                     value={selectedEmployeeId}
@@ -273,7 +273,7 @@ const UsersTab: React.FC = () => {
 
                             {/* Allowed Channels */}
                             <div>
-                                <h4 className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Canais Permitidos</h4>
+                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Canais Permitidos</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 bg-gray-50/50 dark:bg-white/5">
                                     {channels.length === 0 ? (
                                         <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest col-span-full py-4 text-center opacity-50 italic">Nenhum canal configurado.</p>
@@ -296,7 +296,7 @@ const UsersTab: React.FC = () => {
                                                 />
                                                 <label htmlFor={`channel-${channel.id}`} className="ml-4 text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer group-hover/item:text-emerald-500 transition-colors">
                                                     {channel.connection_name} <br />
-                                                    <span className="text-[9px] text-gray-500 dark:text-gray-500 uppercase tracking-widest font-black opacity-60">({channel.channel_type || 'whatsapp'})</span>
+                                                    <span className="text-[9px] text-gray-500 dark:text-gray-500 uppercase tracking-widest font-bold opacity-60">({channel.channel_type || 'whatsapp'})</span>
                                                 </label>
                                             </div>
                                         ))
@@ -306,7 +306,7 @@ const UsersTab: React.FC = () => {
 
                             {/* Permissions Toggles */}
                              <div>
-                                <h4 className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Permissões de Acesso</h4>
+                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Permissões de Acesso</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                                     {[
                                         { key: 'can_view_contacts', label: 'Ver Contatos', desc: 'Visualizar lista de contatos.' },
@@ -327,7 +327,7 @@ const UsersTab: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="ml-4 text-sm">
-                                                <label htmlFor={perm.key} className="font-black text-gray-900 dark:text-white group-hover/perm:text-emerald-500 transition-colors cursor-pointer tracking-tight">{perm.label}</label>
+                                                <label htmlFor={perm.key} className="font-bold text-gray-900 dark:text-white group-hover/perm:text-emerald-500 transition-colors cursor-pointer tracking-tight">{perm.label}</label>
                                                 <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60 mt-1">{perm.desc}</p>
                                             </div>
                                         </div>
@@ -339,14 +339,14 @@ const UsersTab: React.FC = () => {
                         <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={!selectedEmployeeId}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Check className="w-5 h-5 mr-3" />
                                 Salvar Permissões

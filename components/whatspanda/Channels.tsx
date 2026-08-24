@@ -110,7 +110,13 @@ const Channels: React.FC = () => {
 
     const startSession = async (companyId: string, connectionId: string) => {
         try {
-            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`, { method: 'POST' });
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
         } catch (error) {
             console.error('[startSession] Error:', error);
         }
@@ -118,7 +124,13 @@ const Channels: React.FC = () => {
 
     const stopSession = async (companyId: string, connectionId: string) => {
         try {
-            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${connectionId}`, { method: 'POST' });
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${connectionId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
             fetchSettings();
         } catch (error) {
             console.error('Erro ao parar sessão:', error);
@@ -214,12 +226,12 @@ const Channels: React.FC = () => {
                 <div className="animate-in fade-in duration-500">
                     <div className="flex justify-between items-center mb-10 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
                         <div>
-                            <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Canais de Atendimento</h2>
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Canais de Atendimento</h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie seus números de WhatsApp e redes sociais.</p>
                         </div>
                         <button
                             onClick={handleNew}
-                            className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
+                            className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
                         >
                             <Plus className="w-4 h-4" /> Adicionar Canal
                         </button>
@@ -232,9 +244,9 @@ const Channels: React.FC = () => {
                                 <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-8 border border-white/10">
                                     <MessageSquare className="w-10 h-10 text-gray-300 dark:text-gray-600" />
                                 </div>
-                                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Nenhum canal configurado</h3>
+                                <h3 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Nenhum canal configurado</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mt-3 max-w-md font-medium">Adicione contas de WhatsApp, Instagram, Telegram ou Messenger para começar a atender seus clientes com excelência.</p>
-                                <button onClick={handleNew} className="mt-10 px-10 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20">
+                                <button onClick={handleNew} className="mt-10 px-10 py-4 bg-emerald-500 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20">
                                 Configurar Primeiro Canal
                             </button>
                         </div>
@@ -248,26 +260,26 @@ const Channels: React.FC = () => {
                                                 {getChannelIcon(channel.channel_type)}
                                             </div>
                                             <div>
-                                                <h3 className="font-black text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{channel.connection_name}</h3>
-                                                <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60">{channel.channel_type || 'whatsapp'}</span>
+                                                <h3 className="font-bold text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{channel.connection_name}</h3>
+                                                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60">{channel.channel_type || 'whatsapp'}</span>
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border ${channel.is_connected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                                        <div className={`px-3 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-[0.15em] border ${channel.is_connected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
                                             {channel.is_connected ? 'Conectado' : 'Desconectado'}
                                         </div>
                                     </div>
 
                                     {channel.channel_type === 'whatsapp' && (
-                                        <p className="text-xs font-black text-gray-500 dark:text-gray-400 mb-6 bg-gray-100 dark:bg-white/5 py-2 px-4 rounded-xl inline-block tracking-widest">{channel.phone_number}</p>
+                                        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-6 bg-gray-100 dark:bg-white/5 py-2 px-4 rounded-xl inline-block tracking-widest">{channel.phone_number}</p>
                                     )}
 
                                     <div className="flex gap-3 mt-4 pt-6 border-t border-gray-50 dark:border-white/5">
-                                        <button onClick={() => handleEdit(channel)} className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:text-white dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
+                                        <button onClick={() => handleEdit(channel)} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:text-white dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                             <Edit2 className="w-3.5 h-3.5" /> Editar
                                         </button>
 
                                         {channel.channel_type === 'whatsapp' && !channel.is_connected && (
-                                            <button onClick={() => { setCurrentId(channel.id); setView('qr'); }} className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
+                                            <button onClick={() => { setCurrentId(channel.id); setView('qr'); }} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                                 <QrCode className="w-3.5 h-3.5" /> QR Code
                                             </button>
                                         )}
@@ -284,8 +296,8 @@ const Channels: React.FC = () => {
             )}
 
             {view === 'form' && (
-                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-10 rounded-[3rem] shadow-2xl w-full max-w-2xl mx-auto border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500">
-                    <button onClick={() => setView('list')} className="group flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-emerald-500 mb-10 transition-all">
+                <div className="bg-white/90 dark:bg-slate-900/80 backdrop-blur-2xl p-10 rounded-[3rem] shadow-2xl w-full max-w-2xl mx-auto border border-white/20 dark:border-white/5 animate-in fade-in zoom-in duration-500 max-h-[85vh] overflow-y-auto">
+                    <button onClick={() => setView('list')} className="group flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-emerald-500 mb-10 transition-all">
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Voltar para lista
                     </button>
 
@@ -295,13 +307,13 @@ const Channels: React.FC = () => {
                                 {getChannelIcon(channelType)}
                             </div>
                         </div>
-                        <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">{currentId ? 'Editar Canal' : 'Configurar Novo Canal'}</h2>
+                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{currentId ? 'Editar Canal' : 'Configurar Novo Canal'}</h2>
                     </div>
 
                     <div className="space-y-8">
                         {!currentId && (
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Selecione a Plataforma</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Selecione a Plataforma</label>
                                 <div className="grid grid-cols-4 gap-4">
                                     {(['whatsapp', 'telegram', 'instagram', 'messenger'] as const).map(type => (
                                         <button
@@ -312,7 +324,7 @@ const Channels: React.FC = () => {
                                             <div className={`${channelType === type ? 'scale-110' : 'opacity-60'} transition-all`}>
                                                 {getChannelIcon(type)}
                                             </div>
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${channelType === type ? 'text-emerald-500' : 'text-gray-500'}`}>{type}</span>
+                                            <span className={`text-[10px] font-bold uppercase tracking-widest ${channelType === type ? 'text-emerald-500' : 'text-gray-500'}`}>{type}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -320,7 +332,7 @@ const Channels: React.FC = () => {
                         )}
 
                         <div>
-                            <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome de Exibição (Interno)</label>
+                            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome de Exibição (Interno)</label>
                             <input 
                                 type="text" 
                                 value={connectionName}
@@ -333,7 +345,7 @@ const Channels: React.FC = () => {
                         {channelType === 'whatsapp' && (
                             <>
                                 <div>
-                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Número do Telefone</label>
+                                    <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Número do Telefone</label>
                                     <input
                                         type="text"
                                         value={phoneNumber}
@@ -350,7 +362,7 @@ const Channels: React.FC = () => {
                                                 <PhoneOff className="w-5 h-5 text-red-500" />
                                             </div>
                                             <div>
-                                                <span className="font-black text-gray-900 dark:text-white tracking-tight">Rejeitar Chamadas?</span>
+                                                <span className="font-bold text-gray-900 dark:text-white tracking-tight">Rejeitar Chamadas?</span>
                                                 <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Áudio e Vídeo</p>
                                             </div>
                                         </div>
@@ -364,7 +376,7 @@ const Channels: React.FC = () => {
 
                                     {rejectCalls && (
                                         <div className="animate-in slide-in-from-top-4 duration-500 bg-red-500/5 dark:bg-red-500/10 p-6 rounded-[2rem] border border-red-500/10">
-                                            <label className="block text-[11px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <label className="block text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <MessageSquare className="w-4 h-4" /> Mensagem de Rejeição Automática
                                             </label>
                                             <textarea
@@ -381,7 +393,7 @@ const Channels: React.FC = () => {
 
                         {channelType !== 'whatsapp' && (
                             <div className="bg-blue-500/5 dark:bg-blue-500/10 p-8 rounded-[2.5rem] border border-blue-500/10">
-                                <label className="block text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-3">
+                                <label className="block text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-3">
                                     <Key className="w-4.5 h-4.5" /> Token da API / Page Access Token
                                 </label>
                                 <input
@@ -399,7 +411,7 @@ const Channels: React.FC = () => {
 
                         <button 
                             onClick={handleSaveConfig}
-                            className="w-full py-5 bg-emerald-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 mt-6"
+                            className="w-full py-5 bg-emerald-500 text-white rounded-[1.5rem] font-bold text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/30 hover:bg-emerald-600 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 mt-6"
                         >
                             <Save className="w-5 h-5" />
                             {channelType === 'whatsapp' ? 'Salvar e Ver QR Code' : 'Salvar e Conectar'}
@@ -417,13 +429,13 @@ const Channels: React.FC = () => {
                                     <CheckCircle className="w-14 h-14 animate-in zoom-in spin-in-90 duration-700" />
                                 </div>
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">WhatsApp Conectado!</h2>
-                            <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] opacity-70">Sua sessão foi iniciada com sucesso. Redirecionando...</p>
+                            <h2 className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">WhatsApp Conectado!</h2>
+                            <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider text-[10px] opacity-70">Sua sessão foi iniciada com sucesso. Redirecionando...</p>
                         </div>
                     ) : (
                         <>
-                                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter mb-4">Escaneie o QR Code</h2>
-                                <p className="text-gray-500 dark:text-gray-400 text-[11px] font-black uppercase tracking-widest mb-10 opacity-80 leading-relaxed">
+                                <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">Escaneie o QR Code</h2>
+                                <p className="text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-widest mb-10 opacity-80 leading-relaxed">
                                     Abra o WhatsApp em seu celular <br />
                                     <span className="text-emerald-500">Menu &gt; Aparelhos Conectados &gt; Conectar</span>
                                 </p>
@@ -436,7 +448,7 @@ const Channels: React.FC = () => {
                                     ) : (
                                             <div className="w-64 h-64 flex flex-col items-center justify-center bg-gray-50 dark:bg-transparent text-gray-400 space-y-4">
                                                 <RefreshCw className="w-10 h-10 animate-spin text-emerald-500 opacity-50" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Iniciando Sessão...</span>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Iniciando Sessão...</span>
                                         </div>
                                     )}
                                 </div>
@@ -449,13 +461,13 @@ const Channels: React.FC = () => {
                                 const companyId = profile?.company_id || user?.user_metadata?.company_id;
                                 if (companyId && currentId) startSession(companyId, currentId);
                             }}
-                            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-black uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/10"
+                            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-bold uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/10"
                         >
                             Refazer / Forçar Início
                         </button>
                         <button
                             onClick={() => setView('list')}
-                            className="text-[10px] text-gray-400 hover:text-gray-200 font-black uppercase tracking-[0.2em] py-2 transition-all"
+                            className="text-[10px] text-gray-400 hover:text-gray-200 font-bold uppercase tracking-[0.2em] py-2 transition-all"
                         >
                             Cancelar e Voltar
                         </button>

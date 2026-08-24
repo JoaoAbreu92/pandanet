@@ -20,6 +20,7 @@ type View = 'chat' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
 const WhatsPanda: React.FC = () => {
   const { profile } = useAuth();
   const [currentView, setCurrentView] = useState<View>('chat');
+  const [isChatActive, setIsChatActive] = useState(false);
 
   const permissions = profile?.whatspanda_permissions || {
     can_view_contacts: false,
@@ -66,7 +67,7 @@ const WhatsPanda: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'chat': return permissions.can_view_chats ? <Chat /> : null;
+      case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts /> : null;
       case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
       case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
@@ -85,8 +86,8 @@ const WhatsPanda: React.FC = () => {
             <MessageCircle className="w-5 h-5 fill-current" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-gray-800 dark:text-white tracking-tighter leading-none font-brand">WhatsPanda</h1>
-            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Pro</span>
+            <h1 className="text-xl font-bold text-gray-800 dark:text-white leading-none font-brand">WhatsPanda</h1>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400">Pro</span>
           </div>
         </div>
 
@@ -126,14 +127,14 @@ const WhatsPanda: React.FC = () => {
             className="w-9 h-9 rounded-full ring-2 ring-emerald-50"
           />
           <div className="flex flex-col truncate">
-            <span className="text-sm font-black text-gray-800 dark:text-white truncate tracking-tight">{profile?.name || 'Usuário'}</span>
+            <span className="text-sm font-bold text-gray-800 dark:text-white truncate tracking-tight">{profile?.name || 'Usuário'}</span>
             <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate uppercase font-bold tracking-widest">{profile?.role || 'Atendente'}</span>
           </div>
         </div>
       </div>
 
       {/* Mobile Menu - Shown only on small screens */}
-      {menuItems.length > 0 && (
+      {menuItems.length > 0 && !(currentView === 'chat' && isChatActive) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
           {menuItems.map((item) => (
             <button

@@ -108,12 +108,12 @@ const QueuesTab: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Filas de Atendimento</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Filas de Atendimento</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie as filas para organizar os atendimentos com eficiência.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Fila
@@ -127,10 +127,10 @@ const QueuesTab: React.FC = () => {
                         <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                             <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Nome</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Descrição</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Status</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Nome</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Descrição</th>
+                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Status</th>
+                                    <th className="px-8 py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
                             </tr>
                         </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -139,7 +139,7 @@ const QueuesTab: React.FC = () => {
                                      <td className="px-8 py-6 whitespace-nowrap">
                                         <div className="flex items-center">
                                              <div className="w-4 h-4 rounded-full mr-4 shadow-[0_0_12px_rgba(0,0,0,0.2)] group-hover:scale-125 transition-transform" style={{ backgroundColor: queue.color, boxShadow: `0 0 15px ${queue.color}40` }}></div>
-                                             <span className="font-black text-gray-900 dark:text-white tracking-tight text-base">{queue.name}</span>
+                                                <span className="font-bold text-gray-900 dark:text-white tracking-tight text-base">{queue.name}</span>
                                         </div>
                                     </td>
                                      <td className="px-8 py-6 whitespace-nowrap text-[11px] font-bold text-gray-500 dark:text-gray-400 opacity-80 uppercase tracking-widest">
@@ -148,7 +148,7 @@ const QueuesTab: React.FC = () => {
                                      <td className="px-8 py-6 whitespace-nowrap">
                                         <button 
                                             onClick={() => handleToggleActive(queue)}
-                                             className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all ${queue.is_active
+                                                className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg border transition-all ${queue.is_active
                                                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                      : 'bg-red-500/10 text-red-500 border-red-500/20'
                                             }`}
@@ -168,7 +168,7 @@ const QueuesTab: React.FC = () => {
                             ))}
                                 {queues.length === 0 && (
                                 <tr>
-                                        <td colSpan={4} className="px-8 py-20 text-center text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
+                                        <td colSpan={4} className="px-8 py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
                                         Nenhuma fila cadastrada.
                                     </td>
                                 </tr>
@@ -181,9 +181,9 @@ const QueuesTab: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
-                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
                         <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                                 {editingQueue ? 'Editar Fila' : 'Nova Fila'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
@@ -191,9 +191,9 @@ const QueuesTab: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="p-8 space-y-8">
+                        <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Fila</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Fila</label>
                                 <input
                                     type="text"
                                     value={name}
@@ -203,7 +203,7 @@ const QueuesTab: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Descrição</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Descrição</label>
                                 <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -213,7 +213,7 @@ const QueuesTab: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Identidade Visual (Cor)</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Identidade Visual (Cor)</label>
                                 <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
                                     {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'].map((c) => (
                                         <button
@@ -230,13 +230,13 @@ const QueuesTab: React.FC = () => {
                         <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
                                 <Check className="w-5 h-5 mr-3" />
                                 Salvar Fila

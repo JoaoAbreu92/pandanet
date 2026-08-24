@@ -28,6 +28,12 @@ const CRMSales: React.FC<{
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        if (initialTab && initialTab !== activeTab) {
+            setActiveTab(initialTab as SalesTab);
+        }
+    }, [initialTab]);
+
     const tabs = [
         { id: 'proposals', label: 'Propostas', icon: DocumentTextIcon, table: 'crm_proposals' },
         { id: 'estimates', label: 'Estimativas', icon: DocumentTextIcon, table: 'crm_estimates' },

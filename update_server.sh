@@ -14,5 +14,9 @@ docker compose -f docker-compose.production.yml down --remove-orphans
 echo "🚀 Reconstruindo e iniciando o sistema..."
 docker compose -f docker-compose.production.yml up -d --build
 
+# 4. Atualizar e reiniciar processos do PM2
+echo "🔄 Reiniciando processos PM2..."
+pm2 restart all --update-env
+
 echo "✅ Atualização concluída com sucesso!"
 docker ps | grep pandanet

@@ -104,12 +104,12 @@ const TagsTab: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center mb-10">
                 <div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Etiquetas (Tags)</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Etiquetas (Tags)</h3>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Organize seus contatos e atendimentos com etiquetas personalizadas.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Tag
@@ -127,10 +127,10 @@ const TagsTab: React.FC = () => {
                                     <Tag className="w-6 h-6" style={{ color: tag.color }} />
                                 </div>
                                 <div>
-                                    <h4 className="font-black text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{tag.name}</h4>
+                                    <h4 className="font-bold text-gray-900 dark:text-white tracking-tight text-lg leading-tight">{tag.name}</h4>
                                     <button
                                         onClick={() => handleToggleActive(tag)}
-                                        className={`mt-1.5 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border transition-all ${tag.is_active
+                                        className={`mt-1.5 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border transition-all ${tag.is_active
                                                 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                 : 'bg-red-500/10 text-red-500 border-red-500/20'
                                             }`}
@@ -154,7 +154,7 @@ const TagsTab: React.FC = () => {
                                 <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/5">
                                     <Tag className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                                 </div>
-                                <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Nenhuma etiqueta cadastrada</h3>
+                                <h3 className="text-xl font-bold text-gray-800 dark:text-white tracking-tight">Nenhuma etiqueta cadastrada</h3>
                                 <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-widest opacity-60">Comece criando etiquetas para organizar seus atendimentos.</p>
                         </div>
                     )}
@@ -164,9 +164,9 @@ const TagsTab: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
-                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
                         <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                                 {editingTag ? 'Editar Tag' : 'Nova Tag'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
@@ -174,9 +174,9 @@ const TagsTab: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="p-8 space-y-8">
+                        <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Tag</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Tag</label>
                                 <input
                                     type="text"
                                     value={name}
@@ -186,7 +186,7 @@ const TagsTab: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Cor da Tag</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Cor da Tag</label>
                                 <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
                                     {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#000000'].map((c) => (
                                         <button
@@ -203,13 +203,13 @@ const TagsTab: React.FC = () => {
                         <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
                                 <Check className="w-5 h-5 mr-3" />
                                 Salvar Tag

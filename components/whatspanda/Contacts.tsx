@@ -137,14 +137,14 @@ const Contacts: React.FC = () => {
             {/* Header */}
             <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border-b border-gray-200 dark:border-white/5 p-8 flex justify-between items-center shadow-lg">
                 <div>
-                    <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Contatos</h2>
+                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Contatos</h2>
                     <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie sua base de contatos do WhatsApp.</p>
                 </div>
                 <div className="flex gap-4">
                     <button
                         onClick={handleSyncContacts}
                         disabled={syncing}
-                        className={`flex items-center px-6 py-3 bg-blue-600/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-xl border border-blue-500/20 gap-2 font-black text-xs uppercase tracking-widest ${syncing ? 'opacity-70 cursor-wait' : ''}`}
+                        className={`flex items-center px-6 py-3 bg-blue-600/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-xl border border-blue-500/20 gap-2 font-bold text-xs uppercase tracking-widest ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                         title="Sincronizar Contatos do WhatsApp"
                     >
                         <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -152,7 +152,7 @@ const Contacts: React.FC = () => {
                     </button>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-black text-xs uppercase tracking-widest"
+                        className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         Novo Contato
@@ -188,8 +188,8 @@ const Contacts: React.FC = () => {
                                             <User className="w-7 h-7" />
                                         </div>
                                         <div>
-                                            <h3 className="font-black text-gray-900 dark:text-white tracking-tight text-lg">{contact.name}</h3>
-                                            <p className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-80">{contact.phone}</p>
+                                            <h3 className="font-bold text-gray-900 dark:text-white tracking-tight text-lg">{contact.name}</h3>
+                                            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-80">{contact.phone}</p>
                                         </div>
                                     </div>
                                     <button 
@@ -202,7 +202,7 @@ const Contacts: React.FC = () => {
 
                                 <div className="mt-auto space-y-4">
                                     {/* Queue Info */}
-                                    <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-400">
+                                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400">
                                         <Layers className="w-4 h-4 text-emerald-500" />
                                         <span>
                                             {availableQueues.find(q => q.id === contact.queue_id)?.name || 'Sem Fila'}
@@ -217,7 +217,7 @@ const Contacts: React.FC = () => {
                                                 return tag ? (
                                                     <span 
                                                         key={tagId} 
-                                                        className="px-3 py-1 text-[9px] rounded-lg font-black uppercase tracking-widest border"
+                                                        className="px-3 py-1 text-[9px] rounded-lg font-bold uppercase tracking-widest border"
                                                         style={{ backgroundColor: tag.color + '15', color: tag.color, borderColor: tag.color + '30' }}
                                                     >
                                                         {tag.name}
@@ -234,7 +234,7 @@ const Contacts: React.FC = () => {
                             </div>
                         ))}
                         {filteredContacts.length === 0 && (
-                                <div className="col-span-full py-20 text-center text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] text-xs opacity-50">
+                                <div className="col-span-full py-20 text-center text-gray-400 dark:text-gray-500 font-bold uppercase tracking-[0.2em] text-xs opacity-50">
                                 Nenhum contato encontrado.
                             </div>
                         )}
@@ -249,7 +249,7 @@ const Contacts: React.FC = () => {
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
                     <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
                         <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                                 {editingContact ? 'Editar Contato' : 'Novo Contato'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
@@ -259,7 +259,7 @@ const Contacts: React.FC = () => {
                         <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
-                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome Completo</label>
+                                    <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome Completo</label>
                                     <input
                                         type="text"
                                         value={name}
@@ -269,7 +269,7 @@ const Contacts: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Telefone (WhatsApp)</label>
+                                    <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Telefone (WhatsApp)</label>
                                     <input
                                         type="text"
                                         value={phone}
@@ -281,7 +281,7 @@ const Contacts: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Anotações</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Anotações</label>
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
@@ -293,7 +293,7 @@ const Contacts: React.FC = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
-                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Fila Preferencial</label>
+                                    <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Fila Preferencial</label>
                                     <select
                                         value={selectedQueue}
                                         onChange={(e) => setSelectedQueue(e.target.value)}
@@ -307,13 +307,13 @@ const Contacts: React.FC = () => {
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Etiquetas</label>
+                                    <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Etiquetas</label>
                                     <div className="flex flex-wrap gap-2 border border-gray-100 dark:border-white/5 rounded-2xl p-4 bg-gray-100/30 dark:bg-white/5 min-h-[60px]">
                                         {availableTags.map(tag => (
                                             <button
                                                 key={tag.id}
                                                 onClick={() => toggleTag(tag.id)}
-                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                                className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
                                                     selectedTags.includes(tag.id)
                                                     ? 'scale-105 shadow-lg brightness-110'
                                                     : 'opacity-40 hover:opacity-100'
@@ -337,13 +337,13 @@ const Contacts: React.FC = () => {
                         <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-black text-xs uppercase tracking-[0.2em]"
+                                className="px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em]"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
+                                className="px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
                             >
                                 <Check className="w-5 h-5 mr-3" />
                                 Salvar Contato
