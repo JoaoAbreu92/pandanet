@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee, Recognition } from '../types';
+import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem, Employee, Recognition, TIRequest } from '../types';
 import Dashboard from './Dashboard';
 import UserManager from './UserManager';
 import { DepartmentManager } from './DepartmentManager';
@@ -139,6 +139,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'bem-estar', label: 'Bem Estar', featureId: 'wellness' },
         { id: 'settings', label: 'Geral' },
         { id: 'mural', label: 'Mural' },
+        { id: 'ti-requests', label: 'T.I.' },
     ].filter(tab => {
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
@@ -277,6 +278,25 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                         { key: 'type', label: 'Valor', type: 'select', options: ['Trabalho em Equipe', 'Inovação', 'Foco no Cliente', 'Qualidade'] }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{(i as any).message}</p><p className="text-sm">{(i as any).type}</p></div>}
+                />;
+            case 'ti-requests':
+                return <SupabaseGenericManager<TIRequest>
+                    title="Gerenciamento de Solicitações de T.I."
+                    tableName="ti_requests"
+                    newItemTemplate={{ itemName: '', justification: '', requestType: 'Hardware', status: 'Pendente' } as any}
+                    fields={[
+                        { key: 'itemName', label: 'Item', dbColumn: 'item_name' },
+                        { key: 'requestType', label: 'Tipo', type: 'select', options: ['Hardware', 'Software', 'Acesso', 'Outro'], dbColumn: 'request_type' },
+                        { key: 'justification', label: 'Justificativa', type: 'textarea' },
+                        { key: 'status', label: 'Status', type: 'select', options: ['Pendente', 'Em Análise', 'Aprovado', 'Pedido Realizado', 'Entregue', 'Rejeitado', 'Finalizado'] }
+                    ]}
+                    renderItem={(i) => (
+                        <div className="flex flex-col">
+                            <p className="font-bold">{i.itemName}</p>
+                            <p className="text-xs text-gray-500">{i.requestType} • {i.status}</p>
+                            <p className="text-xs italic mt-1 text-gray-400">ID: {i.id}</p>
+                        </div>
+                    )}
                 />;
             default:
                 return null;

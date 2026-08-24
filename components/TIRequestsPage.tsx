@@ -166,7 +166,39 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
     useEffect(() => {
         fetchRequests();
         fetchSelectableUsers();
-    }, [currentUser?.id]);
+
+        if (!currentUser?.company_id) return;
+
+        console.log('[TIRequestsPage] Subscribing to ti_requests realtime changes...');
+        const channel = supabase
+            .channel(`public:ti_requests:${currentUser.company_id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'ti_requests',
+                filter: `company_id=eq.${currentUser.company_id}`
+            }, (payload) => {
+                console.log('[TIRequestsPage] Realtime change detected:', payload);
+                fetchRequests();
+
+                // Se o usuário estiver com o modal de detalhes aberto para ESTA solicitação, atualiza os comentários nela
+                if (selectedRequest && payload.new && (payload.new as any).id === selectedRequest.id) {
+                    console.log('[TIRequestsPage] Updating selected request comments in realtime');
+                    const updatedData = payload.new as any;
+                    setSelectedRequest(prev => prev ? {
+                        ...prev,
+                        status: updatedData.status as TIRequestStatus,
+                        comments: updatedData.comments || []
+                    } : null);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            console.log('[TIRequestsPage] Unsubscribing from ti_requests realtime');
+            supabase.removeChannel(channel);
+        };
+    }, [currentUser?.id, currentUser?.company_id, selectedRequest?.id]);
 
     const handleNewRequest = async (data: Omit<TIRequest, 'id' | 'requesterId' | 'requesterName' | 'requesterAvatarUrl' | 'status' | 'submittedAt'>) => {
         try {
