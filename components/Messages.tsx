@@ -301,6 +301,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [masterAdminId, setMasterAdminId] = useState<string>('');
+    const [masterAdminCompanyId, setMasterAdminCompanyId] = useState<string | null>(null);
     const [masterAdminProfile, setMasterAdminProfile] = useState<{ id: string, name: string, avatarUrl: string } | null>(null);
 
     // Fetch master admin dynamically by email
@@ -308,11 +309,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         const fetchMasterAdmin = async () => {
             const { data } = await supabase
                 .from('profiles')
-                .select('id, full_name, avatar_url')
+                .select('id, full_name, avatar_url, company_id')
                 .eq('email', 'ti@grupopixel.com.br')
                 .maybeSingle();
             if (data) {
                 setMasterAdminId(data.id);
+                setMasterAdminCompanyId(data.company_id);
                 setMasterAdminProfile({
                     id: data.id,
                     name: data.full_name || 'Master Admin',
@@ -611,6 +613,9 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+    const isSupportConversation = selectedConversation && 
+        (currentUser.id === masterAdminId || selectedConversation.participantId === masterAdminId) && 
+        selectedConversation.company_id !== currentUser.company_id;
 
     // Save notes to local storage
     useEffect(() => {
@@ -1176,8 +1181,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const handleStartConversation = async (contactId: string) => {
         try {
             setLoading(true);
-            // 1. Se for o Master Admin (Suporte VIP), usamos um RPC especial para evitar RLS cross-tenant
-            if (contactId === masterAdminId) {
+            // 1. Se for o Master Admin (Suporte VIP) de OUTRA empresa, usamos um RPC especial para evitar RLS cross-tenant
+            if (contactId === masterAdminId && currentUser.company_id !== masterAdminCompanyId) {
                 const { data: convId, error: rpcError } = await supabase.rpc('get_or_create_support_conversation', {
                     admin_id: currentUser.id,
                     master_id: masterAdminId
@@ -1234,8 +1239,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     }
 
                     if (convs) {
-                        // Se for suporte VIP e estiver fechado, reabre
-                        if (contactId === masterAdminId && convs.is_closed) {
+                        // Se estiver fechado (seja suporte ou interna), reabre ao iniciar
+                        if (convs.is_closed) {
                             await supabase
                                 .from('conversations')
                                 .update({ is_closed: false })
@@ -1410,8 +1415,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     </div>
                 </div>
                 
-                {/* Suporte VIP para qualquer usuário - Restrito a Admins de Empresa */}
-                {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && currentUser.isAdmin && masterAdminId && (
+                {/* Suporte VIP para qualquer usuário - Restrito a Admins de Empresa externa (não da mesma empresa do Master Admin) */}
+                {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && currentUser.isAdmin && masterAdminId && currentUser.company_id !== masterAdminCompanyId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
                         {/* Avatar/Name hidden per user request */}
@@ -1461,7 +1466,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                 // Hide ALL closed conversations (including support, so they disappear until reopened)
                                 return c.is_closed !== true;
                             }).map(conv => {
-                                const isSupportConv = conv.participantId === masterAdminId;
+                                const isSupportConv = conv.participantId === masterAdminId && conv.company_id !== currentUser?.company_id;
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group px-2 py-1">
                                         <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
@@ -1636,7 +1641,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-brand-text">{selectedConversation?.participantName}</p>
-                                        {selectedConversation?.is_closed && (
+                                        {selectedConversation?.is_closed && isSupportConversation && (
                                             <span className="bg-red-100 text-red-600 text-[10px] uppercase font-black px-2 py-0.5 rounded-full border border-red-200">Encerrado</span>
                                         )}
                                     </div>
@@ -1668,7 +1673,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                         <span className="hidden sm:inline">MINIMIZAR</span>
                                     </button>
                                 )}
-                                {(currentUser.id === masterAdminId || selectedConversation?.participantId === masterAdminId) && !selectedConversation?.is_closed && (
+                                {isSupportConversation && !selectedConversation?.is_closed && (
                                     <button 
                                         onClick={handleCloseConversation}
                                         className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all border border-slate-200 hover:border-red-200"
@@ -1797,7 +1802,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                         Você não pode enviar mensagens ou reagir neste modo. O envio automático de leitura está bloqueado.
                                     </p>
                                 </div>
-                            ) : selectedConversation?.is_closed ? (
+                            ) : (selectedConversation?.is_closed && isSupportConversation) ? (
                                 <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200 text-center animate-pulse">
                                     <p className="text-xs md:text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
                                         <LockClosedIcon className="w-4 h-4" />
