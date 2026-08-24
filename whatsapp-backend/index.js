@@ -317,6 +317,33 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
     }
 });
 
+// API: Reparar Webhooks
+router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (req, res) => {
+    const { companyId, connectionId } = req.params;
+    const instanceName = `conn_${connectionId}`;
+    const webhookUrl = `${backendWebhookBaseUrl}/webhook/evolution/${companyId}/${connectionId}`;
+
+    console.log(`[REPAIR] Atualizando webhook para ${instanceName} -> ${webhookUrl}`);
+
+    try {
+        const repairReq = await fetch(`${evoUrl}/webhook/set/${instanceName}`, {
+            method: 'POST',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                enabled: true,
+                url: webhookUrl,
+                events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE']
+            })
+        });
+
+        const repairRes = await repairReq.json();
+        res.json({ status: 'success', detail: repairRes });
+    } catch (error) {
+        console.error('[REPAIR] Erro:', error.message);
+        res.status(500).json({ error: 'Falha ao reparar webhook', details: error.message });
+    }
+});
+
 app.use('/whatsapp', router);
 app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
@@ -554,12 +581,20 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         }
 
         // Verificar se mensagem já existe
-        const { data: exists } = await supabase
+        const { data: exists, error: existErr } = await supabase
             .from('whatsapp_messages')
             .select('id')
             .eq('whatsapp_message_id', msgId)
+            .limit(1)
             .maybeSingle();
-        if (exists) return;
+        
+        if (existErr) {
+            console.error(`[MSG] Erro ao verificar existência:`, existErr.message);
+        }
+        if (exists) {
+            console.log(`[MSG] Mensagem ${msgId} já processada. Ignorando.`);
+            return;
+        }
 
         // Extrair texto e mídia
         let text = message.message?.conversation ||
@@ -581,19 +616,26 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         if (!text && !mediaMsg) return;
 
-        // 1. Localizar conversa
-        let { data: conv } = await supabase
+        // 1. Localizar conversa (Usar limit(1) por segurança contra duplicatas históricas)
+        let { data: conv, error: convErr } = await supabase
             .from('whatsapp_conversations')
-            .select('id, unread_count')
+            .select('id, unread_count, queue_id, assigned_to')
             .eq('company_id', companyId)
             .eq('contact_phone', fromPhone)
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
+
+        if (convErr) {
+            console.error(`[MSG] Erro ao buscar conversa para ${fromPhone}:`, convErr.message);
+        }
 
         let conversationId = conv?.id;
 
         if (!conv) {
+            console.log(`[MSG] Criando nova conversa para ${fromPhone}...`);
             const contactName = message.pushName || fromPhone;
-            const { data: newConv } = await supabase
+            const { data: newConv, error: createErr } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
                     company_id: companyId,
@@ -604,6 +646,10 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     connection_id: connectionId,
                     last_message_at: new Date().toISOString()
                 }).select().single();
+            
+            if (createErr) {
+                console.error(`[MSG] Erro ao criar conversa:`, createErr.message);
+            }
             conversationId = newConv?.id;
         } else if (!isHistorical) {
             await supabase

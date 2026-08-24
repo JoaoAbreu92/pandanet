@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key } from 'lucide-react';
+import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key, ShieldCheck, Zap } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
@@ -192,6 +192,33 @@ const Channels: React.FC = () => {
         }
     };
 
+    const repairWebhook = async (companyId: string, connectionId: string) => {
+        addDebugLog(`Iniciando REPARO de webhook para: ${connectionId}`, 'info');
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`https://pandanet.grupopixel.com.br/api/repair-webhooks/${companyId}/${connectionId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session?.access_token}`
+                }
+            });
+            
+            if (res.ok) {
+                addDebugLog('Webhook reparado com sucesso!', 'success');
+                alert('Conexão reparada com sucesso! As mensagens agora devem chegar corretamente.');
+                fetchSettings();
+            } else {
+                const err = await res.json();
+                addDebugLog(`Erro ao reparar: ${err.error || 'Erro desconhecido'}`, 'error');
+                alert('Falha ao reparar conexão. Veja o painel de diagnóstico.');
+                setShowDebug(true);
+            }
+        } catch (error: any) {
+            addDebugLog(`Erro de rede no reparo: ${error.message}`, 'error');
+            setShowDebug(true);
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!confirm('Deseja realmente remover esta conexão?')) return;
         const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
@@ -341,6 +368,19 @@ const Channels: React.FC = () => {
                                                 if (companyId) startSession(companyId, channel.id);
                                             }} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                                 <QrCode className="w-3.5 h-3.5" /> QR Code
+                                            </button>
+                                        )}
+
+                                        {channel.channel_type === 'whatsapp' && channel.is_connected && (
+                                            <button 
+                                                onClick={() => {
+                                                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                                    if (companyId) repairWebhook(companyId, channel.id);
+                                                }} 
+                                                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
+                                                title="Reparar Webhooks (Use se mensagens não chegarem)"
+                                            >
+                                                <ShieldCheck className="w-3.5 h-3.5" /> Reparar
                                             </button>
                                         )}
 
