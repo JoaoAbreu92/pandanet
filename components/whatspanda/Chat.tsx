@@ -1337,6 +1337,35 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!silent) setLoadingMessages(false);
   };
 
+  const [isSyncingMessages, setIsSyncingMessages] = useState(false);
+
+  const handleSyncConversationMessages = async (convId?: string) => {
+    const targetId = convId || selectedConversation?.id;
+    if (!targetId) return;
+    setIsSyncingMessages(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+
+      const res = await fetch(`/api/whatsapp/conversations/sync-messages/${targetId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (res.ok) {
+        await fetchMessages(targetId, true);
+        fetchConversations();
+      }
+    } catch (err) {
+      console.error('Erro ao sincronizar mensagens do celular:', err);
+    } finally {
+      setIsSyncingMessages(false);
+    }
+  };
+
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
     if (isGhostMode) return;
     setConversations(prev => prev.map(conv =>
@@ -1389,6 +1418,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
+      handleSyncConversationMessages(selectedConversation.id);
     }
   }, [selectedConversation?.id]);
 
@@ -2574,6 +2604,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           <span className="hidden sm:inline">Reabrir</span>
                         </button>
                       )}
+                      <button
+                        onClick={() => handleSyncConversationMessages()}
+                        disabled={isSyncingMessages}
+                        className="p-1 sm:p-2 rounded-full hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1"
+                        title="Sincronizar Mensagens do Celular"
+                      >
+                        <RefreshCw className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${isSyncingMessages ? 'animate-spin' : ''}`} />
+                        <span className="text-[10px] font-bold hidden md:inline">Sincronizar Celular</span>
+                      </button>
+
                       {isAdmin && (
                         <button
                           onClick={handleExportPDF}

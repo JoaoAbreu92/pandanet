@@ -3112,6 +3112,157 @@ app.post('/conversations/transfer', async (req, res) => {
     }
 });
 
+app.post('/conversations/sync-messages/:conversationId', async (req, res) => {
+    const { conversationId } = req.params;
+    try {
+        const { data: conv, error: convErr } = await supabase
+            .from('whatsapp_conversations')
+            .select('*')
+            .eq('id', conversationId)
+            .single();
+
+        if (convErr || !conv) {
+            return res.status(404).json({ error: 'Conversa não encontrada.' });
+        }
+
+        const instanceName = `conn_${conv.connection_id}`;
+        let remoteJid;
+        if (conv.is_group) {
+            remoteJid = conv.contact_phone.includes('@g.us') ? conv.contact_phone : `${conv.contact_phone}@g.us`;
+        } else {
+            const cleanPhone = conv.contact_phone.replace(/\D/g, '');
+            remoteJid = `${cleanPhone}@s.whatsapp.net`;
+        }
+
+        console.log(`[SYNC-MSG] Buscando histórico recente de ${remoteJid} na instância ${instanceName}...`);
+
+        const headers = { 
+            'apikey': evoKey, 
+            'Content-Type': 'application/json',
+            'instance': instanceName
+        };
+
+        const evoResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                where: {
+                    key: {
+                        remoteJid: remoteJid
+                    }
+                },
+                limit: 50,
+                count: 50
+            })
+        });
+
+        if (!evoResp.ok) {
+            const errBody = await evoResp.text();
+            console.error(`[SYNC-MSG] Evolution API erro ${evoResp.status}:`, errBody);
+            return res.status(500).json({ error: `Erro na Evolution API (${evoResp.status}) ao buscar mensagens.` });
+        }
+
+        const raw = await evoResp.json();
+        let messageList = [];
+        if (Array.isArray(raw)) {
+            messageList = raw;
+        } else if (raw.messages && Array.isArray(raw.messages)) {
+            messageList = raw.messages;
+        } else if (raw.records && Array.isArray(raw.records)) {
+            messageList = raw.records;
+        } else if (raw.data && Array.isArray(raw.data)) {
+            messageList = raw.data;
+        }
+
+        console.log(`[SYNC-MSG] ${messageList.length} mensagens retornadas pela Evolution API para ${remoteJid}`);
+
+        let importedCount = 0;
+        for (const msg of messageList) {
+            if (!msg) continue;
+            const actualMsg = msg.key ? msg : (msg.message && msg.message.key ? msg.message : null);
+            if (actualMsg) {
+                await processInboundMessage(actualMsg, conv.company_id, conv.connection_id, true);
+                importedCount++;
+            }
+        }
+
+        return res.json({ success: true, imported: importedCount, totalFound: messageList.length });
+    } catch (err) {
+        console.error('[SYNC-MSG] Erro ao sincronizar mensagens:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/conversations/sync-messages/:conversationId', authMiddleware, async (req, res) => {
+    const { conversationId } = req.params;
+    try {
+        const { data: conv, error: convErr } = await supabase
+            .from('whatsapp_conversations')
+            .select('*')
+            .eq('id', conversationId)
+            .single();
+
+        if (convErr || !conv) {
+            return res.status(404).json({ error: 'Conversa não encontrada.' });
+        }
+
+        const instanceName = `conn_${conv.connection_id}`;
+        let remoteJid;
+        if (conv.is_group) {
+            remoteJid = conv.contact_phone.includes('@g.us') ? conv.contact_phone : `${conv.contact_phone}@g.us`;
+        } else {
+            const cleanPhone = conv.contact_phone.replace(/\D/g, '');
+            remoteJid = `${cleanPhone}@s.whatsapp.net`;
+        }
+
+        const headers = { 
+            'apikey': evoKey, 
+            'Content-Type': 'application/json',
+            'instance': instanceName
+        };
+
+        const evoResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                where: {
+                    key: {
+                        remoteJid: remoteJid
+                    }
+                },
+                limit: 50,
+                count: 50
+            })
+        });
+
+        if (!evoResp.ok) {
+            const errBody = await evoResp.text();
+            return res.status(500).json({ error: `Erro na Evolution API (${evoResp.status})` });
+        }
+
+        const raw = await evoResp.json();
+        let messageList = [];
+        if (Array.isArray(raw)) messageList = raw;
+        else if (raw.messages && Array.isArray(raw.messages)) messageList = raw.messages;
+        else if (raw.records && Array.isArray(raw.records)) messageList = raw.records;
+        else if (raw.data && Array.isArray(raw.data)) messageList = raw.data;
+
+        let importedCount = 0;
+        for (const msg of messageList) {
+            if (!msg) continue;
+            const actualMsg = msg.key ? msg : (msg.message && msg.message.key ? msg.message : null);
+            if (actualMsg) {
+                await processInboundMessage(actualMsg, conv.company_id, conv.connection_id, true);
+                importedCount++;
+            }
+        }
+
+        return res.json({ success: true, imported: importedCount, totalFound: messageList.length });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/sync-contacts/:companyId/:connectionId', async (req, res) => {
     const { companyId, connectionId } = req.params;
     try {
