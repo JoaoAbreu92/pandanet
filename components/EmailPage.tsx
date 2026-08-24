@@ -1096,7 +1096,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 alert('Movido para Spam');
                                 setView('inbox');
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <ExclamationTriangleIcon, XMarkIcon className="w-4 h-4" /> Spam
+                                <ExclamationTriangleIcon className="w-4 h-4" /> Spam
                             </button>
                             <button onClick={() => {
                                 toggleFlag(selectedEmail, '\\Seen', false);
@@ -1131,7 +1131,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 </div>
                             ) : bodyError ? (
                                 <div className="flex flex-col items-center justify-center h-40 text-red-500 text-center">
-                                        <ExclamationTriangleIcon, XMarkIcon className="w-8 h-8 mb-2" />
+                                        <ExclamationTriangleIcon className="w-8 h-8 mb-2" />
                                     <span className="text-sm font-medium">{bodyError}</span>
                                     <button
                                         onClick={() => fetchEmailBody(selectedEmail.uid, currentFolder)}
