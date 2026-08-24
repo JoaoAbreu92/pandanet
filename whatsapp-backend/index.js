@@ -478,6 +478,13 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         const contactsToUpsert = [];
 
         const headers = { 'apikey': evoKey, 'Content-Type': 'application/json' };
+        
+        // Configuração para permitir certificados auto-assinados se a URL for HTTPS na rede local
+        const fetchOptions = { headers };
+        if (evoUrl.startsWith('https')) {
+            // Em ambientes Node.js, isso pode ser necessário para Evolution API com SSL auto-assinado
+            process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        }
 
         // 1. Buscar Contatos Pessoais
         try {
@@ -523,6 +530,10 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 const groupList = Array.isArray(groups) ? groups : (groups.groups || groups.data || []);
                 console.log(`[SYNC] ${groupList.length} grupos encontrados na Evolution API.`);
                 
+                if (groupList.length === 0) {
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `Nenhum grupo retornado pela API (${instanceName})` }).eq('id', connectionId);
+                }
+
                 for (const g of groupList) {
                     const jid = g.jid || g.id || g.remoteJid || '';
                     if (!jid || !jid.includes('@g.us')) continue;
@@ -538,8 +549,15 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         updated_at: new Date().toISOString() 
                     });
                 }
+            } else {
+                const errText = await respG.text();
+                console.error(`[SYNC] Falha ao buscar grupos: ${respG.status} - ${errText}`);
+                await supabase.from('whatsapp_settings').update({ last_sync_error: `Erro API Grupos: ${respG.status} - ${errText}` }).eq('id', connectionId);
             }
-        } catch(e) { console.error(`[SYNC] Erro busca grupos:`, e.message); }
+        } catch(e) { 
+            console.error(`[SYNC] Erro busca grupos:`, e.message); 
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção Grupos: ${e.message}` }).eq('id', connectionId);
+        }
 
         if (contactsToUpsert.length > 0) {
             console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas em whatsapp_contacts...`);
