@@ -403,6 +403,7 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     if (payload.bcc) recipients.push(...payload.bcc.split(',').map(e => e.trim()));
 
     console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> To: ${payload.to} - Subject: ${payload.subject}`);
+    console.log(`[email-server] SEND PAYLOAD: html_len=${(payload.html || '').length}, text_len=${(payload.text || '').length}, attachments=${(payload.attachments || []).length}`);
 
     const transporter = nodemailer.createTransport({
         host: config.smtp_host,
@@ -466,10 +467,11 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
                 payload.cc ? `Cc: ${payload.cc}` : '',
                 `Subject: ${payload.subject}`,
                 `Date: ${new Date().toUTCString()}`,
+                `MIME-Version: 1.0`,
                 `Content-Type: text/html; charset=utf-8`,
                 '',
-                payload.html || payload.text
-            ].filter(Boolean).join('\r\n');
+                payload.html || payload.text || ' '
+            ].filter(line => line !== null && line !== undefined).join('\r\n');
 
             await client.append(sentFolder, mimeMessage, ['\\Seen']);
         } catch (imapErr) {
@@ -511,6 +513,7 @@ app.post('/api/email/save-draft', authMiddleware, async (req, res) => {
     if (!config || !payload) return res.status(400).json({ error: 'Missing config or payload' });
 
     console.log(`[email-server] SAVE DRAFT: ${config.imap_host} -> Subject: ${payload.subject}`);
+    console.log(`[email-server] SAVE DRAFT PAYLOAD: html_len=${(payload.html || '').length}, text_len=${(payload.text || '').length}`);
 
     try {
         const client = await getPooledClient(config);
@@ -527,10 +530,11 @@ app.post('/api/email/save-draft', authMiddleware, async (req, res) => {
             `To: ${payload.to}`,
             `Subject: ${payload.subject}`,
             `Date: ${new Date().toUTCString()}`,
+            `MIME-Version: 1.0`,
             `Content-Type: text/html; charset=utf-8`,
             '',
-            payload.html || payload.text
-        ].filter(Boolean).join('\r\n');
+            payload.html || payload.text || ' '
+        ].filter(line => line !== null && line !== undefined).join('\r\n');
 
         await client.append(draftFolder, mimeMessage, ['\\Draft']);
         return res.json({ success: true, folder: draftFolder });

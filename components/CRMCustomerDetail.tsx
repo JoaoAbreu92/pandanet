@@ -49,6 +49,7 @@ const CRMCustomerDetail: React.FC<CRMCustomerDetailProps> = ({ customer, onClose
     const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
+        console.log("[CRMCustomerDetail] Target customer:", customer);
         setFormData(customer);
         fetchRelatedData();
     }, [customer]);

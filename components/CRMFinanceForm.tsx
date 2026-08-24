@@ -9,7 +9,8 @@ import {
     UserIcon,
     CurrencyDollarIcon,
     TagIcon,
-    CheckIcon
+    CheckIcon,
+    QueueListIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '../supabaseClient';
 import type { CRMCustomer, Employee } from '../types';
@@ -244,46 +245,49 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
 
                     {/* Item Table */}
                     <div className="mt-8">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Itens do Documento</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <QueueListIcon className="w-5 h-5 text-brand-primary" />
+                                Itens do Documento
+                            </h3>
                             <button 
                                 onClick={addItem}
-                                className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2 rounded-xl font-bold hover:shadow-lg hover:shadow-brand-primary/30 transition-all text-sm"
+                                className="flex items-center gap-2 bg-brand-primary/10 text-brand-primary px-4 py-2 rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all text-xs border border-brand-primary/20 shadow-sm"
                             >
-                                <PlusIcon className="w-5 h-5" /> Adicionar Item
+                                <PlusIcon className="w-4 h-4" /> Adicionar Item
                             </button>
                         </div>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold mb-4">Gerencie os serviços e produtos desta transação</p>
                         
-                        <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-slate-800">
+                        <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm">
                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 dark:bg-slate-800/80">
+                                <thead className="bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Item</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Descrição</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-24 text-center">Qtd</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Taxa</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Total</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-16"></th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item / Descrição</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-24 text-center">Qtd</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32">Preço Unitário</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32">Subtotal</th>
+                                        <th className="px-6 py-4 w-16"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                                     {formData.items.map((item) => (
                                         <tr key={item.id}>
                                             <td className="px-6 py-4">
-                                                <input 
-                                                    className="w-full bg-transparent outline-none dark:text-white font-medium" 
-                                                    placeholder="Nome do Item"
-                                                    value={item.description}
-                                                    onChange={e => updateItem(item.id, 'description', e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input 
-                                                    className="w-full bg-transparent outline-none dark:text-white text-sm" 
-                                                    placeholder="Descrição detalhada..."
-                                                    value={item.long_description}
-                                                    onChange={e => updateItem(item.id, 'long_description', e.target.value)}
-                                                />
+                                                <div className="flex flex-col gap-1">
+                                                    <input 
+                                                        className="w-full bg-transparent outline-none dark:text-white font-bold text-sm"
+                                                        placeholder="Nome do Item (ex: Consultoria)"
+                                                        value={item.description}
+                                                        onChange={e => updateItem(item.id, 'description', e.target.value)}
+                                                    />
+                                                    <input 
+                                                        className="w-full bg-transparent outline-none text-gray-400 text-[11px] font-medium"
+                                                        placeholder="Adicione detalhes extras aqui..."
+                                                        value={item.long_description}
+                                                        onChange={e => updateItem(item.id, 'long_description', e.target.value)}
+                                                    />
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <input 

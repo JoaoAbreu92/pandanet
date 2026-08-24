@@ -723,6 +723,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
     const saveDraft = async (showNotification = true) => {
         setLoading(true);
+        console.log("[EmailPage] Saving draft payload:", {
+            to: toTags.join(', '),
+            subject: composeSubject,
+            html_len: composeBody.length
+        });
+
         try {
             const { data, error } = await callEmailServer('save-draft', {
                 config: settings,
@@ -752,6 +758,13 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             const finalTo = toTags.join(', ');
             const finalCc = ccTags.join(', ');
             const finalBcc = bccTags.join(', ');
+
+            console.log("[EmailPage] Sending email payload:", {
+                to: finalTo,
+                subject: composeSubject,
+                html_len: composeBody.length,
+                attachments: attachments.length
+            });
 
             const { data, error } = await callEmailServer('send', {
                 config: settings,

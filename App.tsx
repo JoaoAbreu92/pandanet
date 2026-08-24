@@ -698,14 +698,6 @@ const AppContent: React.FC = () => {
                         onNewRequest={() => setShowSubscriptionForm(true)}
                     />
                 );
-            case 'crm-items':
-                return (
-                    <CRMSales
-                        initialTab="items"
-                        onViewCustomer={handleViewCustomer}
-                        onNewRequest={() => setShowItemForm(true)}
-                    />
-                );
             case 'crm-contracts':
                 return (
                     <CRMSales
