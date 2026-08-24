@@ -60,18 +60,35 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         fetchEmployees();
     }, [company?.id]);
 
-    const handleSetData = (key: keyof Company['data'], value: any) => {
-        setCompany({
-            ...company,
-            data: {
-                ...company.data,
-                [key]: value,
-            }
-        });
+    const handleSetData = async (key: keyof Company['data'], value: any) => {
+        const newData = {
+            ...company.data,
+            [key]: value,
+        };
+
+        setCompany({ ...company, data: newData });
+
+        const { error } = await supabase
+            .from('companies')
+            .update({ data: newData })
+            .eq('id', company.id);
+
+        if (error) {
+            console.error('Error updating company data:', error);
+        }
     };
 
-    const handleSetSettings = (settings: Company['settings']) => {
+    const handleSetSettings = async (settings: Company['settings']) => {
         setCompany({ ...company, settings });
+
+        const { error } = await supabase
+            .from('companies')
+            .update({ settings })
+            .eq('id', company.id);
+
+        if (error) {
+            console.error('Error updating company settings:', error);
+        }
     };
 
     const tabs = [

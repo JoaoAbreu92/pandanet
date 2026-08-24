@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XCircleIcon, UsersIcon, Ca
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 
 const mockHolidays = [
     { title: 'Dia do Trabalho', date: '2024-05-01' },
@@ -16,6 +17,7 @@ const mockHolidays = [
 
 const CalendarPage: React.FC = () => {
     const { currentUser } = useAuth();
+    const { addNotification } = useNotifications();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'week'>('month');
     const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -140,6 +142,19 @@ const CalendarPage: React.FC = () => {
                 setEvents([...events, newEvt]);
                 setCreateModalOpen(false);
                 setNewEventData({ title: '', date: new Date().toISOString().split('T')[0], startTime: '09:00', endTime: '10:00', category: 'Reunião', location: '', attendees: [], notes: '' });
+
+                // Notify attendees
+                newEventData.attendees.forEach(attId => {
+                    if (attId !== currentUser?.id) {
+                        addNotification({
+                            user_id: attId,
+                            type: 'event',
+                            title: 'Novo Convite de Evento',
+                            description: `Você foi convidado para: ${newEventData.title}`,
+                            link: '/calendar'
+                        } as any);
+                    }
+                });
             }
         } catch (error) {
             console.error('Error creating event:', error);
@@ -225,10 +240,18 @@ const CalendarPage: React.FC = () => {
         setNewEventData(prev => ({ ...prev, [name]: value }));
     }
 
-    const handleAttendeesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedIds = [...e.target.selectedOptions].map(option => option.value);
-        setNewEventData(prev => ({ ...prev, attendees: selectedIds }));
+    const toggleAttendee = (id: string) => {
+        setNewEventData(prev => {
+            const current = prev.attendees;
+            if (current.includes(id)) {
+                return { ...prev, attendees: current.filter(cid => cid !== id) };
+            } else {
+                return { ...prev, attendees: [...current, id] };
+            }
+        });
     };
+
+    const [attendeeSearch, setAttendeeSearch] = useState('');
 
     const getCategoryColor = (category: CalendarEventCategory) => {
         switch (category) {
@@ -348,7 +371,52 @@ const CalendarPage: React.FC = () => {
                                 <div><label className="block text-sm font-medium text-brand-subtle-text">Fim</label><input type="time" name="endTime" value={newEventData.endTime} onChange={handleInputChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                             </div>
                             <div><label className="block text-sm font-medium text-brand-subtle-text">Local</label><input type="text" name="location" value={newEventData.location} onChange={handleInputChange} placeholder="Ex: Sala de Reunião 1 ou Virtual" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Participantes</label><select multiple name="attendees" onChange={handleAttendeesChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text h-24">{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+                            <div>
+                                <label className="block text-sm font-medium text-brand-subtle-text mb-1">Participantes</label>
+                                <div className="border rounded-md p-2 bg-gray-50">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-md px-2 py-1 mb-2">
+                                        <UsersIcon className="w-4 h-4 text-gray-400 mr-2" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar participantes..."
+                                            value={attendeeSearch}
+                                            onChange={(e) => setAttendeeSearch(e.target.value)}
+                                            className="w-full text-sm py-1 focus:outline-none bg-transparent"
+                                        />
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                        {employees
+                                            .filter(emp => emp.name.toLowerCase().includes(attendeeSearch.toLowerCase()))
+                                            .map(e => (
+                                                <label key={e.id} className="flex items-center space-x-2 p-1.5 hover:bg-white rounded cursor-pointer transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={newEventData.attendees.includes(e.id)}
+                                                        onChange={() => toggleAttendee(e.id)}
+                                                        className="w-4 h-4 text-brand-primary rounded border-gray-300 focus:ring-brand-primary"
+                                                    />
+                                                    <img src={e.avatarUrl || 'https://via.placeholder.com/24'} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-brand-text truncate">{e.name}</p>
+                                                        <p className="text-[10px] text-gray-500 truncate">{e.role}</p>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                    </div>
+                                    {newEventData.attendees.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t flex flex-wrap gap-1">
+                                            {newEventData.attendees.map(id => {
+                                                const emp = employees.find(e => e.id === id);
+                                                return emp ? (
+                                                    <span key={id} className="inline-flex items-center bg-brand-primary/10 text-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                        {emp.name.split(' ')[0]}
+                                                    </span>
+                                                ) : null;
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             <div><label className="block text-sm font-medium text-brand-subtle-text">Observações</label><textarea name="notes" value={newEventData.notes} onChange={handleInputChange} rows={3} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea></div>
                             <div className="flex justify-end space-x-3 pt-2"><button type="button" onClick={() => setCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">Salvar Evento</button></div>
                         </form>

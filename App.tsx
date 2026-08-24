@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './components/ToastContext';
+import { NotificationProvider, useNotifications } from './components/NotificationContext';
 
 import HomePage from './components/HomePage';
 import Messages from './components/Messages';
@@ -69,15 +70,7 @@ const AppContent: React.FC = () => {
     const [companyData, setCompanyData] = useState<AppData | null>(null);
     const [companySettings, setCompanySettings] = useState<any>(null);
 
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-
-    const handleMarkAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    };
-
-    const handleClearAllNotifications = () => {
-        setNotifications([]);
-    };
+    const { notifications, markAsRead, markAllAsRead } = useNotifications();
 
     // Robust Initialization Logic
     useEffect(() => {
@@ -409,8 +402,8 @@ const AppContent: React.FC = () => {
                 onLogout={handleLogout}
                 onEndImpersonation={handleImpersonateEnd}
                 notifications={notifications}
-                onMarkAsRead={handleMarkAsRead}
-                onClearAllNotifications={handleClearAllNotifications}
+                onMarkAsRead={markAsRead}
+                onClearAllNotifications={markAllAsRead}
                 theme={theme}
                 toggleTheme={toggleTheme}
             >
@@ -481,11 +474,13 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
     return (
         <LanguageProvider>
-            <ToastProvider>
-                <AuthProvider>
-                    <AppContent />
-                </AuthProvider>
-            </ToastProvider>
+            <AuthProvider>
+                <NotificationProvider>
+                    <ToastProvider>
+                        <AppContent />
+                    </ToastProvider>
+                </NotificationProvider>
+            </AuthProvider>
         </LanguageProvider>
     );
 };

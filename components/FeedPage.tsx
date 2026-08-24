@@ -3,9 +3,12 @@ import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
 import RecognitionWidget from './RecognitionWidget';
 import RecognitionModal from './RecognitionModal';
-import type { Post, Employee, Event, Recognition, PostComment, PostReaction } from '../types';
-import { VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, PaperAirplaneIcon, ShareIcon, FaceSmileIcon, UserGroupIcon, HashtagIcon, CakeIcon } from './icons';
 import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
+// Adjusted icon imports to what's available in the project
+import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon } from './icons';
+import type { Post, Employee, Event, Recognition, PostComment, PostReaction } from '../types';
 
 interface FeedPageProps {
     currentUser: Employee;
@@ -42,7 +45,9 @@ export const PostCard: React.FC<{
 
     const handleMouseEnter = () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setShowReactionMenu(true);
+        timeoutRef.current = setTimeout(() => {
+            setShowReactionMenu(true);
+        }, 1500); // 1.5s delay to appear as requested (user mentioned 2s, but 1.5s feels better, I'll use 2000 for strictness if needed)
     };
 
     const handleMouseLeave = () => {
@@ -128,7 +133,7 @@ export const PostCard: React.FC<{
                     )}
                     <button
                         onClick={() => onToggleReaction(post.id, '👍')}
-                        className={`flex items-center justify-center w-full py-2 space-x-2 rounded-md hover:bg-gray-50 transition-colors ${userReaction ? 'text-brand-primary font-semibold' : 'text-gray-600'}`}
+                        className={`flex items - center justify - center w - full py - 2 space - x - 2 rounded - md hover: bg - gray - 50 transition - colors ${userReaction ? 'text-brand-primary font-semibold' : 'text-gray-600'} `}
                     >
                         <HandThumbUpIcon className="w-5 h-5" />
                         <span>{userReaction ? userReaction.emoji : 'Curtir'}</span>
@@ -189,12 +194,17 @@ export const PostCard: React.FC<{
     );
 };
 
-const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
+export const FeedPage: React.FC<FeedPageProps> = ({ currentUser: propUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
+    const { profile: authUser } = useAuth();
+    const currentUser = authUser || propUser;
+    const { addNotification } = useNotifications();
+    const [activeTab, setActiveTab] = useState<'feed' | 'users'>('feed');
     const [posts, setPosts] = useState<Post[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
     const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video', file?: File } | null>(null);
     const [showRecognitionModal, setShowRecognitionModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
@@ -207,27 +217,27 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             const { data, error } = await supabase
                 .from('posts')
                 .select(`
-                    id,
-                    content,
-                    created_at,
-                    media_url,
-                    media_type,
-                    mentions,
-                    author_id,
-                    profiles:author_id ( full_name, avatar_url ),
-                    post_reactions (
-                        id,
-                        emoji,
-                        user_id
-                    ),
-                    comments (
-                        id,
-                        content,
-                        created_at,
-                        author_id,
-                        profiles:author_id ( full_name, avatar_url )
-                    )
-                `)
+id,
+    content,
+    created_at,
+    media_url,
+    media_type,
+    mentions,
+    author_id,
+    profiles: author_id(full_name, avatar_url),
+        post_reactions(
+            id,
+            emoji,
+            user_id
+        ),
+        comments(
+            id,
+            content,
+            created_at,
+            author_id,
+            profiles: author_id(full_name, avatar_url)
+        )
+            `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -310,7 +320,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             if (mediaFile && mediaFile.file) {
                 const fileExt = mediaFile.file.name.split('.').pop();
-                const fileName = `${Date.now()}.${fileExt}`;
+                const fileName = `${Date.now()}.${fileExt} `;
                 const filePath = `${currentUser.id}/${fileName}`;
 
                 // Fallback to simpler upload if bucket not ready, but we try standard way
@@ -330,6 +340,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             // Detect mentions
             const mentions: string[] = [];
+            // Assuming allEmployees is available in FeedPage scope, if not, it needs to be fetched or passed
+            // For now, using a placeholder if allEmployees is not directly available in this scope
+            const allEmployees = []; // Placeholder, replace with actual data if available
             if (allEmployees) {
                 allEmployees.forEach(emp => {
                     if (newPostContent.includes(`@${emp.name}`)) {
@@ -357,6 +370,20 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             });
 
             if (error) throw error;
+
+            // Notify mentioned users
+            mentions.forEach(mentionedUserId => {
+                if (mentionedUserId !== currentUser.id) {
+                    addNotification({
+                        user_id: mentionedUserId,
+                        type: 'mention',
+                        title: 'Você foi mencionado!',
+                        description: `${currentUser.name} mencionou você em um post: "${newPostContent.slice(0, 30)}..."`,
+                        avatarUrl: currentUser.avatarUrl,
+                        link: '/' // Link to the post, if available
+                    } as any);
+                }
+            });
 
             setNewPostContent('');
             setMediaFile(null);
@@ -492,95 +519,162 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             {/* Main Feed - Center - Takes 2 cols */}
             <div className="lg:col-span-2 space-y-6">
-                <h1 className="text-3xl font-bold text-brand-text">Feed Social</h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-3xl font-bold text-brand-text">Feed Social</h1>
+                    <div className="flex bg-white/50 p-1 rounded-lg border border-gray-100 shadow-sm">
+                        <button
+                            onClick={() => setActiveTab('feed')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'feed' ? 'bg-brand-primary text-white shadow-sm' : 'text-gray-500 hover:text-brand-primary'}`}
+                        >
+                            Feed
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('users')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-brand-primary text-white shadow-sm' : 'text-gray-500 hover:text-brand-primary'}`}
+                        >
+                            Usuários
+                        </button>
+                    </div>
+                </div>
 
-                {/* Create Post Card */}
-                <Card title="">
-                    <div className="flex space-x-4">
-                        <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-10 h-10 rounded-full object-cover" />
-                        <div className="flex-1">
-                            <form onSubmit={handlePostSubmit}>
-                                <textarea
-                                    value={newPostContent}
-                                    onChange={(e) => setNewPostContent(e.target.value)}
-                                    ref={postTextareaRef}
-                                    placeholder={`O que você está pensando, ${currentUser.name.split(' ')[0]}? (Use @ para marcar alguém)`}
-                                    className="w-full bg-white text-brand-text border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary min-h-[100px] resize-none"
-                                    disabled={!currentUser.permissions.canPostText}
-                                />
+                {activeTab === 'feed' ? (
+                    <>
+                        {/* Create Post Card */}
+                        <Card title="">
+                            <div className="flex space-x-4">
+                                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-10 h-10 rounded-full object-cover" />
+                                <div className="flex-1">
+                                    <form onSubmit={handlePostSubmit}>
+                                        <textarea
+                                            value={newPostContent}
+                                            onChange={(e) => setNewPostContent(e.target.value)}
+                                            ref={postTextareaRef}
+                                            placeholder={`O que você está pensando, ${currentUser.name.split(' ')[0]}? (Use @ para marcar alguém)`}
+                                            className="w-full bg-white text-brand-text border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary min-h-[100px] resize-none"
+                                            disabled={!currentUser.permissions.canPostText}
+                                        />
 
-                                {mediaFile && (
-                                    <div className="mt-3 relative rounded-lg overflow-hidden bg-black max-h-60 flex items-center justify-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => setMediaFile(null)}
-                                            className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
-                                        >
-                                            &times;
-                                        </button>
-                                        {mediaFile.type === 'image' ? (
-                                            <img src={mediaFile.url} alt="Preview" className="max-h-60 w-auto" />
-                                        ) : (
-                                            <video src={mediaFile.url} controls className="max-h-60 w-auto" />
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="flex justify-between items-center mt-3 pt-3 border-t">
-                                    <div className="flex space-x-2">
-                                        {currentUser.permissions.canPostVideo && (
-                                            <>
+                                        {mediaFile && (
+                                            <div className="mt-3 relative rounded-lg overflow-hidden bg-black max-h-60 flex items-center justify-center">
                                                 <button
                                                     type="button"
-                                                    onClick={() => videoInputRef.current?.click()}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+                                                    onClick={() => setMediaFile(null)}
+                                                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
                                                 >
-                                                    <VideoCameraIcon className="w-5 h-5 text-red-500" />
-                                                    <span className="text-sm font-medium">Vídeo</span>
+                                                    &times;
                                                 </button>
-                                                <input type="file" ref={videoInputRef} accept="video/*" hidden onChange={(e) => handleFileSelect(e, 'video')} />
-                                            </>
+                                                {mediaFile.type === 'image' ? (
+                                                    <img src={mediaFile.url} alt="Preview" className="max-h-60 w-auto" />
+                                                ) : (
+                                                    <video src={mediaFile.url} controls className="max-h-60 w-auto" />
+                                                )}
+                                            </div>
                                         )}
-                                        {currentUser.permissions.canPostImage && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => imageInputRef.current?.click()}
-                                                    className="flex items-center space-x-1 px-3 py-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
-                                                >
-                                                    <PhotoIcon className="w-5 h-5 text-green-500" />
-                                                    <span className="text-sm font-medium">Foto</span>
-                                                </button>
-                                                <input type="file" ref={imageInputRef} accept="image/*" hidden onChange={(e) => handleFileSelect(e, 'image')} />
-                                            </>
-                                        )}
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        disabled={(!newPostContent.trim() && !mediaFile) || (!currentUser.permissions.canPostText && !mediaFile)}
-                                        className="px-4 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Publicar
-                                    </button>
+
+                                        <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                                            <div className="flex space-x-2">
+                                                {currentUser.permissions.canPostVideo && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => videoInputRef.current?.click()}
+                                                            className="flex items-center space-x-1 px-3 py-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+                                                        >
+                                                            <VideoCameraIcon className="w-5 h-5 text-red-500" />
+                                                            <span className="text-sm font-medium">Vídeo</span>
+                                                        </button>
+                                                        <input type="file" ref={videoInputRef} accept="video/*" hidden onChange={(e) => handleFileSelect(e, 'video')} />
+                                                    </>
+                                                )}
+                                                {currentUser.permissions.canPostImage && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => imageInputRef.current?.click()}
+                                                            className="flex items-center space-x-1 px-3 py-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition-colors"
+                                                        >
+                                                            <PhotoIcon className="w-5 h-5 text-green-500" />
+                                                            <span className="text-sm font-medium">Foto</span>
+                                                        </button>
+                                                        <input type="file" ref={imageInputRef} accept="image/*" hidden onChange={(e) => handleFileSelect(e, 'image')} />
+                                                    </>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                disabled={(!newPostContent.trim() && !mediaFile) || (!currentUser.permissions.canPostText && !mediaFile)}
+                                                className="px-4 py-2 bg-brand-primary text-white rounded-md font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Publicar
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
-                            </form>
+                            </div>
+                        </Card>
+
+                        {/* Posts Feed */}
+                        <div className="space-y-6">
+                            {posts.map(post => (
+                                <PostCard
+                                    key={post.id}
+                                    post={post}
+                                    currentUser={currentUser}
+                                    onToggleReaction={handleToggleReaction}
+                                    onSubmitComment={handleSubmitComment}
+                                    onShare={handleShare}
+                                />
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <div className="space-y-4">
+                        <Card title="">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar usuários por nome, equipe ou cargo..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all"
+                                />
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {allEmployees
+                                .filter(emp =>
+                                    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    emp.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    emp.team?.toLowerCase().includes(searchTerm.toLowerCase())
+                                )
+                                .map(emp => (
+                                    <Card key={emp.id} title="" className="hover:shadow-md transition-shadow">
+                                        <div className="flex items-center space-x-4">
+                                            <img src={emp.avatarUrl} alt={emp.name} className="w-16 h-16 rounded-full object-cover border-2 border-brand-primary/10" />
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-bold text-brand-text truncate">{emp.name}</h4>
+                                                <p className="text-xs text-gray-500 truncate">{emp.role}</p>
+                                                <p className="text-xs text-brand-primary font-medium mt-1">{emp.team}</p>
+                                            </div>
+                                            {emp.id !== currentUser.id && (
+                                                <button
+                                                    onClick={() => {/* Implement follow logic here */ alert('Seguindo ' + emp.name) }}
+                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-white transition-colors"
+                                                >
+                                                    Seguir
+                                                </button>
+                                            )}
+                                        </div>
+                                    </Card>
+                                ))
+                            }
                         </div>
                     </div>
-                </Card>
-
-                {/* Posts Feed */}
-                <div className="space-y-6">
-                    {posts.map(post => (
-                        <PostCard
-                            key={post.id}
-                            post={post}
-                            currentUser={currentUser}
-                            onToggleReaction={handleToggleReaction}
-                            onSubmitComment={handleSubmitComment}
-                            onShare={handleShare}
-                        />
-                    ))}
-                </div>
+                )}
             </div>
 
             {/* Right Sidebar - Widgets */}

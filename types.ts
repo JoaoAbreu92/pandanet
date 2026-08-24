@@ -41,7 +41,8 @@ export interface Notification {
   description: string;
   timestamp: string; // String ISO ou tempo relativo
   isRead: boolean;
-  linkTo?: Page; // Link opcional para uma página
+  link?: string; // Link flexível para navegação
+  linkTo?: Page; // Link opcional para uma página interna
   actionLabel?: string;
   avatarUrl?: string;
 }
@@ -258,7 +259,9 @@ export interface Ticket {
   title: string;
   description: string;
   requester: string;
+  requester_id?: string;
   assignedTo?: string;
+  assignedToId?: string;
   status: TicketStatus;
   priority: TicketPriority;
   createdAt: string;

@@ -15,6 +15,8 @@ import {
 } from './icons';
 import type { Conversation, Message, Employee } from '../types';
 import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 
 const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
 const availableEmojis = [
@@ -59,14 +61,13 @@ interface Note {
     colorId: string;
 }
 
-import { useAuth } from './AuthContext';
-
 interface MessagesProps {
     // No props needed now
 }
 
 const Messages: React.FC<MessagesProps> = () => {
     const { profile: currentUser } = useAuth();
+    const { addNotification } = useNotifications();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null); // Alterado para string (UUID)
@@ -91,9 +92,39 @@ const Messages: React.FC<MessagesProps> = () => {
     const [newNoteText, setNewNoteText] = useState('');
     const [noteWarning, setNoteWarning] = useState(false);
 
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+    const stickerTimeoutRef = useRef<any>(null);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const typingTimeoutRef = useRef<any>(null);
+
+    const handleMouseEnterReaction = (msgId: string) => {
+        if (stickerTimeoutRef.current) clearTimeout(stickerTimeoutRef.current);
+        stickerTimeoutRef.current = setTimeout(() => {
+            setShowReactionPicker(msgId);
+        }, 1500); // 1.5s delay
+    };
+
+    const handleMouseLeaveReaction = () => {
+        if (stickerTimeoutRef.current) clearTimeout(stickerTimeoutRef.current);
+        stickerTimeoutRef.current = setTimeout(() => {
+            setShowReactionPicker(null);
+        }, 800);
+    };
+
+    const stickers = [
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
+        'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif'
+    ];
+
+    const handleSendSticker = (url: string) => {
+        handleSendMessage(undefined, 'sticker', url);
+        setShowStickerPicker(false);
+    };
 
     const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
@@ -285,9 +316,14 @@ const Messages: React.FC<MessagesProps> = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if ((!newMessageText.trim() && !attachedFile) || !selectedConversationId) return;
+    const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
+        if (e) e.preventDefault();
+
+        const textToSend = type === 'text' ? newMessageText : '';
+        const stickerUrl = type === 'sticker' ? content : null;
+
+        if (!textToSend.trim() && !stickerUrl && !attachedFile) return;
+        if (!selectedConversationId) return;
 
         try {
             let uploadedFileUrl = null;
@@ -318,9 +354,9 @@ const Messages: React.FC<MessagesProps> = () => {
                 conversation_id: selectedConversationId,
                 sender_id: currentUser.id,
                 company_id: profileData?.company_id,
-                text: newMessageText,
-                file_url: uploadedFileUrl,
-                file_type: fileType,
+                text: stickerUrl || textToSend,
+                file_url: uploadedFileUrl || stickerUrl,
+                file_type: stickerUrl ? 'sticker' : fileType,
                 reactions: []
             });
 
@@ -328,7 +364,7 @@ const Messages: React.FC<MessagesProps> = () => {
 
             // Atualiza última mensagem da conversa
             await supabase.from('conversations').update({
-                last_message: attachedFile ? 'Enviou um anexo' : newMessageText,
+                last_message: stickerUrl ? 'Enviou uma figurinha' : (attachedFile ? 'Enviou um anexo' : textToSend),
                 last_message_at: new Date().toISOString()
             }).eq('id', selectedConversationId);
 
@@ -336,6 +372,22 @@ const Messages: React.FC<MessagesProps> = () => {
             setAttachedFile(null);
             setReplyingToMessage(null);
             fetchMessages(selectedConversationId);
+
+            // Trigger Notification for the participants (except me)
+            if (selectedConversation) {
+                // If group, notify all members? For now keep it simple.
+                // In a real app we'd trigger this on the backend or filter here.
+                if (!selectedConversation.isGroup && selectedConversation.participantId) {
+                    addNotification({
+                        user_id: selectedConversation.participantId as any, // Context handles my storage but we want to notify participant
+                        type: 'message',
+                        title: 'Nova Mensagem',
+                        description: `${currentUser.name}: ${stickerUrl ? 'Figurinha' : textToSend.slice(0, 50)}`,
+                        avatarUrl: currentUser.avatarUrl,
+                        link: '/messages'
+                    } as any);
+                }
+            }
 
         } catch (error) {
             console.error('Erro ao enviar mensagem:', error);
@@ -625,13 +677,42 @@ const Messages: React.FC<MessagesProps> = () => {
                                 </div>
                             </div>
                             {selectedConversation.isGroup && (
-                                <button
-                                    onClick={() => setShowMembersModal(true)}
-                                    className="p-2 text-gray-500 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
-                                    title="Ver membros"
-                                >
-                                    <UserGroupIcon className="w-6 h-6" />
-                                </button>
+                                <div className="flex items-center space-x-1">
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowStickerPicker(!showStickerPicker)}
+                                            className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors"
+                                            title="Figurinhas e GIFs"
+                                        >
+                                            <FaceSmileIcon className="w-5 h-5" />
+                                        </button>
+                                        {showStickerPicker && (
+                                            <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border p-3 z-50 animate-in fade-in slide-in-from-bottom-2 w-64 lg:w-80">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Figurinhas</h4>
+                                                    <button onClick={() => setShowStickerPicker(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {stickers.map((url, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => handleSendSticker(url)}
+                                                            className="hover:scale-110 transition-transform p-1 rounded hover:bg-gray-50"
+                                                        >
+                                                            <img src={url} alt="Sticker" className="w-full h-auto" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-3 pt-3 border-t">
+                                                    <p className="text-[10px] text-gray-400 text-center">Integração com GIPHY em breve</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button className="p-2 text-gray-500 hover:text-brand-primary rounded-full hover:bg-gray-100 transition-colors">
+                                        <PaperClipIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
                             )}
                         </div>
                         <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto">

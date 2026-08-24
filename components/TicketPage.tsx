@@ -6,9 +6,11 @@ import type { Ticket, TicketStatus, Employee } from '../types';
 import { XCircleIcon } from './icons';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 
 const TicketPage: React.FC = () => {
     const { currentUser } = useAuth();
+    const { addNotification } = useNotifications();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]); // Need for assignment
     const [isFormOpen, setFormOpen] = useState(false);
@@ -148,6 +150,15 @@ const TicketPage: React.FC = () => {
                 .eq('id', updatedTicket.id);
 
             if (error) throw error;
+
+            // Notify assigned user or requester
+            addNotification({
+                user_id: updatedTicket.assignedToId || (updatedTicket as any).requester_id,
+                type: 'ticket',
+                title: 'Chamado Atualizado',
+                description: `O chamado #${updatedTicket.id.slice(0, 8)} teve uma atualização.`,
+                link: '/tickets'
+            } as any);
 
         } catch (err) {
             console.error("Error updating ticket", err);
