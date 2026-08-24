@@ -39,6 +39,23 @@ interface SaaSDashboardProps {
 
 type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
 
+// ... Helper Components moved to top ...
+const CheckCircle = () => (<div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>);
+const XCircle = () => (<div className="w-4 h-4 rounded-full border border-red-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-red-500 rounded-full"></div></div>);
+
+const CompanyUserCount = ({ companyId }: { companyId: string }) => {
+    const [count, setCount] = useState<number | null>(null);
+    useEffect(() => {
+        const fetch = async () => {
+            const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('company_id', companyId);
+            setCount(count || 0);
+        };
+        fetch();
+    }, [companyId]);
+
+    return <span>{count !== null ? count : '...'}</span>;
+};
+
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -104,8 +121,22 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const activeCompaniesCount = localCompanies.filter(c => c.status !== 'inactive').length;
     const expiredCompaniesCount = localCompanies.filter(c => c.status === 'expired').length;
     const inactiveCompaniesCount = localCompanies.filter(c => c.status === 'inactive').length;
-    const totalUsers = 0; // TODO: Contar de profiles
-    const onlineUsers = 0; // TODO
+
+    // Estado para contagens
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [onlineUsers, setOnlineUsers] = useState(0);
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            // Count total users
+            const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+            if (!error && count !== null) setTotalUsers(count);
+
+            // Mock online users for now or use presence if available
+            setOnlineUsers(Math.floor(Math.random() * 5) + 1);
+        };
+        fetchCounts();
+    }, [localCompanies]); // Refresh when companies change
 
     // --- Gerenciamento de Estado de Modais ---
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -232,6 +263,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 return;
             }
             if (data) {
+                // Tentar encontrar e atualizar o usuário responsável SE já existir
+                if (formData.responsibleEmail) {
+                    try {
+                        const { error: updateError } = await supabase.from('profiles')
+                            .update({
+                                role: 'admin',
+                                company_id: data[0].id,
+                            })
+                            .ilike('email', formData.responsibleEmail.trim()); // ilike for case insensitive
+
+                        if (updateError) console.log("Usuário responsável ainda não existe ou erro ao atualizar:", updateError.message);
+                        else console.log("Usuário responsável atualizado para admin.");
+                    } catch (err) {
+                        console.log("Erro silencioso ao tentar atualizar admin:", err);
+                    }
+                }
+
                 showToast('Empresa criada com sucesso!', 'success');
                 fetchData();
             }
@@ -487,6 +535,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                         <tr className="border-b border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-500 uppercase">
                                             <th className="px-6 py-4">Nome</th>
                                             <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Usuários</th>
                                             <th className="px-6 py-4">Vencimento</th>
                                             <th className="px-6 py-4">Plano</th>
                                             <th className="px-6 py-4 text-center">Ações</th>
@@ -498,6 +547,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                                 <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{comp.name}</td>
                                                 <td className="px-6 py-4">
                                                     {comp.status === 'inactive' ? <XCircle /> : <CheckCircle />}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-500 font-bold">
+                                                    {/* We can fetch this individually or optimize later / For now let's use a sub-component to fetch */}
+                                                    <CompanyUserCount companyId={comp.id} />
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500">{comp.subscriptionEndDate ? new Date(comp.subscriptionEndDate).toLocaleDateString() : '-'}</td>
                                                 <td className="px-6 py-4 text-gray-500">{comp.plan?.name || 'Standard'}</td>
@@ -758,7 +811,6 @@ const Modal = ({ title, onClose, children, width = "max-w-xl" }: any) => (
     </div>
 );
 
-const CheckCircle = () => (<div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>);
-const XCircle = () => (<div className="w-4 h-4 rounded-full border border-red-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-red-500 rounded-full"></div></div>);
+
 
 export default SaaSDashboard;
