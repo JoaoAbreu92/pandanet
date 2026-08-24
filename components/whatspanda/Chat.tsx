@@ -241,28 +241,33 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
 
-    // Optimistic update
-    // In a real app, wait for server confirmation or use a local ID
-    
-    const { error } = await supabase
-      .from('whatsapp_messages')
-      .insert({
-        conversation_id: selectedConversation.id,
-        message_text: newMessage,
-        is_from_customer: false,
-        sent_by: user?.id // Replace with actual user ID
-      });
+    const messageToSend = newMessage;
+    setNewMessage(''); // Clear input optimistically
 
-    if (!error) {
-      setNewMessage('');
-      // Update last message in conversation
-      await supabase
-        .from('whatsapp_conversations')
-        .update({ 
-            last_message_at: new Date().toISOString(),
-            status: selectedConversation.status === 'fechado' ? 'aberto' : selectedConversation.status
-        })
-        .eq('id', selectedConversation.id);
+    try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error("No active session");
+
+        const response = await fetch(`/api/whatsapp/messages/send/${selectedConversation.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ message: messageToSend })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to send message');
+        }
+
+        // The backend will handle inserting the message into Supabase
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Erro ao enviar mensagem.');
+        setNewMessage(messageToSend); // Restore input on failure
     }
   };
 

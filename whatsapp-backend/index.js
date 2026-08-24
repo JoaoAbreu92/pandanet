@@ -183,6 +183,89 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
     res.json({ status: 'Sync started' });
 });
 
+// API: Enviar Mensagem
+router.post('/messages/send/:conversationId', authMiddleware, async (req, res) => {
+    const { conversationId } = req.params;
+    const { message } = req.body;
+    const userId = req.user?.id; // from authMiddleware
+
+    if (!message) {
+        return res.status(400).json({ error: 'Message text is required' });
+    }
+
+    try {
+        // 1. Get conversation details (contact phone, connection id, company id)
+        const { data: conv, error: convErr } = await supabase
+            .from('whatsapp_conversations')
+            .select('*, connection:whatsapp_settings!connection_id(instance_name)')
+            .eq('id', conversationId)
+            .single();
+
+        if (convErr || !conv) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        const instanceName = conv.connection?.instance_name;
+        if (!instanceName) {
+            return res.status(400).json({ error: 'WhatsApp instance not found for this conversation' });
+        }
+
+        // 2. Send via Evolution API
+        const sendReq = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+            method: 'POST',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                number: conv.contact_phone,
+                text: message
+            })
+        });
+
+        let sendRes;
+        try {
+            sendRes = await sendReq.json();
+        } catch (e) {
+            sendRes = { error: 'Invalid response from Evolution API' };
+        }
+
+        if (!sendReq.ok || (sendRes.error && !sendRes.key)) {
+            console.error('[SEND API] Erro ao enviar na Evolution:', sendRes);
+            return res.status(500).json({ error: 'Failed to send message via WhatsApp' });
+        }
+
+        // 3. Save message in Supabase
+        const { data: newMsg, error: msgErr } = await supabase
+            .from('whatsapp_messages')
+            .insert({
+                company_id: conv.company_id,
+                conversation_id: conversationId,
+                message_text: message,
+                is_from_customer: false,
+                sent_by: userId,
+                whatsapp_message_id: sendRes?.key?.id || undefined
+            })
+            .select()
+            .single();
+
+        if (msgErr) {
+            console.error('[SEND API] Erro ao salvar mensagem no Supabase:', msgErr);
+        }
+        
+        // 4. Update conversation timestamp
+        await supabase
+            .from('whatsapp_conversations')
+            .update({ 
+                last_message_at: new Date().toISOString(),
+                status: conv.status === 'fechado' ? 'aberto' : conv.status
+            })
+            .eq('id', conversationId);
+
+        res.json({ status: 'success', message: newMsg || { message_text: message, is_from_customer: false, sent_by: userId } });
+    } catch (error) {
+        console.error('[SEND API] Erro fatal:', error.message);
+        res.status(500).json({ error: 'Internal server error while sending message' });
+    }
+});
+
 app.use('/whatsapp', router);
 app.use('/', router); // Manter fallback para as rotas antigas se necessário
 

@@ -83,20 +83,28 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                 .single();
             
             if (settings?.id) {
-                // 2. Trigger backend sync (assuming backend runs on same host/port or discovery)
-                // We'll use the relative path or window.location.origin if it's the same
-                // But since it's a proxy, let's assume it's at /api/whatsapp/sync or similar
-                // Actually, looking at previous turns, backend might be at :3001 or similar.
-                // Let's use a standard fetch to the backend proxy
-                await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { method: 'POST' });
+                // Get current session token
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData?.session?.access_token;
+
+                if (!token) {
+                    throw new Error("No active session token found");
+                }
+
+                await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { 
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
             }
 
             // 3. Refresh list from Supabase
             await fetchContacts();
             alert('Sincronização iniciada em segundo plano! Os contatos aparecerão em instantes.');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error syncing:', error);
-            alert('Erro ao iniciar sincronização.');
+            alert(`Erro ao iniciar sincronização: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setSyncing(false);
         }

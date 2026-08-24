@@ -166,15 +166,25 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
 
         // 3. Send initial message if provided
         if (initialMessage.trim()) {
-            await supabase
-                .from('whatsapp_messages')
-                .insert({
-                    company_id: companyId,
-                    conversation_id: conversationId,
-                    message_text: initialMessage,
-                    is_from_customer: false,
-                    sent_by: profile?.id
-                });
+            try {
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData?.session?.access_token;
+                
+                if (token) {
+                    await fetch(`/api/whatsapp/messages/send/${conversationId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ message: initialMessage })
+                    });
+                } else {
+                    console.error("No active session token for initial message");
+                }
+            } catch (error) {
+                console.error('Error sending initial message:', error);
+            }
         }
 
         // 4. Redirect
