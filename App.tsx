@@ -62,6 +62,35 @@ const AppContent: React.FC = () => {
         setTheme('light');
     };
 
+    // Proteção contra Inspeção de Código (DevTools)
+    useEffect(() => {
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault();
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // F12
+            if (e.keyCode === 123) {
+                e.preventDefault();
+            }
+            // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+            if (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) {
+                e.preventDefault();
+            }
+            if (e.ctrlKey && e.keyCode === 85) {
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('contextmenu', handleContextMenu);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('contextmenu', handleContextMenu);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
     const [isImpersonating, setIsImpersonating] = useState(false);
     const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
 

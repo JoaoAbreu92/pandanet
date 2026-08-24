@@ -13,7 +13,7 @@ import {
     XMarkIcon,
     SparklesIcon,
 } from './icons';
-import type { Conversation, Message, Employee } from '../types';
+import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -349,13 +349,19 @@ const Messages: React.FC<MessagesProps> = () => {
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
                 file: m.file_url ? { name: (m.file_type?.startsWith('image/') || m.file_type === 'sticker') ? 'Imagem' : 'Anexo', url: m.file_url, type: m.file_type } : undefined,
-                // replyingTo: support needs a column or parsing payload
+                sender_deleted_at: m.sender_deleted_at,
             }));
 
-            setMessages(formattedMessages);
+            // Filter out messages that I deleted from MY view
+            const visibleMessages = formattedMessages.filter(m => {
+                if (m.sender === 'me' && m.sender_deleted_at) return false;
+                return true;
+            });
+
+            setMessages(visibleMessages);
 
             // Atualiza estado local para feedback imediato na UI
-            setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: formattedMessages } : c));
+            setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: visibleMessages } : c));
 
         } catch (error) {
             console.error('Erro ao buscar mensagens:', error);
@@ -580,6 +586,24 @@ const Messages: React.FC<MessagesProps> = () => {
         }
     };
 
+    const handleDeleteMessage = async (messageId: string) => {
+        if (!window.confirm("Deseja apagar esta mensagem? Ela sumirá para você agora e em 20 minutos para o destinatário.")) return;
+
+        try {
+            const { error } = await supabase
+                .from('messages')
+                .update({ sender_deleted_at: new Date().toISOString() })
+                .eq('id', messageId);
+
+            if (error) throw error;
+
+            // Update local state immediately
+            setMessages(prev => prev.filter(m => m.id !== messageId));
+        } catch (err: any) {
+            alert("Erro ao apagar mensagem: " + err.message);
+        }
+    };
+
     // Lógica de Notas Adesivas
     const handleAddNote = () => {
         if (!newNoteText.trim()) return;
@@ -607,10 +631,49 @@ const Messages: React.FC<MessagesProps> = () => {
 
     const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
         const isMe = message.sender === 'me';
+        const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+        useEffect(() => {
+            if (!isMe && message.sender_deleted_at) {
+                const deletedAt = new Date(message.sender_deleted_at).getTime();
+                const now = new Date().getTime();
+                const diff = (deletedAt + 20 * 60 * 1000) - now;
+
+                if (diff > 0) {
+                    setTimeLeft(Math.floor(diff / 1000));
+                    const timer = setInterval(() => {
+                        setTimeLeft(prev => {
+                            if (prev && prev > 0) return prev - 1;
+                            clearInterval(timer);
+                            return 0;
+                        });
+                    }, 1000);
+                    return () => clearInterval(timer);
+                } else {
+                    setTimeLeft(0);
+                }
+            }
+        }, [isMe, message.sender_deleted_at]);
+
+        const formatTime = (seconds: number) => {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        };
+
+        if (!isMe && timeLeft === 0) return null;
+
         return (
             <div className={`flex items-start gap-3 group ${isMe ? 'flex-row-reverse' : ''}`}>
                 <img src={message.avatarUrl} alt={message.senderName} className="w-8 h-8 rounded-full mt-1 object-cover" />
                 <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
+                    {/* Balão informativo para o destinatário */}
+                    {!isMe && message.sender_deleted_at && (
+                        <div className="bg-orange-50 text-orange-700 text-[10px] px-2 py-1 rounded-full mb-1 border border-orange-100 animate-pulse">
+                            {message.senderName} apagou esta mensagem. Ela sumirá em {timeLeft ? formatTime(timeLeft) : '...'}
+                        </div>
+                    )}
+
                     {/* Mostrar nome para outros usuários em grupos */}
                     {!isMe && selectedConversation?.isGroup && (
                         <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
@@ -644,15 +707,10 @@ const Messages: React.FC<MessagesProps> = () => {
                                                 className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
                                                 onClick={() => window.open(message.text)}
                                                 onError={(e) => {
-                                                    // Fallback to text if image fails to load
                                                     e.currentTarget.style.display = 'none';
                                                     e.currentTarget.parentElement?.classList.add('hidden');
-                                                    // We can't easily force a re-render of pure text here without state, 
-                                                    // but we can ensure the container doesn't look broken.
-                                                    // Ideally, we'd use state for loading status, but for this quick fix:
                                                 }}
                                             />
-                                            {/* Fallback text hidden by default, could be enabled if img errors */}
                                         </div>
                                     );
                                 }
@@ -687,9 +745,19 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <button
                                     onClick={() => setReplyingToMessage(message)}
                                     className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
+                                    title="Responder"
                                 >
                                     <ArrowUturnLeftIcon className="w-4 h-4" />
                                 </button>
+                                {isMe && (
+                                    <button
+                                        onClick={() => handleDeleteMessage(message.id)}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors"
+                                        title="Apagar para mim"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

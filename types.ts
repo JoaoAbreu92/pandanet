@@ -237,8 +237,9 @@ export interface Message {
   text: string;
   timestamp: string;
   reactions: Reaction[];
-  file?: { name: string; url: string };
+  file?: { name: string; url: string; type?: string };
   replyingTo?: Message;
+  sender_deleted_at?: string;
 }
 
 export interface Reaction {
