@@ -29,6 +29,17 @@ let evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
 // For internal docker network:
 const backendWebhookBaseUrl = process.env.BACKEND_WEBHOOK_URL || 'http://whatsapp-backend:3000';
 
+// Global debug logs in memory
+global.debugLogs = [];
+function addDebugLog(type, message, details = null) {
+    const timestamp = new Date().toISOString();
+    global.debugLogs.unshift({ timestamp, type, message, details });
+    if (global.debugLogs.length > 200) {
+        global.debugLogs.pop();
+    }
+    console.log(`[DEBUG_LOG] [${type}] ${message}`, details ? JSON.stringify(details).substring(0, 300) : '');
+}
+
 app.set('trust proxy', 1);
 
 // --- Security Middlewares ---
@@ -456,6 +467,11 @@ async function updateInstanceSettings(instanceName) {
     }
 }
 
+// API: Debug Logs em Memória
+router.get('/debug-logs', (req, res) => {
+    res.json(global.debugLogs);
+});
+
 // API: Reparar Webhooks
 router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (req, res) => {
     const { companyId, connectionId } = req.params;
@@ -526,11 +542,16 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         };
 
         try {
-            const resp = await fetch(`${evoUrl}/contact/findAll/${instanceName}`, { headers });
+            addDebugLog('SYNC_START', `Buscando contatos pessoais para ${instanceName}`);
+            const resp = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({})
+            });
             if (resp.ok) {
                 const raw = await resp.json();
                 const list = Array.isArray(raw) ? raw : (raw.contacts || raw.data || []);
-                console.log(`[SYNC] ${list.length} contatos pessoais encontrados.`);
+                addDebugLog('SYNC_CONTACTS_RAW', `Encontrados ${list.length} contatos pessoais.`);
                 for (const c of list) {
                     const jid = c.remoteJid || c.jid || c.id || '';
                     if (!jid || jid.includes('@g.us')) continue;
@@ -546,11 +567,55 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         });
                     }
                 }
+            } else {
+                const errText = await resp.text();
+                addDebugLog('SYNC_CONTACTS_ERR', `Erro na resposta findContacts: ${resp.status} - ${errText}`);
             }
-        } catch(e) { console.error(`[SYNC] Erro contatos:`, e.message); }
+        } catch(e) { 
+            console.error(`[SYNC] Erro contatos:`, e.message); 
+            addDebugLog('SYNC_CONTACTS_EXCEPTION', `Exceção em findContacts: ${e.message}`);
+        }
+
+        // 4. Buscar Histórico
+        let activeChats = [];
+        try {
+            addDebugLog('SYNC_CHATS_START', `Buscando chats ativos para ${instanceName}`);
+            const respC = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { 
+                method: 'GET', 
+                headers 
+            });
+            if (respC.ok) {
+                const raw = await respC.json();
+                activeChats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
+                addDebugLog('SYNC_CHATS_RAW', `Encontrados ${activeChats.length} chats ativos.`);
+                
+                // Extrair contatos também dos chats ativos para garantir que apareçam
+                for (const chat of activeChats) {
+                    const jid = chat.remoteJid || chat.jid || chat.id || '';
+                    if (!jid || jid.includes('@g.us') || jid.includes('@broadcast')) continue;
+                    const phone = jid.split('@')[0];
+                    if (!processedJids.has(phone)) {
+                        processedJids.add(phone);
+                        contactsToUpsert.push({
+                            company_id: companyId,
+                            phone,
+                            name: chat.pushName || chat.name || chat.verifiedName || formatPhoneDisplay(phone),
+                            is_group: false,
+                            updated_at: new Date().toISOString()
+                        });
+                    }
+                }
+            } else {
+                const errText = await respC.text();
+                addDebugLog('SYNC_CHATS_ERR', `Erro na resposta findChats: ${respC.status} - ${errText}`);
+            }
+        } catch(e) { 
+            console.error(`[SYNC] Erro findChats:`, e.message); 
+            addDebugLog('SYNC_CHATS_EXCEPTION', `Exceção em findChats: ${e.message}`);
+        }
 
         if (contactsToUpsert.length > 0) {
-            console.log(`[SYNC] Upserting ${contactsToUpsert.length} contatos pessoais...`);
+            console.log(`[SYNC] Upserting ${contactsToUpsert.length} contatos no Supabase...`);
             const chunks = [];
             for (let i = 0; i < contactsToUpsert.length; i += 500) chunks.push(contactsToUpsert.slice(i, i + 500));
             for (const chunk of chunks) {
@@ -558,16 +623,6 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
             await supabase.from('whatsapp_settings').update({ last_sync_error: `✅ Sincronização de contatos OK às ${new Date().toLocaleTimeString()}.` }).eq('id', connectionId);
         }
-
-        // 4. Buscar Histórico
-        let activeChats = [];
-        try {
-            const respC = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, { method: 'POST', headers, body: JSON.stringify({ where: {} }) });
-            if (respC.ok) {
-                const raw = await respC.json();
-                activeChats = Array.isArray(raw) ? raw : (raw.chats || raw.data || []);
-            }
-        } catch(e) { console.error(`[SYNC] Erro findChats:`, e.message); }
 
         console.log(`[SYNC] Histórico para ${activeChats.length} chats...`);
         const batchSize = 5; 
@@ -578,6 +633,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 if (!jid || jid.includes('@broadcast')) return; // Ignorar status/broadcast no histórico
                 
                 try {
+                    addDebugLog('SYNC_MSG_START', `Buscando mensagens do chat ${jid}`);
                     // Aumentar o limite para buscar mais histórico (ex: 50 mensagens)
                     const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, { 
                         method: 'POST', 
@@ -591,6 +647,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     if (msgResp.ok) {
                         const messages = await msgResp.json();
                         const msgs = Array.isArray(messages) ? messages : (messages.messages || messages.data || []);
+                        addDebugLog('SYNC_MSG_RAW', `Obtidas ${msgs.length} mensagens para ${jid}`);
                         if (msgs.length > 0) {
                             console.log(`[SYNC-MSG] Processando ${msgs.length} mensagens para ${jid}...`);
                             for (const m of msgs) {
@@ -598,14 +655,21 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                                 await processInboundMessage(m, companyId, connectionId, true);
                             }
                         }
+                    } else {
+                        const errText = await msgResp.text();
+                        addDebugLog('SYNC_MSG_ERR', `Erro findMessages para ${jid}: ${msgResp.status} - ${errText}`);
                     }
-                } catch(e) { console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); }
+                } catch(e) { 
+                    console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); 
+                    addDebugLog('SYNC_MSG_EXCEPTION', `Exceção em findMessages para ${jid}: ${e.message}`);
+                }
             }));
             await new Promise(r => setTimeout(r, 800)); // Delay um pouco maior entre batches para evitar rate limit
         }
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
         console.error(`[SYNC] Erro fatal:`, err.message);
+        addDebugLog('SYNC_FATAL_ERR', `Erro fatal na sincronização: ${err.message}`);
     }
 }
 
@@ -849,6 +913,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         const isGroup = false;
         
         console.log(`[MSG] Processando mensagem ${message.key?.id} de ${remoteJid}${isHistorical ? ' (Histórico)' : ''}`);
+        addDebugLog('MSG_PROCESS', `Processando mensagem: ${message.key?.id} | De: ${remoteJid} | fromMe: ${isFromMe} | Histórico: ${isHistorical}`);
         
         // extrair telefone real
         let fromPhone;
@@ -858,6 +923,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 fromPhone = senderPn.split('@')[0];
             } else {
                 console.log(`[MSG] JID @lid sem senderPn. Ignorando.`);
+                addDebugLog('MSG_LID_ERR', `JID @lid sem senderPn para msg ${message.key?.id}`);
                 return;
             }
         } else {
@@ -868,14 +934,41 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         const pushName = message.pushName || message.contact?.name || message.verifiedName || null;
 
         // Auto-criar contato para indivíduos (não grupos)
-        if (!isFromMe && fromPhone && !isGroup) {
-            const contactName = pushName || formatPhoneDisplay(fromPhone);
-            await supabase
-                .from('whatsapp_contacts')
-                .upsert(
-                    { company_id: companyId, phone: fromPhone, name: contactName, updated_at: new Date().toISOString() },
-                    { onConflict: 'company_id,phone', ignoreDuplicates: false }
-                );
+        if (fromPhone && !isGroup) {
+            // Se for enviado por nós (fromMe: true), o pushName no webhook é o nosso perfil.
+            // Portanto, usamos apenas o número formatado como nome do contato para evitar salvar o nosso nome nele.
+            // Se for enviado pelo cliente, usamos o pushName do cliente.
+            const contactName = isFromMe ? formatPhoneDisplay(fromPhone) : (pushName || formatPhoneDisplay(fromPhone));
+            
+            if (!isFromMe) {
+                // Upsert para garantir atualização do pushName do cliente se ele enviar mensagem
+                await supabase
+                    .from('whatsapp_contacts')
+                    .upsert(
+                        { company_id: companyId, phone: fromPhone, name: contactName, updated_at: new Date().toISOString() },
+                        { onConflict: 'company_id,phone', ignoreDuplicates: false }
+                    );
+            } else {
+                // Se for fromMe, verifica se já existe. Se não existir, insere.
+                const { data: contactExists } = await supabase
+                    .from('whatsapp_contacts')
+                    .select('id')
+                    .eq('company_id', companyId)
+                    .eq('phone', fromPhone)
+                    .maybeSingle();
+                
+                if (!contactExists) {
+                    addDebugLog('CONTACT_AUTO_CREATE', `Criando contato de destino para mensagem enviada do celular: ${fromPhone}`);
+                    await supabase
+                        .from('whatsapp_contacts')
+                        .insert({
+                            company_id: companyId,
+                            phone: fromPhone,
+                            name: contactName,
+                            updated_at: new Date().toISOString()
+                        });
+                }
+            }
         }
 
         // 0. Verificar se o contato está bloqueado
@@ -889,6 +982,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
             if (contact?.is_blocked) {
                 console.log(`[BOT] Contato ${fromPhone} bloqueado.`);
+                addDebugLog('MSG_BLOCKED', `Contato ${fromPhone} está bloqueado.`);
                 return;
             }
         }
@@ -900,7 +994,10 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             .eq('whatsapp_message_id', msgId)
             .maybeSingle();
         
-        if (exists) return;
+        if (exists) {
+            addDebugLog('MSG_DUPLICATE', `Mensagem duplicada, ignorando: ${msgId}`);
+            return;
+        }
 
         // --- EXTRAÇÃO ROBUSTA DE CONTEÚDO ---
         // Função auxiliar para extrair a mensagem real de wrappers (ephemeral, viewOnce, etc)
@@ -1023,7 +1120,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
 
         // 2. Inserir a mensagem
         if (conversationId) {
-            await supabase.from('whatsapp_messages').insert({
+            const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
                 company_id: companyId,
                 conversation_id: conversationId,
                 message_text: text,
@@ -1034,6 +1131,13 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 created_at: message.messageTimestamp ? new Date(message.messageTimestamp * 1000).toISOString() : new Date().toISOString()
             });
 
+            if (insertErr) {
+                addDebugLog('MSG_INSERT_ERR', `Erro ao inserir mensagem ${msgId} na conv ${conversationId}: ${insertErr.message}`, insertErr);
+                throw insertErr;
+            } else {
+                addDebugLog('MSG_INSERT_OK', `Mensagem ${msgId} salva com sucesso na conv ${conversationId}`);
+            }
+
             if (!isHistorical && !isFromMe) {
                 // Chatbot se necessário
                 runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
@@ -1041,6 +1145,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         }
     } catch (err) {
         console.error('[MSG] Erro fatal:', err.message);
+        addDebugLog('MSG_FATAL_ERR', `Erro fatal processando mensagem: ${err.message}`, err);
     }
 }
 
@@ -1069,10 +1174,11 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     const instance = body.instance || body.instanceName || connectionId;
 
     console.log(`[WEBHOOK] ===== Evento recebido: "${event}" | Instância: ${instance} | Empresa: ${companyId} =====`);
-    console.log(`[WEBHOOK RAW]`, JSON.stringify(body, null, 2).substring(0, 1000)); // Limita para não sobrecarregar os logs
+    addDebugLog('WEBHOOK_EVENT', `Evento: ${event} | Instância: ${instance} | Empresa: ${companyId}`, body);
 
     if (!event) {
         console.log(`[WEBHOOK] Payload sem campo 'event'. Body keys: ${Object.keys(body).join(', ')}`);
+        addDebugLog('WEBHOOK_NO_EVENT', `Payload recebido sem evento. Keys: ${Object.keys(body).join(', ')}`);
         return;
     }
 
