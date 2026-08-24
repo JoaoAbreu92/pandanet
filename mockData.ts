@@ -192,15 +192,107 @@ const acmeData: AppData = {
     benefits: mockBenefits,
     polls: mockPolls,
     feedPosts: mockFeedPosts,
-    events: [], // Initialize events
+    events: [
+        {
+            id: 1,
+            title: 'Happy Hour Mensal',
+            description: 'Venha celebrar os aniversariantes do mês!',
+            date: new Date(Date.now() + 86400000 * 2).toISOString(), // +2 days
+            time: '18:00',
+            location: 'Terraço',
+            category: 'Social',
+            imageUrl: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=400&q=80',
+            attendees: [],
+        },
+        {
+            id: 2,
+            title: 'Workshop de React Avançado',
+            description: 'Aprenda sobre Server Components e Hooks.',
+            date: new Date(Date.now() + 86400000 * 5).toISOString(), // +5 days
+            time: '14:00',
+            location: 'Sala de Treinamento',
+            category: 'Treinamento',
+            imageUrl: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400&q=80',
+            attendees: [],
+        },
+        {
+            id: 3,
+            title: 'Reunião Geral (All-Hands)',
+            description: 'Atualização trimestral de resultados.',
+            date: new Date(Date.now() + 86400000 * 10).toISOString(), // +10 days
+            time: '10:00',
+            location: 'Auditório Principal',
+            category: 'Corporativo',
+            imageUrl: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=400&q=80',
+            attendees: [],
+        }
+    ],
     trainings: mockTrainings,
     kbArticles: mockKBArticles,
     services: mockServices,
-    securityAlerts: mockSecurityAlerts
+    securityAlerts: mockSecurityAlerts,
+    recognitions: [
+        {
+            id: 1,
+            to: 'Ana Williams',
+            from: 'John Doe',
+            toAvatar: 'https://i.pravatar.cc/150?u=ana@acme.com',
+            fromAvatar: 'https://i.pravatar.cc/150?u=john@acme.com',
+            message: 'Obrigado por me ajudar com o bug crítico ontem! Você arrasou.',
+            value: 'Trabalho em Equipe'
+        },
+        {
+            id: 2,
+            to: 'Peter Jones',
+            from: 'Ana Williams',
+            toAvatar: 'https://i.pravatar.cc/150?u=peter@acme.com',
+            fromAvatar: 'https://i.pravatar.cc/150?u=ana@acme.com',
+            message: 'Excelente trabalho na otimização da API.',
+            value: 'Qualidade'
+        },
+        {
+            id: 3,
+            to: 'Mary Johnson',
+            from: 'Carlos Silva',
+            toAvatar: 'https://i.pravatar.cc/150?u=mary@acme.com',
+            fromAvatar: 'https://i.pravatar.cc/150?u=carlos@globex.com',
+            message: 'Os novos designs estão incríveis! O cliente adorou.',
+            value: 'Inovação'
+        }
+    ],
+    wellnessItems: [
+        {
+            id: 1,
+            title: 'Saúde Mental no Trabalho',
+            description: 'Dicas importantes para manter o equilíbrio mental durante a jornada de trabalho.',
+            category: 'Saúde Mental',
+            videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Example video
+            linkUrl: '#',
+            linkText: 'Saiba mais'
+        },
+        {
+            id: 2,
+            title: 'Exercícios de Alongamento',
+            description: 'Faça pausas regulares para alongar. Veja este guia rápido.',
+            category: 'Atividade Física',
+            videoUrl: '',
+            linkUrl: '#',
+            linkText: 'Ver guia PDF'
+        },
+        {
+            id: 3,
+            title: 'Alimentação Balanceada',
+            description: 'Como preparar marmitas saudáveis para a semana.',
+            category: 'Nutrição',
+            videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+            linkUrl: '#',
+            linkText: 'Ver Receitas'
+        }
+    ]
 };
 
 // FIX: Explicitly typed globexData with AppData to ensure type consistency.
-const globexData: AppData = { ...acmeData, polls: [], events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], employees: [{ id: 1, name: 'Carlos Silva', email: 'carlos@globex.com', password: '123', role: 'Diretor de Vendas', team: 'Vendas', avatarUrl: 'https://i.pravatar.cc/150?u=carlos@globex.com', joinDate: '2020-02-02', birthDate: '1985-10-10', isAdmin: true, isOnline: true, permissions: { ...basePermissions }, phone: '(11) 91111-2222', officeLocation: 'São Paulo', bio: 'Liderando equipes de vendas para o sucesso.', following: [] }] };
+const globexData: AppData = { ...acmeData, polls: [], events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: [], employees: [{ id: 1, name: 'Carlos Silva', email: 'carlos@globex.com', password: '123', role: 'Diretor de Vendas', team: 'Vendas', avatarUrl: 'https://i.pravatar.cc/150?u=carlos@globex.com', joinDate: '2020-02-02', birthDate: '1985-10-10', isAdmin: true, isOnline: true, permissions: { ...basePermissions }, phone: '(11) 91111-2222', officeLocation: 'São Paulo', bio: 'Liderando equipes de vendas para o sucesso.', following: [] }] };
 
 export const mockCompanies: Company[] = [
     {

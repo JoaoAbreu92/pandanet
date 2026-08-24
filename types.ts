@@ -407,6 +407,18 @@ export interface AppData {
   kbArticles: KBArticle[];
   services: ServiceStatusItem[];
   securityAlerts: SecurityAlert[];
+  recognitions: Recognition[];
+  wellnessItems: WellnessItem[];
+}
+
+export interface WellnessItem {
+  id: number;
+  title: string;
+  description: string;
+  category: 'Saúde Mental' | 'Atividade Física' | 'Nutrição' | 'Outro';
+  videoUrl?: string;
+  linkUrl?: string;
+  linkText?: string;
 }
 
 export interface CompanySettings {

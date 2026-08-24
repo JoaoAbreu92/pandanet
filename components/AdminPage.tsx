@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-// FIX: Correcting the import path for types.
-import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument } from '../types';
+import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, TrainingModule, ResourceDocument, WellnessItem } from '../types';
 import Dashboard from './Dashboard';
-// FIX: Correcting the import path for UserManager.
 import UserManager from './UserManager';
 import GeneralSettings from './GeneralSettings';
 import FormSubmissionsManager from './FormSubmissionsManager';
@@ -49,6 +47,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
         { id: 'infosec', label: 'Segurança' },
         { id: 'policies', label: 'Políticas' },
         { id: 'polls', label: 'Enquetes' },
+        { id: 'bem-estar', label: 'Bem Estar' },
         { id: 'settings', label: 'Geral' },
     ];
 
@@ -135,6 +134,22 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                 />;
             case 'polls':
                 return <PollManager polls={company.data.polls} setPolls={(p) => handleSetData('polls', p)} />;
+            case 'bem-estar':
+                return <GenericManager<WellnessItem>
+                    title="Itens de Bem-Estar"
+                    items={company.data.wellnessItems}
+                    setItems={(i) => handleSetData('wellnessItems', i)}
+                    newItemTemplate={{ id: 0, title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
+                    fields={[
+                        { key: 'title', label: 'Título' },
+                        { key: 'description', label: 'Descrição', type: 'textarea' },
+                        { key: 'category', label: 'Categoria', type: 'select', options: ['Saúde Mental', 'Atividade Física', 'Nutrição', 'Outro'] },
+                        { key: 'videoUrl', label: 'URL do Vídeo (Embed)', type: 'text' },
+                        { key: 'linkUrl', label: 'Link Externo', type: 'text' },
+                        { key: 'linkText', label: 'Texto do Link', type: 'text' }
+                    ]}
+                    renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
+                />;
             case 'settings':
                 return <GeneralSettings settings={company.settings} setSettings={handleSetSettings} />;
             default:

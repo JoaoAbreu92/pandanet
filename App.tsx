@@ -375,7 +375,7 @@ const App: React.FC = () => {
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
-            case 'feed': return <FeedPage posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} currentUser={currentUser} allEmployees={companyData.employees} />;
+            case 'feed': return <FeedPage posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} />;
             case 'messages': return canAccess('viewMessages') ? <Messages conversations={companyData.conversations} setConversations={handleUpdateConversations} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
             case 'tickets': return canAccess('openTickets') ? <TicketPage tickets={companyData.tickets} setTickets={handleUpdateTickets} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
             case 'calendar': return canAccess('viewCalendar') ? <CalendarPage allEmployees={companyData.employees} userEvents={calendarEvents} onEventCreate={handleAddEvent} /> : null;
@@ -385,7 +385,7 @@ const App: React.FC = () => {
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage items={companyData.marketplaceItems} setItems={(i) => setCompanyData({ ...companyData, marketplaceItems: i })} currentUser={currentUser} /> : null;
             case 'forms': return canAccess('viewForms') ? <FormsPage submissions={companyData.formSubmissions} setSubmissions={(s) => setCompanyData({ ...companyData, formSubmissions: s })} currentUser={currentUser} /> : null;
             case 'benefits': return canAccess('viewBenefits') ? <BeneficiosPage benefits={companyData.benefits} setBenefits={(b) => setCompanyData({ ...companyData, benefits: b })} currentUser={currentUser} /> : null;
-            case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage /> : null;
+            case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage items={companyData.wellnessItems} /> : null;
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;

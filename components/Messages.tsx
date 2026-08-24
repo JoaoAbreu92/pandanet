@@ -12,11 +12,33 @@ import {
     TrashIcon,
     UserGroupIcon,
     XMarkIcon,
+    PhotoIcon,
 } from './icons';
 import type { Conversation, Message, Employee } from '../types';
 
-const availableReactions = ['👍', '❤️', '🤔', '🎉'];
-const availableEmojis = ['😊', '👍', '❤️', '🤔', '🎉', '🙏', '👏'];
+const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
+const availableEmojis = [
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😋', '😛', '😝', '😜', '🤪', 'Mw', '😔', '😪', '🤤', '😴',
+    '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵',
+    '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', 'wv', '☹️', '😮',
+    '😯', '😲', '😳', '🥺', 'mV', '😨', 'mw', '😥', '😢', '😭',
+    '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡',
+    '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺',
+    '👻', '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽',
+    '🙀', '😿', '😾', '👋', '🤚', 'Mw', '✋', '🖖', '👌', '🤏',
+    '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇',
+    '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲',
+    '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', 'Foot',
+    '👂', '🦻', 'Nose', '🧠', '🫀', '🫁', 'Tooth', 'Bone', 'Eyes',
+    'Eye', 'Tongue', 'Mouth', 'Lip', 'Baby', 'Child', 'Boy', 'Girl',
+    'Person', 'Blond', 'Man', 'Beard', 'Redhead', 'Woman', 'Older_Adult', 'Old_Man',
+    'Old_Woman', 'Frown', 'Pout', 'Gesturing_NO', 'Gesturing_OK', 'Tipping_Hand', 'Raising_Hand', 'Deaf_Person',
+    'Bowing', 'Facepalming', 'Shrugging', 'Health_Worker', 'Student', 'Teacher', 'Judge', 'Farmer',
+    'Cook', 'Mechanic', 'Factory_Worker', 'Office_Worker', 'Scientist', 'Software_Engineer', 'Singer', 'Artist',
+    'Pilot', 'Astronaut', 'Firefighter', 'Police_Officer', 'Detective', 'Guard', 'Ninja', 'Construction_Worker',
+    'Prince', 'Princess', 'Person_Wearing_Turban', 'Person_With_Veil'];
 
 const NOTE_COLORS = [
     { id: 'blue', bg: 'bg-blue-100', border: 'border-blue-200' },
@@ -50,6 +72,8 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
     const [newMessage, setNewMessage] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showStickerPicker, setShowStickerPicker] = useState(false);
+    const [stickerTab, setStickerTab] = useState<'gallery' | 'saved'>('gallery');
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
     const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
@@ -216,7 +240,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                 <div className="overflow-y-auto flex-1">
                     {activeTab === 'conversations' && (
                         <ul>
-                            {conversations.map(conv => {
+                            {conversations.filter(c => !c.isGroup).map(conv => {
                                 const participant = companyEmployees.find(e => e.name === conv.participantName);
                                 const isOnline = participant ? participant.isOnline : false;
                                 return (
@@ -305,12 +329,57 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                             {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                             {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                             <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
-                                {showEmojiPicker && (<div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap w-48"> {availableEmojis.map(emoji => (<button key={emoji} type="button" onClick={() => setNewMessage(prev => prev + emoji)} className="text-2xl p-1 hover:bg-gray-200 rounded-md"> {emoji} </button>))} </div>)}
-                                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 text-gray-500 hover:text-brand-primary"> <FaceSmileIcon className="w-6 h-6" /> </button>
+                                {showEmojiPicker && (
+                                    <div className="absolute bottom-14 left-0 bg-white border rounded-lg shadow-lg p-2 flex flex-wrap w-64 max-h-60 overflow-y-auto z-50">
+                                        {availableEmojis.map(emoji => (
+                                            <button key={emoji} type="button" onClick={() => setNewMessage(prev => prev + emoji)} className="text-2xl p-1 hover:bg-gray-200 rounded-md">
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {showStickerPicker && (
+                                    <div className="absolute bottom-14 left-10 bg-white border rounded-lg shadow-lg w-72 h-80 z-50 flex flex-col">
+                                        <div className="flex border-b">
+                                            <button type="button" onClick={() => setStickerTab('gallery')} className={`flex-1 py-2 text-sm font-medium ${stickerTab === 'gallery' ? 'text-brand-primary border-b-2 border-brand-primary' : 'text-gray-500'}`}>Galeria</button>
+                                            <button type="button" onClick={() => setStickerTab('saved')} className={`flex-1 py-2 text-sm font-medium ${stickerTab === 'saved' ? 'text-brand-primary border-b-2 border-brand-primary' : 'text-gray-500'}`}>Salvos</button>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-2">
+                                            {stickerTab === 'gallery' ? (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {/* Mock Gallery GIFs */}
+                                                    {['https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXg0d3F6aG55b3F6aG55b3F6aG55b3F6aG55b3F6aG55b3F/3o7TKs6KZp6lW2q64I/giphy.gif', 'https://media.giphy.com/media/l0HlHJGHe3yAMhdQY/giphy.gif', 'https://media.giphy.com/media/3o6Zt481isNVuQIqZm/giphy.gif'].map((url, i) => (
+                                                        <div key={i} className="group relative cursor-pointer">
+                                                            <img src={url} alt="GIF" className="w-full h-full object-cover rounded" onClick={() => { setAttachedFile(new File([""], "sticker.gif", { type: "image/gif" })); setShowStickerPicker(false); }} />
+                                                            <button type="button" className="absolute top-0 right-0 p-1 bg-black/50 text-white opacity-0 group-hover:opacity-100 rounded-bl text-xs" title="Salvar">★</button>
+                                                        </div>
+                                                    ))}
+                                                    <div className="col-span-3 text-center text-xs text-gray-400 mt-2">Mais GIFs em breve...</div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-8 text-gray-500 text-sm">
+                                                    <p>Nenhum sticker salvo.</p>
+                                                    <p className="text-xs mt-1">Clique na ★ para salvar.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button type="button" onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary">
+                                    <FaceSmileIcon className="w-6 h-6" />
+                                </button>
+                                <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary" title="Stickers & GIFs">
+                                    <PhotoIcon className="w-6 h-6" />
+                                </button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary"> <PaperClipIcon className="w-6 h-6" /> </button>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
+                                    <PaperClipIcon className="w-6 h-6" />
+                                </button>
                                 <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Digite uma mensagem..." className="flex-1 w-full px-4 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary" />
-                                <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessage.trim() && !attachedFile)}> <PaperAirplaneIcon className="w-6 h-6" /> </button>
+                                <button type="submit" className="p-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:bg-emerald-300" disabled={(!newMessage.trim() && !attachedFile)}>
+                                    <PaperAirplaneIcon className="w-6 h-6" />
+                                </button>
                             </form>
                         </div>
                     </>

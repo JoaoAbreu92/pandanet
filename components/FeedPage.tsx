@@ -1,7 +1,10 @@
 
 import React, { useState, useRef } from 'react';
 import Card from './Card';
-import type { Post, Employee } from '../types';
+import EventsCarouselMini from './EventsCarouselMini';
+import RecognitionWidget from './RecognitionWidget';
+import EmployeeOfTheMonth from './EmployeeOfTheMonth';
+import type { Post, Employee, Event, Recognition } from '../types';
 import { VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, PaperAirplaneIcon, ShareIcon, FaceSmileIcon, UserGroupIcon, HashtagIcon, CakeIcon } from './icons';
 
 interface FeedPageProps {
@@ -9,6 +12,8 @@ interface FeedPageProps {
     setPosts: (posts: Post[]) => void;
     currentUser: Employee;
     allEmployees?: Employee[];
+    events?: Event[];
+    recognitions?: Recognition[];
 }
 
 export const PostCard: React.FC<{
@@ -21,8 +26,9 @@ export const PostCard: React.FC<{
     const [commentText, setCommentText] = useState('');
     const [showReactionMenu, setShowReactionMenu] = useState(false);
     const timeoutRef = useRef<any>(null); // Ref for the timeout
+    const commentInputRef = useRef<HTMLInputElement>(null); // Ref for comment input
 
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀', '🚀', '💯'];
 
     const handleCommentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -127,7 +133,10 @@ export const PostCard: React.FC<{
                     </button>
                 </div>
 
-                <button className="flex items-center justify-center flex-1 py-2 space-x-2 rounded-md hover:bg-gray-50 text-gray-600 transition-colors">
+                <button
+                    onClick={() => commentInputRef.current?.focus()}
+                    className="flex items-center justify-center flex-1 py-2 space-x-2 rounded-md hover:bg-gray-50 text-gray-600 transition-colors"
+                >
                     <ChatBubbleLeftIcon className="w-5 h-5" />
                     <span>Comentar</span>
                 </button>
@@ -165,6 +174,7 @@ export const PostCard: React.FC<{
                             placeholder="Escreva um comentário..."
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
+                            ref={commentInputRef}
                             className="w-full pl-3 pr-10 py-2 bg-white text-brand-text rounded-full border border-gray-300 focus:outline-none focus:border-brand-primary text-sm shadow-sm"
                         />
                         <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-primary hover:text-emerald-700">
@@ -177,12 +187,18 @@ export const PostCard: React.FC<{
     );
 };
 
-const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEmployees = [] }) => {
+const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEmployees = [], events = [], recognitions = [] }) => {
     const [newPostContent, setNewPostContent] = useState('');
     const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
+    const postTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleBirthdayClick = (name: string) => {
+        setNewPostContent(`Parabéns @${name}! 🥳 `);
+        postTextareaRef.current?.focus();
+    };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         if (e.target.files && e.target.files[0]) {
@@ -274,6 +290,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
         });
     };
 
+    // Determine Employee of the Month (Mock logic: Pick random or specific one)
+    // For demo, let's pick the 3rd employee or random if available
+    const employeeOfTheMonth = allEmployees.length > 2 ? allEmployees[2] : (allEmployees[0] || currentUser);
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* Left Sidebar - Profile & Shortcuts */}
@@ -313,6 +333,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
                         </li>
                     </ul>
                 </div>
+
+                {/* Events Carousel */}
+                <div className="mt-6">
+                    <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase px-1">Próximos Eventos</h3>
+                    <EventsCarouselMini events={events} />
+                </div>
             </div>
 
             {/* Main Feed - Center - Takes 2 cols */}
@@ -328,6 +354,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
                                 <textarea
                                     value={newPostContent}
                                     onChange={(e) => setNewPostContent(e.target.value)}
+                                    ref={postTextareaRef}
                                     placeholder={`O que você está pensando, ${currentUser.name.split(' ')[0]}? (Use @ para marcar alguém)`}
                                     className="w-full bg-white text-brand-text border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-brand-primary min-h-[100px] resize-none"
                                     disabled={!currentUser.permissions.canPostText}
@@ -409,6 +436,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
 
             {/* Right Sidebar - Widgets */}
             <div className="hidden lg:block space-y-6">
+
+                {/* Employee of The Month */}
+                <EmployeeOfTheMonth employee={employeeOfTheMonth} />
+
+                {/* Recognition Wall */}
+                <RecognitionWidget recognitions={recognitions} onRecognize={() => alert('Feature coming soon!')} />
+
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
                     <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase flex items-center">
                         <CakeIcon className="w-5 h-5 mr-2 text-pink-500" />
@@ -416,14 +450,20 @@ const FeedPage: React.FC<FeedPageProps> = ({ posts, setPosts, currentUser, allEm
                     </h3>
                     <div className="space-y-3">
                         {/* Mock Birthdays */}
-                        <div className="flex items-center space-x-3">
+                        <div
+                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            onClick={() => handleBirthdayClick('Mariana Costa')}
+                        >
                             <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-emoji">🎂</div>
                             <div>
                                 <p className="text-sm font-semibold text-gray-800">Mariana Costa</p>
-                                <p className="text-xs text-gray-500">Hoje!</p>
+                                <p className="text-xs text-brand-primary font-bold">Hoje!</p>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div
+                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            onClick={() => handleBirthdayClick('Carlos Silva')}
+                        >
                             <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-emoji">🎈</div>
                             <div>
                                 <p className="text-sm font-semibold text-gray-800">Carlos Silva</p>

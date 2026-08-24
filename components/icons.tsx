@@ -41,7 +41,6 @@ export {
   QuestionMarkCircleIcon,
   ArrowPathIcon,
   BuildingOffice2Icon,
-  VideoCameraIcon,
   PhotoIcon,
   HandThumbUpIcon,
   NewspaperIcon,
@@ -57,4 +56,7 @@ export {
   PlayCircleIcon,
   ArrowDownTrayIcon,
   LockClosedIcon,
+  TrophyIcon,
+  VideoCameraIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';

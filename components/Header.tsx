@@ -49,6 +49,8 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                         />
                     </div>
                 </div>
+
+
                 <div className="flex items-center space-x-4">
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
