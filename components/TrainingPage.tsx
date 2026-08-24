@@ -288,7 +288,7 @@ const TrainingPage: React.FC = () => {
                                 <div className="aspect-video w-full rounded-xl bg-gray-100 dark:bg-slate-900 flex flex-col items-center justify-center text-gray-400 border border-dashed">
                                     <PlayCircleIcon className="w-16 h-16 opacity-40 mb-2" />
                                     <p className="font-semibold">Nenhum vídeo anexado a este treinamento.</p>
-                                    <p className="text-xs">Consulte o material de apoio em PDF.</p>
+                                    <p className="text-xs">Consulte o material de apoio anexado.</p>
                                 </div>
                             )}
                         </div>
@@ -304,10 +304,10 @@ const TrainingPage: React.FC = () => {
                                         rel="noreferrer"
                                         className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 shadow transition-colors text-sm"
                                     >
-                                        <span>Download Material (PDF)</span>
+                                        <span>Acessar Material de Apoio</span>
                                     </a>
                                 ) : (
-                                    <p className="text-sm text-gray-500">Nenhum documento PDF disponível.</p>
+                                    <p className="text-sm text-gray-500">Nenhum material de apoio disponível.</p>
                                 )}
                             </div>
 

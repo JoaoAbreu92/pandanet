@@ -654,14 +654,14 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                                     {existingThumbnailUrl && <p className="text-xs text-gray-400 mt-1">Capa cadastrada: <a href={existingThumbnailUrl} target="_blank" rel="noreferrer" className="text-brand-primary underline">Ver</a></p>}
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Documento de Apoio (PDF)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Material de Apoio (PDF, Vídeo, Documentos)</label>
                                     <input
                                         type="file"
-                                        accept=".pdf"
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.mp4,.mov,.avi,.mkv"
                                         onChange={e => e.target.files && setPdfFile(e.target.files[0])}
                                         className="mt-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer"
                                     />
-                                    {existingPdfUrl && <p className="text-xs text-gray-400 mt-1">PDF cadastrado: <a href={existingPdfUrl} target="_blank" rel="noreferrer" className="text-brand-primary underline">Ver</a></p>}
+                                    {existingPdfUrl && <p className="text-xs text-gray-400 mt-1">Material cadastrado: <a href={existingPdfUrl} target="_blank" rel="noreferrer" className="text-brand-primary underline">Ver</a></p>}
                                 </div>
                             </div>
 

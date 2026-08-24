@@ -957,5 +957,30 @@ WHERE n.id = sub.id AND n.sort_order = 0;
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
 
+-- ==========================================
+-- 16. STORAGE RLS POLICIES FOR UPLOADING FILES
+-- ==========================================
+-- Garante que RLS está habilitada na tabela storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Remove políticas antigas conflitantes
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Updates" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Deletes" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public select" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated insert" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated update" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated delete" ON storage.objects;
+
+-- Cria políticas universais permissivas para usuários autenticados da intranet
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (true);
+CREATE POLICY "Authenticated Uploads" ON storage.objects FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated Updates" ON storage.objects FOR UPDATE TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated Deletes" ON storage.objects FOR DELETE TO authenticated USING (true);
+
+-- Final Force Schema Cache Reload
+NOTIFY pgrst, 'reload schema';
+
 
 
