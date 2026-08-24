@@ -27,6 +27,9 @@ const ChatbotSettings: React.FC = () => {
     const [team, setTeam] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [geminiKey, setGeminiKey] = useState('');
+    const activeProfile = currentUser || profile;
+    const [signature, setSignature] = useState(activeProfile?.whatsapp_signature || '');
+    const [useSignature, setUseSignature] = useState(activeProfile?.use_whatsapp_signature || false);
 
     useEffect(() => {
         fetchData();
@@ -124,6 +127,18 @@ const ChatbotSettings: React.FC = () => {
         alert('Configuração salva!');
     };
 
+    const handleSaveSignature = async () => {
+        if (!profile?.id) return;
+        setLoading(true);
+        const { error } = await supabase.from('profiles').update({ 
+            whatsapp_signature: signature,
+            use_whatsapp_signature: useSignature
+        }).eq('id', profile.id);
+        setLoading(false);
+        if (error) alert('Erro ao salvar assinatura: ' + error.message);
+        else alert('Assinatura salva com sucesso!');
+    };
+
     const handleDeleteNode = async (nodeId: string) => {
         const { error } = await supabase.from('whatsapp_chatbot_nodes').delete().eq('id', nodeId);
         if (!error) setNodes(nodes.filter(n => n.id !== nodeId));
@@ -155,6 +170,50 @@ const ChatbotSettings: React.FC = () => {
                         >
                             {loading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             Salvar Chave
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* User Personal Settings */}
+            <div className="bg-white dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                    <div className="flex-1">
+                        <h2 className="text-lg font-bold flex items-center gap-2">
+                           <MessageSquare className="w-5 h-5 text-emerald-500" /> Minha Assinatura WhatsPanda
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">Este texto será anexado automaticamente às suas mensagens enviadas.</p>
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Texto da Assinatura</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Ex: Att, [Seu Nome]"
+                                    value={signature}
+                                    onChange={(e) => setSignature(e.target.value)}
+                                    className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/5 p-3 rounded-xl outline-none text-sm"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="checkbox" 
+                                    id="use_signature"
+                                    checked={useSignature}
+                                    onChange={(e) => setUseSignature(e.target.checked)}
+                                    className="w-4 h-4 rounded text-emerald-500"
+                                />
+                                <label htmlFor="use_signature" className="text-sm text-slate-600 dark:text-slate-300 cursor-pointer">Habilitar assinatura por padrão</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-end">
+                        <button 
+                            onClick={handleSaveSignature} 
+                            disabled={loading}
+                            className={`flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all text-xs font-bold shadow-lg ${loading ? 'opacity-50' : ''}`}
+                        >
+                            {loading ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            Salvar Minha Assinatura
                         </button>
                     </div>
                 </div>

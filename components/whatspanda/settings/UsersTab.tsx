@@ -347,6 +347,10 @@ const UsersTab: React.FC = () => {
                                         { key: 'can_view_chats', label: 'Acessar Chats', desc: 'Ver conversas e histórico.' },
                                         { key: 'can_send_messages', label: 'Enviar Mensagens', desc: 'Enviar mensagens de texto.' },
                                         { key: 'can_send_media', label: 'Enviar Mídia', desc: 'Enviar fotos, vídeos e áudios.' },
+                                        { key: 'can_transfer', label: 'Transferir Conversas', desc: 'Permitir transferência entre setores/usuários.' },
+                                        { key: 'can_see_all_departments', label: 'Ver Todos Departamentos', desc: 'Ver conversas de qualquer departamento.' },
+                                        { key: 'can_view_others_chats', label: 'Ver Chats de Terceiros', desc: 'Ver conversas atribuídas a outros usuários.' },
+                                        { key: 'can_manage_tags', label: 'Gerenciar Tags', desc: 'Criar e atribuir tags a conversas.' },
                                         { key: 'can_manage_settings', label: 'Gerenciar Configurações', desc: 'Acesso total às configurações.' },
                                     ].map((perm) => (
                                         <div key={perm.key} className="flex items-start group/perm cursor-pointer" onClick={() => handlePermissionChange(perm.key as keyof WhatsAppPermissions)}>

@@ -58,6 +58,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
+  const [useSignature, setUseSignature] = useState(activeProfile?.use_whatsapp_signature || false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false); // Added loading state for messages
@@ -157,17 +158,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
         department:departments(id, name),
-        channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected)
+        channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected),
+        tags:whatsapp_conversation_tags(tag:whatsapp_tags(id, name, color))
       `)
       .eq('company_id', companyId);
 
     // Filter by queues if not Admin and cannot see all departments
-    if (!isAdmin && profile?.id && !permissions.can_see_all_departments) {
+    if (!isAdmin && profile?.id && !permissions.can_see_all_departments && !permissions.can_view_others_chats) {
       const assignedQueues = permissions.assigned_queues || [];
       if (assignedQueues.length > 0) {
         query = query.or(`queue_id.in.(${assignedQueues.join(',')}),queue_id.is.null,assigned_to.eq.${profile.id}`);
       } else {
-        query = query.or(`queue_id.is.null,assigned_to.eq.${profile.id}`);
+        query = query.or(`assigned_to.eq.${profile.id}`);
       }
     }
 
@@ -262,7 +264,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || !currentUser?.company_id) return;
 
-    const messageToSend = newMessage;
+    let messageToSend = newMessage;
+    
+    // Add signature if enabled
+    if (useSignature && activeProfile?.whatsapp_signature) {
+      messageToSend = `*${activeProfile.whatsapp_signature}*:\n${messageToSend}`;
+    }
+
     setNewMessage(''); // Clear input optimistically
     const conversationId = selectedConversation.id;
     const companyId = currentUser.company_id;
@@ -410,6 +418,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                         <Smartphone className="w-3 h-3 text-emerald-500" />
                       )}
                     </div>
+                    {/* Tags Badge on Avatar */}
+                    {conv.tags && conv.tags.length > 0 && (
+                      <div className="absolute -top-1 -right-1 flex gap-0.5">
+                        {conv.tags.slice(0, 2).map((t: any, i: number) => (
+                          <div 
+                            key={i} 
+                            className="w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 shadow-sm"
+                            style={{ backgroundColor: t.tag?.color || '#10B981' }}
+                            title={t.tag?.name}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <h3 className={`font-semibold text-sm truncate tracking-tight transition-colors ${selectedConversation?.id === conv.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
                     {conv.contact_name || conv.contact_phone}
@@ -586,6 +607,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
                 >
                   <Paperclip className="w-5 h-5 md:w-5 md:h-5" />
                 </button>
+                <div className="flex flex-col items-center justify-center px-1 mb-2">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Assin.</span>
+                  <button
+                    onClick={() => setUseSignature(!useSignature)}
+                    className={`p-1.5 rounded-lg transition-all ${useSignature ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'}`}
+                    title={useSignature ? "Assinatura Ativada" : "Assinatura Desativada"}
+                  >
+                    <CheckCheck className={`w-3.5 h-3.5 ${useSignature ? 'opacity-100' : 'opacity-40'}`} />
+                  </button>
+                </div>
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}

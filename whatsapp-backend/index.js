@@ -367,6 +367,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 if (phone && !jid.includes('@g.us')) {
                     const name = c.name || c.pushName || c.notify || phone;
                     
+                    console.log(`[SYNC] Upserting contact: ${name} (${phone})`);
                     const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
                         company_id: companyId,
                         phone: phone,
@@ -598,6 +599,15 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
             } else {
                 if (!isHistorical) {
                     console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
+                    
+                    // Garantir que a conversa seja atualizada mesmo se for de saída (fromMe)
+                    // Isso ajuda o usuário a ver o que enviou por outro dispositivo
+                    if (isFromMe) {
+                         await supabase.from('whatsapp_conversations').update({
+                            last_message_at: new Date().toISOString()
+                        }).eq('id', conversationId);
+                    }
+
                     // Disparar Chatbot se for do cliente e não for histórico
                     if (!isFromMe) {
                         // 5. Executar Roteamento Inteligente Gemini (se habilitado)

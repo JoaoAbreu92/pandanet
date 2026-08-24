@@ -239,8 +239,9 @@ export interface WhatsAppPermissions {
   can_transfer: boolean; // New: Can transfer conversations
   can_see_all_departments: boolean; // New: Can see conversations from all departments
   can_manage_tags: boolean; // New: Can manage tags
-  allowed_connections?: string[]; // IDs of Allowed connections
   assigned_queues?: string[]; // IDs of assigned queues
+  allowed_connections?: string[]; // IDs of Allowed connections
+  can_view_others_chats?: boolean; // New: Can view chats from other sectors/users
 }
 
 export interface Employee {
@@ -284,6 +285,8 @@ export interface Employee {
   ai_api_key?: string | null;
   ai_provider?: 'gemini' | 'openai' | null;
   ai_behavior?: 'popup' | 'sidebar' | 'tab' | null;
+  whatsapp_signature?: string;
+  use_whatsapp_signature?: boolean;
 }
 
 export interface AIMessage {
