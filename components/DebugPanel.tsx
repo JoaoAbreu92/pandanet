@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BugAntIcon, XCircleIcon, CheckCircleIcon, ExclamationTriangleIcon, TrashIcon } from './icons';
 import type { Employee, Company } from '../types';
+import { useAuth } from './AuthContext';
 
 interface DebugPanelProps {
     currentUser: Employee;
@@ -11,11 +12,12 @@ interface DebugPanelProps {
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ currentUser, currentCompany, isOpen, onClose }) => {
+    const { realProfile } = useAuth();
     const [dbStatus, setDbStatus] = useState<'checking' | 'ok' | 'error'>('checking');
     const [tables, setTables] = useState<{ name: string; count: number | null; error: boolean }[]>([]);
     const [logs, setLogs] = useState<{ type: 'info' | 'error'; msg: string; time: string }[]>([]);
 
-    const isMasterAdmin = currentUser.email === 'ti@grupopixel.com.br';
+    const isMasterAdmin = realProfile?.email === 'ti@grupopixel.com.br';
 
     const addLog = (type: 'info' | 'error', msg: string) => {
         setLogs(prev => [{ type, msg, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));

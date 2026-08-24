@@ -8,6 +8,7 @@ import SystemUpdateNotification from './SystemUpdateNotification';
 import EmailNotifier from './EmailNotifier';
 import { useNotifications } from './NotificationContext';
 import { OnlineUsersSidebar } from './OnlineUsersSidebar';
+import { useAuth } from './AuthContext';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -64,12 +65,13 @@ const Layout: React.FC<LayoutProps> = ({
     onSearch,
     onStartDirectChat
 }) => {
+    const { realProfile } = useAuth();
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isRightSidebarOpen, setRightSidebarOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [isDebugOpen, setDebugOpen] = useState(false);
 
-    const isMasterAdmin = currentUser.email === 'ti@grupopixel.com.br';
+    const isMasterAdmin = realProfile?.email === 'ti@grupopixel.com.br';
 
     // Synchronize currentPage with NotificationContext
     const { setCurrentPage } = useNotifications();

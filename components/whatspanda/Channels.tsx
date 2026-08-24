@@ -6,7 +6,7 @@ import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
 const Channels: React.FC = () => {
-    const { profile, user, currentUser, isGhostMode } = useAuth();
+    const { profile, user, currentUser, realProfile, isGhostMode } = useAuth();
 
     const [channels, setChannels] = useState<WhatsAppSettings[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ const Channels: React.FC = () => {
     };
 
     const toggleChannelUser = async (channelId: string, userId: string, currentlyAdded: boolean) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
         if (!companyId) return;
         if (currentlyAdded) {
@@ -86,7 +86,7 @@ const Channels: React.FC = () => {
     };
 
     const updateChannelUserPerm = async (channelId: string, userId: string, field: string, value: boolean) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         await supabase.from('whatsapp_channel_users')
             .update({ [field]: value })
             .eq('channel_id', channelId)
@@ -258,7 +258,7 @@ const Channels: React.FC = () => {
     }, [view, currentId, channels]);
 
     const generatePairingCode = async (phoneNumber?: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         const numberToUse = phoneNumber || pairingNumberInput;
         if (!numberToUse) {
             alert('Por favor, digite o número do WhatsApp com o DDI (ex: 5541999999999).');
@@ -318,7 +318,7 @@ const Channels: React.FC = () => {
     };
 
     const startSession = async (companyId: string, connectionId: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         addDebugLog(`Iniciando sessão: Empresa=${companyId}, Conexão=${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -354,7 +354,7 @@ const Channels: React.FC = () => {
     };
 
     const stopSession = async (companyId: string, connectionId: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         try {
             const { data: { session } } = await supabase.auth.getSession();
             await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${connectionId}`, {
@@ -369,8 +369,28 @@ const Channels: React.FC = () => {
         }
     };
 
+    const handleRestartSession = async (companyId: string, connectionId: string) => {
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
+        setQrCode(null);
+        setPairingCode(null);
+        addDebugLog(`Reiniciando sessão para garantir estado limpo...`, 'info');
+        
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${connectionId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+            });
+        } catch (e) {
+            console.error("Erro ao parar sessão no restart:", e);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await startSession(companyId, connectionId);
+    };
+
     const repairWebhook = async (companyId: string, connectionId: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         addDebugLog(`Iniciando REPARO de webhook para: ${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -398,7 +418,7 @@ const Channels: React.FC = () => {
     };
 
     const syncContacts = async (companyId: string, connectionId: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         addDebugLog(`Iniciando SINCRONIZAÇÃO de contatos para: ${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -423,7 +443,7 @@ const Channels: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         if (!confirm('⚠️ ATENÇÃO: Isso irá apagar permanentemente o canal, TODAS as conversas, mensagens e contatos vinculados a ele.\n\nEsta ação não pode ser desfeita. Deseja continuar?')) return;
 
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
@@ -489,7 +509,7 @@ const Channels: React.FC = () => {
     };
 
     const handleSaveConfig = async () => {
-        if (isGhostMode) return;
+        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
         if (!connectionName) {
             alert('Por favor, preencha o Nome da Conexão.');
             return;
@@ -657,26 +677,42 @@ const Channels: React.FC = () => {
                                         )}
 
                                         {channel.channel_type === 'whatsapp' && channel.is_connected && (
-                                            <div className="flex flex-1 gap-2">
+                                            <div className="flex flex-1 gap-1.5">
                                                 <button 
                                                     onClick={() => {
                                                         const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
                                                         if (companyId) syncContacts(companyId, channel.id);
                                                     }} 
-                                                    className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
-                                                    title="Sincronizar Contatos e Grupos"
+                                                    className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
+                                                    title="Sincronizar"
                                                 >
-                                                    <RefreshCw className="w-3.5 h-3.5" /> Sync
+                                                    <RefreshCw className="w-3 h-3" /> Sync
                                                 </button>
                                                 <button 
                                                     onClick={() => {
                                                         const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
                                                         if (companyId) repairWebhook(companyId, channel.id);
                                                     }} 
-                                                    className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white rounded-xl transition-all duration-300 flex justify-center items-center gap-2"
+                                                    className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
                                                     title="Reparar Webhook"
                                                 >
-                                                    <ShieldCheck className="w-3.5 h-3.5" /> Reparar
+                                                    <ShieldCheck className="w-3 h-3" /> Reparar
+                                                </button>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (isGhostMode && realProfile?.email !== 'ti@grupopixel.com.br') return;
+                                                        const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
+                                                        if (companyId) {
+                                                            if (confirm('Deseja realmente desconectar este WhatsApp?')) {
+                                                                await stopSession(companyId, channel.id);
+                                                                fetchSettings();
+                                                            }
+                                                        }
+                                                    }} 
+                                                    className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
+                                                    title="Desconectar"
+                                                >
+                                                    <PhoneOff className="w-3 h-3" /> Sair
                                                 </button>
                                             </div>
                                         )}
@@ -959,16 +995,28 @@ const Channels: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            setQrCode(null);
-                                            const companyId = profile?.company_id || user?.user_metadata?.company_id;
-                                            if (companyId && currentId) startSession(companyId, currentId);
-                                        }}
-                                        className="text-[10px] text-emerald-500 hover:text-emerald-400 font-bold uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-2.5 px-5 rounded-xl border border-emerald-500/10 mb-4 block mx-auto"
-                                    >
-                                        Gerar novo QR Code
-                                    </button>
+                                    <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-4">
+                                        <button
+                                            onClick={() => {
+                                                setQrCode(null);
+                                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                                if (companyId && currentId) startSession(companyId, currentId);
+                                            }}
+                                            className="text-[10px] text-emerald-500 hover:text-emerald-400 font-bold uppercase tracking-[0.2em] transition-all bg-emerald-500/5 hover:bg-emerald-500/10 py-2.5 px-5 rounded-xl border border-emerald-500/10"
+                                        >
+                                            Obter QR Code
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                                                if (companyId && currentId) handleRestartSession(companyId, currentId);
+                                            }}
+                                            className="text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-[0.2em] transition-all bg-amber-500/5 hover:bg-amber-500/10 py-2.5 px-5 rounded-xl border border-amber-500/10"
+                                            title="Força a exclusão e recriação da instância no WhatsApp/Evolution"
+                                        >
+                                            Forçar Reinício
+                                        </button>
+                                    </div>
                                 </>
                             )}
 

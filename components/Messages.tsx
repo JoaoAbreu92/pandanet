@@ -295,7 +295,7 @@ interface MessagesProps {
 }
 
 const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeConversation }) => {
-    const { currentUser, profile, isGhostMode } = useAuth();
+    const { currentUser, profile, isGhostMode, realProfile } = useAuth();
     const { showToast } = useToast();
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
     const { addNotification, playNotificationSound, showDesktopNotification, markNotificationsByLink } = useNotifications();
@@ -1425,7 +1425,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const isMasterAdmin = (profile?.email === 'ti@grupopixel.com.br' || profile?.id === masterAdminId) && isGhostMode;
+        const isMasterAdmin = (realProfile?.email === 'ti@grupopixel.com.br' || realProfile?.id === masterAdminId) && isGhostMode;
         if (!isMasterAdmin) {
             alert("Apenas o Administrador Master (em Modo Fantasma) tem permissão para apagar conversas permanentemente.");
             return;
@@ -1586,7 +1586,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                                     <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        {((profile?.email === 'ti@grupopixel.com.br' || profile?.id === masterAdminId) && isGhostMode) && (
+                                                        {((realProfile?.email === 'ti@grupopixel.com.br' || realProfile?.id === masterAdminId) && isGhostMode) && (
                                                             <button
                                                                 onClick={(e) => handleDeleteConversation(conv.id, e)}
                                                                 className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"

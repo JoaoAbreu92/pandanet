@@ -48,7 +48,7 @@ const GeneralTab: React.FC = () => {
     const [rejectionMessage, setRejectionMessage] = useState('');
     const [autoAssign, setAutoAssign] = useState(false);
     const [isolateChatHistory, setIsolateChatHistory] = useState(false);
-    
+
     // Transfer Settings State
     const [transferMessageClient, setTransferMessageClient] = useState('Seu atendimento foi transferido para {target}. Por favor, aguarde.');
     const [transferMessageAgent, setTransferMessageAgent] = useState('Atendimento transferido para {target} por {sender}.');
@@ -89,7 +89,7 @@ const GeneralTab: React.FC = () => {
                 .from('whatsapp_queues')
                 .select('id, name')
                 .eq('company_id', companyId);
-            
+
             if (queuesData) setQueues(queuesData);
 
             // Fetch agents
@@ -98,7 +98,7 @@ const GeneralTab: React.FC = () => {
                 .select('id, full_name')
                 .eq('company_id', companyId)
                 .order('full_name', { ascending: true });
-            
+
             if (agentsData) setAgents(agentsData);
 
             if (settingsData && settingsData.length > 0) {
@@ -296,7 +296,7 @@ const GeneralTab: React.FC = () => {
                         <MessageSquare className="w-5 h-5 text-amber-500" /> Mensagem de Ausência
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes que entrarem em contato fora do horário de atendimento.</p>
-                    
+
                     <div>
                         <textarea
                             value={awayMessage}
@@ -314,7 +314,7 @@ const GeneralTab: React.FC = () => {
                         <MessageSquare className="w-5 h-5 text-emerald-500" /> Mensagem de Encerramento
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes no WhatsApp assim que o atendimento for encerrado pelo atendente.</p>
-                    
+
                     <div>
                         <textarea
                             value={closeMessage}
@@ -344,7 +344,7 @@ const GeneralTab: React.FC = () => {
                         </label>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Se ativado, o WhatsPanda irá rejeitar chamadas de voz ou vídeo automaticamente e responderá com o texto abaixo.</p>
-                    
+
                     <div>
                         <textarea
                             value={rejectionMessage}
@@ -505,11 +505,10 @@ const GeneralTab: React.FC = () => {
                                                 <tr key={rule.id} className="hover:bg-gray-50/50 dark:hover:bg-white/3 transition-colors font-semibold dark:text-white">
                                                     <td className="py-3.5 px-6 font-mono text-emerald-500">{rule.keyword}</td>
                                                     <td className="py-3.5 px-6">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                            rule.target_type === 'queue'
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${rule.target_type === 'queue'
                                                                 ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
                                                                 : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
-                                                        }`}>
+                                                            }`}>
                                                             {rule.target_type === 'queue' ? 'Setor' : 'Agente'}
                                                         </span>
                                                     </td>
@@ -679,11 +678,10 @@ const GeneralTab: React.FC = () => {
                                                     updateTargetHours(activeTarget, day.value, [{ start: '08:00', end: '18:00' }]);
                                                 }
                                             }}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                                                isOpen
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isOpen
                                                     ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
                                                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border-emerald-200'
-                                            }`}
+                                                }`}
                                         >
                                             {isOpen ? 'Marcar Fechado' : 'Marcar Aberto'}
                                         </button>

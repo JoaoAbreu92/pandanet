@@ -8,6 +8,7 @@ interface AuthContextType {
     user: User | null;
     profile: Employee | null;
     currentUser: Employee | null;
+    realProfile: Employee | null;
     /** @deprecated Use profile for real user, currentUser for context user */
     impersonatedUser: Employee | null;
     isGhostMode: boolean;
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     profile: null,
     currentUser: null,
+    realProfile: null,
     impersonatedUser: null,
     isGhostMode: false,
     loading: true,
@@ -33,7 +35,7 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
-    const [profile, setProfile] = useState<Employee | null>(null);
+    const [realProfile, setRealProfile] = useState<Employee | null>(null);
     const [impersonatedUser, setImpersonatedUser] = useState<Employee | null>(() => {
         const saved = localStorage.getItem('pixel_ghost_user_data');
         return saved ? JSON.parse(saved) : null;
@@ -58,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const fetchProfile = async (userId: string, email?: string) => {
-        // ... (resto da função permanece igual, vou omitir para o replacement mas manter no arquivo)
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -131,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         plan_email_limit: 100,
                         plan_whatsapp_limit: 100
                     };
-                    setProfile(masterAdmin);
+                    setRealProfile(masterAdmin);
                     return;
                 }
                 return;
@@ -268,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                 }
 
-                setProfile(employee);
+                setRealProfile(employee);
         } catch (err) { }
     };
 
@@ -293,7 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (session?.user) {
                 fetchProfile(session.user.id, session.user.email).finally(() => setLoading(false));
             } else {
-                setProfile(null);
+                setRealProfile(null);
                 setLoading(false);
             }
         });
@@ -302,7 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = async () => {
-        setProfile(null);
+        setRealProfile(null);
         setSession(null);
         setUser(null);
         localStorage.removeItem('pixel_is_ghost_mode');
@@ -314,8 +315,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         <AuthContext.Provider value={{
             session,
             user,
-            profile,
-            currentUser: impersonatedUser || profile,
+            profile: impersonatedUser || realProfile,
+            currentUser: impersonatedUser || realProfile,
+            realProfile,
             impersonatedUser,
             isGhostMode,
             loading,
