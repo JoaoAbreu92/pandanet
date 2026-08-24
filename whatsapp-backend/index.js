@@ -977,12 +977,16 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     sticker: base64Data
                 }
             } : isAudio ? {
+                // Formato correto da Evolution API v2 para sendWhatsAppAudio com encoding
+                // delay e encoding ficam dentro de "options", audio fica dentro de "audioMessage"
                 number: phoneNumber,
-                // A Evolution API espera base64 puro (sem prefixo data:) no campo audio
-                audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data,
-                delay: 1200,
                 options: {
+                    delay: 1200,
+                    presence: 'recording',
                     encoding: true
+                },
+                audioMessage: {
+                    audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data
                 }
             } : {
                 number: phoneNumber,
@@ -996,8 +1000,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             };
             console.log(`[SEND API] Enviando para Evolution: endpoint=${endpoint} | body length=`, JSON.stringify(body).length);
 
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 120000); // 120s timeout
+            const sendController = new AbortController();
+            const sendTimeout = setTimeout(() => sendController.abort(), 120000); // 120s timeout
 
             let sendReq;
             try {
@@ -1005,17 +1009,53 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     method: 'POST',
                     headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
-                    signal: controller.signal
+                    signal: sendController.signal
                 });
             } catch (fetchErr) {
-                clearTimeout(timeout);
+                clearTimeout(sendTimeout);
                 console.error(`[SEND API] Erro de rede/timeout ao enviar mídia:`, fetchErr.message);
                 return res.status(504).json({ error: `Timeout ou erro de rede ao enviar mídia para WhatsApp: ${fetchErr.message}` });
             }
-            clearTimeout(timeout);
+            clearTimeout(sendTimeout);
             
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes).substring(0, 500));
+
+            // Se falhou com o formato audioMessage, tenta com o formato legado (audio na raiz)
+            if (isAudio && (!sendReq.ok || sendRes?.error)) {
+                console.warn('[SEND API] audioMessage falhou, tentando formato legado (audio na raiz)...');
+                const legacyBody = {
+                    number: phoneNumber,
+                    audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data,
+                    delay: 1200,
+                    options: { encoding: true }
+                };
+                const legacyController = new AbortController();
+                const legacyTimeout = setTimeout(() => legacyController.abort(), 120000);
+                let legacyReq;
+                try {
+                    legacyReq = await fetch(`${evoUrl}/message/${endpoint}/${instanceName}`, {
+                        method: 'POST',
+                        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(legacyBody),
+                        signal: legacyController.signal
+                    });
+                } catch (e) {
+                    clearTimeout(legacyTimeout);
+                    console.error('[SEND API] Formato legado também falhou:', e.message);
+                }
+                clearTimeout(legacyTimeout);
+                if (legacyReq) {
+                    let legacyRes = {};
+                    try { legacyRes = await legacyReq.json(); } catch(e) { }
+                    console.log(`[SEND API] Resposta formato legado (${legacyReq.status}):`, JSON.stringify(legacyRes).substring(0, 300));
+                    if (legacyReq.ok && !legacyRes?.error) {
+                        sendRes = legacyRes;
+                        sendReq = legacyReq;
+                    }
+                }
+            }
+
             if (sendReq.ok && !sendRes?.error) sendOk = true;
 
         } else {
@@ -1203,8 +1243,19 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
             console.log(`[MEDIA-PROXY] Redirecionando para rede interna: ${targetUrl}`);
         }
 
-        const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(30000) });
+        // AbortController compatível com Node.js < 17.3 (sem AbortSignal.timeout)
+        const proxyController = new AbortController();
+        const proxyTimeout = setTimeout(() => proxyController.abort(), 30000);
+
+        let fetchRes;
+        try {
+            fetchRes = await fetch(targetUrl, { signal: proxyController.signal });
+        } finally {
+            clearTimeout(proxyTimeout);
+        }
+
         if (!fetchRes.ok) {
+            console.error(`[MEDIA-PROXY] Supabase retornou ${fetchRes.status} para: ${targetUrl}`);
             return res.status(fetchRes.status).json({ error: `Falha ao buscar mídia: HTTP ${fetchRes.status}` });
         }
 

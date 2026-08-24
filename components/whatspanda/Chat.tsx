@@ -1882,7 +1882,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send audio');
+        // Mostra detalhes reais da Evolution API para debug
+        const detail = errorData.details
+          ? (typeof errorData.details === 'string' ? errorData.details : JSON.stringify(errorData.details).substring(0, 200))
+          : '';
+        throw new Error((errorData.error || 'Failed to send audio') + (detail ? `\n\nDetalhe Evolution API: ${detail}` : ''));
       }
 
       fetchMessages(selectedConversation.id);
