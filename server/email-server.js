@@ -70,6 +70,19 @@ const ensureNumber = (val) => {
     return isNaN(num) ? 0 : num;
 };
 
+async function resolveFolderPath(client, path) {
+    if (!path) return 'INBOX';
+    try {
+        const folders = await client.list();
+        const target = folders.find(f => f.path === path) || 
+                       folders.find(f => f.path.toLowerCase() === path.toLowerCase());
+        return target ? target.path : path;
+    } catch (e) {
+        console.warn('[email-server] Error resolving folder path:', e.message);
+        return path;
+    }
+}
+
 // --- IMAP Pool Management ---
 const imapPool = new Map(); // key -> { client, lastUsed }
 const POOL_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -285,15 +298,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
         // Ensure folder exists and handle potential delimiter issues
         // We can use list() to see how the server sees it
-        const folders = await client.list();
-        let targetFolder = folders.find(f => f.path === mailboxPath);
-
-        // If not found exactly, try fuzzy match (case insensitive or common naming)
-        if (!targetFolder) {
-            targetFolder = folders.find(f => f.path.toLowerCase() === mailboxPath.toLowerCase());
-        }
-
-        const finalPath = targetFolder ? targetFolder.path : mailboxPath;
+        const finalPath = await resolveFolderPath(client, mailboxPath);
         console.log(`[email-server] FETCHING FOLDER: "${finalPath}" (Original: "${mailboxPath}")`);
 
         const lock = await client.getMailboxLock(finalPath);
@@ -374,13 +379,7 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
     try {
         const client = await getPooledClient(config);
 
-        // Ensure folder exists and handle potential delimiter issues
-        const folders = await client.list();
-        let targetFolder = folders.find(f => f.path === mailboxPath);
-        if (!targetFolder) {
-            targetFolder = folders.find(f => f.path.toLowerCase() === mailboxPath.toLowerCase());
-        }
-        const finalPath = targetFolder ? targetFolder.path : mailboxPath;
+        const finalPath = await resolveFolderPath(client, mailboxPath);
 
         const lock = await client.getMailboxLock(finalPath);
         try {
@@ -436,7 +435,8 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock(mailboxPath);
+        const resolvedPath = await resolveFolderPath(client, mailboxPath);
+        const lock = await client.getMailboxLock(resolvedPath);
         try {
             if (operation === 'add') {
                 await client.messageFlagsAdd(uidsNum, flags, { uid: true });
@@ -455,6 +455,30 @@ app.post('/api/email/flags', authMiddleware, async (req, res) => {
     }
 });
 
+// --- FETCH UNREAD COUNT (STATUS) ---
+app.post('/api/email/status', authMiddleware, async (req, res) => {
+    const { config, folder } = req.body;
+    const mailboxPath = folder || 'INBOX';
+    if (!config || !config.imap_host) {
+        return res.status(400).json({ error: 'Missing IMAP config' });
+    }
+
+    try {
+        const client = await getPooledClient(config);
+        const resolvedPath = await resolveFolderPath(client, mailboxPath);
+        const lock = await client.getMailboxLock(resolvedPath);
+        try {
+            const status = await client.status(resolvedPath, { unseen: true });
+            return res.json({ unseen: status.unseen || 0 });
+        } finally {
+            lock.release();
+        }
+    } catch (err) {
+        console.error('[email-server] Status Error:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // --- MOVE EMAIL ---
 app.post('/api/email/move', authMiddleware, async (req, res) => {
     const { config, uids, fromPath, toPath } = req.body;
@@ -467,9 +491,11 @@ app.post('/api/email/move', authMiddleware, async (req, res) => {
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock(fromMailboxPath);
+        const resolvedFromPath = await resolveFolderPath(client, fromMailboxPath);
+        const resolvedToPath = await resolveFolderPath(client, toPath);
+        const lock = await client.getMailboxLock(resolvedFromPath);
         try {
-            await client.messageMove(uidsStr, toPath, { uid: true });
+            await client.messageMove(uidsStr, resolvedToPath, { uid: true });
             console.log(`[email-server] Successfully moved UIDs [${uidsStr}]`);
             return res.json({ success: true });
         } finally {
@@ -488,7 +514,8 @@ app.post('/api/email/attachment', authMiddleware, async (req, res) => {
 
     try {
         const client = await getPooledClient(config);
-        const lock = await client.getMailboxLock(path || 'INBOX');
+        const resolvedPath = await resolveFolderPath(client, path || 'INBOX');
+        const lock = await client.getMailboxLock(resolvedPath);
         try {
             const message = await client.fetchOne(String(uid), { source: true }, { uid: true });
             if (!message) return res.status(404).json({ error: 'Email not found' });

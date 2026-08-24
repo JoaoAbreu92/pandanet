@@ -240,3 +240,15 @@
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.2);
 }
+
+/* Wiggle Shake Animation for Kanban Board Drops */
+@keyframes wiggle-shake-anim {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+  75% { transform: rotate(-1.5deg); }
+}
+
+.animate-wiggle-shake {
+  animation: wiggle-shake-anim 0.4s ease-in-out;
+}

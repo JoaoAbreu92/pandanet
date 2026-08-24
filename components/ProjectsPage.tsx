@@ -44,6 +44,8 @@ interface ProjectStage {
     name: string;
     position: number;
     department_id?: string | null;
+    responsible_id?: string | null;
+    checklist_items?: string[];
 }
 
 interface ProjectTask {
@@ -64,6 +66,7 @@ interface ProjectTask {
     start_date?: string | null;
     cover_url?: string | null;
     timesheets?: ProjectTimesheet[];
+    checklist_status?: Record<string, Record<string, boolean>>;
 }
 
 interface ProjectSubtask {
@@ -196,6 +199,41 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
     const [isStageModalOpen, setIsStageModalOpen] = useState(false);
     const [editingStage, setEditingStage] = useState<ProjectStage | null>(null);
     const [stageForm, setStageForm] = useState({ name: '', department_id: '' });
+
+    // Custom flow states
+    const [projectStagesForm, setProjectStagesForm] = useState<any[]>([]);
+    const [taskHistory, setTaskHistory] = useState<any[]>([]);
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [justDroppedTaskId, setJustDroppedTaskId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (isProjectModalOpen) {
+            if (editingProject) {
+                const loadProjectStages = async () => {
+                    const { data, error } = await supabase
+                        .from('project_stages')
+                        .select('id, name, responsible_id, checklist_items, position')
+                        .eq('project_id', editingProject.id)
+                        .order('position', { ascending: true });
+                    if (data && !error) {
+                        setProjectStagesForm(data.map(d => ({
+                            id: d.id,
+                            name: d.name,
+                            responsible_id: d.responsible_id || '',
+                            checklist_items: Array.isArray(d.checklist_items) ? d.checklist_items : []
+                        })));
+                    }
+                };
+                loadProjectStages();
+            } else {
+                setProjectStagesForm([
+                    { name: 'Setor Comercial', responsible_id: '', checklist_items: ['Validar briefing', 'Montar proposta'] },
+                    { name: 'Setor de Criação', responsible_id: '', checklist_items: ['Definir layout', 'Aprovar com cliente'] },
+                    { name: 'Setor de Desenvolvimento', responsible_id: '', checklist_items: ['Desenvolver frontend', 'Integrar API'] }
+                ]);
+            }
+        }
+    }, [isProjectModalOpen, editingProject]);
 
     // Carregar dados iniciais
     useEffect(() => {
@@ -399,7 +437,8 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             const mappedTasks = (taskData || []).map((t: any) => ({
                 ...t,
                 subtasks: t.subtasks || [],
-                timesheets: t.timesheets || []
+                timesheets: t.timesheets || [],
+                checklist_status: t.checklist_status || {}
             }));
             setTasks(mappedTasks);
         } catch (e: any) {
@@ -429,6 +468,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             showToast('O nome do projeto é obrigatório.', 'warning');
             return;
         }
+        if (projectStagesForm.length === 0) {
+            showToast('O projeto precisa ter pelo menos um setor/estágio.', 'warning');
+            return;
+        }
 
         try {
             const payload = {
@@ -440,6 +483,8 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                 status: 'active'
             };
 
+            let projectId = editingProject?.id;
+
             if (editingProject) {
                 const { error } = await supabase
                     .from('projects')
@@ -447,20 +492,68 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                     .eq('id', editingProject.id);
 
                 if (error) throw error;
-                showToast('Projeto atualizado com sucesso!', 'success');
             } else {
-                const { error } = await supabase
+                const { data: insertData, error: insertError } = await supabase
                     .from('projects')
-                    .insert([payload]);
+                    .insert([payload])
+                    .select()
+                    .single();
 
-                if (error) throw error;
-                showToast('Projeto criado com sucesso!', 'success');
+                if (insertError) throw insertError;
+                projectId = insertData.id;
             }
 
+            // --- SALVAR ESTÁGIOS / SETORES ---
+            // 1. Apagar estágios que foram removidos
+            if (editingProject) {
+                const currentStageIds = projectStagesForm.filter(s => s.id).map(s => s.id);
+                const { data: dbStages } = await supabase
+                    .from('project_stages')
+                    .select('id')
+                    .eq('project_id', editingProject.id);
+                if (dbStages) {
+                    const stagesToDelete = dbStages.filter(s => !currentStageIds.includes(s.id)).map(s => s.id);
+                    if (stagesToDelete.length > 0) {
+                        // Deletar tarefas associadas ou soltá-las (cascade ou RLS cuidará disso)
+                        await supabase.from('project_stages').delete().in('id', stagesToDelete);
+                    }
+                }
+            }
+
+            // 2. Inserir ou atualizar estágios
+            for (let i = 0; i < projectStagesForm.length; i++) {
+                const stage = projectStagesForm[i];
+                const stagePayload = {
+                    project_id: projectId,
+                    name: stage.name,
+                    position: i + 1,
+                    responsible_id: stage.responsible_id || null,
+                    checklist_items: stage.checklist_items
+                };
+
+                if (stage.id) {
+                    const { error: stageErr } = await supabase
+                        .from('project_stages')
+                        .update(stagePayload)
+                        .eq('id', stage.id);
+                    if (stageErr) throw stageErr;
+                } else {
+                    const { error: stageErr } = await supabase
+                        .from('project_stages')
+                        .insert([stagePayload]);
+                    if (stageErr) throw stageErr;
+                }
+            }
+
+            showToast(editingProject ? 'Projeto atualizado com sucesso!' : 'Projeto criado com sucesso!', 'success');
             setIsProjectModalOpen(false);
             setEditingProject(null);
             setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
+            setProjectStagesForm([]);
             fetchProjects();
+            if (selectedProject && selectedProject.id === projectId) {
+                handleSelectProject(selectedProject);
+            }
         } catch (e: any) {
             showToast('Erro ao salvar projeto: ' + e.message, 'error');
         }
@@ -553,6 +646,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             // Comentários
             const { data: commentData } = await supabase.from('project_task_comments').select('*, user:profiles(full_name, avatar_url)').eq('task_id', taskId).order('created_at', { ascending: true });
             setTaskComments(commentData || []);
+
+            // Histórico de Movimentação
+            const { data: historyData } = await supabase
+                .from('project_task_history')
+                .select('*, moved_by_user:profiles!moved_by(full_name, avatar_url), from_stage:project_stages!from_stage_id(name), to_stage:project_stages!to_stage_id(name)')
+                .eq('task_id', taskId)
+                .order('moved_at', { ascending: true });
+            setTaskHistory(historyData || []);
         } catch (e) {
             console.error('Erro ao carregar detalhes da tarefa:', e);
         }
@@ -561,6 +662,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
     // Salvar Tarefa (Criar ou Atualizar)
     const handleSaveTask = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        const currentStage = selectedTask ? stages.find(s => s.id === selectedTask.stage_id) : null;
+        const isReadOnly = !isNewTaskMode && !canUserModifyTaskInStage(selectedTask, currentStage);
+        if (isReadOnly) {
+            showToast('Você não tem permissão para editar esta tarefa.', 'error');
+            return;
+        }
         if (!taskForm.title) {
             showToast('O título da tarefa é obrigatório.', 'warning');
             return;
@@ -794,62 +901,120 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
         }
     };
 
+    // --- HELPERS PARA FLUXO E PERMISSÕES DE SETOR ---
+    const canUserModifyTaskInStage = (task: ProjectTask | null, stage: ProjectStage | null | undefined) => {
+        if (!task || !stage) return false;
+        if (currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || selectedProject?.manager_id === currentUser?.id) {
+            return true;
+        }
+        if (stage.responsible_id === currentUser?.id) {
+            return true;
+        }
+        return false;
+    };
+
+    const getIncompleteStageChecklistItems = (task: ProjectTask, stage: ProjectStage | undefined) => {
+        if (!stage || !stage.checklist_items || stage.checklist_items.length === 0) {
+            return [];
+        }
+        const status = task.checklist_status?.[stage.id] || {};
+        return stage.checklist_items.filter((item: string) => !status[item]);
+    };
+
     // --- DRAG AND DROP KANBAN ---
     const handleDragStart = (e: React.DragEvent, task: ProjectTask) => {
         e.dataTransfer.setData('taskId', task.id);
         e.dataTransfer.effectAllowed = 'move';
+        setDraggedTaskId(task.id);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
     };
 
+    const handleDragEnd = () => {
+        setDraggedTaskId(null);
+    };
+
+    const moveTaskStage = async (taskId: string, fromStageId: string, toStageId: string) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const sourceStage = stages.find(s => s.id === fromStageId);
+        const targetStage = stages.find(s => s.id === toStageId);
+        if (!sourceStage || !targetStage) return;
+
+        // 1. Verificar permissão de modificação no estágio de origem
+        if (!canUserModifyTaskInStage(task, sourceStage)) {
+            const respName = employees.find(emp => emp.id === sourceStage.responsible_id)?.name || 'Sem responsável';
+            showToast(`Bloqueio: Apenas o responsável pelo setor "${sourceStage.name}" (${respName}), o gerente do projeto ou administradores podem movimentar este projeto.`, 'error');
+            return;
+        }
+
+        // 2. Verificar checklist completo no estágio de origem (somente para avanço)
+        const isMovingForward = targetStage.position > sourceStage.position;
+        if (isMovingForward) {
+            const incompleteItems = getIncompleteStageChecklistItems(task, sourceStage);
+            if (incompleteItems.length > 0) {
+                showToast(`Bloqueio: Conclua todos os itens de checklist do setor "${sourceStage.name}" (${incompleteItems.length} pendentes) antes de transferir para o próximo setor.`, 'error');
+                return;
+            }
+        }
+
+        // Atualização Otimista local
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stage_id: toStageId } : t));
+        if (selectedTask && selectedTask.id === taskId) {
+            setSelectedTask(prev => prev ? { ...prev, stage_id: toStageId } : null);
+        }
+
+        // Feedback de tremor sutil
+        setJustDroppedTaskId(taskId);
+        setTimeout(() => setJustDroppedTaskId(null), 800);
+
+        try {
+            // 1. Atualizar estágio no banco
+            const { error: updateError } = await supabase
+                .from('project_tasks')
+                .update({ stage_id: toStageId })
+                .eq('id', taskId);
+
+            if (updateError) throw updateError;
+
+            // 2. Gravar histórico
+            const { error: historyError } = await supabase
+                .from('project_task_history')
+                .insert([{
+                    task_id: taskId,
+                    from_stage_id: fromStageId,
+                    to_stage_id: toStageId,
+                    moved_by: currentUser?.id
+                }]);
+
+            if (historyError) {
+                console.error("Erro ao registrar histórico de movimentação:", historyError);
+            } else {
+                fetchTaskDetails(taskId);
+            }
+
+            showToast(`Projeto movido para "${targetStage.name}" com sucesso!`, 'success');
+        } catch (err: any) {
+            showToast('Erro ao atualizar estágio do projeto: ' + err.message, 'error');
+            if (selectedProject) handleSelectProject(selectedProject);
+        }
+    };
+
     const handleDrop = async (e: React.DragEvent, targetStageId: string) => {
         e.preventDefault();
+        setDraggedTaskId(null);
         const taskId = e.dataTransfer.getData('taskId');
         if (!taskId) return;
 
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        // Verificar se há subtarefas pendentes no checklist
-        const incompleteSubtasks = task.subtasks?.filter(s => !s.is_completed) || [];
-        if (incompleteSubtasks.length > 0) {
-            showToast(`Bloqueio: Conclua todas as subtarefas do checklist (${incompleteSubtasks.length} pendentes) antes de transferir o projeto para outro setor.`, 'error');
-            return;
-        }
-
-        const sourceStage = stages.find(s => s.id === task.stage_id);
-
         if (task.stage_id === targetStageId) return;
 
-        const isAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin';
-        const isProjectManager = selectedProject?.manager_id === currentUser?.id;
-
-        // Se o estágio de origem tem um departamento associado, o usuário deve pertencer a ele (ou ser admin/gerente)
-        if (sourceStage?.department_id && !isAdmin && !isProjectManager) {
-            if (currentUser?.department_id !== sourceStage.department_id) {
-                const deptName = departments.find(d => d.id === sourceStage.department_id)?.name || 'Setor Responsável';
-                showToast(`Bloqueio: Apenas colaboradores do setor "${deptName}" podem movimentar tarefas deste estágio.`, 'error');
-                return;
-            }
-        }
-
-        // Atualização Otimista local
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stage_id: targetStageId } : t));
-
-        try {
-            const { error } = await supabase
-                .from('project_tasks')
-                .update({ stage_id: targetStageId })
-                .eq('id', taskId);
-
-            if (error) throw error;
-        } catch (err: any) {
-            showToast('Erro ao atualizar estágio da tarefa: ' + err.message, 'error');
-            // Reverter caso dê erro
-            if (selectedProject) handleSelectProject(selectedProject);
-        }
+        await moveTaskStage(taskId, task.stage_id, targetStageId);
     };
 
     // Estilo de cor de borda baseado no hex do projeto
@@ -1239,16 +1404,19 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                         {stages.map(stage => {
                                             const stageTasks = filteredTasks.filter(t => t.stage_id === stage.id);
                                             
-                                            // Calcula progresso da coluna
-                                            const totalSubtasks = stageTasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0);
-                                            const completedSubtasks = stageTasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.is_completed).length || 0), 0);
-                                            const columnProgress = totalSubtasks > 0 
-                                                ? Math.round((completedSubtasks / totalSubtasks) * 100) 
-                                                : (stageTasks.length > 0 
+                                            const totalStageItems = stageTasks.length * (stage.checklist_items?.length || 0);
+                                            const completedStageItems = stageTasks.reduce((acc, t) => {
+                                                const statusObj = t.checklist_status?.[stage.id] || {};
+                                                const completedCount = (stage.checklist_items || []).filter(item => statusObj[item]).length;
+                                                return acc + completedCount;
+                                            }, 0);
+                                            const columnProgress = totalStageItems > 0
+                                                ? Math.round((completedStageItems / totalStageItems) * 100)
+                                                : (stageTasks.length > 0
                                                     ? Math.round((stageTasks.filter(t => {
                                                         const stageName = stages.find(s => s.id === t.stage_id)?.name || '';
                                                         return stageName === 'Concluído' || stageName === 'Done';
-                                                    }).length / stageTasks.length) * 100) 
+                                                    }).length / stageTasks.length) * 100)
                                                     : 0);
                                             return (
                                                 <div
@@ -1298,13 +1466,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                     <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px] pr-1">
                                                         {stageTasks.map(task => {
                                                             const isOverdue = task.due_date && new Date(task.due_date).getTime() < new Date().getTime() && stage.name !== 'Concluído';
+                                                            const currentStage = stages.find(s => s.id === task.stage_id);
                                                             return (
                                                                 <div
                                                                     key={task.id}
                                                                     draggable
                                                                     onDragStart={(e) => handleDragStart(e, task)}
                                                                     onClick={() => openEditTaskModal(task)}
-                                                                    className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-100 dark:border-slate-850 p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all duration-200 shadow-sm hover:shadow-md group relative"
+                                                                    className={`bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-100 dark:border-slate-850 p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all duration-205 shadow-sm hover:shadow-md group relative ${draggedTaskId === task.id ? 'rotate-[25deg] scale-95 opacity-50' : ''} ${justDroppedTaskId === task.id ? 'animate-wiggle-shake' : ''}`}
                                                                 >
                                                                     {task.cover_url && (
                                                                         <img src={task.cover_url} className="w-full h-24 object-cover rounded-xl mb-3" alt="" />
@@ -1349,24 +1518,53 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                                         );
                                                                     })()}
 
-                                                                    {/* Checklist Inline do Odoo */}
-                                                                    {task.subtasks && task.subtasks.length > 0 && (
+                                                                    {/* Checklist Setorizado do Kanban */}
+                                                                    {currentStage && currentStage.checklist_items && currentStage.checklist_items.length > 0 && (
                                                                         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
-                                                                            {task.subtasks.map(sub => (
-                                                                                <label
-                                                                                    key={sub.id}
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                    className="flex items-center space-x-2 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer hover:text-brand-primary"
-                                                                                >
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        checked={sub.is_completed}
-                                                                                        onChange={() => handleToggleSubtask(sub)}
-                                                                                        className="rounded text-brand-primary focus:ring-emerald-500 w-3 h-3"
-                                                                                    />
-                                                                                    <span className={sub.is_completed ? 'line-through opacity-50' : ''}>{sub.title}</span>
-                                                                                </label>
-                                                                            ))}
+                                                                            <div className="text-[9px] font-bold text-slate-450 dark:text-slate-500 mb-1 uppercase">Checklist do Setor</div>
+                                                                            {currentStage.checklist_items.map((item, idx) => {
+                                                                                const isCompleted = !!task.checklist_status?.[currentStage.id]?.[item];
+                                                                                const isReadOnly = !canUserModifyTaskInStage(task, currentStage);
+                                                                                return (
+                                                                                    <label
+                                                                                        key={idx}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        className="flex items-center space-x-2 text-[10px] text-slate-600 dark:text-slate-450 cursor-pointer hover:text-brand-primary"
+                                                                                    >
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={isCompleted}
+                                                                                            disabled={isReadOnly}
+                                                                                            onChange={async () => {
+                                                                                                if (isReadOnly) {
+                                                                                                    showToast("Sem permissão para alterar o checklist deste setor.", "error");
+                                                                                                    return;
+                                                                                                }
+                                                                                                const updatedStatus = {
+                                                                                                    ...(task.checklist_status || {}),
+                                                                                                    [currentStage.id]: {
+                                                                                                        ...(task.checklist_status?.[currentStage.id] || {}),
+                                                                                                        [item]: !isCompleted
+                                                                                                    }
+                                                                                                };
+                                                                                                try {
+                                                                                                    const { error } = await supabase
+                                                                                                        .from('project_tasks')
+                                                                                                        .update({ checklist_status: updatedStatus })
+                                                                                                        .eq('id', task.id);
+                                                                                                    if (error) throw error;
+                                                                                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, checklist_status: updatedStatus } : t));
+                                                                                                    showToast("Checklist atualizado!", "success");
+                                                                                                } catch (err: any) {
+                                                                                                    showToast("Erro ao atualizar checklist: " + err.message, "error");
+                                                                                                }
+                                                                                            }}
+                                                                                            className="rounded text-brand-primary focus:ring-emerald-500 w-3 h-3"
+                                                                                        />
+                                                                                        <span className={isCompleted ? 'line-through opacity-50' : ''}>{item}</span>
+                                                                                    </label>
+                                                                                );
+                                                                            })}
                                                                         </div>
                                                                     )}
 
@@ -1385,7 +1583,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                                             {(() => {
                                                                                 const hours = task.timesheets?.reduce((acc, curr) => acc + curr.hours, 0) || 0;
                                                                                 return hours > 0 ? (
-                                                                                    <div className="flex items-center gap-1 text-slate-400">
+                                                                                    <div className="flex items-center gap-1 text-slate-450">
                                                                                         <ClockIcon className="w-3.5 h-3.5" />
                                                                                         <span className="font-bold text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded-lg">{hours}h</span>
                                                                                     </div>
@@ -1398,7 +1596,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                                                     e.stopPropagation();
                                                                                     openEditTaskModal(task);
                                                                                 }}
-                                                                                className="p-1 text-slate-450 hover:text-brand-primary hover:bg-slate-100 dark:hover:bg-slate-850 rounded-lg transition-colors"
+                                                                                className="p-1 text-slate-455 hover:text-brand-primary hover:bg-slate-100 dark:hover:bg-slate-850 rounded-lg transition-colors"
                                                                                 title="Clique para conversar"
                                                                             >
                                                                                 <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
@@ -1413,7 +1611,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                                                             {task.assignee?.avatar_url ? (
                                                                                 <img src={task.assignee.avatar_url} className="w-5 h-5 rounded-full object-cover" title={task.assignee.full_name} />
                                                                             ) : (
-                                                                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-300 uppercase" title={task.assignee?.full_name || 'Sem responsável'}>
+                                                                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-355 uppercase" title={task.assignee?.full_name || 'Sem responsável'}>
                                                                                     {task.assignee?.full_name?.substring(0, 2) || '?'}
                                                                                 </div>
                                                                             )}
@@ -1661,15 +1859,15 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
             {/* --- MODAL 1: CRIAR / EDITAR PROJETO --- */}
             {isProjectModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in">
                         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center">
                             <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">
                                 {editingProject ? 'Editar Projeto' : 'Novo Projeto'}
                             </h3>
-                            <button onClick={() => setIsProjectModalOpen(false)} className="text-slate-450 hover:text-slate-600 font-bold">✕</button>
+                            <button onClick={() => { setIsProjectModalOpen(false); setProjectStagesForm([]); }} className="text-slate-450 hover:text-slate-600 font-bold">✕</button>
                         </div>
 
-                        <form onSubmit={handleSaveProject} className="p-6 space-y-4">
+                        <form onSubmit={handleSaveProject} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
                             <div>
                                 <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Nome do Projeto</label>
                                 <input
@@ -1688,7 +1886,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                     value={projectForm.description}
                                     onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
                                     placeholder="Uma breve descrição sobre o projeto..."
-                                    rows={3}
+                                    rows={2}
                                     className="w-full p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                                 />
                             </div>
@@ -1725,8 +1923,143 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                                 </div>
                             </div>
 
+                            {/* --- SETORES E CHECKLISTS DO PROJETO --- */}
+                            <div className="border-t pt-4 dark:border-slate-800 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest">Setores / Estágios do Projeto</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setProjectStagesForm([
+                                                ...projectStagesForm,
+                                                { name: `Setor ${projectStagesForm.length + 1}`, responsible_id: '', checklist_items: [] }
+                                            ]);
+                                        }}
+                                        className="text-xs font-black text-brand-primary hover:text-emerald-600 flex items-center gap-1"
+                                    >
+                                        + Adicionar Setor
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
+                                    {projectStagesForm.length === 0 ? (
+                                        <p className="text-xs text-slate-400 italic text-center py-4">Nenhum setor configurado. Adicione setores para este projeto.</p>
+                                    ) : (
+                                        projectStagesForm.map((stage, sIdx) => (
+                                            <div key={sIdx} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border dark:border-slate-800/80 space-y-3 relative group/stage">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setProjectStagesForm(projectStagesForm.filter((_, i) => i !== sIdx));
+                                                    }}
+                                                    className="absolute top-3 right-3 text-slate-400 hover:text-red-500 text-xs font-bold opacity-0 group-hover/stage:opacity-100 transition-opacity"
+                                                    title="Remover Setor"
+                                                >
+                                                    ✕
+                                                </button>
+                                                
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Nome do Setor</label>
+                                                        <input
+                                                            type="text"
+                                                            required
+                                                            value={stage.name}
+                                                            onChange={(e) => {
+                                                                const newStages = [...projectStagesForm];
+                                                                newStages[sIdx].name = e.target.value;
+                                                                setProjectStagesForm(newStages);
+                                                            }}
+                                                            placeholder="Ex: Comercial"
+                                                            className="w-full p-2 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Responsável pelo Setor</label>
+                                                        <select
+                                                            value={stage.responsible_id}
+                                                            onChange={(e) => {
+                                                                const newStages = [...projectStagesForm];
+                                                                newStages[sIdx].responsible_id = e.target.value;
+                                                                setProjectStagesForm(newStages);
+                                                            }}
+                                                            className="w-full p-2 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white bg-white"
+                                                        >
+                                                            <option value="">Selecione o responsável</option>
+                                                            {employees.map(emp => (
+                                                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Checklist do Setor */}
+                                                <div className="space-y-2">
+                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">Itens de Checklist</label>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {stage.checklist_items.map((item: string, iIdx: number) => (
+                                                            <div key={iIdx} className="flex items-center gap-1 bg-white dark:bg-slate-850 px-2 py-1 rounded-lg border dark:border-slate-750 text-[10px] font-semibold text-slate-600 dark:text-slate-350">
+                                                                <span>{item}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newStages = [...projectStagesForm];
+                                                                        newStages[sIdx].checklist_items = stage.checklist_items.filter((_: any, i: number) => i !== iIdx);
+                                                                        setProjectStagesForm(newStages);
+                                                                    }}
+                                                                    className="text-slate-400 hover:text-red-500 font-bold"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Novo item de checklist..."
+                                                            id={`new-item-${sIdx}`}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    const val = (e.target as HTMLInputElement).value.trim();
+                                                                    if (val) {
+                                                                        const newStages = [...projectStagesForm];
+                                                                        newStages[sIdx].checklist_items = [...stage.checklist_items, val];
+                                                                        setProjectStagesForm(newStages);
+                                                                        (e.target as HTMLInputElement).value = '';
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="flex-grow p-2 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const input = document.getElementById(`new-item-${sIdx}`) as HTMLInputElement;
+                                                                const val = input?.value.trim();
+                                                                if (val) {
+                                                                    const newStages = [...projectStagesForm];
+                                                                    newStages[sIdx].checklist_items = [...stage.checklist_items, val];
+                                                                    setProjectStagesForm(newStages);
+                                                                    input.value = '';
+                                                                }
+                                                            }}
+                                                            className="px-3 bg-brand-primary text-white text-xs font-bold rounded-xl"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-800">
-                                <button type="button" onClick={() => setIsProjectModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Cancelar</button>
+                                <button type="button" onClick={() => { setIsProjectModalOpen(false); setProjectStagesForm([]); }} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Cancelar</button>
                                 <button type="submit" className="px-6 py-2 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg shadow-emerald-100">Confirmar</button>
                             </div>
                         </form>
@@ -1734,345 +2067,511 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                 </div>
             )}
 
-            {/* --- MODAL 2: DETALHES DA TAREFA / APONTAMENTOS (OODO-STYLE CHATTER & TIMESHEETS) --- */}
-            {isTaskModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
-                        {/* Header do Modal */}
-                        <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-                            <div>
-                                <span className="text-[9px] font-black uppercase text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md">
-                                    {isNewTaskMode ? 'Nova Tarefa' : 'Visualizar Tarefa'}
-                                </span>
-                                <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 mt-1">
-                                    {isNewTaskMode ? 'Agendar tarefa no estágio' : taskForm.title}
-                                </h3>
+             {isTaskModalOpen && (() => {
+                const currentStage = selectedTask ? stages.find(s => s.id === selectedTask.stage_id) : null;
+                const isReadOnly = !isNewTaskMode && !canUserModifyTaskInStage(selectedTask, currentStage);
+                return (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+                            {/* Header do Modal */}
+                            <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                                <div>
+                                    <span className="text-[9px] font-black uppercase text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md">
+                                        {isNewTaskMode ? 'Nova Tarefa' : 'Visualizar Tarefa'}
+                                    </span>
+                                    <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 mt-1">
+                                        {isNewTaskMode ? 'Agendar tarefa no estágio' : taskForm.title}
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {!isNewTaskMode && !isReadOnly && (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteTask}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
+                                            title="Excluir Tarefa"
+                                        >
+                                            <TrashIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
+                                    <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-450 hover:text-slate-600 font-bold text-xl px-2">✕</button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {!isNewTaskMode && (
-                                    <button
-                                        type="button"
-                                        onClick={handleDeleteTask}
-                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
-                                        title="Excluir Tarefa"
-                                    >
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
-                                )}
-                                <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-450 hover:text-slate-600 font-bold text-xl px-2">✕</button>
-                            </div>
-                        </div>
 
-                        {/* Corpo com Grid de Conteúdo */}
-                        <div className="flex-grow overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* LADO ESQUERDO: Detalhes, Checklist e Lançamentos */}
-                            <div className="lg:col-span-2 space-y-6">
-                                {/* Formulário Base */}
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Título da Tarefa</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={taskForm.title}
-                                            onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                                            placeholder="Ex: Implementar menu lateral"
-                                            className="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-primary/20 dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold"
-                                        />
+                            {/* Status Bar / Workflow Transitions (Odoo-Style) */}
+                            {!isNewTaskMode && selectedTask && (
+                                <div className="px-6 py-3 border-b dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/30 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase overflow-x-auto no-scrollbar">
+                                        {stages.map((stage, idx) => {
+                                            const isCurrent = stage.id === selectedTask.stage_id;
+                                            return (
+                                                <React.Fragment key={stage.id}>
+                                                    {idx > 0 && <span className="text-slate-300 dark:text-slate-700 mx-1">→</span>}
+                                                    <span className={`px-2 py-1 rounded-md transition-all ${isCurrent ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                        {stage.name}
+                                                    </span>
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </div>
 
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Descrição</label>
-                                        <textarea
-                                            value={taskForm.description}
-                                            onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                                            placeholder="Descreva as especificações desta tarefa..."
-                                            rows={4}
-                                            className="w-full p-3 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-primary/20 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                        />
-                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {(() => {
+                                            const currentStageIdx = stages.findIndex(s => s.id === selectedTask.stage_id);
+                                            const prevStage = currentStageIdx > 0 ? stages[currentStageIdx - 1] : null;
+                                            const nextStage = currentStageIdx !== -1 && currentStageIdx < stages.length - 1 ? stages[currentStageIdx + 1] : null;
+                                            
+                                            const incompleteItems = getIncompleteStageChecklistItems(selectedTask, currentStage);
+                                            const isChecklistComplete = incompleteItems.length === 0;
 
-                                    {/* Mapeamento de Tags */}
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Etiquetas (Tags)</label>
-                                        <div className="flex flex-wrap gap-1.5 mb-2">
-                                            {taskForm.tags.map((tag, i) => (
-                                                <span key={i} className="px-2 py-0.5 rounded bg-brand-primary/10 text-brand-primary text-[9px] font-black uppercase flex items-center gap-1">
-                                                    {tag}
-                                                    <button type="button" onClick={() => handleRemoveTag(tag)} className="text-brand-primary font-bold hover:text-red-500">✕</button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="flex gap-2">
+                                            return (
+                                                <>
+                                                    {prevStage && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                if (isReadOnly) {
+                                                                    showToast("Sem permissão para movimentar esta tarefa.", "error");
+                                                                    return;
+                                                                }
+                                                                if (confirm(`Deseja devolver o projeto para o setor "${prevStage.name}"?`)) {
+                                                                    await moveTaskStage(selectedTask.id, selectedTask.stage_id, prevStage.id);
+                                                                }
+                                                            }}
+                                                            disabled={isReadOnly}
+                                                            className={`px-3 py-1.5 border border-amber-500/30 text-amber-500 hover:bg-amber-500/10 rounded-xl text-[10px] font-bold uppercase transition-all flex items-center gap-1 ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            <span>↩ Devolver para: {prevStage.name}</span>
+                                                        </button>
+                                                    )}
+
+                                                    {nextStage && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                if (isReadOnly) {
+                                                                    showToast("Sem permissão para movimentar esta tarefa.", "error");
+                                                                    return;
+                                                                }
+                                                                if (!isChecklistComplete) {
+                                                                    showToast(`Bloqueio: Conclua todos os itens de checklist do setor atual (${incompleteItems.length} pendentes) antes de avançar.`, 'error');
+                                                                    return;
+                                                                }
+                                                                await moveTaskStage(selectedTask.id, selectedTask.stage_id, nextStage.id);
+                                                            }}
+                                                            disabled={isReadOnly || !isChecklistComplete}
+                                                            className={`px-3 py-1.5 text-white bg-brand-primary hover:bg-emerald-600 rounded-xl text-[10px] font-bold uppercase transition-all flex items-center gap-1 shadow-sm ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''} ${!isChecklistComplete ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed hover:bg-slate-300' : ''}`}
+                                                            title={!isChecklistComplete ? `Finalize o checklist de ${currentStage?.name} para avançar` : ''}
+                                                        >
+                                                            <span>Avançar para: {nextStage.name} ➔</span>
+                                                        </button>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Corpo com Grid de Conteúdo */}
+                            <div className="flex-grow overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* LADO ESQUERDO: Detalhes, Checklist e Lançamentos */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Formulário Base */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Título da Tarefa</label>
                                             <input
                                                 type="text"
-                                                value={taskForm.newTagInput}
-                                                onChange={(e) => setTaskForm({ ...taskForm, newTagInput: e.target.value })}
-                                                placeholder="Nova tag..."
-                                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                                                className="p-2 border rounded-xl text-xs outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                required
+                                                disabled={isReadOnly}
+                                                value={taskForm.title}
+                                                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                                                placeholder="Ex: Implementar menu lateral"
+                                                className={`w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-primary/20 dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
                                             />
-                                            <button type="button" onClick={handleAddTag} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl">Add</button>
                                         </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Descrição</label>
+                                            <textarea
+                                                disabled={isReadOnly}
+                                                value={taskForm.description}
+                                                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                                                placeholder="Descreva as especificações desta tarefa..."
+                                                rows={4}
+                                                className={`w-full p-3 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-primary/20 dark:bg-slate-800 dark:border-slate-700 dark:text-white ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
+                                            />
+                                        </div>
+
+                                        {/* Mapeamento de Tags */}
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Etiquetas (Tags)</label>
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {taskForm.tags.map((tag, i) => (
+                                                    <span key={i} className="px-2 py-0.5 rounded bg-brand-primary/10 text-brand-primary text-[9px] font-black uppercase flex items-center gap-1">
+                                                        {tag}
+                                                        {!isReadOnly && (
+                                                            <button type="button" onClick={() => handleRemoveTag(tag)} className="text-brand-primary font-bold hover:text-red-500">✕</button>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            {!isReadOnly && (
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={taskForm.newTagInput}
+                                                        onChange={(e) => setTaskForm({ ...taskForm, newTagInput: e.target.value })}
+                                                        placeholder="Nova tag..."
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                                                        className="p-2 border rounded-xl text-xs outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                    />
+                                                    <button type="button" onClick={handleAddTag} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl">Add</button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Barra de Progresso dos Setores (Fases) no Modal */}
+                                        {!isNewTaskMode && (
+                                            <div className="pt-2">
+                                                {(() => {
+                                                    const stageIdx = stages.findIndex(s => s.id === selectedTask?.stage_id);
+                                                    const progressPct = stages.length > 1 ? Math.round((stageIdx / (stages.length - 1)) * 100) : 0;
+                                                    return (
+                                                        <>
+                                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">
+                                                                <span>Progresso nos Setores</span>
+                                                                <span>{progressPct}%</span>
+                                                            </div>
+                                                            <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className="h-full rounded-full transition-all duration-500" 
+                                                                    style={{ width: `${progressPct}%`, backgroundColor: selectedProject?.color || '#10B981' }}
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Barra de Progresso dos Setores (Fases) no Modal */}
+                                    {/* CHECKLIST DO SETOR ATUAL */}
+                                    {!isNewTaskMode && currentStage && currentStage.checklist_items && currentStage.checklist_items.length > 0 && (
+                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
+                                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
+                                                <ClipboardDocumentCheckIcon className="w-4 h-4 text-brand-primary" />
+                                                Checklist do Setor: {currentStage.name}
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {currentStage.checklist_items.map((item, idx) => {
+                                                    const isCompleted = !!selectedTask?.checklist_status?.[currentStage.id]?.[item];
+                                                    return (
+                                                        <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl">
+                                                            <label className={`flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-650 dark:text-slate-350 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isCompleted}
+                                                                    disabled={isReadOnly}
+                                                                    onChange={async () => {
+                                                                        if (!selectedTask) return;
+                                                                        if (isReadOnly) {
+                                                                            showToast("Sem permissão para alterar o checklist deste setor.", "error");
+                                                                            return;
+                                                                        }
+                                                                        const updatedStatus = {
+                                                                            ...(selectedTask.checklist_status || {}),
+                                                                            [currentStage.id]: {
+                                                                                ...(selectedTask.checklist_status?.[currentStage.id] || {}),
+                                                                                [item]: !isCompleted
+                                                                            }
+                                                                        };
+                                                                        try {
+                                                                            const { error } = await supabase
+                                                                                .from('project_tasks')
+                                                                                .update({ checklist_status: updatedStatus })
+                                                                                .eq('id', selectedTask.id);
+                                                                            if (error) throw error;
+                                                                            
+                                                                            setSelectedTask({
+                                                                                ...selectedTask,
+                                                                                checklist_status: updatedStatus
+                                                                            });
+                                                                            setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, checklist_status: updatedStatus } : t));
+                                                                            showToast("Checklist atualizado!", "success");
+                                                                        } catch (err: any) {
+                                                                            showToast("Erro ao atualizar checklist: " + err.message, "error");
+                                                                        }
+                                                                    }}
+                                                                    className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary w-4 h-4 cursor-pointer"
+                                                                />
+                                                                <span className={isCompleted ? 'line-through text-slate-400 dark:text-slate-500 font-normal' : ''}>
+                                                                    {item}
+                                                                </span>
+                                                            </label>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {!isNewTaskMode && currentStage && (!currentStage.checklist_items || currentStage.checklist_items.length === 0) && (
+                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-dashed dark:border-slate-800 text-center py-6">
+                                            <ClipboardDocumentCheckIcon className="w-8 h-8 text-slate-300 dark:text-slate-650 mx-auto mb-2" />
+                                            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                                Sem checklist para o setor {currentStage.name}
+                                            </h4>
+                                        </div>
+                                    )}
+
+                                    {/* TIMESHEETS / APONTAMENTO DE HORAS */}
                                     {!isNewTaskMode && (
-                                        <div className="pt-2">
-                                            {(() => {
-                                                const stageIdx = stages.findIndex(s => s.id === selectedTask?.stage_id);
-                                                const progressPct = stages.length > 1 ? Math.round((stageIdx / (stages.length - 1)) * 100) : 0;
-                                                return (
-                                                    <>
-                                                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">
-                                                            <span>Progresso nos Setores</span>
-                                                            <span>{progressPct}%</span>
+                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
+                                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
+                                                <ClockIcon className="w-4 h-4 text-brand-primary" />
+                                                Lançamento de Horas (Timesheet)
+                                            </h4>
+
+                                            <form onSubmit={handleAddTimesheet} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                                                <div>
+                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Horas</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        required
+                                                        placeholder="Ex: 2.5"
+                                                        value={timesheetForm.hours}
+                                                        onChange={(e) => setTimesheetForm({ ...timesheetForm, hours: e.target.value })}
+                                                        className="w-full p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data</label>
+                                                    <input
+                                                        type="date"
+                                                        required
+                                                        value={timesheetForm.date}
+                                                        onChange={(e) => setTimesheetForm({ ...timesheetForm, date: e.target.value })}
+                                                        className="w-full p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-3 flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        placeholder="Descreva o que foi feito..."
+                                                        value={timesheetForm.description}
+                                                        onChange={(e) => setTimesheetForm({ ...timesheetForm, description: e.target.value })}
+                                                        className="flex-grow p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                    />
+                                                    <button type="submit" className="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl">Lançar</button>
+                                                </div>
+                                            </form>
+
+                                            {/* Histórico de Horas */}
+                                            <div className="space-y-2 mt-4 max-h-[150px] overflow-y-auto pr-1">
+                                                {taskTimesheets.map(t => (
+                                                    <div key={t.id} className="flex justify-between items-center p-2.5 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl text-xs font-semibold">
+                                                        <div>
+                                                            <p className="text-slate-700 dark:text-slate-200">{t.description}</p>
+                                                            <p className="text-[9px] text-slate-400 mt-0.5">{new Date(t.date).toLocaleDateString()} • por {t.user?.full_name}</p>
                                                         </div>
-                                                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                                                            <div 
-                                                                className="h-full rounded-full transition-all duration-500" 
-                                                                style={{ width: `${progressPct}%`, backgroundColor: selectedProject?.color || '#10B981' }}
-                                                            />
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-1 rounded-lg font-bold text-[10px]">{t.hours}h</span>
+                                                            {t.user_id === currentUser?.id && (
+                                                                <button onClick={() => handleDeleteTimesheet(t.id)} className="text-slate-450 hover:text-red-500">✕</button>
+                                                            )}
                                                         </div>
-                                                    </>
-                                                );
-                                            })()}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* CHECKLIST / SUBTAREFAS */}
-                                {!isNewTaskMode && (
-                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
-                                        <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
-                                            <ClipboardDocumentCheckIcon className="w-4 h-4 text-brand-primary" />
-                                            Subtarefas Checklist
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {taskSubtasks.map(sub => (
-                                                <div key={sub.id} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl">
-                                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={sub.is_completed}
-                                                            onChange={() => handleToggleSubtask(sub)}
-                                                            className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary w-4 h-4"
-                                                        />
-                                                        <span className={sub.is_completed ? 'line-through text-slate-400 font-normal' : ''}>
-                                                            {sub.title}
-                                                        </span>
-                                                    </label>
-                                                    <button onClick={() => handleDeleteSubtask(sub.id)} className="text-slate-400 hover:text-red-500 p-1">✕</button>
-                                                </div>
-                                            ))}
+                                {/* LADO DIREITO: Configurações Rápidas & Chatter */}
+                                <div className="space-y-6">
+                                    {/* Definições Rápidas */}
+                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4 text-xs">
+                                        <h4 className="text-xs font-black text-slate-850 dark:text-slate-200 uppercase tracking-widest border-b pb-2 mb-4">Informações Gerais</h4>
+                                        
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Atribuído a (Responsável)</label>
+                                            <select
+                                                disabled={isReadOnly}
+                                                value={taskForm.assigned_to}
+                                                onChange={(e) => setTaskForm({ ...taskForm, assigned_to: e.target.value })}
+                                                className={`w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
+                                            >
+                                                <option value="">Sem responsável</option>
+                                                {employees.map(e => (
+                                                    <option key={e.id} value={e.id}>{e.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <div className="flex gap-2">
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Data de Início (Start Date)</label>
+                                            <input
+                                                type="date"
+                                                disabled={isReadOnly}
+                                                value={taskForm.start_date}
+                                                onChange={(e) => setTaskForm({ ...taskForm, start_date: e.target.value })}
+                                                className={`w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Prazo Limite (Due Date)</label>
+                                            <input
+                                                type="date"
+                                                disabled={isReadOnly}
+                                                value={taskForm.due_date}
+                                                onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                                                className={`w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">URL da Imagem de Capa</label>
                                             <input
                                                 type="text"
-                                                value={newSubtaskTitle}
-                                                onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                                                placeholder="Adicionar item de checklist..."
-                                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
-                                                className="flex-grow p-2.5 border rounded-xl text-xs outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                disabled={isReadOnly}
+                                                value={taskForm.cover_url}
+                                                onChange={(e) => setTaskForm({ ...taskForm, cover_url: e.target.value })}
+                                                placeholder="https://exemplo.com/imagem.png"
+                                                className={`w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white ${isReadOnly ? 'bg-slate-100 dark:bg-slate-850 cursor-not-allowed opacity-75' : ''}`}
                                             />
-                                            <button type="button" onClick={handleAddSubtask} className="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl">Adicionar</button>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Prioridade da Tarefa</label>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={isReadOnly}
+                                                    onClick={() => setTaskForm({ ...taskForm, priority: 0 })}
+                                                    className={`flex-1 py-2 rounded-xl border text-center transition-all ${isReadOnly ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''} ${taskForm.priority === 0 ? 'bg-slate-200 dark:bg-slate-700 border-slate-350 dark:border-slate-500 font-bold' : 'border-slate-200 dark:border-slate-800'}`}
+                                                >
+                                                    ⭐ Normal
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={isReadOnly}
+                                                    onClick={() => setTaskForm({ ...taskForm, priority: 1 })}
+                                                    className={`flex-1 py-2 rounded-xl border text-center transition-all ${isReadOnly ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''} ${taskForm.priority === 1 ? 'bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold' : 'border-slate-200 dark:border-slate-800'}`}
+                                                >
+                                                    ⭐⭐ Alta
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
 
-                                {/* TIMESHEETS / APONTAMENTO DE HORAS */}
-                                {!isNewTaskMode && (
-                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
-                                        <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
-                                            <ClockIcon className="w-4 h-4 text-brand-primary" />
-                                            Lançamento de Horas (Timesheet)
-                                        </h4>
+                                    {/* CHATTER / FEED DE ATIVIDADES DO ODOO */}
+                                    {!isNewTaskMode && (
+                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4 flex flex-col h-[350px]">
+                                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2 border-b pb-2 mb-2">
+                                                <ChatBubbleLeftRightIcon className="w-4 h-4 text-brand-primary" />
+                                                Histórico & Chatter
+                                            </h4>
 
-                                        <form onSubmit={handleAddTimesheet} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                                            <div>
-                                                <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Horas</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.5"
-                                                    required
-                                                    placeholder="Ex: 2.5"
-                                                    value={timesheetForm.hours}
-                                                    onChange={(e) => setTimesheetForm({ ...timesheetForm, hours: e.target.value })}
-                                                    className="w-full p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                                />
+                                            {/* Lista de Comentários e Histórico Combinado */}
+                                            <div className="flex-grow overflow-y-auto space-y-3 pr-1 text-xs">
+                                                {(() => {
+                                                    const feed: any[] = [];
+                                                    taskComments.forEach(c => {
+                                                        feed.push({
+                                                            id: `comment-${c.id}`,
+                                                            type: 'comment',
+                                                            date: new Date(c.created_at),
+                                                            user: c.user,
+                                                            content: c.comment
+                                                        });
+                                                    });
+                                                    taskHistory.forEach(h => {
+                                                        feed.push({
+                                                            id: `history-${h.id}`,
+                                                            type: 'history',
+                                                            date: new Date(h.moved_at),
+                                                            user: h.moved_by_user,
+                                                            fromStage: h.from_stage?.name || 'Sem setor',
+                                                            toStage: h.to_stage?.name || 'Sem setor'
+                                                        });
+                                                    });
+                                                    feed.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+                                                    if (feed.length === 0) {
+                                                        return <p className="text-slate-450 italic text-center py-6">Sem atividades registradas.</p>;
+                                                    }
+
+                                                    return feed.map(item => {
+                                                        if (item.type === 'comment') {
+                                                            return (
+                                                                <div key={item.id} className="flex gap-2.5 items-start">
+                                                                    {item.user?.avatar_url ? (
+                                                                        <img src={item.user.avatar_url} className="w-6 h-6 rounded-full object-cover mt-0.5 animate-fade-in" />
+                                                                    ) : (
+                                                                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[7px] font-bold text-slate-400 dark:text-slate-300 uppercase mt-0.5">
+                                                                            {item.user?.full_name?.substring(0,2) || 'US'}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex-grow bg-white dark:bg-slate-900 border dark:border-slate-800 p-2.5 rounded-2xl relative shadow-sm">
+                                                                        <p className="font-bold text-[10px] text-slate-500">{item.user?.full_name || 'Usuário'}</p>
+                                                                        <p className="text-slate-700 dark:text-slate-200 mt-1 leading-normal">{item.content}</p>
+                                                                        <span className="text-[8px] text-slate-400 absolute bottom-1 right-2">
+                                                                            {item.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <div key={item.id} className="flex items-center gap-2 pl-2 border-l-2 border-slate-200 dark:border-slate-750 text-[10px] text-slate-450 dark:text-slate-500 font-semibold italic py-1 bg-slate-100/30 dark:bg-slate-900/10 px-2 rounded-lg">
+                                                                    <ClockIcon className="w-3.5 h-3.5 text-brand-primary animate-pulse" />
+                                                                    <span>
+                                                                        <strong>{item.user?.full_name || 'Alguém'}</strong> moveu de <em>{item.fromStage}</em> para <em>{item.toStage}</em>
+                                                                    </span>
+                                                                    <span className="text-[8px] text-slate-400 not-italic ml-auto">
+                                                                        {item.date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                    });
+                                                })()}
                                             </div>
-                                            <div>
-                                                <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data</label>
-                                                <input
-                                                    type="date"
-                                                    required
-                                                    value={timesheetForm.date}
-                                                    onChange={(e) => setTimesheetForm({ ...timesheetForm, date: e.target.value })}
-                                                    className="w-full p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                                />
-                                            </div>
-                                            <div className="md:col-span-3 flex gap-2">
+
+                                            {/* Input do Comentário */}
+                                            <form onSubmit={handleAddComment} className="flex gap-2 border-t pt-3 dark:border-slate-800 mt-auto">
                                                 <input
                                                     type="text"
-                                                    required
-                                                    placeholder="Descreva o que foi feito..."
-                                                    value={timesheetForm.description}
-                                                    onChange={(e) => setTimesheetForm({ ...timesheetForm, description: e.target.value })}
-                                                    className="flex-grow p-2 border rounded-xl text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                    placeholder="Escreva uma mensagem..."
+                                                    value={newCommentText}
+                                                    onChange={(e) => setNewCommentText(e.target.value)}
+                                                    className="flex-grow p-2.5 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white"
                                                 />
-                                                <button type="submit" className="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl">Lançar</button>
-                                            </div>
-                                        </form>
-
-                                        {/* Histórico de Horas */}
-                                        <div className="space-y-2 mt-4 max-h-[150px] overflow-y-auto pr-1">
-                                            {taskTimesheets.map(t => (
-                                                <div key={t.id} className="flex justify-between items-center p-2.5 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl text-xs font-semibold">
-                                                    <div>
-                                                        <p className="text-slate-700 dark:text-slate-200">{t.description}</p>
-                                                        <p className="text-[9px] text-slate-400 mt-0.5">{new Date(t.date).toLocaleDateString()} • por {t.user?.full_name}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-1 rounded-lg font-bold text-[10px]">{t.hours}h</span>
-                                                        {t.user_id === currentUser?.id && (
-                                                            <button onClick={() => handleDeleteTimesheet(t.id)} className="text-slate-450 hover:text-red-500">✕</button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                <button type="submit" className="p-2 bg-brand-primary hover:bg-emerald-600 text-white rounded-xl transition-all shadow-sm">
+                                                    <PaperAirplaneIcon className="w-4 h-4 transform rotate-90" />
+                                                </button>
+                                            </form>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* LADO DIREITO: Configurações Rápidas & Chatter */}
-                            <div className="space-y-6">
-                                {/* Definições Rápidas */}
-                                <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4 text-xs">
-                                    <h4 className="text-xs font-black text-slate-850 dark:text-slate-200 uppercase tracking-widest border-b pb-2 mb-4">Informações Gerais</h4>
-                                    
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Atribuído a (Responsável)</label>
-                                        <select
-                                            value={taskForm.assigned_to}
-                                            onChange={(e) => setTaskForm({ ...taskForm, assigned_to: e.target.value })}
-                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
-                                        >
-                                            <option value="">Sem responsável</option>
-                                            {employees.map(e => (
-                                                <option key={e.id} value={e.id}>{e.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Data de Início (Start Date)</label>
-                                        <input
-                                            type="date"
-                                            value={taskForm.start_date}
-                                            onChange={(e) => setTaskForm({ ...taskForm, start_date: e.target.value })}
-                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Prazo Limite (Due Date)</label>
-                                        <input
-                                            type="date"
-                                            value={taskForm.due_date}
-                                            onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
-                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">URL da Imagem de Capa</label>
-                                        <input
-                                            type="text"
-                                            value={taskForm.cover_url}
-                                            onChange={(e) => setTaskForm({ ...taskForm, cover_url: e.target.value })}
-                                            placeholder="https://exemplo.com/imagem.png"
-                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Prioridade da Tarefa</label>
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setTaskForm({ ...taskForm, priority: 0 })}
-                                                className={`flex-1 py-2 rounded-xl border text-center transition-all ${taskForm.priority === 0 ? 'bg-slate-200 dark:bg-slate-700 border-slate-350 dark:border-slate-500 font-bold' : 'border-slate-200 dark:border-slate-800'}`}
-                                            >
-                                                ⭐ Normal
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setTaskForm({ ...taskForm, priority: 1 })}
-                                                className={`flex-1 py-2 rounded-xl border text-center transition-all ${taskForm.priority === 1 ? 'bg-amber-500/10 text-amber-500 border-amber-500/40 font-bold' : 'border-slate-200 dark:border-slate-800'}`}
-                                            >
-                                                ⭐⭐ Alta
-                                            </button>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
+                            </div>
 
-                                {/* CHATTER / FEED DE ATIVIDADES DO ODOO */}
-                                {!isNewTaskMode && (
-                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4 flex flex-col h-[350px]">
-                                        <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2 border-b pb-2 mb-2">
-                                            <ChatBubbleLeftRightIcon className="w-4 h-4 text-brand-primary" />
-                                            Histórico & Chatter
-                                        </h4>
-
-                                        {/* Lista de Comentários */}
-                                        <div className="flex-grow overflow-y-auto space-y-3 pr-1 text-xs">
-                                            {taskComments.length === 0 ? (
-                                                <p className="text-slate-400 italic text-center py-6">Sem atividades registradas.</p>
-                                            ) : (
-                                                taskComments.map(c => (
-                                                    <div key={c.id} className="flex gap-2.5 items-start">
-                                                        {c.user?.avatar_url ? (
-                                                            <img src={c.user.avatar_url} className="w-6 h-6 rounded-full object-cover mt-0.5" />
-                                                        ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold text-slate-400 uppercase mt-0.5">{c.user?.full_name?.substring(0,2)}</div>
-                                                        )}
-                                                        <div className="flex-grow bg-white dark:bg-slate-900 border dark:border-slate-800 p-2.5 rounded-2xl relative">
-                                                            <p className="font-bold text-[10px] text-slate-500">{c.user?.full_name}</p>
-                                                            <p className="text-slate-700 dark:text-slate-200 mt-1 leading-normal">{c.comment}</p>
-                                                            <span className="text-[8px] text-slate-400 absolute bottom-1 right-2">{new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-
-                                        {/* Input do Comentário */}
-                                        <form onSubmit={handleAddComment} className="flex gap-2 border-t pt-3 dark:border-slate-800 mt-auto">
-                                            <input
-                                                type="text"
-                                                placeholder="Escreva uma mensagem..."
-                                                value={newCommentText}
-                                                onChange={(e) => setNewCommentText(e.target.value)}
-                                                className="flex-grow p-2.5 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white"
-                                            />
-                                            <button type="submit" className="p-2 bg-brand-primary hover:bg-emerald-600 text-white rounded-xl transition-all shadow-sm">
-                                                <PaperAirplaneIcon className="w-4 h-4 transform rotate-90" />
-                                            </button>
-                                        </form>
-                                    </div>
+                            {/* Botões do Rodapé */}
+                            <div className="p-6 border-t dark:border-slate-800 flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/50">
+                                <button type="button" onClick={() => setIsTaskModalOpen(false)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Fechar</button>
+                                {!isReadOnly && (
+                                    <button type="button" onClick={() => handleSaveTask()} className="px-6 py-2.5 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg shadow-emerald-100">Salvar Alterações</button>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Botões do Rodapé */}
-                        <div className="p-6 border-t dark:border-slate-800 flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/50">
-                            <button type="button" onClick={() => setIsTaskModalOpen(false)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase">Fechar</button>
-                            <button type="button" onClick={() => handleSaveTask()} className="px-6 py-2.5 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg shadow-emerald-100">Salvar Alterações</button>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* --- MODAL 3: GERENCIAR ESTÁGIO (COLUNAS) --- */}
             {isStageModalOpen && (

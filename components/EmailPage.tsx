@@ -410,15 +410,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (data && !error) {
             setAccounts(data);
             if (data.length > 0) {
-                // Tenta restaurar a última conta ativa do localStorage ou usa a primeira
+                // Prioridade para a conta da notificação, depois localStorage, depois primeira conta
                 const lastAccountId = localStorage.getItem(`panda_active_email_account_${currentUser.id}`);
-                if (lastAccountId && data.find(a => a.id === lastAccountId)) {
-                    setActiveAccountId(lastAccountId);
-                    setExpandedAccounts(new Set([lastAccountId]));
-                } else {
-                    setActiveAccountId(data[0].id);
-                    setExpandedAccounts(new Set([data[0].id]));
-                }
+                const targetAccountId = (pageContext?.accountId && data.find(a => a.id === pageContext.accountId))
+                    ? pageContext.accountId
+                    : (lastAccountId && data.find(a => a.id === lastAccountId) ? lastAccountId : data[0].id);
+
+                setActiveAccountId(targetAccountId);
+                setExpandedAccounts(new Set([targetAccountId]));
             }
         }
     };
@@ -611,15 +610,20 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 });
             }
 
-            // Background update Seen flag on server if not seen (using stale reference, but that's fine for calling the server)
+            // Background update Seen flag on server if not seen
             if (!isGhostMode) {
-                const email = emails.find(e => e.uid === uid);
-                if (email && !(email.flags || []).includes('\\Seen')) {
-                    // Background call to server, don't await to avoid blocking UI
-                    toggleFlag(email, '\\Seen', true).catch(e => console.error("Error setting Seen flag:", e));
-                    
-                    // Also clean notification
-                    markNotificationsByLink(`/email?uid=${uid}`);
+                callEmailServer('flags', {
+                    config: settings,
+                    uids: [uid],
+                    operation: 'add',
+                    flags: ['\\Seen'],
+                    path: folder
+                }).catch(e => console.error("Error setting Seen flag:", e));
+                
+                // Also clean notification
+                markNotificationsByLink(`/email?uid=${uid}`);
+                if (activeAccountId) {
+                    markNotificationsByLink(`/email?accountId=${activeAccountId}&uid=${uid}`);
                 }
             }
         } catch (err: any) {
@@ -1086,6 +1090,31 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     useEffect(() => {
         if (savedImapUser) fetchEmails();
     }, [page, pageSize, currentFolder, filterTag]);
+
+    // Switch account based on notification context
+    useEffect(() => {
+        if (pageContext?.accountId && accounts.length > 0) {
+            const acc = accounts.find(a => a.id === pageContext.accountId);
+            if (acc && activeAccountId !== acc.id) {
+                setActiveAccountId(acc.id);
+                setExpandedAccounts(new Set([acc.id]));
+                setSettings({
+                    imap_host: acc.imap_host,
+                    imap_port: acc.imap_port,
+                    imap_user: acc.imap_user,
+                    imap_pass: acc.imap_pass,
+                    imap_ssl: acc.imap_ssl,
+                    smtp_host: acc.smtp_host,
+                    smtp_port: acc.smtp_port,
+                    smtp_user: acc.smtp_user,
+                    smtp_pass: acc.smtp_pass,
+                    smtp_ssl: acc.smtp_ssl,
+                    signature: acc.signature || ''
+                });
+                setSavedImapUser(acc.imap_user);
+            }
+        }
+    }, [pageContext?.accountId, accounts, activeAccountId]);
 
     // Handle initial email from context (notifications)
     useEffect(() => {

@@ -6,30 +6,33 @@ import { useNotifications } from './NotificationContext';
 const EmailNotifier: React.FC = () => {
     const { currentUser } = useAuth();
     const { addNotification, playNotificationSound, showDesktopNotification, setModuleUnreadCount, moduleUnreadCounts } = useNotifications();
-    const [lastUnseenCount, setLastUnseenCount] = useState<number | null>(null);
-    const [settings, setSettings] = useState<any>(null);
+    const [lastUnseenCounts, setLastUnseenCounts] = useState<Record<string, number>>({});
+    const [accounts, setAccounts] = useState<any[]>([]);
 
-    // Carregar configurações de email
+    // Carregar todas as configurações de email acessíveis pelo usuário
     useEffect(() => {
-        if (!currentUser) return;
-        const loadSettings = async () => {
-            const { data } = await supabase
-                .from('email_settings')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .single();
-            if (data) setSettings(data);
+        if (!currentUser?.company_id) return;
+        const loadAccounts = async () => {
+            let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
+            const perms = currentUser.email_permissions;
+            if (!currentUser.isCompanyAdmin && perms && !perms.can_view_all_accounts) {
+                if (perms.allowed_accounts && perms.allowed_accounts.length > 0) {
+                    query = query.in('id', perms.allowed_accounts);
+                } else {
+                    query = query.eq('user_id', currentUser.id);
+                }
+            }
+            const { data } = await query;
+            if (data) setAccounts(data);
         };
-        loadSettings();
+        loadAccounts();
     }, [currentUser]);
 
     // Polling
     const isFetching = useRef(false);
 
     useEffect(() => {
-        if (!settings || !settings.imap_host || !settings.imap_user || !settings.imap_pass) return;
-
-        let lastCount = lastUnseenCount;
+        if (accounts.length === 0) return;
 
         const checkEmails = async () => {
             if (isFetching.current) return;
@@ -47,74 +50,75 @@ const EmailNotifier: React.FC = () => {
                     return;
                 }
 
-                const response = await fetch(`${EMAIL_SERVER_URL}/fetch`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        config: settings,
-                        path: 'INBOX',
-                        page: 1,
-                        pageSize: 1
-                    })
-                });
-                
-                if (response.status === 429) {
-                    console.warn("[EmailNotifier] Rate limited (429). Aguardando próxima rodada...");
-                    isFetching.current = false;
-                    return;
-                }
+                const newCounts: Record<string, number> = {};
 
-                const data = await response.json();
-                
-                if (data && typeof data.unseen === 'number') {
-                    const currentUnseen = data.unseen;
-
-                    setModuleUnreadCount('email', currentUnseen);
-
-                    if (lastCount === null) {
-                        lastCount = currentUnseen;
-                        setLastUnseenCount(currentUnseen);
-                        isFetching.current = false;
-                        return;
-                    }
-
-                    if (currentUnseen > lastCount) {
-                        const newEmailsCount = currentUnseen - lastCount;
-                        
-                        playNotificationSound('message');
-                        showDesktopNotification(
-                            'Novo E-mail', 
-                            `Você tem ${newEmailsCount} novo(s) e-mail(s).`,
-                            '/logo.png'
-                        );
-
-                        addNotification({
-                            type: 'system',
-                            title: 'Novo E-mail Recebido',
-                            description: `Você tem e-mail(s) não lido(s) na caixa de entrada.`,
-                            link: '/email',
-                            avatarUrl: '/logo.png'
+                // Verifica o status de cada conta em paralelo
+                await Promise.all(accounts.map(async (account) => {
+                    try {
+                        const response = await fetch(`${EMAIL_SERVER_URL}/status`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                config: account,
+                                folder: 'INBOX'
+                            })
                         });
-                    }
 
-                    if (currentUnseen === 0 && lastCount > 0) {
-                        // Limpa as notificações de sistema do tipo E-mail Recebido se não há mais não lidos
-                        if (currentUser?.id) {
-                            supabase.from('notifications')
-                                .update({ is_read: true })
-                                .eq('user_id', currentUser.id)
-                                .eq('title', 'Novo E-mail Recebido')
-                                .eq('is_read', false)
-                                .then(() => { });
+                        if (response.status === 429) {
+                            console.warn(`[EmailNotifier] Rate limited (429) para a conta ${account.imap_user}.`);
+                            return;
                         }
-                    }
 
-                    lastCount = currentUnseen;
-                    setLastUnseenCount(currentUnseen);
-                }
+                        const data = await response.json();
+                        if (data && typeof data.unseen === 'number') {
+                            const currentUnseen = data.unseen;
+                            newCounts[account.id] = currentUnseen;
+
+                            const prevUnseen = lastUnseenCounts[account.id];
+
+                            if (prevUnseen !== undefined && currentUnseen > prevUnseen) {
+                                const newEmailsCount = currentUnseen - prevUnseen;
+                                
+                                playNotificationSound('message');
+                                showDesktopNotification(
+                                    `Novo E-mail (${account.imap_user})`, 
+                                    `Você tem ${newEmailsCount} novo(s) e-mail(s) na conta ${account.imap_user}.`,
+                                    '/logo.png'
+                                );
+
+                                addNotification({
+                                    type: 'system',
+                                    title: `Novo E-mail (${account.imap_user})`,
+                                    description: `Você recebeu e-mail(s) não lido(s) na conta ${account.imap_user}.`,
+                                    link: `/email?accountId=${account.id}`,
+                                    avatarUrl: '/logo.png'
+                                });
+                            }
+
+                            if (currentUnseen === 0 && prevUnseen > 0) {
+                                // Limpa as notificações de sistema desta conta
+                                if (currentUser?.id) {
+                                    await supabase.from('notifications')
+                                        .update({ is_read: true })
+                                        .eq('user_id', currentUser.id)
+                                        .eq('title', `Novo E-mail (${account.imap_user})`)
+                                        .eq('is_read', false);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error(`[EmailNotifier] Erro no status da conta ${account.imap_user}:`, err);
+                    }
+                }));
+
+                // Atualiza o contador global no sidebar como a soma de todas as contas
+                const totalUnseen = Object.values(newCounts).reduce((sum, val) => sum + val, 0);
+                setModuleUnreadCount('email', totalUnseen);
+
+                setLastUnseenCounts(newCounts);
             } catch (err) {
                 console.error("[EmailNotifier] Falha no polling:", err);
             } finally {
@@ -125,8 +129,7 @@ const EmailNotifier: React.FC = () => {
         checkEmails();
         const interval = setInterval(checkEmails, 90000); // Polling a cada 90s para evitar 429
         return () => clearInterval(interval);
-    }, [settings, currentUser?.id, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]);
-
+    }, [accounts, currentUser?.id, lastUnseenCounts, setModuleUnreadCount, playNotificationSound, showDesktopNotification, addNotification]);
 
     // Limpa a notificação de banco de dados se a tela de Email reportar zero
     useEffect(() => {
@@ -135,12 +138,10 @@ const EmailNotifier: React.FC = () => {
             supabase.from('notifications')
                 .update({ is_read: true })
                 .eq('user_id', currentUser.id)
-                .eq('title', 'Novo E-mail Recebido')
+                .like('title', 'Novo E-mail%')
                 .eq('is_read', false)
                 .then(() => { });
-            setLastUnseenCount(0);
-        } else if (globalCount !== undefined && globalCount !== lastUnseenCount) {
-            setLastUnseenCount(globalCount);
+            setLastUnseenCounts({});
         }
     }, [moduleUnreadCounts['email'], currentUser?.id]);
 
