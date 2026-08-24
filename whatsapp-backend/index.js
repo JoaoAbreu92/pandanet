@@ -189,6 +189,14 @@ async function runAutoMigration() {
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar coluna shared_with:', e));
 
+        console.log('[MIGRATION] Verificando e criando colunas de gerenciamento de acesso a grupos...');
+        await supabase.rpc('exec_sql', {
+            sql: `
+                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS allow_all_groups_access BOOLEAN DEFAULT TRUE;
+                ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS allowed_users UUID[] DEFAULT '{}';
+            `
+        }).catch(e => console.error('[MIGRATION] Erro ao adicionar colunas de acesso a grupos:', e));
+
         console.log('[MIGRATION] Verificando e aplicando correção de segurança RLS para whatsapp_conversations...');
         await supabase.rpc('exec_sql', {
             sql: `
@@ -236,14 +244,28 @@ async function runAutoMigration() {
                     AND (
                       (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
                       OR
-                      assigned_to = auth.uid()
-                      OR
                       (
-                        queue_id IS NOT NULL 
-                        AND public.get_user_assigned_queues() ? queue_id::text
+                        is_group = true
+                        AND (
+                          (SELECT COALESCE(allow_all_groups_access, true) FROM public.whatsapp_settings WHERE id = connection_id) = true
+                          OR
+                          auth.uid() = ANY(allowed_users)
+                        )
                       )
                       OR
-                      (assigned_to IS NULL AND queue_id IS NULL)
+                      (
+                        (is_group = false OR is_group IS NULL)
+                        AND (
+                          assigned_to = auth.uid()
+                          OR
+                          (
+                            queue_id IS NOT NULL 
+                            AND public.get_user_assigned_queues() ? queue_id::text
+                          )
+                          OR
+                          (assigned_to IS NULL AND queue_id IS NULL)
+                        )
+                      )
                     )
                   );
 
@@ -256,14 +278,28 @@ async function runAutoMigration() {
                     AND (
                       (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
                       OR
-                      assigned_to = auth.uid()
-                      OR
                       (
-                        queue_id IS NOT NULL 
-                        AND public.get_user_assigned_queues() ? queue_id::text
+                        is_group = true
+                        AND (
+                          (SELECT COALESCE(allow_all_groups_access, true) FROM public.whatsapp_settings WHERE id = connection_id) = true
+                          OR
+                          auth.uid() = ANY(allowed_users)
+                        )
                       )
                       OR
-                      (assigned_to IS NULL AND queue_id IS NULL)
+                      (
+                        (is_group = false OR is_group IS NULL)
+                        AND (
+                          assigned_to = auth.uid()
+                          OR
+                          (
+                            queue_id IS NOT NULL 
+                            AND public.get_user_assigned_queues() ? queue_id::text
+                          )
+                          OR
+                          (assigned_to IS NULL AND queue_id IS NULL)
+                        )
+                      )
                     )
                   );
             `

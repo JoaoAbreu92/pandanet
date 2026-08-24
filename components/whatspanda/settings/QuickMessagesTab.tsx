@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { useAuth } from '../../AuthContext';
-import { 
+import {
   Plus, Edit2, Trash2, Shield, Eye, EyeOff, Loader2, Save, X, Search
 } from 'lucide-react';
 
@@ -28,7 +28,7 @@ const QuickMessagesTab: React.FC = () => {
   const [messages, setMessages] = useState<QuickMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Form State
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -237,9 +237,8 @@ const QuickMessagesTab: React.FC = () => {
                     setSelectedAgents([]);
                   }
                 }}
-                className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${
-                  isPublic ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
-                }`}
+                className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${isPublic ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
+                  }`}
               >
                 <span className="w-4.5 h-4.5 bg-white rounded-full shadow-md" />
               </button>
@@ -255,9 +254,8 @@ const QuickMessagesTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShareWithSpecific(!shareWithSpecific)}
-                    className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${
-                      shareWithSpecific ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
-                    }`}
+                    className={`w-12 h-6.5 rounded-full p-1 transition-all duration-300 ${shareWithSpecific ? 'bg-emerald-500 flex justify-end' : 'bg-slate-350 dark:bg-slate-600 flex justify-start'
+                      }`}
                   >
                     <span className="w-4.5 h-4.5 bg-white rounded-full shadow-md" />
                   </button>
@@ -345,7 +343,7 @@ const QuickMessagesTab: React.FC = () => {
         ) : (
           <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
             {filteredMessages.map((msg) => (
-              <div 
+              <div
                 key={msg.id}
                 className="bg-white dark:bg-slate-900/40 backdrop-blur-xl p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all duration-300 flex justify-between gap-6"
               >

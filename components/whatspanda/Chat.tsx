@@ -48,7 +48,8 @@ import {
   BellOff,
   Share,
   Share2,
-  CornerUpRight
+  CornerUpRight,
+  Users
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -220,6 +221,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [convToClose, setConvToClose] = useState<string | null>(null);
   const [terminationReasons, setTerminationReasons] = useState<any[]>([]);
   const [selectedReasonId, setSelectedReasonId] = useState<string>('');
+
+  const [isGroupAccessModalOpen, setIsGroupAccessModalOpen] = useState(false);
+  const [groupAccessAllowAll, setGroupAccessAllowAll] = useState(true);
+  const [groupAccessApplyToAll, setGroupAccessApplyToAll] = useState(false);
+  const [groupAccessSelectedUsers, setGroupAccessSelectedUsers] = useState<string[]>([]);
+  const [groupAccessSearchUser, setGroupAccessSearchUser] = useState('');
+  const [isSavingGroupAccess, setIsSavingGroupAccess] = useState(false);
 
   const renderMessageText = (text: string) => {
     if (!text) return null;
@@ -700,6 +708,80 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     fetchTerminationReasons();
     setIsCloseModalOpen(true);
   };
+
+  const handleOpenGroupAccessModal = async () => {
+    if (!selectedConversation) return;
+    
+    const connId = selectedConversation.connection_id;
+    const { data: conn } = await supabase
+      .from('whatsapp_settings')
+      .select('allow_all_groups_access')
+      .eq('id', connId)
+      .maybeSingle();
+      
+    const allowAll = conn ? (conn.allow_all_groups_access !== false) : true;
+    setGroupAccessAllowAll(allowAll);
+    
+    const { data: conv } = await supabase
+      .from('whatsapp_conversations')
+      .select('allowed_users')
+      .eq('id', selectedConversation.id)
+      .maybeSingle();
+      
+    const allowed = conv?.allowed_users || [];
+    setGroupAccessSelectedUsers(allowed);
+    setGroupAccessApplyToAll(false);
+    setGroupAccessSearchUser('');
+    setIsGroupAccessModalOpen(true);
+  };
+
+  const handleSaveGroupAccess = async () => {
+    if (!selectedConversation) return;
+    setIsSavingGroupAccess(true);
+    try {
+      const connId = selectedConversation.connection_id;
+      const companyId = activeProfile?.company_id || profile?.company_id;
+      
+      const { error: err1 } = await supabase
+        .from('whatsapp_settings')
+        .update({ allow_all_groups_access: groupAccessAllowAll })
+        .eq('id', connId);
+        
+      if (err1) throw err1;
+      
+      setSettings((prev: any) => prev ? { ...prev, allow_all_groups_access: groupAccessAllowAll } : prev);
+      setConnections((prev: any[]) => prev.map((c: any) => c.id === connId ? { ...c, allow_all_groups_access: groupAccessAllowAll } : c));
+
+      if (groupAccessApplyToAll) {
+        const { error: err2 } = await supabase
+          .from('whatsapp_conversations')
+          .update({ allowed_users: groupAccessSelectedUsers })
+          .eq('company_id', companyId)
+          .eq('connection_id', connId)
+          .eq('is_group', true);
+          
+        if (err2) throw err2;
+      } else {
+        const { error: err2 } = await supabase
+          .from('whatsapp_conversations')
+          .update({ allowed_users: groupAccessSelectedUsers })
+          .eq('id', selectedConversation.id);
+          
+        if (err2) throw err2;
+      }
+
+      setSelectedConversation((prev: any) => prev ? { ...prev, allowed_users: groupAccessSelectedUsers } : prev);
+      
+      alert('Configuração de acesso salva com sucesso!');
+      setIsGroupAccessModalOpen(false);
+      fetchConversations();
+    } catch (err: any) {
+      console.error('Erro ao salvar acessos do grupo:', err);
+      alert('Erro ao salvar as configurações de acesso: ' + err.message);
+    } finally {
+      setIsSavingGroupAccess(false);
+    }
+  };
   
   const loadFiltersData = async () => {
     const companyId = currentUser?.company_id;
@@ -931,9 +1013,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!isAdmin && activeTab !== 'meus') {
       const allowedQueues = permissions.assigned_queues || [];
       if (allowedQueues.length > 0) {
-        query = query.or(`queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
+        query = query.or(`is_group.eq.true,queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
       } else {
-        query = query.is('queue_id', null);
+        query = query.or(`is_group.eq.true,queue_id.is.null`);
       }
     }
 
@@ -2360,6 +2442,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       <CornerUpRight className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </button>
                   )}
+                  {selectedConversation.is_group && isAdmin && (
+                    <button
+                      onClick={handleOpenGroupAccessModal}
+                      className="p-1 sm:p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors animate-pulse-subtle"
+                      title="Gerenciar Acesso ao Grupo"
+                    >
+                      <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowContactSidebar(!showContactSidebar)}
                     className={`p-1 sm:p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
@@ -3091,6 +3182,152 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             )}
           </div>
         </>
+      )}
+
+      {/* Group Access Control Modal */}
+      {isGroupAccessModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-950 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-500" />
+                  Gerenciar Acesso ao Grupo
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-[320px] sm:max-w-none">
+                  Configure quais usuários têm acesso a este grupo de conversa.
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsGroupAccessModalOpen(false)} 
+                className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Global Switch Card */}
+              <div className="p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 dark:border-emerald-500/10 rounded-2xl space-y-3">
+                <div className="flex justify-between items-start gap-4">
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white">Acesso Global Liberado</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Permitir que TODOS os operadores visualizem todos os grupos conectados.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={groupAccessAllowAll}
+                      onChange={(e) => setGroupAccessAllowAll(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-focus:ring-4 peer-focus:ring-emerald-500/20 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:height-5 after:width-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Individual / Specific Configs (visible when global is OFF) */}
+              {!groupAccessAllowAll && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                  {/* Select All Groups Checkbox */}
+                  <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={groupAccessApplyToAll}
+                      onChange={(e) => setGroupAccessApplyToAll(e.target.checked)}
+                      className="rounded text-emerald-500 focus:ring-emerald-500/20 w-4 h-4 border-slate-300 dark:border-white/10"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-white">Aplicar a TODOS os grupos da conexão</p>
+                      <p className="text-[10px] text-slate-500">Replica a lista de operadores selecionados para todos os grupos deste número.</p>
+                    </div>
+                  </label>
+
+                  {/* Users Selection Header & Search */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Selecione os operadores autorizados
+                    </label>
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar operador pelo nome..."
+                        value={groupAccessSearchUser}
+                        onChange={(e) => setGroupAccessSearchUser(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Users Scrollable List */}
+                  <div className="border border-slate-100 dark:border-white/5 rounded-2xl divide-y divide-slate-100 dark:divide-white/5 max-h-[220px] overflow-y-auto bg-slate-50/30">
+                    {agents
+                      .filter(agent => (agent.full_name || '').toLowerCase().includes(groupAccessSearchUser.toLowerCase()))
+                      .map(agent => {
+                        const isChecked = groupAccessSelectedUsers.includes(agent.id);
+                        return (
+                          <label
+                            key={agent.id}
+                            className="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                          >
+                            <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                              {agent.full_name}
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setGroupAccessSelectedUsers(prev =>
+                                  prev.includes(agent.id)
+                                    ? prev.filter(uid => uid !== agent.id)
+                                    : [...prev, agent.id]
+                                );
+                              }}
+                              className="rounded text-emerald-500 focus:ring-emerald-500/20 w-4.5 h-4.5 border-slate-300 dark:border-white/10"
+                            />
+                          </label>
+                        );
+                      })}
+                    {agents.filter(agent => (agent.full_name || '').toLowerCase().includes(groupAccessSearchUser.toLowerCase())).length === 0 && (
+                      <div className="p-6 text-center text-xs text-slate-400">
+                        Nenhum operador encontrado.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-slate-100 dark:border-white/5 flex gap-3 bg-slate-50/50 dark:bg-slate-900/30">
+              <button
+                onClick={() => setIsGroupAccessModalOpen(false)}
+                className="flex-1 py-3 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveGroupAccess}
+                disabled={isSavingGroupAccess}
+                className="flex-1 py-3 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-1.5"
+              >
+                {isSavingGroupAccess ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Configurações'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Transfer Modal */}
