@@ -1797,27 +1797,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const handleSendAudio = async (blob: Blob) => {
     if (!selectedConversation || !currentUser?.company_id) return;
     try {
-      let fileExt = 'webm';
-      if (blob.type.includes('ogg')) fileExt = 'ogg';
-      else if (blob.type.includes('mp4')) fileExt = 'mp4';
-      else if (blob.type.includes('mpeg') || blob.type.includes('mp3')) fileExt = 'mp3';
-
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `whatsapp/${selectedConversation.id}/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('chat-media')
-        .upload(filePath, blob, {
-          contentType: blob.type
-        });
-
-      if (uploadError) {
-        console.error('Falha no upload do áudio:', uploadError);
-        alert(`Erro ao subir áudio: ${uploadError.message}`);
-        return;
-      }
-
-      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+      // Converter blob para base64 data URI diretamente, sem passar pelo Supabase Storage
+      // Isso evita o problema de NAT Loopback do Docker que impedia o backend de baixar a URL
+      const reader = new FileReader();
+      const base64DataUri = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -1831,8 +1818,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         },
         body: JSON.stringify({
           message: '',
-          mediaUrl: publicUrl,
-          mediaType: blob.type
+          mediaUrl: base64DataUri,  // base64 data URI direto
+          mediaType: blob.type      // ex: 'audio/webm', 'audio/ogg', etc.
         })
       });
 
@@ -1845,7 +1832,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       scrollToBottom(true, 'smooth');
     } catch (error) {
       console.error('Error sending audio message:', error);
-      alert('Erro ao enviar áudio.');
+      alert('Erro ao enviar áudio. Verifique sua conexão e tente novamente.');
     }
   };
 
@@ -2611,7 +2598,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         title="Sincronizar Mensagens do Celular"
                       >
                         <RefreshCw className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${isSyncingMessages ? 'animate-spin' : ''}`} />
-                        <span className="text-[10px] font-bold hidden md:inline">Sincronizar Celular</span>
+                        <span className="text-[10px] font-bold hidden sm:inline">Sincronizar Celular</span>
                       </button>
 
                       {isAdmin && (
@@ -2661,9 +2648,32 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   onScroll={handleScroll}
                   className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
                 >
-                  {messages.map((msg) => (
+                  {messages.map((msg, index) => {
+                    // --- Separador de Data (estilo WhatsApp) ---
+                    const msgDate = msg.created_at ? new Date(msg.created_at) : null;
+                    const prevMsgDate = index > 0 && messages[index - 1]?.created_at ? new Date(messages[index - 1].created_at) : null;
+                    const showDateSeparator = msgDate && (
+                      !prevMsgDate ||
+                      msgDate.toDateString() !== prevMsgDate.toDateString()
+                    );
+                    const getDateLabel = (date: Date) => {
+                      const today = new Date();
+                      const yesterday = new Date();
+                      yesterday.setDate(today.getDate() - 1);
+                      if (date.toDateString() === today.toDateString()) return 'Hoje';
+                      if (date.toDateString() === yesterday.toDateString()) return 'Ontem';
+                      return date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+                    };
+                    return (
+                    <React.Fragment key={msg.id}>
+                      {showDateSeparator && msgDate && (
+                        <div className="flex items-center justify-center my-3">
+                          <div className="px-3 py-1 rounded-full bg-gray-100 dark:bg-white/10 text-xs font-semibold text-gray-500 dark:text-gray-400 shadow-sm capitalize">
+                            {getDateLabel(msgDate)}
+                          </div>
+                        </div>
+                      )}
                     <div
-                      key={msg.id}
                       className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
@@ -2879,7 +2889,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </div>
                       </div>
                     </div>
-                  ))}
+                    </React.Fragment>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
 

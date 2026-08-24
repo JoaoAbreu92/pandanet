@@ -939,10 +939,17 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         };
 
         if (mediaUrl) {
-            // Converter a URL pública em Base64 bruto (para contornar NAT Loopback do Docker VPS)
+            // Suporte a base64 direto (data: URI) ou URL pública do Supabase
             let base64Data;
             try {
-                base64Data = await getBase64FromUrl(mediaUrl);
+                if (mediaUrl.startsWith('data:')) {
+                    // Base64 direto enviado pelo frontend (evita NAT Loopback Docker)
+                    const commaIdx = mediaUrl.indexOf(',');
+                    base64Data = commaIdx !== -1 ? mediaUrl.substring(commaIdx + 1) : mediaUrl;
+                    console.log(`[SEND API] Base64 extraído de data URI (length: ${base64Data.length})`);
+                } else {
+                    base64Data = await getBase64FromUrl(mediaUrl);
+                }
             } catch (base64Err) {
                 console.error(`[SEND API] Falha ao converter mídia para base64:`, base64Err.message);
                 return res.status(500).json({ error: `Falha ao processar arquivo para envio: ${base64Err.message}` });
