@@ -1,6 +1,7 @@
--- SCRIPT DE CORREÇÃO GERAL PARA VPS (CORRIGIDO v3)
+-- SCRIPT DE CORREÇÃO GERAL PARA VPS (CORRIGIDO v4)
 -- Objetivo: Garantir que o usuário ti@grupopixel.com.br tenha um perfil válido vinculado a uma empresa
 -- e que as permissões de Storage e RLS estejam corretas.
+-- v4: Tenta definir status='active' para evitar tela "Aguardando Aprovação".
 
 BEGIN;
 
@@ -8,7 +9,7 @@ BEGIN;
 -- A tabela companies usa 'domain' para identificação única
 INSERT INTO public.companies (name, domain, status)
 VALUES ('Grupo Pixel', 'grupopixel.com.br', 'active')
-ON CONFLICT (domain) DO NOTHING;
+ON CONFLICT (domain) DO UPDATE SET status = 'active';
 
 -- 2. Garantir que o usuário tenha um Perfil (Profile)
 DO $$
@@ -22,7 +23,7 @@ BEGIN
     
     -- Se não achar pelo email, tente achar qualquer usuário admin (fallback seguro para não quebrar)
     IF target_user_id IS NULL THEN
-        RAISE NOTICE 'Usuário ti@grupopixel.com.br não encontrado. Tentando verificar se há algum usuário...';
+        RAISE NOTICE 'Usuário ti@grupopixel.com.br não encontrado no Auth. Verifique se o login foi feito.';
     END IF;
 
     -- Buscar ID da empresa usando DOMAIN
@@ -31,7 +32,7 @@ BEGIN
     IF target_user_id IS NOT NULL THEN
         -- Inserir ou Atualizar o Perfil
         -- Use full_name em vez de name
-        -- Use team em vez de department (se department for UUID, team deve ser o texto)
+        -- Use team em vez de department
         INSERT INTO public.profiles (id, email, full_name, role, company_id, team)
         VALUES (
             target_user_id, 
@@ -47,7 +48,24 @@ BEGIN
             team = EXCLUDED.team,
             full_name = EXCLUDED.full_name;
             
-        RAISE NOTICE 'Perfil do usuário % atualizado com sucesso.', target_user_id;
+        RAISE NOTICE 'Perfil do usuário % atualizado/criado com sucesso.', target_user_id;
+
+        -- TENTATIVA DE ATUALIZAR STATUS (Para evitar tela de "Aguardando Aprovação")
+        -- Verifica se a coluna exists antes de tentar, para não quebrar o script
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='status') THEN
+            EXECUTE 'UPDATE public.profiles SET status = ''active'' WHERE id = $1' USING target_user_id;
+            RAISE NOTICE 'Status do perfil forçado para active.';
+        END IF;
+
+        -- TENTATIVA DE ATUALIZAR is_admin / is_company_admin se existirem
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='is_admin') THEN
+            EXECUTE 'UPDATE public.profiles SET is_admin = true WHERE id = $1' USING target_user_id;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='is_company_admin') THEN
+            EXECUTE 'UPDATE public.profiles SET is_company_admin = true WHERE id = $1' USING target_user_id;
+        END IF;
+
     ELSE
         RAISE WARNING 'Nenhum usuário encontrado para vincular o perfil!';
     END IF;
