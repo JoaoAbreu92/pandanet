@@ -56,6 +56,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Reusable AudioContext and Audio elements to bypass browser autoplay blocks
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const audioCacheRef = useRef<Record<string, HTMLAudioElement>>({});
+
     // Module explicit counts
     const [moduleUnreadCounts, setModuleUnreadCountsState] = useState<Record<string, number>>({});
     
@@ -76,6 +80,62 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Sound Customization
     const [selectedSound, setSelectedSound] = useState<string>(() => localStorage.getItem('pixel_notification_sound') || 'synth');
 
+    const AVAILABLE_SOUNDS = [
+        { id: 'synth', name: 'Original (Bip)', path: null },
+        { id: 'custom1', name: 'Toque 1', path: '/sounds/custom1.mp3' },
+        { id: 'custom2', name: 'Toque 2', path: '/sounds/custom2.mp3' },
+        { id: 'custom4', name: 'Toque 4', path: '/sounds/custom4.mp3' },
+        { id: 'custom5', name: 'Toque 5', path: '/sounds/custom5.mp3' },
+        { id: 'custom6', name: 'Toque 6', path: '/sounds/custom6.mp3' },
+    ];
+
+    // Preload and unlock audio on first user click/touch to bypass WebView autoplay restrictions
+    useEffect(() => {
+        const unlockAudio = () => {
+            console.log('[PandaNet] Unlocking audio contexts and preloading assets...');
+            // Unlock AudioContext
+            if (!audioContextRef.current) {
+                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioContextClass) {
+                    audioContextRef.current = new AudioContextClass();
+                }
+            }
+            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume().catch(() => {});
+            }
+
+            // Preload and unlock audio assets
+            AVAILABLE_SOUNDS.forEach(sound => {
+                if (sound.path && !audioCacheRef.current[sound.id]) {
+                    try {
+                        const audio = new Audio(sound.path);
+                        audio.load();
+                        // Play silently to register with system and unlock
+                        audio.play().then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        }).catch(() => {});
+                        audioCacheRef.current[sound.id] = audio;
+                    } catch (e) {
+                        console.warn(`Failed to preload sound: ${sound.id}`, e);
+                    }
+                }
+            });
+
+            // Remove event listeners
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        };
+
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+
+        return () => {
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        };
+    }, []);
+
     // Carregar preferência do banco ao iniciar
     useEffect(() => {
         if (currentUser?.id) {
@@ -89,28 +149,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, [currentUser?.id]);
 
-    const AVAILABLE_SOUNDS = [
-        { id: 'synth', name: 'Original (Bip)', path: null },
-        { id: 'custom1', name: 'Toque 1', path: '/sounds/custom1.mp3' },
-        { id: 'custom2', name: 'Toque 2', path: '/sounds/custom2.mp3' },
-        { id: 'custom4', name: 'Toque 4', path: '/sounds/custom4.mp3' },
-        { id: 'custom5', name: 'Toque 5', path: '/sounds/custom5.mp3' },
-        { id: 'custom6', name: 'Toque 6', path: '/sounds/custom6.mp3' },
-    ];
-
     const playNotificationSound = useCallback((type: NotificationType | 'nudge', overrideSoundId?: string) => {
         const soundId = overrideSoundId || selectedSound;
         const soundDef = AVAILABLE_SOUNDS.find(s => s.id === soundId);
 
         try {
             if (!soundDef || !soundDef.path) {
-                const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                if (!AudioContext) return;
-
-                const ctx = new AudioContext();
-                if (ctx.state === 'suspended') {
-                    ctx.resume();
+                // Use the cached AudioContext
+                let ctx = audioContextRef.current;
+                if (!ctx) {
+                    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                    if (AudioContextClass) {
+                        ctx = new AudioContextClass();
+                        audioContextRef.current = ctx;
+                    }
                 }
+                if (!ctx) return;
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                }
+
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
@@ -144,9 +202,39 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 }
                 console.log(`[PandaNet] Playing synthesized sound for: ${type}`);
             } else {
-                const audio = new Audio(soundDef.path);
+                // Use the cached Audio element
+                let audio = audioCacheRef.current[soundId];
+                if (!audio) {
+                    audio = new Audio(soundDef.path);
+                    audioCacheRef.current[soundId] = audio;
+                }
                 audio.volume = 0.9;
-                audio.play().catch(e => console.error("Erro ao tocar MP3 customizado:", e, soundDef.path));
+                audio.currentTime = 0; // Reset play position
+                audio.play().catch(e => {
+                    console.error("Erro ao jogar MP3 customizado, tentando fallback de Bip:", e, soundDef.path);
+                    // Fallback to synthesize beep if custom audio play fails
+                    try {
+                        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                        if (AudioContextClass) {
+                            const fallbackCtx = audioContextRef.current || new AudioContextClass();
+                            audioContextRef.current = fallbackCtx;
+                            if (fallbackCtx.state === 'suspended') fallbackCtx.resume().catch(() => {});
+                            const osc = fallbackCtx.createOscillator();
+                            const gain = fallbackCtx.createGain();
+                            osc.connect(gain);
+                            gain.connect(fallbackCtx.destination);
+                            const now = fallbackCtx.currentTime;
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(800, now);
+                            gain.gain.setValueAtTime(0.3, now);
+                            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                            osc.start(now);
+                            osc.stop(now + 0.3);
+                        }
+                    } catch (err) {
+                        console.error("Fallback beep failed:", err);
+                    }
+                });
                 console.log(`[PandaNet] Playing custom sound: ${soundDef.name}`);
             }
 
