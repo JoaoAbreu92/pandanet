@@ -1308,7 +1308,27 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             </div>
                         )}
                         <button 
-                            onClick={() => handleStartConversation(masterAdminId)}
+                            onClick={async () => {
+                                const closedConv = conversations.find(c => !c.isGroup && c.participantId === masterAdminId && c.is_closed);
+                                if (closedConv) {
+                                    // Optimistic reopen
+                                    try {
+                                        await supabase.from('conversations').update({ is_closed: false }).eq('id', closedConv.id);
+                                        await supabase.from('messages').insert({
+                                            conversation_id: closedConv.id,
+                                            sender_id: currentUser.id,
+                                            company_id: currentUser.company_id,
+                                            content: '🔔 Novo chamado de suporte aberto',
+                                            is_system_message: true
+                                        });
+                                        fetchConversations();
+                                        setSelectedConversationId(closedConv.id);
+                                        setActiveTab('conversations');
+                                    } catch (err) { }
+                                } else {
+                                    handleStartConversation(masterAdminId);
+                                }
+                            }}
                             className="w-full flex items-center justify-center gap-3 bg-red-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-red-700 transition-all shadow-lg active:scale-95 group-hover:shadow-red-200"
                         >
                             <SparklesIcon className="w-5 h-5 animate-pulse" />
@@ -1384,12 +1404,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     )}
                     {activeTab === 'support' && (
                         <ul>
-                            {conversations.filter(c => c.company_id !== currentUser?.company_id).length === 0 && (
+                            {conversations.filter(c => c.company_id !== currentUser?.company_id && !c.is_closed).length === 0 && (
                                 <div className="p-4 text-center text-sm text-gray-500">
                                     Nenhum chamado de suporte pendente.
                                 </div>
                             )}
-                            {conversations.filter(c => c.company_id !== currentUser?.company_id).map(conv => {
+                            {conversations.filter(c => c.company_id !== currentUser?.company_id && !c.is_closed).map(conv => {
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group px-2 py-1">
                                         <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
