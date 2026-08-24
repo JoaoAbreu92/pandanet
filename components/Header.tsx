@@ -111,7 +111,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
     };
 
     return (
-        <header className="sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 z-[60] dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300">
+        <header className="sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 z-30 dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
