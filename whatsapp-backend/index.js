@@ -100,6 +100,12 @@ function parseMessageTimestamp(ts) {
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
+global.realtimeStatus = {
+    notifications: 'unknown',
+    messages: 'unknown',
+    whatsapp_messages: 'unknown'
+};
+
 // --- CONFIGURAÇÃO DO REALTIME PARA NOTIFICAÇÕES PUSH EM SEGUNDO PLANO ---
 function setupPushNotificationsListener() {
     console.log('[FCM] Inicializando ouvintes do Supabase Realtime para notificações...');
@@ -143,8 +149,14 @@ function setupPushNotificationsListener() {
                 console.error('[FCM] Erro crítico no ouvinte de notifications:', err.message);
             }
         })
-        .subscribe((status) => {
+        .subscribe((status, err) => {
             console.log(`[FCM] Status do canal de notifications: ${status}`);
+            if (global.realtimeStatus) {
+                global.realtimeStatus.notifications = status + (err ? ' - ' + err.message : '');
+            }
+            if (global.addDebugLog) {
+                global.addDebugLog('FCM_REALTIME_STATUS', `Status do canal de notifications: ${status}`, err ? { error: err.message } : null);
+            }
         });
 
     // 2. Ouvinte para a tabela: messages (Chat Interno)
@@ -204,8 +216,14 @@ function setupPushNotificationsListener() {
                 console.error('[FCM] Erro no ouvinte de messages:', err.message);
             }
         })
-        .subscribe((status) => {
+        .subscribe((status, err) => {
             console.log(`[FCM] Status do canal de messages: ${status}`);
+            if (global.realtimeStatus) {
+                global.realtimeStatus.messages = status + (err ? ' - ' + err.message : '');
+            }
+            if (global.addDebugLog) {
+                global.addDebugLog('FCM_REALTIME_STATUS', `Status do canal de messages: ${status}`, err ? { error: err.message } : null);
+            }
         });
 
     // 3. Ouvinte para a tabela: whatsapp_messages (WhatsPanda)
@@ -281,8 +299,14 @@ function setupPushNotificationsListener() {
                 console.error('[FCM] Erro no ouvinte de whatsapp_messages:', err.message);
             }
         })
-        .subscribe((status) => {
+        .subscribe((status, err) => {
             console.log(`[FCM] Status do canal de whatsapp_messages: ${status}`);
+            if (global.realtimeStatus) {
+                global.realtimeStatus.whatsapp_messages = status + (err ? ' - ' + err.message : '');
+            }
+            if (global.addDebugLog) {
+                global.addDebugLog('FCM_REALTIME_STATUS', `Status do canal de whatsapp_messages: ${status}`, err ? { error: err.message } : null);
+            }
         });
 }
 
@@ -775,6 +799,15 @@ async function updateInstanceSettings(instanceName) {
 // API: Debug Logs em Memória
 router.get('/debug-logs', (req, res) => {
     res.json(global.debugLogs);
+});
+
+// API: Status de Conexão Realtime
+router.get('/realtime-status', (req, res) => {
+    res.json({
+        supabase_url: supabaseUrl,
+        has_service_key: !!supabaseKey,
+        realtime_status: global.realtimeStatus
+    });
 });
 
 // API: Reparar Webhooks
