@@ -211,7 +211,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
         <div className="p-4 border-b border-slate-200 dark:border-white/5 bg-white dark:bg-transparent">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-white tracking-tight uppercase text-sm opacity-80">
+            <h2 className="text-xl font-semibold flex items-center gap-2 text-slate-800 dark:text-white tracking-tight uppercase text-sm opacity-80">
               Atendimentos
             </h2>
             <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl capitalize transition-all duration-300 ${activeTab === tab
+                className={`flex-1 py-1.5 text-xs font-medium rounded-xl capitalize transition-all duration-300 ${activeTab === tab
                   ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-xl scale-[1.02]'
                   : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/5'
                 }`}
@@ -309,20 +309,20 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
                       )}
                     </div>
                   </div>
-                  <h3 className={`font-bold text-sm truncate tracking-tight transition-colors ${selectedConversation?.id === conv.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
+                  <h3 className={`font-semibold text-sm truncate tracking-tight transition-colors ${selectedConversation?.id === conv.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
                     {conv.contact_name || conv.contact_phone}
                   </h3>
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-widest whitespace-nowrap mt-1 ${selectedConversation?.id === conv.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-medium uppercase tracking-widest whitespace-nowrap mt-1 ${selectedConversation?.id === conv.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
                     {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
               <div className="flex justify-between items-center mt-2 pl-10">
-                <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-bold tracking-tight opacity-70 group-hover:opacity-100">
+                <p className="text-[11px] text-slate-500 dark:text-gray-400 truncate max-w-[140px] font-medium tracking-tight opacity-70 group-hover:opacity-100">
                     {conv.contact_phone}
                 </p>
                 {conv.unread_count > 0 ? (
-                  <span className="bg-emerald-500 text-white text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 rounded-full text-center shadow-sm">
+                  <span className="bg-emerald-500 text-white text-[10px] font-medium min-w-[20px] px-1.5 py-0.5 rounded-full text-center shadow-sm">
                     {conv.unread_count > 99 ? '99+' : conv.unread_count}
                   </span>
                 ) : (
@@ -432,9 +432,21 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
                       : 'bg-emerald-100/90 dark:bg-emerald-500/20 text-slate-800 dark:text-emerald-50 rounded-tr-sm border-emerald-200/50 dark:border-emerald-500/20'
                     }`}
                   >
-                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
+                    {msg.media_type === 'image' ? (
+                      <img src={msg.media_url || ''} alt="Image" className="rounded-lg max-w-full h-auto cursor-pointer" onClick={() => window.open(msg.media_url || '')} />
+                    ) : msg.media_type === 'audio' ? (
+                      <audio controls className="w-full min-w-[200px] h-10 mt-1">
+                        <source src={msg.media_url || ''} type="audio/mpeg" />
+                      </audio>
+                    ) : msg.media_type === 'video' ? (
+                      <video controls className="rounded-lg max-w-full h-auto">
+                        <source src={msg.media_url || ''} type="video/mp4" />
+                      </video>
+                    ) : (
+                      <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
+                    )}
                     <div className="flex justify-end items-center gap-1.5 mt-2 opacity-60">
-                      <span className="text-[10px] font-bold uppercase tracking-tight">
+                      <span className="text-[10px] font-medium uppercase tracking-tight">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {!msg.is_from_customer && (

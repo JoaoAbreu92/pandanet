@@ -184,7 +184,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
 
         console.log(`[SYNC] ${chats.length} chats encontrados. Sincronizando no Supabase...`);
 
-        // 2. Buscar contatos para mapear nomes (Opcional, mas ajuda muito)
+        // 2. Mapear contatos para nomes
         const contactRes = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
             headers: { 'apikey': evoKey }
         }).catch(() => null);
@@ -194,34 +194,33 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             const contacts = await contactRes.json();
             if (Array.isArray(contacts)) {
                 contacts.forEach(c => {
-                    if (c.id || c.remoteJid) {
-                         contactsMap[c.id || c.remoteJid] = c.name || c.pushName || c.notify;
-                    }
+                    const jid = c.id || c.remoteJid;
+                    if (jid) contactsMap[jid] = c.name || c.pushName || c.notify;
                 });
             }
         }
 
-        // 3. Inserir ou atualizar na tabela whatsapp_conversations
+        // 3. Processar cada chat
         for (const chat of chats) {
             const remoteJid = chat.id || chat.remoteJid;
-            if (!remoteJid || remoteJid.includes('@g.us')) continue; // Ignorar grupos por enquanto
+            if (!remoteJid || remoteJid.includes('@g.us')) continue;
             
             const fromPhone = remoteJid.split('@')[0];
             const contactName = chat.name || contactsMap[remoteJid] || fromPhone;
             const unreadCount = chat.unreadCount || 0;
-            // A Evo API geralmente retorna timestamp em segundos
             const timestamp = chat.conversationTimestamp ? new Date(chat.conversationTimestamp * 1000).toISOString() : new Date().toISOString();
 
-            // Verifica se já existe
-            const { data: existingConv } = await supabase
+            // Sincronizar Conversa
+            let { data: existingConv } = await supabase
                 .from('whatsapp_conversations')
                 .select('id')
                 .eq('company_id', companyId)
                 .eq('contact_phone', fromPhone)
-                .single();
+                .maybeSingle();
 
+            let conversationId;
             if (!existingConv) {
-                await supabase.from('whatsapp_conversations').insert({
+                const { data: newConv } = await supabase.from('whatsapp_conversations').insert({
                     company_id: companyId,
                     contact_phone: fromPhone,
                     contact_name: contactName,
@@ -229,12 +228,129 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                     unread_count: unreadCount,
                     connection_id: connectionId,
                     last_message_at: timestamp
-                });
+                }).select().single();
+                conversationId = newConv?.id;
+            } else {
+                conversationId = existingConv.id;
+                await supabase.from('whatsapp_conversations').update({
+                    last_message_at: timestamp,
+                    unread_count: unreadCount
+                }).eq('id', conversationId);
+            }
+
+            // 4. Buscar Mensagens deste Chat (Histórico 30 dias)
+            if (conversationId) {
+                console.log(`[SYNC] Buscando mensagens para ${fromPhone}...`);
+                const msgRes = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
+                    method: 'POST',
+                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        where: { remoteJid },
+                        limit: 50 // Pegar as últimas 50 mensagens para começar
+                    })
+                }).catch(() => null);
+
+                if (msgRes && msgRes.ok) {
+                    const messages = await msgRes.json();
+                    if (Array.isArray(messages)) {
+                        for (const msg of messages) {
+                            await processInboundMessage(msg, companyId, connectionId, true); // true = historical
+                        }
+                    }
+                }
             }
         }
         console.log(`[SYNC] Sincronização da instância ${instanceName} concluída!`);
     } catch (err) {
         console.error(`[SYNC] Erro durante a sincronização:`, err.message);
+    }
+}
+
+async function processInboundMessage(message, companyId, connectionId, isHistorical = false) {
+    try {
+        const isFromMe = message.key?.fromMe;
+        const remoteJid = message.key?.remoteJid;
+        if (!remoteJid || remoteJid.includes('@g.us')) return;
+        
+        const fromPhone = remoteJid.split('@')[0];
+        const msgId = message.key?.id;
+
+        // Verificar se mensagem já existe
+        const { data: exists } = await supabase
+            .from('whatsapp_messages')
+            .select('id')
+            .eq('whatsapp_message_id', msgId)
+            .maybeSingle();
+        if (exists) return;
+
+        // Extrair texto e mídia
+        let text = message.message?.conversation ||
+            message.message?.extendedTextMessage?.text || 
+            message.text || "";
+
+        let mediaUrl = null;
+        let mediaType = null;
+
+        const m = message.message || {};
+        const mediaMsg = m.imageMessage || m.audioMessage || m.videoMessage || m.documentMessage || m.stickerMessage;
+
+        if (mediaMsg) {
+            mediaType = m.imageMessage ? 'image' : m.audioMessage ? 'audio' : m.videoMessage ? 'video' : 'file';
+            // Evolution API usually returns the internal URL/path. If they don't provide a public one, we might need to fetch it.
+            // For now, we'll try to use the message text or a placeholder if evolution doesn't provide URL directly in upsert.
+            if (!text) text = `[Mídia: ${mediaType}]`;
+        }
+
+        if (!text && !mediaMsg) return;
+
+        // 1. Localizar conversa
+        let { data: conv } = await supabase
+            .from('whatsapp_conversations')
+            .select('id, unread_count')
+            .eq('company_id', companyId)
+            .eq('contact_phone', fromPhone)
+            .maybeSingle();
+
+        let conversationId = conv?.id;
+
+        if (!conv) {
+            const contactName = message.pushName || fromPhone;
+            const { data: newConv } = await supabase
+                .from('whatsapp_conversations')
+                .insert({
+                    company_id: companyId,
+                    contact_phone: fromPhone,
+                    contact_name: contactName,
+                    status: 'aberto',
+                    unread_count: isHistorical ? 0 : 1,
+                    connection_id: connectionId,
+                    last_message_at: new Date().toISOString()
+                }).select().single();
+            conversationId = newConv?.id;
+        } else if (!isHistorical) {
+            await supabase
+                .from('whatsapp_conversations')
+                .update({
+                    unread_count: (conv.unread_count || 0) + 1,
+                    last_message_at: new Date().toISOString()
+                }).eq('id', conversationId);
+        }
+
+        // 2. Inserir a mensagem
+        if (conversationId) {
+            await supabase.from('whatsapp_messages').insert({
+                company_id: companyId,
+                conversation_id: conversationId,
+                message_text: text,
+                is_from_customer: !isFromMe,
+                whatsapp_message_id: msgId,
+                media_url: mediaUrl,
+                media_type: mediaType,
+                created_at: new Date(message.messageTimestamp * 1000).toISOString()
+            });
+        }
+    } catch (err) {
+        console.error('[MSG] Erro ao processar mensagem:', err.message);
     }
 }
 
@@ -261,10 +377,10 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     if (event === 'connection.update') {
         const state = data.state || data.status; // 'connecting', 'open', 'close', 'refused'
         console.log(`[WEBHOOK] Status de Conexão: ${state}`);
-        
+
         if (state === 'open' || state === 'connected') {
             await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null }).eq('id', connectionId);
-            
+
             // Disparar sincronização em background
             syncEvolutionData(instance, companyId, connectionId);
         } else if (state === 'close' || state === 'disconnected' || state === 'refused') {
@@ -278,69 +394,7 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         const message = data.messages ? data.messages[0] : data.message;
         if (!message) return;
 
-        const isFromMe = message.key?.fromMe;
-        if (isFromMe) return; // Ignorando mensagens da própria empresa por enquanto para simplificar o MVP
-        
-        const remoteJid = message.key?.remoteJid;
-        if (!remoteJid || remoteJid.includes('@g.us')) return; // Ignorar grupos por enquanto
-        
-        const fromPhone = remoteJid.split('@')[0];
-        
-        // Texto formatado pela Evolution
-        const text = message.message?.conversation || 
-                     message.message?.extendedTextMessage?.text || 
-                     message.text || 
-                     "";
-
-        if (!text) return; // Se for áudio/imagem, pula no MVP
-
-        const contactName = message.pushName || fromPhone;
-        const msgId = message.key?.id;
-
-        console.log(`[WEBHOOK] Msg recebida de ${fromPhone}: ${text}`);
-
-        // 1. Procurar ou criar Conversa
-        let { data: conv } = await supabase
-            .from('whatsapp_conversations')
-            .select('id, unread_count')
-            .eq('company_id', companyId)
-            .eq('contact_phone', fromPhone)
-            .single();
-
-        let conversationId = conv?.id;
-
-        if (!conv) {
-            const { data: newConv } = await supabase
-                .from('whatsapp_conversations')
-                .insert({
-                    company_id: companyId,
-                    contact_phone: fromPhone,
-                    contact_name: contactName,
-                    status: 'aberto',
-                    unread_count: 1,
-                    connection_id: connectionId,
-                    last_message_at: new Date().toISOString()
-                }).select().single();
-            conversationId = newConv?.id;
-        } else {
-            await supabase
-                .from('whatsapp_conversations')
-                .update({
-                    unread_count: (conv.unread_count || 0) + 1,
-                    last_message_at: new Date().toISOString()
-                }).eq('id', conversationId);
-        }
-
-        // 2. Inserir a mensagem
-        if (conversationId) {
-            await supabase.from('whatsapp_messages').insert({
-                conversation_id: conversationId,
-                message_text: text,
-                is_from_customer: true,
-                whatsapp_message_id: msgId,
-                created_at: new Date().toISOString()
-            });
-        }
+        await processInboundMessage(message, companyId, connectionId);
     }
 });
 

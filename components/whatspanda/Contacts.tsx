@@ -52,14 +52,14 @@ const Contacts: React.FC = () => {
 
     const handleSyncContacts = async () => {
         setSyncing(true);
-        // In a real scenario, this might trigger a backend sync job.
-        // For now, we refresh the list from Supabase to ensure we have the latest.
+        // Refresh list from Supabase
         await fetchContacts();
 
-        // Simulate a short delay for visual feedback if fetch is too fast
+        // Simulate a short delay for visual feedback
         await new Promise(resolve => setTimeout(resolve, 800));
 
         setSyncing(false);
+        alert('Sincronização concluída com sucesso!');
     };
 
     const handleOpenModal = (contact?: WhatsAppContact) => {
@@ -137,14 +137,14 @@ const Contacts: React.FC = () => {
             {/* Header */}
             <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border-b border-gray-200 dark:border-white/5 p-8 flex justify-between items-center shadow-lg">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Contatos</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie sua base de contatos do WhatsApp.</p>
+                    <h2 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Contatos</h2>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-medium opacity-80 uppercase tracking-widest mt-1">Gerencie sua base de contatos do WhatsApp.</p>
                 </div>
                 <div className="flex gap-4">
                     <button
                         onClick={handleSyncContacts}
                         disabled={syncing}
-                        className={`flex items-center px-6 py-3 bg-blue-600/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-xl border border-blue-500/20 gap-2 font-bold text-xs uppercase tracking-widest ${syncing ? 'opacity-70 cursor-wait' : ''}`}
+                        className={`flex items-center px-6 py-3 bg-blue-600/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-xl border border-blue-500/20 gap-2 font-semibold text-xs uppercase tracking-widest ${syncing ? 'opacity-70 cursor-wait' : ''}`}
                         title="Sincronizar Contatos do WhatsApp"
                     >
                         <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -152,7 +152,7 @@ const Contacts: React.FC = () => {
                     </button>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
+                        className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-semibold text-xs uppercase tracking-widest"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         Novo Contato

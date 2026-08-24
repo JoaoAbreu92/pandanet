@@ -69,6 +69,7 @@ const WhatsPanda: React.FC = () => {
     switch (currentView) {
       case 'chat': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts /> : null;
+      case 'new-ticket': return permissions.can_view_chats ? <NewTicket onBack={() => setCurrentView('chat')} /> : null;
       case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
       case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
       default: return null;
@@ -86,10 +87,19 @@ const WhatsPanda: React.FC = () => {
             <MessageCircle className="w-5 h-5 fill-current" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800 dark:text-white leading-none font-brand">WhatsPanda</h1>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400">Pro</span>
+            <h1 className="text-xl font-semibold text-gray-800 dark:text-white leading-none font-brand">WhatsPanda</h1>
+            <span className="text-[10px] uppercase tracking-widest font-medium text-emerald-600 dark:text-emerald-400">Pro</span>
           </div>
         </div>
+
+        {/* Novo Atendimento Button */}
+        <button
+          onClick={() => setCurrentView('new-ticket')}
+          className="mx-2 mb-6 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 group font-medium"
+        >
+          <PlusCircle className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+          <span>Novo Atendimento</span>
+        </button>
 
         {/* Navigation Menu */}
         <div className="flex flex-col gap-1.5 flex-1 mt-2">
@@ -127,8 +137,8 @@ const WhatsPanda: React.FC = () => {
             className="w-9 h-9 rounded-full ring-2 ring-emerald-50"
           />
           <div className="flex flex-col truncate">
-            <span className="text-sm font-bold text-gray-800 dark:text-white truncate tracking-tight">{profile?.name || 'Usuário'}</span>
-            <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate uppercase font-bold tracking-widest">{profile?.role || 'Atendente'}</span>
+            <span className="text-sm font-medium text-gray-800 dark:text-white truncate tracking-tight">{profile?.name || 'Usuário'}</span>
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate uppercase font-medium tracking-widest">{profile?.role || 'Atendente'}</span>
           </div>
         </div>
       </div>
