@@ -19,14 +19,28 @@ const OrgChartPage: React.FC<OrgChartPageProps> = ({ employees }) => {
 
     const isAdmin = profile?.isAdmin || profile?.role === 'Super Admin';
 
-    // build tree structure from local state
-    const buildOrgTree = (managerId: string | null = null): any[] => {
+    // build tree structure from local state with recursion protection and orphaned node recovery
+    const buildOrgTree = (managerId: string | null = null, visited = new Set<string>()): any[] => {
         return localEmployees
-            .filter(e => (managerId === null ? !e.reports_to : e.reports_to === managerId))
-            .map(e => ({
-                ...e,
-                subordinates: buildOrgTree(e.id)
-            }));
+            .filter(e => {
+                if (visited.has(e.id)) return false;
+                
+                if (managerId === null) {
+                    // É um nó raiz se não tem gestor definido (null/undefined)
+                    // OU se o gestor definido não existe na lista de colaboradores da empresa (nó órfão)
+                    return !e.reports_to || !localEmployees.some(emp => emp.id === e.reports_to);
+                } else {
+                    return e.reports_to === managerId;
+                }
+            })
+            .map(e => {
+                const newVisited = new Set(visited);
+                newVisited.add(e.id);
+                return {
+                    ...e,
+                    subordinates: buildOrgTree(e.id, newVisited)
+                };
+            });
     };
 
     const treeData = buildOrgTree();
