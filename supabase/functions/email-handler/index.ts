@@ -115,16 +115,17 @@ Deno.serve(async (req) => {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
 
-      // BREVO DETECT: Se o host contém 'brevo' ou se passou explicitamente uma API Key
-      const isBrevo = settings.smtp_host?.includes('brevo') || settings.brevo_api_key;
-      const brevoKey = settings.brevo_api_key || (isBrevo ? settings.pass : null);
+      // BREVO DETECT: Se o host contém 'brevo' ou se a senha começa com o prefixo da Brevo
+      const isBrevo = settings.smtp_host?.includes('brevo');
+      const hasBrevoKey = settings.brevo_api_key || settings.pass?.startsWith('xkeysib-');
+      const brevoKey = settings.brevo_api_key || (hasBrevoKey ? settings.pass : null);
 
       let smtpResult: any;
       let imapResult: any;
 
       // 1. TESTE SMTP / BREVO
       if (isBrevo && brevoKey) {
-        console.log("[V32] Testando via Brevo API...");
+        console.log(`[V33] Testando via Brevo API... (Key detectada)`);
         const auth = await testBrevoAuth(brevoKey);
         if (auth.ok) {
           smtpResult = { status: 'fulfilled', value: "Brevo API OK" };
@@ -164,6 +165,7 @@ Deno.serve(async (req) => {
       if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error}`);
 
       const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
+      // FIX TYPO: Era imap_host no lugar de imap_port
       const imapProbe = useImapSsl ? await probeTls(settings.imap_host, settings.imap_port) : await testConnection(settings.imap_host, settings.imap_port);
 
       if (!imapProbe.ok) {
