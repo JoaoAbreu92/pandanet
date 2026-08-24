@@ -270,6 +270,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // --- State: Context Menu ---
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, email: EmailMessage } | null>(null);
+    const [accountContextMenu, setAccountContextMenu] = useState<{ x: number, y: number, account: any } | null>(null);
+    const [disabledNotifications, setDisabledNotifications] = useState<Set<string>>(new Set());
     const [selectedEmailUids, setSelectedEmailUids] = useState<string[]>([]);
     const [locallySeenUids, setLocallySeenUids] = useState<Set<string>>(new Set());
 
@@ -279,7 +281,31 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         setContextMenu({ x: e.clientX, y: e.clientY, email });
     };
 
-    const closeContextMenu = () => setContextMenu(null);
+    const closeContextMenu = () => {
+        setContextMenu(null);
+    };
+
+    const handleAccountContextMenu = (e: React.MouseEvent, account: any) => {
+        e.preventDefault();
+        setAccountContextMenu({ x: e.clientX, y: e.clientY, account });
+    };
+
+    const toggleNotificationForAccount = (accountId: string) => {
+        setDisabledNotifications(prev => {
+            const next = new Set(prev);
+            if (next.has(accountId)) {
+                next.delete(accountId);
+            } else {
+                next.add(accountId);
+            }
+            if (currentUser?.id) {
+                localStorage.setItem(`panda_email_disabled_notifications_${currentUser.id}`, JSON.stringify(Array.from(next)));
+            }
+            return next;
+        });
+        showToast("Preferência de notificação atualizada.", "success");
+        setAccountContextMenu(null);
+    };
 
     // --- Persistence (localStorage) ---
     useEffect(() => {
@@ -304,6 +330,29 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             } catch (e) { console.error("Error parsing saved selected email", e); }
         }
     }, [currentUser.id]);
+
+    // Carregar notificações desabilitadas do localStorage e registrar listener de clique global
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        
+        const saved = localStorage.getItem(`panda_email_disabled_notifications_${currentUser.id}`);
+        if (saved) {
+            try {
+                setDisabledNotifications(new Set(JSON.parse(saved)));
+            } catch (e) {
+                console.error("Error parsing disabled notifications", e);
+            }
+        }
+
+        const handleGlobalClick = () => {
+            setContextMenu(null);
+            setAccountContextMenu(null);
+        };
+        document.addEventListener('click', handleGlobalClick);
+        return () => {
+            document.removeEventListener('click', handleGlobalClick);
+        };
+    }, [currentUser?.id]);
 
     // Fetch body for restored email only after settings are loaded
     useEffect(() => {
@@ -535,6 +584,46 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const deleteAccount = async (accountId: string) => {
         if (!canManageAccounts) {
             showToast('Você não tem permissão para remover contas.', 'error');
+            return;
+        }
+
+        const account = accounts.find(a => a.id === accountId);
+        if (!account) return;
+
+        const isOwner = account.user_id === currentUser.id;
+
+        if (!isOwner) {
+            const perms = currentUser.email_permissions || {};
+            const allowed = perms.allowed_accounts || [];
+            
+            if (allowed.includes(accountId)) {
+                openConfirm(
+                    'Remover Acesso Compartilhado',
+                    `Tem certeza que deseja remover o seu acesso à conta de e-mail "${account.imap_user}"? A conta continuará ativa para o usuário proprietário.`,
+                    async () => {
+                        closeConfirm();
+                        const newAllowed = allowed.filter((id: string) => id !== accountId);
+                        const newPerms = { ...perms, allowed_accounts: newAllowed };
+                        
+                        const { error } = await supabase.from('profiles')
+                            .update({ email_permissions: newPerms })
+                            .eq('id', currentUser.id);
+                            
+                        if (error) {
+                            showToast('Erro ao remover acesso compartilhado: ' + error.message, 'error');
+                        } else {
+                            showToast('Acesso compartilhado removido com sucesso.', 'success');
+                            currentUser.email_permissions = newPerms;
+                            await fetchAccounts();
+                            if (activeAccountId === accountId) {
+                                setActiveAccountId(null);
+                            }
+                        }
+                    }
+                );
+            } else {
+                showToast('Você não é o proprietário desta conta de e-mail. Apenas o proprietário pode excluí-la de forma definitiva.', 'error');
+            }
             return;
         }
 
@@ -1606,6 +1695,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                     {/* Account Accordion Header */}
                                     <button
                                         onClick={() => toggleAccountExpansion(account.id)}
+                                        onContextMenu={(e) => handleAccountContextMenu(e, account)}
                                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-300 border ${isActive ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 shadow-sm' : 'hover:bg-gray-100 border-transparent text-gray-500 dark:text-gray-400 dark:hover:bg-white/5'}`}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden">
@@ -2156,6 +2246,44 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         </div>
                     )}
 
+                    {/* Account Context Menu */}
+                    {accountContextMenu && (
+                        <div
+                            className="fixed bg-white dark:bg-slate-800 shadow-2xl rounded-xl border border-gray-200 dark:border-slate-700 z-[100] w-64 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
+                            style={{ top: accountContextMenu.y, left: accountContextMenu.x }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800 truncate">
+                                {accountContextMenu.account.imap_user}
+                            </div>
+
+                            <button
+                                onClick={() => toggleNotificationForAccount(accountContextMenu.account.id)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                            >
+                                <EnvelopeIcon className="w-4 h-4 text-gray-400" />
+                                {disabledNotifications.has(accountContextMenu.account.id) ? (
+                                    <span className="text-emerald-600 font-bold">Ativar Notificações</span>
+                                ) : (
+                                    <span className="text-gray-600 dark:text-gray-400">Silenciar Notificações</span>
+                                )}
+                            </button>
+
+                            <div className="border-t dark:border-slate-700 mt-1 pt-1">
+                                <button
+                                    onClick={() => {
+                                        deleteAccount(accountContextMenu.account.id);
+                                        setAccountContextMenu(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                    Remover / Excluir Conta
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Pagination Controls */}
                     {view === 'inbox' && (
                         <div className="p-4 border-t border-gray-100 dark:border-white/5 bg-white/50 dark:bg-slate-900/20 backdrop-blur-xl flex items-center justify-between">
@@ -2632,14 +2760,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 >
                                                     <UserPlusIcon className="w-5 h-5" />
                                                     Adicionar Nova Conta
-                                                </button>
+                                                                </button>
                                             )}
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                                         {accounts.map(acc => (
-                                            <div key={acc.id} className={`p-6 rounded-3xl border transition-all cursor-pointer group ${activeAccountId === acc.id ? 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-500/30 shadow-xl ring-2 ring-emerald-500/20' : 'bg-white/50 dark:bg-slate-900/50 border-gray-100 dark:border-white/5 hover:border-gray-200 shadow-sm'}`} onClick={() => setActiveAccountId(acc.id)}>
+                                            <div key={acc.id} className={`p-6 rounded-3xl border transition-all cursor-pointer group ${activeAccountId === acc.id ? 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-500/30 shadow-xl ring-2 ring-emerald-500/20' : 'bg-white/50 dark:bg-slate-900/50 border-gray-100 dark:border-white/5 hover:border-gray-200 shadow-sm'}`} onClick={() => setActiveAccountId(acc.id)} onContextMenu={(e) => handleAccountContextMenu(e, acc)}>
                                                 <div className="flex justify-between items-start mb-4">
                                                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${activeAccountId === acc.id ? 'bg-brand-primary text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500'}`}>
                                                         {acc.imap_user.substring(0, 2).toUpperCase()}

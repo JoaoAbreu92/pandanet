@@ -85,20 +85,35 @@ const EmailNotifier: React.FC = () => {
                             if (prevUnseen !== undefined && currentUnseen > prevUnseen) {
                                 const newEmailsCount = currentUnseen - prevUnseen;
                                 
-                                playNotificationSound('message');
-                                showDesktopNotification(
-                                    `Novo E-mail (${account.imap_user})`, 
-                                    `Você tem ${newEmailsCount} novo(s) e-mail(s) na conta ${account.imap_user}.`,
-                                    '/logo.png'
-                                );
+                                let notificationsEnabled = true;
+                                if (currentUser?.id) {
+                                    try {
+                                        const disabledStr = localStorage.getItem(`panda_email_disabled_notifications_${currentUser.id}`);
+                                        const disabledIds = disabledStr ? JSON.parse(disabledStr) : [];
+                                        if (Array.isArray(disabledIds) && disabledIds.includes(account.id)) {
+                                            notificationsEnabled = false;
+                                        }
+                                    } catch (e) {
+                                        console.error("[EmailNotifier] Error parsing disabled notifications", e);
+                                    }
+                                }
 
-                                addNotification({
-                                    type: 'system',
-                                    title: `Novo E-mail (${account.imap_user})`,
-                                    description: `Você recebeu e-mail(s) não lido(s) na conta ${account.imap_user}.`,
-                                    link: `/email?accountId=${account.id}`,
-                                    avatarUrl: '/logo.png'
-                                });
+                                if (notificationsEnabled) {
+                                    playNotificationSound('message');
+                                    showDesktopNotification(
+                                        `Novo E-mail (${account.imap_user})`, 
+                                        `Você tem ${newEmailsCount} novo(s) e-mail(s) na conta ${account.imap_user}.`,
+                                        '/logo.png'
+                                    );
+
+                                    addNotification({
+                                        type: 'system',
+                                        title: `Novo E-mail (${account.imap_user})`,
+                                        description: `Você recebeu e-mail(s) não lido(s) na conta ${account.imap_user}.`,
+                                        link: `/email?accountId=${account.id}`,
+                                        avatarUrl: '/logo.png'
+                                    });
+                                }
                             }
 
                             if (currentUnseen === 0 && prevUnseen > 0) {
