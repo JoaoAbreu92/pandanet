@@ -128,6 +128,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
 
+    const [departments, setDepartments] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            if (currentUser.company_id) {
+                const { data } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
+                if (data) setDepartments(data);
+            }
+        };
+        fetchDepartments();
+    }, [currentUser.company_id]);
+
     const handleSave = async () => {
         try {
             const updates: any = {
@@ -135,10 +147,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 id: currentUser.id,
                 updated_at: new Date(),
             };
-
-            // Needs to map tempUserData fields to DB columns if names differ?
-            // "role", "team" are in DB. "name" -> "full_name". 
-            // "bio", "phone", "officeLocation" -> "office_location"
 
             const dbUpdates: any = {
                 id: currentUser.id,
@@ -151,6 +159,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 avatar_url: tempUserData.avatarUrl,
                 cover_url: tempUserData.coverUrl,
                 birth_date: tempUserData.birthDate,
+                department_id: (tempUserData as any).department_id,
                 updated_at: new Date()
             };
 
@@ -442,6 +451,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                         <input name="officeLocation" value={tempUserData.officeLocation || ''} onChange={handleInputChange} placeholder="Ex: São Paulo ou Remoto" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
                                     </div>
                                     <div className="sm:col-span-2">
+                                        <label className="text-sm font-medium text-brand-subtle-text">Departamento</label>
+                                        <select
+                                            name="department_id"
+                                            value={(tempUserData as any).department_id || ''}
+                                            onChange={(e) => setTempUserData(prev => ({ ...prev, department_id: e.target.value } as any))}
+                                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                                        >
+                                            <option value="">Selecione um departamento</option>
+                                            {departments.map(dept => (
+                                                <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="sm:col-span-2">
                                         <label className="text-sm font-medium text-brand-subtle-text">Sobre mim</label>
                                         <textarea name="bio" value={tempUserData.bio || ''} onChange={handleInputChange} rows={3} placeholder="Fale um pouco sobre você..." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea>
                                     </div>
@@ -472,6 +495,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Escritório</h4>
                                         <p className="text-brand-text">{currentUser.officeLocation || 'Não informado'}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-brand-subtle-text">Departamento</h4>
+                                        <p className="text-brand-text">
+                                            {departments.find(d => d.id === (currentUser as any).department_id)?.name || 'Não informado'}
+                                        </p>
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-brand-subtle-text">Data de Início</h4>

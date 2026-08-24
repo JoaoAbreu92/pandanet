@@ -42,9 +42,17 @@ const CalendarPage: React.FC = () => {
         if (!currentUser?.company_id) return;
 
         const fetchData = async () => {
-            // Fetch Employees
-            const { data: emps } = await supabase.from('profiles').select('*').eq('company_id', currentUser.company_id);
+            console.log('Fetching calendar data for company:', currentUser.company_id);
+
+            // Fetch Employees - Rely on RLS
+            const { data: emps, error: empError } = await supabase.from('profiles').select('*');
+            if (empError) {
+                console.error('Error fetching employees:', empError);
+                alert('Erro ao buscar funcionários: ' + empError.message);
+            }
+
             if (emps) {
+                console.log('Employees found:', emps.length);
                 setEmployees(emps.map((e: any) => ({
                     id: e.id,
                     name: e.full_name,
@@ -60,41 +68,45 @@ const CalendarPage: React.FC = () => {
                 })));
             }
 
-            // Fetch Departments
-            const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
-            if (depts) setDepartments(depts);
+            // Fetch Departments - Rely on RLS
+            const { data: depts, error: deptError } = await supabase.from('departments').select('*');
+            if (deptError) {
+                console.error('Error fetching departments:', deptError);
+                alert('Erro ao buscar departamentos: ' + deptError.message);
+            }
+            if (depts) {
+                console.log('Departments found:', depts.length);
+                setDepartments(depts);
+            }
 
-            // Fetch Events
-            const { data: evts, error } = await supabase
+            // Fetch Events - Rely on RLS
+            const { data: evts, error: evtError } = await supabase
                 .from('events')
-                .select('*')
-                .eq('company_id', currentUser.company_id);
+                .select('*');
+
+            if (evtError) {
+                console.error('Error fetching events:', evtError);
+                alert('Erro ao buscar eventos: ' + evtError.message);
+            }
 
             if (evts) {
                 const formattedEvents: CalendarEvent[] = evts.map((e: any) => ({
                     id: e.id,
                     title: e.title,
-                    date: e.date?.split('T')[0] || e.created_at?.split('T')[0], // Fallback
+                    date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
                     startTime: e.start_time || '00:00',
                     endTime: e.end_time || '00:00',
                     category: (e.category as CalendarEventCategory) || 'Reunião',
                     location: e.location || '',
-                    attendees: [], // We will map this if needed, complicated to map right away without employees loaded
+                    attendees: [], // Mapped below
                     notes: e.description || ''
                 }));
-                // Note: Real attendees mapping requires loaded employees. 
-                // We'll update state. Ideally we fetch attendees IDs.
-                // Assuming e.attendees is array of strings.
 
+                // Map attendees only after employees are loaded? 
+                // We can use 'emps' from local scope.
                 const eventsWithAttendees = formattedEvents.map((fe, index) => {
                     const raw = evts[index];
                     const attendeeIds = raw.attendees || [];
-                    // We can't map here because 'employees' state might not be set yet if run in parallel.
-                    // But we are in same function.
-                    // Actually let's just store IDs in formattedEvents and map in render or useMemo.
-                    // types.ts defines attendees: Employee[]. strict.
-                    // So we need to map here.
-                    // We have 'emps' from previous await.
                     return {
                         ...fe,
                         attendees: (emps || []).filter((emp: any) => attendeeIds.includes(emp.id)).map((emp: any) => ({

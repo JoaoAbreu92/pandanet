@@ -227,6 +227,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
 const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition, onNavigate }) => {
     const { addNotification } = useNotifications();
     const [posts, setPosts] = useState<Post[]>([]);
+    const [localRecognitions, setLocalRecognitions] = useState<Recognition[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
     const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image' | 'video', file?: File } | null>(null);
     const [showRecognitionModal, setShowRecognitionModal] = useState(false);
@@ -280,18 +281,48 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             setPosts(formattedPosts);
         } catch (error) {
             console.error('Error fetching posts:', error);
-        } finally {
-            setLoading(false);
+        }
+    };
+
+    const fetchRecognitions = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('recognitions')
+                .select(`
+                    id, message, type, from_id, to_id,
+                    from_profile:from_id(full_name, avatar_url),
+                    to_profile:to_id(full_name, avatar_url)
+                `)
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (error) throw error;
+
+            const formatted: Recognition[] = data.map((item: any) => ({
+                id: item.id,
+                from: item.from_profile?.full_name || 'Desconhecido',
+                to: item.to_profile?.full_name || 'Desconhecido', // Mapping name to 'to' property for display
+                fromAvatar: item.from_profile?.avatar_url || 'https://via.placeholder.com/150',
+                toAvatar: item.to_profile?.avatar_url || 'https://via.placeholder.com/150',
+                message: item.message,
+                value: item.type as any
+            }));
+            setLocalRecognitions(formatted);
+        } catch (err) {
+            console.error('Error fetching recognitions:', err);
         }
     };
 
     useEffect(() => {
-        fetchPosts();
+        setLoading(true);
+        Promise.all([fetchPosts(), fetchRecognitions()]).finally(() => setLoading(false));
+
         const channel = supabase
-            .channel('public:posts')
+            .channel('public:posts_and_recognitions')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchPosts())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'recognitions' }, () => fetchRecognitions())
             .subscribe();
 
         return () => {
@@ -399,14 +430,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 message: data.message,
                 type: data.value
             });
-            if (onAddRecognition) {
-                onAddRecognition({
-                    id: Date.now().toString(),
-                    from: currentUser.name,
-                    fromAvatar: currentUser.avatarUrl,
-                    ...data
-                });
-            }
+            fetchRecognitions(); // Refresh list immediately
         } catch (err) {
             console.error(err);
         }
@@ -469,10 +493,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         }
     };
 
-    const recentRecognitions = [...recognitions].sort((a, b) => {
-        const idA = parseInt(a.id) || 0;
-        const idB = parseInt(b.id) || 0;
-        return idB - idA;
+    const recentRecognitions = [...localRecognitions].sort((a, b) => {
+        // IDs are now UUIDs, so simple parsing won't work for sorting implies latest is first
+        // But we already sort by created_at desc in fetch
+        return 0;
     }).slice(0, 3);
 
     return (
@@ -481,7 +505,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 <div className="lg:col-span-2 space-y-6">
                     <Card title="" className="text-center pb-6">
                         <div className="relative mb-4">
-                            <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-10"></div>
+                            {currentUser.coverUrl ? (
+                                <img src={currentUser.coverUrl} alt="Capa" className="h-20 w-full object-cover rounded-t-xl -mx-6 -mt-6 mb-10" />
+                            ) : (
+                                <div className="h-20 bg-brand-primary rounded-t-xl -mx-6 -mt-6 mb-10"></div>
+                            )}
                             <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white absolute left-1/2 -translate-x-1/2 top-10 shadow-md object-cover" />
                         </div>
                         <h3 className="text-lg font-bold text-brand-text mb-1">{currentUser.name}</h3>
@@ -495,7 +523,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div><p className="font-bold text-brand-text">{allEmployees.length > 0 ? allEmployees.length - 1 : 0}</p><p className="text-[10px] text-brand-subtle-text uppercase">Interações</p></div>
                         </div>
                     </Card>
-                    <RecognitionWidget recognitions={recentRecognitions} onRecognize={() => setShowRecognitionModal(true)} />
+                    <RecognitionWidget recognitions={localRecognitions} onRecognize={() => setShowRecognitionModal(true)} />
                 </div>
 
                 <div className="lg:col-span-8 space-y-6">
