@@ -14,8 +14,9 @@ services:
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - JWT_SECRET=${JWT_SECRET}
-      - COMPANY_ID=${COMPANY_ID:-1}
       - PORT=3000
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - EVOLUTION_API_KEY=EvolutionPandaSecret123
     networks:
       - pandanet_network
       - supabase_default

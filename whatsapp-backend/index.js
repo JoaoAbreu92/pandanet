@@ -509,10 +509,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         // 2. Buscar TODOS os Grupos
         try {
             console.log(`[SYNC] Buscando grupos via Evolution API para ${instanceName}...`);
-            let respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
-            if (!respG.ok) {
-                respG = await fetch(`${evoUrl}/group/findAll/${instanceName}`, { headers });
-            }
+            const respG = await fetch(`${evoUrl}/group/fetchAllGroups/${instanceName}`, { headers });
 
             if (respG.ok) {
                 const groups = await respG.json();
@@ -520,9 +517,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 console.log(`[SYNC] ${groupList.length} grupos encontrados.`);
                 
                 if (groupList.length === 0) {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A API retornou 0 grupos para ${instanceName}.` }).eq('id', connectionId);
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `AVISO: A API retornou 0 grupos para a instância ${instanceName}. Certifique-se de que a conta tem grupos.` }).eq('id', connectionId);
                 } else {
-                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados.` }).eq('id', connectionId);
+                    await supabase.from('whatsapp_settings').update({ last_sync_error: `SUCESSO: ${groupList.length} grupos identificados. Processando importação...` }).eq('id', connectionId);
                 }
 
                 for (const g of groupList) {
@@ -539,8 +536,20 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         });
                     }
                 }
+            } else {
+                const errStatus = respG.status;
+                const errText = await respG.text();
+                let errMsg = `Erro API Grupos (${errStatus})`;
+                if (errStatus === 404) errMsg = `Erro 404: Instância "${instanceName}" não encontrada na Evolution API. Tente REPARAR a conexão.`;
+                if (errStatus === 401) errMsg = `Erro 401: API Key inválida na Evolution API. Verifique as variáveis de ambiente.`;
+                
+                await supabase.from('whatsapp_settings').update({ last_sync_error: errMsg }).eq('id', connectionId);
+                console.error(`[SYNC] ${errMsg}`, errText);
             }
-        } catch(e) { console.error(`[SYNC] Erro grupos:`, e.message); }
+        } catch(e) { 
+            console.error(`[SYNC] Erro grupos:`, e.message); 
+            await supabase.from('whatsapp_settings').update({ last_sync_error: `Exceção na sincronização de grupos: ${e.message}` }).eq('id', connectionId);
+        }
 
         // 3. Salvar Contatos e Garantir Conversas de Grupo
         if (contactsToUpsert.length > 0) {
