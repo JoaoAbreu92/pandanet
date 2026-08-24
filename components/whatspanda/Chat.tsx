@@ -26,7 +26,7 @@ import TransferModal from './TransferModal';
 import ContactSidebar from './ContactSidebar';
 
 const Chat: React.FC = () => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const permissions = profile?.whatspanda_permissions || {};
   const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
   const canSendMessages = isAdmin || permissions.can_send_messages !== false; // Default true if undefined? No, types say boolean. Let's assume false default if not admin.
@@ -47,7 +47,7 @@ const Chat: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [user] = useState({ id: 'current-user-id' }); // Mock for now, replace with actual auth
+  // const [user] = useState({ id: 'current-user-id' }); // Mock removed
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showContactSidebar, setShowContactSidebar] = useState(false);
   const canTransfer = isAdmin || profile?.whatspanda_permissions?.can_transfer;
@@ -143,7 +143,7 @@ const Chat: React.FC = () => {
         conversation_id: selectedConversation.id,
         message_text: newMessage,
         is_from_customer: false,
-        sent_by: user.id // Replace with actual user ID
+        sent_by: user?.id // Replace with actual user ID
       });
 
     if (!error) {
