@@ -655,6 +655,9 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                                         onChange={e => setNewEvent({ ...newEvent, imageUrl: e.target.value })}
                                         placeholder="https://..."
                                     />
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                                        Tamanho recomendado: <strong>800x400px</strong> (Proporção 2:1). Exemplo: <code>https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=800&h=400&fit=crop</code>
+                                    </p>
                                 </div>
                                 <div className="border-t dark:border-slate-700 pt-4 mt-4">
                                     <h4 className="font-bold text-gray-900 dark:text-gray-100 mb-3">Videoconferência & Convidados</h4>

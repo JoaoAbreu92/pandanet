@@ -8,14 +8,16 @@ import { useAuth } from './AuthContext';
 import BadgeDetailModal from './BadgeDetailModal';
 
 const PRESET_AVATARS = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&q=80'
+    'https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?auto=format&fit=crop&w=150&q=80', // Panda
+    'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=150&q=80', // Gato
+    'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=150&q=80', // Cachorro
+    'https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=150&q=80', // Raposa
+    'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=150&q=80', // Leão
+    'https://images.unsplash.com/photo-1507666480-f344d6741b16?auto=format&fit=crop&w=150&q=80', // Esquilo
+    'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?auto=format&fit=crop&w=150&q=80', // Coelho
+    'https://images.unsplash.com/photo-1517783999520-f068d7431a60?auto=format&fit=crop&w=150&q=80', // Pinguim
+    'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?auto=format&fit=crop&w=150&q=80', // Coala
+    'https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?auto=format&fit=crop&w=150&q=80'  // Lontra
 ];
 
 const PRESET_BANNERS = [
@@ -392,6 +394,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 };
                 
                 setTempUserData(reloadedUser);
+                setTargetUser(reloadedUser);
                 onUpdateUser(reloadedUser);
             }
             

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
@@ -203,6 +204,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
 
     // Calendário interno
     const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+    const [selectedCollabId, setSelectedCollabId] = useState<string>('');
 
     const [departments, setDepartments] = useState<any[]>([]);
     const [isStageModalOpen, setIsStageModalOpen] = useState(false);
@@ -1338,6 +1340,60 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                 fetchTaskDetails(taskId);
             }
 
+            // Zerar Cronômetro Automaticamente na Conclusão da Tarefa
+            const sortedStages = [...stages].sort((a, b) => a.position - b.position);
+            const finalStage = sortedStages[sortedStages.length - 1];
+            const isFinal = finalStage && toStageId === finalStage.id;
+
+            if (isFinal) {
+                const active = localStorage.getItem('pixel_active_timer');
+                if (active) {
+                    try {
+                        const activeTimer = JSON.parse(active);
+                        if (activeTimer && activeTimer.taskId === taskId) {
+                            let totalMs = activeTimer.accumulatedTime || 0;
+                            if (!activeTimer.isPaused) {
+                                totalMs += (Date.now() - activeTimer.startTime);
+                            }
+                            const hours = parseFloat((totalMs / (1000 * 60 * 60)).toFixed(2));
+                            
+                            if (hours > 0.01) {
+                                const { error: timesheetError } = await supabase
+                                    .from('project_timesheets')
+                                    .insert([{
+                                        task_id: taskId,
+                                        user_id: currentUser?.id,
+                                        hours: hours,
+                                        description: 'Apontamento automático - Conclusão da Tarefa',
+                                        date: new Date().toISOString().split('T')[0]
+                                    }]);
+                                    
+                                if (!timesheetError) {
+                                    const mins = Math.round((totalMs / (1000 * 60)) % 60);
+                                    const hrs = Math.floor(totalMs / (1000 * 60 * 60));
+                                    const timeStr = `${hrs}h ${mins}m`;
+                                    
+                                    await supabase.from('project_task_comments').insert([{
+                                        task_id: taskId,
+                                        user_id: currentUser?.id,
+                                        comment: `[CRONÔMETRO AUTOMÁTICO] Tarefa concluída. Cronômetro finalizado automaticamente. Total apontado: ${timeStr}.`
+                                    }]);
+                                }
+                            }
+                            localStorage.removeItem('pixel_active_timer');
+                            setTimerState(null);
+                            showToast('Cronômetro finalizado automaticamente pois a tarefa foi concluída.', 'info');
+                        }
+                    } catch (err) {
+                        console.error('Erro ao processar cronômetro automático:', err);
+                    }
+                }
+            }
+
+            if (selectedProject) {
+                await handleSelectProject(selectedProject);
+            }
+
             showToast(`Projeto movido para "${targetStage.name}" com sucesso!`, 'success');
         } catch (err: any) {
             showToast('Erro ao atualizar estágio do projeto: ' + err.message, 'error');
@@ -2125,88 +2181,226 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                 )}
 
                                 {/* TAB 4: METRICS & TIMESHEETS */}
-                                {activeTab === 'timesheet' && (
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        {/* Cartões Estatísticos */}
-                                        <div className="lg:col-span-2 space-y-6">
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Total de Tarefas</p>
-                                                    <p className="text-4xl font-black text-slate-800 dark:text-slate-100">{tasks.length}</p>
-                                                </div>
-                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Tarefas Concluídas</p>
-                                                    <p className="text-4xl font-black text-emerald-500">
-                                                        {tasks.filter(t => {
-                                                            const stageName = stages.find(s => s.id === t.stage_id)?.name;
-                                                            return stageName === 'Concluído' || stageName === 'Done';
-                                                        }).length}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                {activeTab === 'timesheet' && (() => {
+                                    const realTotalHours = tasks.reduce((acc, t) => {
+                                        const taskHours = t.timesheets?.reduce((sum, ts) => sum + ts.hours, 0) || 0;
+                                        return acc + taskHours;
+                                    }, 0);
 
-                                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25">
-                                                <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider mb-6 flex items-center gap-2">
-                                                    <ChartBarIcon className="w-5 h-5 text-brand-primary" />
-                                                    Distribuição de Tarefas por Estágio
-                                                </h4>
-                                                <div className="space-y-4">
-                                                    {stages.map(stage => {
-                                                        const stageTasks = tasks.filter(t => t.stage_id === stage.id);
-                                                        const pct = tasks.length ? Math.round(stageTasks.length / tasks.length * 100) : 0;
-                                                        return (
-                                                            <div key={stage.id}>
-                                                                <div className="flex justify-between text-xs font-semibold mb-1">
-                                                                    <span className="text-slate-600 dark:text-slate-350">{stage.name}</span>
-                                                                    <span className="text-slate-400">{stageTasks.length} ({pct}%)</span>
+                                    const tasksWithHours = tasks.map(t => {
+                                        const totalHours = t.timesheets?.reduce((sum, ts) => sum + ts.hours, 0) || 0;
+                                        return {
+                                            id: t.id,
+                                            title: t.title,
+                                            totalHours
+                                        };
+                                    }).filter(t => t.totalHours > 0);
+
+                                    // Integrantes do projeto (gerente ou designado em tarefa ou com horas apontadas)
+                                    const projectMembers = (() => {
+                                        const memberIds = new Set<string>();
+                                        if (selectedProject?.manager_id) {
+                                            memberIds.add(selectedProject.manager_id);
+                                        }
+                                        tasks.forEach(task => {
+                                            if (task.assigned_to) {
+                                                memberIds.add(task.assigned_to);
+                                            }
+                                            task.timesheets?.forEach(ts => {
+                                                if (ts.user_id) {
+                                                    memberIds.add(ts.user_id);
+                                                }
+                                            });
+                                        });
+                                        return employees.filter(emp => memberIds.has(emp.id));
+                                    })();
+
+                                    const collabChartData = (() => {
+                                        if (!selectedCollabId) return [];
+                                        return tasks.map(task => {
+                                            const collabHours = task.timesheets
+                                                ?.filter(ts => ts.user_id === selectedCollabId)
+                                                .reduce((sum, ts) => sum + ts.hours, 0) || 0;
+                                            return {
+                                                name: task.title.length > 15 ? task.title.substring(0, 15) + '...' : task.title,
+                                                fullName: task.title,
+                                                horas: parseFloat(collabHours.toFixed(2))
+                                            };
+                                        }).filter(t => t.horas > 0);
+                                    })();
+
+                                    return (
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                            {/* Cartões Estatísticos e Distribuição */}
+                                            <div className="lg:col-span-2 space-y-6">
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Total de Tarefas</p>
+                                                        <p className="text-4xl font-black text-slate-800 dark:text-slate-100">{tasks.length}</p>
+                                                    </div>
+                                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 flex flex-col justify-center">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Tarefas Concluídas</p>
+                                                        <p className="text-4xl font-black text-emerald-500">
+                                                            {tasks.filter(t => {
+                                                                const stageName = stages.find(s => s.id === t.stage_id)?.name;
+                                                                return stageName === 'Concluído' || stageName === 'Done';
+                                                            }).length}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25">
+                                                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider mb-6 flex items-center gap-2">
+                                                        <ChartBarIcon className="w-5 h-5 text-brand-primary" />
+                                                        Distribuição de Tarefas por Estágio
+                                                    </h4>
+                                                    <div className="space-y-4">
+                                                        {stages.map(stage => {
+                                                            const stageTasks = tasks.filter(t => t.stage_id === stage.id);
+                                                            const pct = tasks.length ? Math.round(stageTasks.length / tasks.length * 100) : 0;
+                                                            return (
+                                                                <div key={stage.id}>
+                                                                    <div className="flex justify-between text-xs font-semibold mb-1">
+                                                                        <span className="text-slate-600 dark:text-slate-350">{stage.name}</span>
+                                                                        <span className="text-slate-400">{stageTasks.length} ({pct}%)</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                                        <div className="bg-brand-primary h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: selectedProject.color }}></div>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                                                    <div className="bg-brand-primary h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: selectedProject.color }}></div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        {/* Progresso de Horas do Projeto */}
-                                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25 flex flex-col justify-between">
-                                            <div>
-                                                <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                    <ClockIcon className="w-5 h-5 text-brand-primary" />
-                                                    Apontamento de Horas
-                                                </h4>
-                                                <p className="text-xs text-slate-450 dark:text-slate-500 mb-6">Total de horas registradas na equipe para este projeto.</p>
-                                                
-                                                <div className="flex items-baseline gap-2 mb-6">
-                                                    {/* Obter total de horas real do projeto via Timesheet local */}
-                                                    <span className="text-5xl font-black text-slate-800 dark:text-slate-100">
-                                                        {/* Calculado por uma query simples nos timesheets do projeto se quiséssemos, mas vamos simular ou buscar na renderização da tarefa */}
-                                                        {tasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0) * 3 + 12}
-                                                    </span>
-                                                    <span className="text-xs font-bold text-slate-450 uppercase">horas totais</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border dark:border-slate-800 text-xs">
-                                                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Equipe Dedicada</p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {employees.slice(0, 5).map(e => (
-                                                        <div key={e.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-850 px-2.5 py-1 rounded-full border dark:border-slate-800">
-                                                            {e.avatarUrl ? (
-                                                                <img src={e.avatarUrl} className="w-4 h-4 rounded-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold text-slate-400 uppercase">{e.name.substring(0,2)}</div>
-                                                            )}
-                                                            <span className="font-semibold text-slate-500">{e.name.split(' ')[0]}</span>
+                                                {/* Soma de Horas por Tarefa */}
+                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25">
+                                                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider mb-6 flex items-center gap-2">
+                                                        <ListBulletIcon className="w-5 h-5 text-brand-primary" />
+                                                        Tempo Gasto por Tarefa
+                                                    </h4>
+                                                    {tasksWithHours.length > 0 ? (
+                                                        <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-96 overflow-y-auto pr-2">
+                                                            {tasksWithHours.map(task => {
+                                                                const percentage = realTotalHours > 0 ? Math.round((task.totalHours / realTotalHours) * 100) : 0;
+                                                                return (
+                                                                    <div key={task.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                                                                            <div className="mt-2 w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                                                                <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: selectedProject.color || '#10B981' }}></div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-right shrink-0">
+                                                                            <span className="text-sm font-black text-slate-800 dark:text-slate-100">{task.totalHours.toFixed(2)}h</span>
+                                                                            <p className="text-[10px] text-slate-450 font-bold uppercase">{percentage}% do total</p>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    ))}
+                                                    ) : (
+                                                        <p className="text-xs text-center text-slate-400 py-8">Nenhuma tarefa deste projeto registrou tempo apontado até o momento.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Coluna Direita: Progresso de Horas e Gráfico */}
+                                            <div className="space-y-6">
+                                                {/* Progresso de Horas do Projeto */}
+                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25 flex flex-col justify-between">
+                                                    <div>
+                                                        <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            <ClockIcon className="w-5 h-5 text-brand-primary" />
+                                                            Apontamento de Horas
+                                                        </h4>
+                                                        <p className="text-xs text-slate-450 dark:text-slate-500 mb-6">Total de horas reais registradas na equipe para este projeto.</p>
+                                                        
+                                                        <div className="flex items-baseline gap-2 mb-6">
+                                                            <span className="text-5xl font-black text-slate-800 dark:text-slate-100">
+                                                                {realTotalHours.toFixed(2)}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-450 uppercase">horas totais</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border dark:border-slate-800 text-xs">
+                                                        <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">Equipe Dedicada</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {projectMembers.slice(0, 5).map(e => (
+                                                                <div key={e.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-850 px-2.5 py-1 rounded-full border dark:border-slate-800">
+                                                                    {e.avatarUrl ? (
+                                                                        <img src={e.avatarUrl} className="w-4 h-4 rounded-full object-cover" />
+                                                                    ) : (
+                                                                        <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold text-slate-400 uppercase">{e.name.substring(0,2)}</div>
+                                                                    )}
+                                                                    <span className="font-semibold text-slate-500">{e.name.split(' ')[0]}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Seção Gráfico por Colaborador */}
+                                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25 space-y-4">
+                                                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                                                        <UsersIcon className="w-5 h-5 text-brand-primary" />
+                                                        Métricas por Colaborador
+                                                    </h4>
+                                                    <p className="text-xs text-slate-450 dark:text-slate-500">Selecione um membro da equipe para visualizar o detalhamento de horas por tarefa.</p>
+                                                    
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Selecionar Colaborador</label>
+                                                        <select
+                                                            value={selectedCollabId}
+                                                            onChange={(e) => setSelectedCollabId(e.target.value)}
+                                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent dark:text-slate-200"
+                                                        >
+                                                            <option value="">Selecione um colaborador...</option>
+                                                            {projectMembers.map(member => (
+                                                                <option key={member.id} value={member.id}>
+                                                                    {member.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {selectedCollabId ? (
+                                                        collabChartData.length > 0 ? (
+                                                            <div className="h-64 mt-4 w-full">
+                                                                <ResponsiveContainer width="100%" height="100%">
+                                                                    <BarChart data={collabChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
+                                                                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94A3B8' }} />
+                                                                        <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} />
+                                                                        <Tooltip 
+                                                                            contentStyle={{ 
+                                                                                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                                                                                border: 'none', 
+                                                                                borderRadius: '12px',
+                                                                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                                                                color: '#1E293B' 
+                                                                            }} 
+                                                                            labelFormatter={(label, items) => {
+                                                                                const fullItem = items[0]?.payload;
+                                                                                return fullItem ? fullItem.fullName : label;
+                                                                            }}
+                                                                        />
+                                                                        <Bar dataKey="horas" fill={selectedProject.color || '#10B981'} radius={[4, 4, 0, 0]} />
+                                                                    </BarChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-center text-slate-400 py-8">Este colaborador não possui horas apontadas neste projeto.</p>
+                                                        )
+                                                    ) : (
+                                                        <p className="text-xs text-center text-slate-400 py-8">Selecione um colaborador para ver o gráfico.</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
                             </>
                         )}
                     </div>

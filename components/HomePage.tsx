@@ -8,7 +8,7 @@ import QuickLinks from './QuickLinks';
 import { supabase } from '../supabaseClient';
 import type { Employee, AppData } from '../types';
 import Card from './Card';
-import { GiftIcon, UserPlusIcon } from './icons';
+import { GiftIcon, UserPlusIcon, VideoCameraIcon, BuildingStorefrontIcon, ClipboardDocumentCheckIcon, Cog6ToothIcon } from './icons';
 import { useAuth } from './AuthContext';
 
 interface HomePageProps {
@@ -339,6 +339,319 @@ const MasterBanner: React.FC = () => {
     );
 };
 
+interface CompanyHighlightsWidgetProps {
+    onNavigate: (page: string, context?: any) => void;
+    currentUser: Employee;
+}
+
+const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNavigate, currentUser }) => {
+    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [latestMarketplace, setLatestMarketplace] = useState<any>(null);
+    const [latestProject, setLatestProject] = useState<any>(null);
+    
+    const [isEditingVideo, setIsEditingVideo] = useState(false);
+    const [videoInputUrl, setVideoInputUrl] = useState('');
+
+    const companyId = currentUser?.company_id;
+    const canEditVideo = currentUser?.isAdmin || currentUser?.role === 'Super Admin' || currentUser?.isCompanyAdmin;
+
+    const fetchHighlights = async () => {
+        if (!companyId) return;
+        setLoading(true);
+        try {
+            // 1. YouTube Video
+            const { data: videoSetting } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', `company_video_${companyId}`)
+                .maybeSingle();
+            
+            if (videoSetting?.value) {
+                setYoutubeUrl(videoSetting.value);
+                setVideoInputUrl(videoSetting.value);
+            }
+
+            // 2. Latest Marketplace Item
+            const { data: marketData } = await supabase
+                .from('marketplace_items')
+                .select(`
+                    *,
+                    seller:listed_by(full_name)
+                `)
+                .eq('company_id', companyId)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (marketData && marketData.length > 0) {
+                const item = marketData[0];
+                setLatestMarketplace({
+                    id: item.id,
+                    title: item.title,
+                    price: item.price,
+                    imageUrl: item.image_urls?.[0] || '',
+                    seller: item.seller?.full_name || 'Usuário',
+                    status: item.status
+                });
+            }
+
+            // 3. Latest Active Project
+            const { data: projData } = await supabase
+                .from('projects')
+                .select('*, manager:profiles(full_name, avatar_url)')
+                .eq('company_id', companyId)
+                .neq('status', 'Concluído')
+                .order('created_at', { ascending: false });
+
+            const { data: taskData } = await supabase
+                .from('project_tasks')
+                .select('id, project_id, assigned_to, stage:project_stages(name)');
+
+            if (projData) {
+                const mapped = projData.map((p: any) => {
+                    const projectTasks = (taskData || []).filter((t: any) => t.project_id === p.id);
+                    const completedTasks = projectTasks.filter((t: any) => t.stage?.name === 'Concluído' || t.stage?.name === 'Done');
+                    return {
+                        ...p,
+                        task_count: projectTasks.length,
+                        completed_task_count: completedTasks.length,
+                        tasks: projectTasks
+                    };
+                });
+
+                const userProjects = mapped.filter((p: any) => {
+                    if (canEditVideo) return true; // Admins see all
+                    const isManager = p.manager_id === currentUser.id;
+                    const hasAssignedTask = p.tasks.some((t: any) => t.assigned_to === currentUser.id);
+                    return isManager || hasAssignedTask;
+                });
+
+                if (userProjects.length > 0) {
+                    setLatestProject(userProjects[0]);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching highlights:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchHighlights();
+    }, [companyId]);
+
+    const handleSaveVideo = async () => {
+        if (!companyId) return;
+        try {
+            const { error } = await supabase
+                .from('system_settings')
+                .upsert({ key: `company_video_${companyId}`, value: videoInputUrl }, { onConflict: 'key' });
+            
+            if (error) throw error;
+            setYoutubeUrl(videoInputUrl);
+            setIsEditingVideo(false);
+        } catch (err: any) {
+            alert('Erro ao salvar vídeo: ' + err.message);
+        }
+    };
+
+    const getYouTubeEmbedUrl = (url: string) => {
+        if (!url) return '';
+        let videoId = '';
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        if (match && match[2].length === 11) {
+            videoId = match[2];
+        } else {
+            if (url.includes('youtube.com/embed/')) {
+                return url;
+            }
+            return '';
+        }
+        return `https://www.youtube.com/embed/${videoId}`;
+    };
+
+    const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
+
+    if (loading) {
+        return <div className="text-center text-slate-450 py-4 text-xs font-semibold">Carregando destaques...</div>;
+    }
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 space-y-6 mt-8">
+            <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                🌟 Destaques da Empresa
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 1. YouTube Video */}
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <VideoCameraIcon className="w-3.5 h-3.5 text-brand-primary" />
+                            Vídeo em Destaque
+                        </span>
+                        {canEditVideo && (
+                            <button
+                                onClick={() => setIsEditingVideo(true)}
+                                className="text-[10px] text-brand-primary font-bold hover:underline flex items-center gap-0.5"
+                            >
+                                <Cog6ToothIcon className="w-3 h-3" />
+                                Configurar
+                            </button>
+                        )}
+                    </div>
+                    {embedUrl ? (
+                        <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
+                            <iframe
+                                src={embedUrl}
+                                title="YouTube video player"
+                                frameBorder="0"
+                                className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
+                    ) : (
+                        <div className="aspect-video w-full rounded-2xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center p-4">
+                            <span className="text-xl mb-1">📺</span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sem vídeo</span>
+                            {canEditVideo && (
+                                <button
+                                    onClick={() => setIsEditingVideo(true)}
+                                    className="mt-2 text-[10px] bg-brand-primary text-white px-2.5 py-1 rounded-full font-bold shadow-sm"
+                                >
+                                    Adicionar
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. Latest Marketplace Announcement */}
+                <div className="space-y-3">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <BuildingStorefrontIcon className="w-3.5 h-3.5 text-brand-primary" />
+                        Último Anúncio
+                    </span>
+                    {latestMarketplace ? (
+                        <div
+                            onClick={() => onNavigate('marketplace')}
+                            className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px]"
+                        >
+                            <div className="flex gap-3">
+                                {latestMarketplace.imageUrl ? (
+                                    <img src={latestMarketplace.imageUrl} alt={latestMarketplace.title} className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                                ) : (
+                                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg shrink-0">🛍️</div>
+                                )}
+                                <div className="min-w-0">
+                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{latestMarketplace.title}</h5>
+                                    <p className="text-[10px] text-slate-400 font-medium">Por {latestMarketplace.seller}</p>
+                                    <span className="inline-block mt-1 bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                        {latestMarketplace.status}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-105 dark:border-slate-800">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Preço</span>
+                                <span className="text-xs font-black text-brand-primary">R$ {latestMarketplace.price.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[120px]">
+                            <span className="text-xl mb-1">🛍️</span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum anúncio</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* 3. Latest Active Project */}
+                <div className="space-y-3">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-brand-primary" />
+                        Último Projeto Ativo
+                    </span>
+                    {(() => {
+                        if (!latestProject) {
+                            return (
+                                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[120px]">
+                                    <span className="text-xl mb-1">📂</span>
+                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum projeto</span>
+                                </div>
+                            );
+                        }
+                        const progress = latestProject.task_count > 0 ? Math.round((latestProject.completed_task_count / latestProject.task_count) * 100) : 0;
+                        return (
+                            <div
+                                onClick={() => {
+                                    localStorage.setItem('pixel_selected_project', JSON.stringify(latestProject));
+                                    onNavigate('projects');
+                                }}
+                                className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px]"
+                                style={{ borderLeft: `4px solid ${latestProject.color || '#10B981'}` }}
+                            >
+                                <div>
+                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{latestProject.name}</h5>
+                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">
+                                        Gerente: {latestProject.manager?.full_name || 'Sem gerente'}
+                                    </p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+                                        <span>Progresso</span>
+                                        <span>{progress}% ({latestProject.completed_task_count}/{latestProject.task_count})</span>
+                                    </div>
+                                    <div className="w-full bg-slate-150 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: latestProject.color || '#10B981' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            </div>
+
+            {/* Modal para Editar Vídeo */}
+            {isEditingVideo && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider">Configurar Vídeo em Destaque</h3>
+                            <button onClick={() => setIsEditingVideo(false)} className="text-slate-450 hover:text-slate-650 text-lg font-bold">&times;</button>
+                        </div>
+                        <p className="text-xs text-slate-450 dark:text-slate-500">Cole a URL do YouTube correspondente ao vídeo institucional ou de treinamento.</p>
+                        <div>
+                            <input
+                                type="text"
+                                value={videoInputUrl}
+                                onChange={(e) => setVideoInputUrl(e.target.value)}
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                            />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setIsEditingVideo(false)}
+                                className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-550 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveVideo}
+                                className="flex-1 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-emerald-600 shadow-lg"
+                            >
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 interface RecentBadgeAward {
     id: string;
     reason: string;
@@ -507,6 +820,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                     )}
 
                     <RecognitionWall />
+                    <CompanyHighlightsWidget onNavigate={onNavigate} currentUser={currentUser} />
                 </div>
                 {/* Right Sidebar */}
                 <div className="space-y-8">

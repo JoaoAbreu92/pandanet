@@ -1209,7 +1209,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                                         </span>
                                                         {booking.price > 0 && (
                                                             <span className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-600 border border-amber-200 px-2 py-0.5 rounded font-bold">
-                                                                R$ {booking.price.toFixed(2)} ({booking.payment_status === 'paid' ? 'Pago' : 'Pendente'})
+                                                                R$ {booking.price.toFixed(2)} - {booking.payment_status === 'paid' ? 'Pago' : 'Pendente'}
                                                             </span>
                                                         )}
                                                     </div>
@@ -1704,6 +1704,33 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                         />
                                         Exibir vagas ao convidado
                                     </label>
+                                </div>
+                            </div>
+
+                            {/* Pago ou Gratuito */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.is_paid}
+                                            onChange={e => setEventForm({ ...eventForm, is_paid: e.target.checked })}
+                                            className="rounded text-brand-primary focus:ring-brand-primary mr-2" 
+                                        />
+                                        É pago?
+                                    </label>
+                                    <p className="text-[10px] text-slate-500">Marque se este agendamento ou reserva exige pagamento.</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Valor de Reserva (R$)</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        disabled={!eventForm.is_paid}
+                                        value={eventForm.price}
+                                        onChange={e => setEventForm({ ...eventForm, price: Number(e.target.value) })}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-brand-primary disabled:opacity-50"
+                                    />
                                 </div>
                             </div>
 
