@@ -1,136 +1,570 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Company } from '../types';
-import { useLanguage } from './LanguageContext';
-import Card from './Card';
 import {
     BuildingOfficeIcon,
     UsersIcon,
     CurrencyDollarIcon,
     ChartBarIcon,
     PlusIcon,
-    ArrowRightOnRectangleIcon
+    LifebuoyIcon,
+    ServerIcon,
+    CommandLineIcon,
+    TagIcon,
+    GlobeAltIcon,
+    ArrowPathIcon,
+    UserGroupIcon,
+    ChatBubbleLeftRightIcon,
+    TicketIcon,
+    BanknotesIcon,
+    CalendarDaysIcon,
+    ChartPieIcon,
+    CloudIcon,
+    NoSymbolIcon,
+    AdjustmentsHorizontalIcon,
+    PencilIcon,
+    TrashIcon,
+    XMarkIcon,
+    CheckCircleIcon,
+    LockClosedIcon,
+    MagnifyingGlassIcon
 } from './icons';
 
 interface SaaSDashboardProps {
-    companies: Company[];
+    companies?: Company[];
 }
 
-const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies }) => {
-    const { t } = useLanguage();
-    const [selectedMetric, setSelectedMetric] = useState<'users' | 'revenue'>('users');
+type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
 
-    const totalUsers = companies.reduce((acc, company) => acc + company.employees.length, 0);
-    const activeCompanies = companies.length;
-    // Mock revenue calculation
-    const totalRevenue = activeCompanies * 299; // Mock pricing
+const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
+    const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+
+    // --- Local State for Data & Filters ---
+    const [localCompanies, setLocalCompanies] = useState<Company[]>(Array.isArray(companies) ? companies : []);
+    const [localPlans, setLocalPlans] = useState([
+        { id: 2, name: 'Acrilight', users: 21, conn: 1, val: 320.00, features: {} },
+        { id: 4, name: 'Deploy Info', users: 20, conn: 1, val: 1.00, features: {} },
+        { id: 3, name: 'Trial', users: 10, conn: 2, val: 1.00, features: {} },
+    ]);
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
+
+    // --- Computed Data ---
+    const filteredCompanies = localCompanies.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.domain.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = statusFilter === 'all' ? true :
+            statusFilter === 'active' ? (c.status === 'active' || !c.status) :
+                statusFilter === 'inactive' ? c.status === 'inactive' : true;
+        return matchesSearch && matchesStatus;
+    });
+
+    // Metrics
+    const totalCompanies = localCompanies.length;
+    const activeCompaniesCount = localCompanies.filter(c => c.status !== 'inactive').length;
+    const expiredCompaniesCount = localCompanies.filter(c => c.status === 'expired').length;
+    const inactiveCompaniesCount = localCompanies.filter(c => c.status === 'inactive').length;
+    const totalUsers = localCompanies.reduce((acc, c) => acc + (c.employees?.length || 0), 0);
+    const onlineUsers = localCompanies.reduce((acc, c) => acc + (c.employees?.filter(e => e.status === 'online')?.length || 0), 0);
+
+    // --- Modal State Management ---
+    const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+    const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+    const [modalOpen, setModalOpen] = useState<Record<string, boolean>>({});
+
+    // Forms State
+    const [formData, setFormData] = useState<any>({});
+    const [featuresState, setFeaturesState] = useState<Record<string, boolean>>({});
+
+    // Helpers
+    const openModal = (type: string, company: Company | null = null, planId: number | null = null) => {
+        setSelectedCompany(company);
+        setSelectedPlanId(planId);
+        setModalOpen({ [type]: true });
+
+        // Initialize form data based on context
+        if (type === 'createCompany') {
+            setFormData({ name: '', domain: '', whatsapp: '', plan: 'Standard', responsibleName: '', responsibleEmail: '' });
+        } else if (type === 'edit' && company) {
+            setFormData({ name: company.name, domain: company.domain });
+        } else if (type === 'createPlan') {
+            setFormData({ name: '', users: '', conn: '', val: '' });
+            setFeaturesState({});
+        } else if (type === 'editPlan' && planId) {
+            const plan = localPlans.find(p => p.id === planId);
+            if (plan) {
+                setFormData({ name: plan.name, users: plan.users, conn: plan.conn, val: plan.val });
+                setFeaturesState(plan.features || {});
+            }
+        } else if (type === 'config' && company) {
+            // Load company features if they exist, otherwise default
+            setFeaturesState({}); // In a real app, this would come from company.settings
+        }
+    };
+
+    const closeModal = () => {
+        setModalOpen({});
+        setSelectedCompany(null);
+        setSelectedPlanId(null);
+        setFormData({});
+        setFeaturesState({});
+    };
+
+    // --- Actions ---
+
+    // 1. DELETE
+    const handleDeleteCompany = () => {
+        if (selectedCompany) {
+            setLocalCompanies(prev => prev.filter(c => c !== selectedCompany));
+            closeModal();
+        }
+    };
+    const handleDeletePlan = () => {
+        if (selectedPlanId) {
+            setLocalPlans(prev => prev.filter(p => p.id !== selectedPlanId));
+            closeModal();
+        }
+    };
+
+    // 2. CREATE / UPDATE COMPANY
+    const submitCompanyForm = () => {
+        if (modalOpen.createCompany) {
+            const newCompany: Company = {
+                id: Date.now().toString(),
+                name: formData.name || 'Nova Empresa',
+                domain: formData.domain || 'nova.com',
+                status: 'active',
+                subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                settings: { companyName: formData.name },
+                data: {} as any,
+                employees: [],
+                plan: { name: formData.plan } as any
+            };
+            setLocalCompanies([...localCompanies, newCompany]);
+        } else if (modalOpen.edit && selectedCompany) {
+            setLocalCompanies(prev => prev.map(c => c === selectedCompany ? { ...c, name: formData.name, domain: formData.domain } : c));
+        }
+        closeModal();
+    };
+
+    // 3. DISABLE
+    const handleDisableCompany = () => {
+        if (selectedCompany) {
+            setLocalCompanies(prev => prev.map(c => c === selectedCompany ? { ...c, status: 'inactive' } : c));
+            closeModal();
+        }
+    };
+
+    // 4. ADD MONTH
+    const handleAddMonth = () => {
+        if (selectedCompany) {
+            setLocalCompanies(prev => prev.map(c => {
+                if (c === selectedCompany) {
+                    const currentEnd = c.subscriptionEndDate ? new Date(c.subscriptionEndDate) : new Date();
+                    currentEnd.setMonth(currentEnd.getMonth() + 1);
+                    return { ...c, subscriptionEndDate: currentEnd.toISOString() };
+                }
+                return c;
+            }));
+            closeModal();
+        }
+    };
+
+    // 5. UPDATE CONFIG (Menu Features)
+    const handleSaveConfig = () => {
+        // In a real app we would save 'featuresState' to the company settings
+        console.log("Saving features for company", selectedCompany?.name, featuresState);
+        closeModal();
+    };
+
+    // 6. PLANS (Create/Edit)
+    const submitPlanForm = () => {
+        if (modalOpen.createPlan) {
+            const newPlan = {
+                id: Date.now(),
+                name: formData.name,
+                users: parseInt(formData.users) || 0,
+                conn: parseInt(formData.conn) || 0,
+                val: parseFloat(formData.val) || 0,
+                features: featuresState
+            };
+            setLocalPlans([...localPlans, newPlan]);
+        } else if (modalOpen.editPlan && selectedPlanId) {
+            setLocalPlans(prev => prev.map(p => p.id === selectedPlanId ? {
+                ...p,
+                name: formData.name,
+                users: parseInt(formData.users),
+                conn: parseInt(formData.conn),
+                val: parseFloat(formData.val),
+                features: featuresState
+            } : p));
+        }
+        closeModal();
+    };
+
+
+    // --- Generic Handlers ---
+    const handleInputChange = (field: string, value: string) => {
+        setFormData((prev: any) => ({ ...prev, [field]: value }));
+    };
+
+    const handleFeatureToggle = (feature: string) => {
+        setFeaturesState(prev => ({ ...prev, [feature]: !prev[feature] }));
+    };
+
+
+    // --- Subcomponents within Scope ---
+    const MetricCardSimple = ({ title, value, icon: Icon, subText }: any) => (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-3">{title}</p>
+            <div className="flex items-center gap-3">
+                <span className="text-4xl font-bold text-gray-800 dark:text-white">{value}</span>
+                {Icon && <Icon className="w-8 h-8 text-gray-400 dark:text-gray-500" />}
+            </div>
+            {subText && <p className="text-xs text-green-500 mt-2">{subText}</p>}
+        </div>
+    );
+
+    const ActionButton = ({ icon: Icon, color, onClick, title }: any) => (
+        <button
+            onClick={onClick}
+            title={title}
+            className={`p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${color}`}
+        >
+            <Icon className="w-5 h-5" />
+        </button>
+    );
+
+    const ConfigFeaturesList = () => {
+        const Toggle = ({ label, id }: { label: string, id: string }) => (
+            <div className="flex items-center justify-between py-3">
+                <span className="text-sm text-gray-600 font-medium">{label}</span>
+                <div
+                    onClick={() => handleFeatureToggle(id)}
+                    className="relative inline-flex items-center cursor-pointer"
+                >
+                    <input type="checkbox" checked={!!featuresState[id]} readOnly className="sr-only peer" />
+                    <div className={`w-11 h-6 rounded-full peer peer-focus:outline-none transition-colors ${featuresState[id] ? 'bg-blue-600' : 'bg-gray-200'} after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${featuresState[id] ? 'after:translate-x-full after:border-white' : ''}`}></div>
+                </div>
+            </div>
+        );
+
+        return (
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 max-h-[400px] overflow-y-auto">
+                <h5 className="font-bold text-gray-700 col-span-full mb-2">Opções do Menu</h5>
+                <Toggle label="Feed de Notícias" id="feed" />
+                <Toggle label="Mensagens" id="messages" />
+                <Toggle label="Calendário" id="calendar" />
+                <Toggle label="Marketplace" id="marketplace" />
+                <Toggle label="Bem Estar" id="wellness" />
+                <Toggle label="Eventos" id="events" />
+
+                <h5 className="font-bold text-gray-700 col-span-full mt-4 mb-2">Recursos de RH</h5>
+                <Toggle label="Benefícios" id="benefits" />
+                <Toggle label="Políticas" id="policies" />
+                <Toggle label="Mural" id="wall" />
+
+                <h5 className="font-bold text-gray-700 col-span-full mt-4 mb-2">Recursos de TI</h5>
+                <Toggle label="Chamados" id="tickets" />
+                <Toggle label="Equipamentos" id="equip" />
+                <Toggle label="Base de Conhecimento" id="kb" />
+            </div>
+        );
+    }
+
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Painel Super Admin SaaS</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Gerenciamento global da plataforma</p>
-                </div>
-                <button className="flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors">
-                    <PlusIcon className="w-5 h-5 mr-2" />
-                    Nova Empresa
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Empresas Ativas</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{activeCompanies}</p>
-                        </div>
-                        <BuildingOfficeIcon className="w-8 h-8 text-blue-500 opacity-20" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-green-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Total de Usuários</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalUsers}</p>
-                        </div>
-                        <UsersIcon className="w-8 h-8 text-green-500 opacity-20" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-purple-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Receita Mensal (Estimada)</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">R$ {totalRevenue.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <CurrencyDollarIcon className="w-8 h-8 text-purple-500 opacity-20" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border-l-4 border-yellow-500">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Sistemas Saudáveis</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">100%</p>
-                        </div>
-                        <ChartBarIcon className="w-8 h-8 text-yellow-500 opacity-20" />
-                    </div>
+        <div className="bg-gray-50/50 dark:bg-gray-900 min-h-screen flex flex-col font-sans relative">
+            <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 pt-2">
+                <div className="flex space-x-1 overflow-x-auto no-scrollbar tracking-wide uppercase">
+                    <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>DASHBOARD</button>
+                    <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>EMPRESAS</button>
+                    <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>PLANOS</button>
+                    <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>CONFIGURAÇÕES</button>
                 </div>
             </div>
 
-            <Card title="Empresas Cadastradas">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Empresa</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Usuários</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Plano</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {companies.map((company) => (
-                                <tr key={company.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-xl">
-                                                {company.logo ? (
-                                                    <img className="h-10 w-10 rounded-full object-cover" src={company.logo} alt="" />
-                                                ) : (
-                                                    <span>🏢</span>
-                                                )}
-                                            </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{company.name}</div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400">{company.domain}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900 dark:text-white">{company.employees.length}</div>
-                                        <div className="text-xs text-green-500">Ativos</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                            Enterprise
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                            Ativo
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <a href="#" className="text-brand-primary hover:text-brand-secondary dark:text-blue-400 dark:hover:text-blue-300">Gerenciar</a>
+            <div className="p-8 flex-1 overflow-y-auto">
+                {/* DASHBOARD */}
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
+                                <p className="text-sm text-gray-500 font-medium">Versão do Sistema</p>
+                                <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">1.0</h2>
+                                <p className="text-xs text-green-500 mt-1 font-semibold">Sistema Atualizado</p>
+                            </div>
+                            <MetricCardSimple title="Empresas Cadastradas" value={totalCompanies} icon={BuildingOfficeIcon} />
+                            <MetricCardSimple title="Empresas Ativas" value={activeCompaniesCount} icon={CheckCircleIcon} />
+                            <MetricCardSimple title="Empresas Vencidas" value={expiredCompaniesCount} icon={UserGroupIcon} />
+                            <MetricCardSimple title="Empresas Inativas" value={inactiveCompaniesCount} icon={LockClosedIcon} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <MetricCardSimple title="Total de Usuários" value={totalUsers} icon={UserGroupIcon} />
+                            <MetricCardSimple title="Usuários Online" value={onlineUsers} icon={UsersIcon} />
+                        </div>
+                    </div>
+                )}
+
+                {/* COMPANIES */}
+                {activeTab === 'companies' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex items-center gap-2 mb-6">
+                            <BuildingOfficeIcon className="w-5 h-5 text-gray-800 dark:text-white" />
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Empresas</h2>
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                            <div className="relative flex-1 w-full">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Localize empresa..."
+                                    className="w-full pl-8 pr-4 py-2 bg-gray-100 dark:bg-gray-700 border-none rounded text-sm focus:ring-1 focus:ring-brand-primary outline-none"
+                                />
+                                <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-gray-100 dark:bg-gray-700 border-none rounded py-2 px-4 text-sm w-full md:w-48 text-gray-600 outline-none"
+                            >
+                                <option value="all">Status: todas</option>
+                                <option value="active">Ativas</option>
+                                <option value="inactive">Inativas</option>
+                            </select>
+                            <button
+                                onClick={() => openModal('createCompany')}
+                                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase tracking-wide flex items-center gap-2 transition-colors"
+                            >
+                                <PlusIcon className="w-4 h-4" /> Adicionar
+                            </button>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-500 uppercase">
+                                            <th className="px-6 py-4">Nome</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Vencimento</th>
+                                            <th className="px-6 py-4">Plano</th>
+                                            <th className="px-6 py-4 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-xs divide-y divide-gray-50 dark:divide-gray-700/50">
+                                        {filteredCompanies.map((comp, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{comp.name}</td>
+                                                <td className="px-6 py-4">
+                                                    {comp.status === 'inactive' ? <XCircle /> : <CheckCircle />}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-500">{comp.subscriptionEndDate ? new Date(comp.subscriptionEndDate).toLocaleDateString() : '-'}</td>
+                                                <td className="px-6 py-4 text-gray-500">{comp.plan?.name || 'Standard'}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <ActionButton icon={BanknotesIcon} color="text-green-600" title="Faturas" onClick={() => openModal('invoices', comp)} />
+                                                        <ActionButton icon={CalendarDaysIcon} color="text-blue-500" title="Add Mês" onClick={() => openModal('addMonth', comp)} />
+                                                        <ActionButton icon={ChartPieIcon} color="text-purple-500" title="Stats" onClick={() => openModal('stats', comp)} />
+                                                        <ActionButton icon={CloudIcon} color="text-gray-500" title="Disco" onClick={() => openModal('disk', comp)} />
+                                                        <ActionButton icon={NoSymbolIcon} color="text-orange-500" title="Desativar" onClick={() => openModal('disable', comp)} />
+                                                        <ActionButton icon={UserGroupIcon} color="text-teal-500" title="Usuários" onClick={() => openModal('users', comp)} />
+                                                        <ActionButton icon={AdjustmentsHorizontalIcon} color="text-indigo-500" title="Config" onClick={() => openModal('config', comp)} />
+                                                        <ActionButton icon={PencilIcon} color="text-amber-500" title="Editar" onClick={() => openModal('edit', comp)} />
+                                                        <ActionButton icon={TrashIcon} color="text-red-500" title="Excluir" onClick={() => openModal('delete', comp)} />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* PLANS */}
+                {activeTab === 'plans' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex items-center gap-2 mb-6">
+                            <CurrencyDollarIcon className="w-5 h-5 text-gray-800 dark:text-white" />
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Planos</h2>
+                        </div>
+                        <div className="flex justify-start mb-4">
+                            <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> Adicionar</button>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-100 overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="border-b border-gray-100 text-xs font-bold text-gray-500 uppercase">
+                                    <tr>
+                                        <th className="px-6 py-4">Nome</th>
+                                        <th className="px-6 py-4 text-center">Usuários</th>
+                                        <th className="px-6 py-4 text-center">Conexões</th>
+                                        <th className="px-6 py-4 text-right">Valor</th>
+                                        <th className="px-6 py-4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs divide-y divide-gray-50">
+                                    {localPlans.map(plan => (
+                                        <tr key={plan.id}>
+                                            <td className="px-6 py-4 font-medium">{plan.name}</td>
+                                            <td className="px-6 py-4 text-center">{plan.users}</td>
+                                            <td className="px-6 py-4 text-center">{plan.conn}</td>
+                                            <td className="px-6 py-4 text-right">{plan.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-3 text-green-500">
+                                                    <button onClick={() => openModal('editPlan', null, plan.id)} className="hover:text-blue-600"><PencilIcon className="w-4 h-4" /></button>
+                                                    <button onClick={() => openModal('deletePlan', null, plan.id)} className="hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* --- MODALS --- */}
+            {modalOpen.invoices && selectedCompany && (
+                <Modal onClose={closeModal} title="Faturas em Aberto">
+                    <div className="p-4">
+                        <div className="bg-yellow-50 text-yellow-800 p-3 rounded mb-4 text-sm font-medium border border-yellow-200">
+                            Simulação: Visualize e gerencie as faturas desta empresa.
+                        </div>
+                        <table className="w-full text-xs text-left">
+                            <thead className="border-b border-gray-200"><tr><th className="py-2">Plano</th><th className="py-2">Valor</th><th className="py-2">Status</th><th className="py-2 text-right">Ações</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td className="py-3">{selectedCompany.plan?.name || 'Standard'}</td>
+                                    <td className="py-3">R$ 330,00</td>
+                                    <td className="py-3"><span className="bg-yellow-300 text-yellow-900 px-2 py-1 font-bold rounded">ABERTO</span></td>
+                                    <td className="py-3 text-right flex justify-end gap-2">
+                                        <button className="text-green-600 hover:bg-green-50 p-1" title="Pagar"><CurrencyDollarIcon className="w-5 h-5" /></button>
+                                        <button className="text-red-500 hover:bg-red-50 p-1" title="Excluir"><TrashIcon className="w-5 h-5" /></button>
                                     </td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
+                            </tbody>
+                        </table>
+                    </div>
+                </Modal>
+            )}
+
+            {modalOpen.addMonth && selectedCompany && (
+                <Modal onClose={closeModal} title="Confirmar Adição" width="max-w-md">
+                    <div className="p-6">
+                        <p className="text-gray-600 mb-6">Adicionar 1 mês extra ao vencimento de <strong>{selectedCompany.name}</strong>?</p>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
+                            <button onClick={handleAddMonth} className="px-6 py-2 bg-blue-600 text-white rounded text-xs font-bold uppercase">Confirmar</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {modalOpen.delete && selectedCompany && (
+                <Modal onClose={closeModal} title="Confirmar Exclusão" width="max-w-md">
+                    <div className="p-6">
+                        <p className="text-gray-600 mb-6">Tem certeza que deseja <strong className="text-red-600">excluir permanentemente</strong> a empresa <strong>{selectedCompany.name}</strong>?</p>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
+                            <button onClick={handleDeleteCompany} className="px-6 py-2 bg-red-600 text-white rounded text-xs font-bold uppercase">Excluir</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {modalOpen.disable && selectedCompany && (
+                <Modal onClose={closeModal} title="Desativar Empresa" width="max-w-md">
+                    <div className="p-6">
+                        <p className="text-gray-600 mb-6">Deseja desativar o acesso de <strong>{selectedCompany.name}</strong>?</p>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
+                            <button onClick={handleDisableCompany} className="px-6 py-2 bg-orange-500 text-white rounded text-xs font-bold uppercase">Desativar</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Create Company / Edit Company */}
+            {(modalOpen.createCompany || modalOpen.edit) && (
+                <Modal onClose={closeModal} title={modalOpen.createCompany ? "Nova Empresa" : "Editar Empresa"} width="max-w-2xl">
+                    <div className="p-6 space-y-4">
+                        <input type="text" placeholder="Nome da Empresa" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        <input type="text" placeholder="Domínio" value={formData.domain || ''} onChange={(e) => handleInputChange('domain', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                        {modalOpen.createCompany && (
+                            <>
+                                <input type="text" placeholder="Whatsapp" value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
+                                <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">Responsável</h4>
+                                    <input type="text" placeholder="Nome" className="w-full p-3 border rounded text-sm mb-2" />
+                                    <input type="email" placeholder="Email" className="w-full p-3 border rounded text-sm" />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div className="p-6 border-t flex justify-end gap-2">
+                        <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
+                        <button onClick={submitCompanyForm} className="px-6 py-2 bg-blue-600 text-white rounded font-bold text-xs uppercase">Salvar</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Config & Plans Form */}
+            {(modalOpen.config || modalOpen.createPlan || modalOpen.editPlan) && (
+                <Modal onClose={closeModal} title={modalOpen.config ? "Configurar Menu" : (modalOpen.createPlan ? "Novo Plano" : "Editar Plano")} width="max-w-2xl">
+                    <div className="p-6 overflow-y-auto max-h-[70vh]">
+                        {(modalOpen.createPlan || modalOpen.editPlan) && (
+                            <div className="space-y-3 mb-6">
+                                <h4 className="font-bold text-gray-700">Detalhes do Plano</h4>
+                                <input type="text" placeholder="Nome" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                <div className="grid grid-cols-3 gap-3">
+                                    <input type="number" placeholder="Max Usuários" value={formData.users || ''} onChange={(e) => handleInputChange('users', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                    <input type="number" placeholder="Max Conexões" value={formData.conn || ''} onChange={(e) => handleInputChange('conn', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                    <input type="number" placeholder="Valor (R$)" value={formData.val || ''} onChange={(e) => handleInputChange('val', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                </div>
+                            </div>
+                        )}
+                        <ConfigFeaturesList />
+                    </div>
+                    <div className="p-6 border-t flex justify-end gap-2">
+                        <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
+                        <button onClick={modalOpen.config ? handleSaveConfig : submitPlanForm} className="px-6 py-2 bg-blue-600 text-white rounded font-bold text-xs uppercase">Salvar</button>
+                    </div>
+                </Modal>
+            )}
+
+            {modalOpen.deletePlan && selectedPlanId && (
+                <Modal onClose={closeModal} title="Confirmar Exclusão" width="max-w-md">
+                    <div className="p-6">
+                        <p className="text-gray-600 mb-6">Excluir este plano permanentemente?</p>
+                        <div className="flex justify-end gap-2">
+                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
+                            <button onClick={handleDeletePlan} className="px-6 py-2 bg-red-600 text-white rounded text-xs font-bold uppercase">Excluir</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
         </div>
     );
 };
+
+// --- Helper Components ---
+const Modal = ({ title, onClose, children, width = "max-w-xl" }: any) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+        <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full ${width} m-4 flex flex-col max-h-[90vh]`}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-700 dark:text-white">{title}</h3>
+                <button onClick={onClose} className="text-red-400 hover:text-red-500"><XMarkIcon className="w-6 h-6" /></button>
+            </div>
+            <div className="overflow-y-auto">{children}</div>
+        </div>
+    </div>
+);
+
+const CheckCircle = () => (<div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>);
+const XCircle = () => (<div className="w-4 h-4 rounded-full border border-red-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-red-500 rounded-full"></div></div>);
 
 export default SaaSDashboard;

@@ -55,7 +55,7 @@ const UserFormModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(user?.id ? { ...user, ...formData } as Employee : formData as Omit<Employee, 'id'>);
+        onSave((user?.id && user.id !== '') ? { ...user, ...formData } as Employee : formData as Omit<Employee, 'id'>);
     };
 
     return (
@@ -219,7 +219,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
                 alert(`Limite de ${plan.userLimit} usuários para o plano ${plan.name} atingido.`);
                 return;
             }
-            const newUser: Employee = { ...userData, id: Date.now() };
+            const newUser: Employee = { ...userData, id: Date.now().toString() };
             setUsers([newUser, ...users]);
         }
         setModalOpen(false);
@@ -231,7 +231,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan }) => {
         setModalOpen(true);
     };
 
-    const handleDelete = (userId: number) => {
+    const handleDelete = (userId: string) => {
         if (window.confirm("Tem certeza que deseja apagar este usuário?")) {
             setUsers(users.filter(u => u.id !== userId));
         }

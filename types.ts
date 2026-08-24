@@ -7,7 +7,7 @@ export type Page =
   | 'tickets'
   | 'calendar'
   | 'directory'
-  | 'resources' // Kept for legacy, corresponds to 'documentos'
+  | 'resources' // Mantido para legado, corresponde a 'documentos'
   | 'recognition'
   | 'marketplace'
   | 'forms'
@@ -16,7 +16,7 @@ export type Page =
   | 'onboarding'
   | 'ti-dashboard'
   | 'ti-requests'
-  | 'profile'
+  | 'profile-page' // Era apenas 'profile' mas mantido consistente
   | 'admin'
   | 'announcement-detail'
   | 'documentos'
@@ -35,13 +35,13 @@ export type Page =
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'system';
 
 export interface Notification {
-  id: string; // Changed to string to support different ID sources
+  id: string; // Alterado para string para suportar diferentes fontes de ID
   type: NotificationType;
   title: string;
   description: string;
-  timestamp: string; // ISO string or relative time
+  timestamp: string; // String ISO ou tempo relativo
   isRead: boolean;
-  linkTo?: Page; // Optional link to a page
+  linkTo?: Page; // Link opcional para uma página
   actionLabel?: string;
   avatarUrl?: string;
 }
@@ -58,13 +58,13 @@ export interface Announcement {
   category: 'Notícias da Empresa' | 'Atualização de Produto' | 'RH & Cultura' | 'Evento';
   date: string;
   imageUrl?: string;
-  videoUrl?: string; // YouTube URL
-  videoFile?: string; // Direct upload URL (Blob)
+  videoUrl?: string; // URL do YouTube
+  videoFile?: string; // URL de upload direto (Blob)
   reactions?: { emoji: string; users: string[] }[];
 }
 
 export interface Banner {
-  id: number;
+  id: string;
   imageUrl: string;
   title: string;
   subtitle: string;
@@ -72,7 +72,7 @@ export interface Banner {
 }
 
 export interface UpcomingEvent {
-  id: number;
+  id: string;
   title: string;
   date: string; // e.g., 'AGO 02'
   time: string;
@@ -80,7 +80,7 @@ export interface UpcomingEvent {
 }
 
 export interface Event {
-  id: number;
+  id: string;
   title: string;
   description: string;
   date: string; // YYYY-MM-DD
@@ -89,13 +89,13 @@ export interface Event {
   imageUrl?: string;
   category: 'Social' | 'Corporativo' | 'Treinamento' | 'Outro';
   imageType?: 'url' | 'upload';
-  invitees?: number[]; // User IDs of specifically invited/convoked users
-  attendees: number[]; // User IDs who CONFIRMED
-  declined?: { userId: number; reason: string }[]; // Users who declined and why
+  invitees?: string[]; // IDs de usuários especificamente convidados/convocados
+  attendees: string[]; // IDs de usuários que CONFIRMARAM
+  declined?: { userId: string; reason: string }[]; // Usuários que recusaram e o motivo
 }
 
 export interface TrainingModule {
-  id: number;
+  id: string;
   title: string;
   duration: string;
   thumbnail: string;
@@ -104,7 +104,7 @@ export interface TrainingModule {
 }
 
 export interface KBArticle {
-  id: number;
+  id: string;
   title: string;
   category: string;
   views: number;
@@ -114,7 +114,7 @@ export interface KBArticle {
 }
 
 export interface ServiceStatusItem {
-  id: number;
+  id: string;
   name: string;
   status: 'operational' | 'maintenance' | 'outage';
   uptime: string;
@@ -122,7 +122,7 @@ export interface ServiceStatusItem {
 }
 
 export interface SecurityAlert {
-  id: number;
+  id: string;
   title: string;
   description: string;
   level: 'info' | 'warning' | 'critical';
@@ -166,10 +166,10 @@ export interface EmployeePermissions {
 }
 
 export interface Employee {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  password?: string; // Should not be stored in frontend state in a real app
+  password?: string; // Não deve ser armazenado no estado do frontend em um app real
   role: string;
   team: string;
   sectorManager?: string; // Gestor do Setor
@@ -184,17 +184,17 @@ export interface Employee {
   phone?: string;
   officeLocation?: string;
   bio?: string;
-  following: number[]; // Array of user IDs this employee follows
+  following: string[]; // Array de IDs de usuários que este funcionário segue
 }
 
 export interface Task {
-  id: number;
+  id: string;
   text: string;
   completed: boolean;
 }
 
 export interface Recognition {
-  id: number;
+  id: string;
   to: string;
   from: string;
   toAvatar: string;
@@ -204,14 +204,14 @@ export interface Recognition {
 }
 
 export interface Poll {
-  id: number;
+  id: string;
   question: string;
-  options: { id: number; text: string; votes: number }[];
+  options: { id: string; text: string; votes: number }[];
 }
 
 export interface Message {
-  id: number;
-  sender: 'me' | string; // 'me' for the current user
+  id: string;
+  sender: 'me' | string; // 'me' para o usuário atual
   senderName: string;
   avatarUrl: string;
   text: string;
@@ -227,7 +227,7 @@ export interface Reaction {
 }
 
 export interface Conversation {
-  id: number;
+  id: string; // Changed to string
   participantName: string;
   participantAvatarUrl: string;
   messages: Message[];
@@ -236,14 +236,14 @@ export interface Conversation {
   unreadCount: number;
   isGroup?: boolean;
   groupName?: string;
-  admins?: number[];
+  admins?: string[]; // IDs de usuários
 }
 
 export type TicketStatus = 'Aberto' | 'Em Andamento' | 'Resolvido' | 'Fechado';
 export type TicketPriority = 'Baixa' | 'Média' | 'Alta' | 'Urgente';
 
 export interface TicketComment {
-  id: number;
+  id: string;
   author: string;
   authorAvatarUrl: string;
   text: string;
@@ -251,7 +251,7 @@ export interface TicketComment {
 }
 
 export interface Ticket {
-  id: number;
+  id: string;
   title: string;
   description: string;
   requester: string;
@@ -268,7 +268,7 @@ export interface Ticket {
 export type CalendarEventCategory = 'Reunião' | 'Evento da Empresa' | 'Feriado' | 'Aniversário';
 
 export interface CalendarEvent {
-  id: number;
+  id: string;
   title: string;
   date: string; // YYYY-MM-DD
   startTime: string;
@@ -280,7 +280,7 @@ export interface CalendarEvent {
 }
 
 export interface ResourceDocument {
-  id: number;
+  id: string;
   title: string;
   category: string;
   type: 'PDF' | 'DOCX' | 'PPTX' | 'XLSX' | 'OUTRO';
@@ -292,7 +292,7 @@ export type MarketplaceItemStatus = 'Disponível' | 'Reservado' | 'Vendido';
 export type MarketplaceItemCondition = 'Novo' | 'Quase Novo' | 'Bom' | 'Usado';
 
 export interface MarketplaceItem {
-  id: number;
+  id: string;
   title: string;
   description: string;
   price: number;
@@ -308,8 +308,8 @@ export interface MarketplaceItem {
 export type FormStatus = 'Pendente' | 'Aprovado' | 'Rejeitado';
 
 export interface FormSubmission {
-  id: number;
-  requesterId: number;
+  id: string;
+  requesterId: string;
   requesterName: string;
   requesterAvatarUrl: string;
   formType: 'Solicitação de Férias';
@@ -327,8 +327,8 @@ export type TIRequestStatus = 'Pendente' | 'Em Análise' | 'Aprovado' | 'Pedido 
 export type TIRequestType = 'Hardware' | 'Software';
 
 export interface TIRequest {
-  id: number;
-  requesterId: number;
+  id: string;
+  requesterId: string;
   requesterName: string;
   requesterAvatarUrl: string;
   requestType: TIRequestType;
@@ -339,7 +339,7 @@ export interface TIRequest {
 }
 
 export interface OnboardingStep {
-  id: number;
+  id: string;
   title: string;
   description: string;
   completed: boolean;
@@ -352,7 +352,7 @@ export interface OnboardingCategory {
 }
 
 export interface Benefit {
-  id: number;
+  id: string;
   title: string;
   description: string;
   features: string[];
@@ -361,8 +361,8 @@ export interface Benefit {
 
 // Feed Types
 export interface PostComment {
-  id: number;
-  authorId: number;
+  id: string;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   text: string;
@@ -371,12 +371,12 @@ export interface PostComment {
 
 export interface PostReaction {
   emoji: string;
-  userId: number;
+  userId: string;
 }
 
 export interface Post {
-  id: number;
-  authorId: number;
+  id: string;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   content: string;
@@ -385,7 +385,7 @@ export interface Post {
   timestamp: string;
   reactions: PostReaction[];
   comments: PostComment[];
-  mentions: number[]; // IDs of mentioned users
+  mentions: string[]; // IDs de usuários mencionados
 }
 
 // Main App Data Structure
@@ -412,7 +412,7 @@ export interface AppData {
 }
 
 export interface WellnessItem {
-  id: number;
+  id: string;
   title: string;
   description: string;
   category: 'Saúde Mental' | 'Atividade Física' | 'Nutrição' | 'Outro';
@@ -427,7 +427,7 @@ export interface CompanySettings {
 }
 
 export interface PlanFeatures extends EmployeePermissions {
-  // Future plan-specific features can be added here
+  // Recursos futuros específicos do plano podem ser adicionados aqui
 }
 
 export interface Plan {
@@ -438,10 +438,13 @@ export interface Plan {
 }
 
 export interface Company {
+  id?: string;
   domain: string;
   name: string;
-  plan: Plan;
-  subscriptionEndDate: string; // YYYY-MM-DD
+  plan?: Plan;
+  subscriptionEndDate?: string; // YYYY-MM-DD
+  status?: 'active' | 'inactive' | 'expired';
   settings: CompanySettings;
   data: AppData;
+  employees?: Employee[];
 }

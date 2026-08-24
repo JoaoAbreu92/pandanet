@@ -39,13 +39,13 @@ import { fetchAnnouncements } from './services/geminiService';
 
 
 const AppContent: React.FC = () => {
-    const { session, loading } = useAuth();
+    const { session, profile, loading } = useAuth();
 
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>(mockCompanies);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(mockCompanies[0]);
-    // Allow mock user initially for dev/testing if needed, but ideally we sync with session
-    const [currentUser, setCurrentUser] = useState<Employee | null>(mockCompanies[0].data.employees[0]);
+    // Initialize currentUser as null, waiting for AuthContext
+    const [currentUser, setCurrentUser] = useState<Employee | null>(null);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     const [theme, setTheme] = useState<'light'>('light');
@@ -79,56 +79,24 @@ const AppContent: React.FC = () => {
     };
 
     useEffect(() => {
-        if (authStage === 'logged_in' && currentCompany && companyData) {
-            const loadAnnouncements = async () => {
-                const fetchedAnnouncements = await fetchAnnouncements();
-                if (fetchedAnnouncements.length > 0 && fetchedAnnouncements[0].title !== 'Erro de API: Não foi possível buscar notícias') {
-                    setCompanyData(prevData => prevData ? { ...prevData, announcements: fetchedAnnouncements } : null);
-                }
-            };
-            loadAnnouncements();
+        if (profile) {
+            setCurrentUser(profile);
+            // In a real multi-tenant app, we might check profile.company_id to setCurrentCompany
+            // For now, we continue using the mock company structure but with the real user
+            const company = mockCompanies[0];
+            setCurrentCompany(company);
+            setCompanyData(company.data);
+            setCompanySettings(company.settings);
+        } else {
+            setCurrentUser(null);
         }
-    }, [authStage, currentCompany]);
+    }, [profile]);
 
-    useEffect(() => {
-        if (companyData && currentUser) {
-            const currentTeams = Array.from(new Set(companyData.employees.map(e => e.team).filter(t => t && t !== 'Sem Equipe')));
-
-            setCompanyData(prevData => {
-                if (!prevData) return null;
-
-                let updatedConversations = [...prevData.conversations];
-                let hasChanges = false;
-
-                currentTeams.forEach((teamName: string) => {
-                    const exists = updatedConversations.find(c => c.isGroup && c.groupName === teamName);
-                    const isMember = prevData.employees.some(e => e.id === currentUser.id && e.team === teamName);
-
-                    if (!exists && isMember) {
-                        const newConversation: Conversation = {
-                            id: Date.now() + Math.random(),
-                            participantName: teamName,
-                            groupName: teamName,
-                            isGroup: true,
-                            participantAvatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(teamName)}&background=random`,
-                            messages: [],
-                            lastMessage: 'Grupo criado',
-                            lastMessageTimestamp: 'Agora',
-                            unreadCount: 0
-                        };
-                        updatedConversations.push(newConversation);
-                        hasChanges = true;
-                    }
-                });
-
-                return hasChanges ? { ...prevData, conversations: updatedConversations } : prevData;
-            });
-        }
-    }, [companyData?.employees, currentUser?.team]);
+    // Cleanup or additional side effects when session changes can be handled here if needed.
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        // window.location.reload(); // Not needed as state change will trigger re-render
+        // State updates handled by AuthProvider and useEffect above
     };
 
     const handleImpersonateStart = (company: Company) => {
@@ -136,7 +104,7 @@ const AppContent: React.FC = () => {
         if (!freshCompany) return;
 
         const superAdminUser: Employee = {
-            id: 0,
+            id: '0',
             name: 'Super Admin',
             email: 'super@admin.com',
             role: 'Administrador da Plataforma',
@@ -161,10 +129,13 @@ const AppContent: React.FC = () => {
     const handleImpersonateEnd = () => {
         setIsImpersonating(false);
         setImpersonatedCompany(null);
-        setCurrentCompany(mockCompanies[0]);
-        setCurrentUser(mockCompanies[0].data.employees[0]);
-        setCompanyData(mockCompanies[0].data);
-        setCompanySettings(mockCompanies[0].settings);
+        // Revert to real user
+        if (profile) {
+            setCurrentUser(profile);
+            setCurrentCompany(mockCompanies[0]);
+            setCompanyData(mockCompanies[0].data);
+            setCompanySettings(mockCompanies[0].settings);
+        }
         setAuthStage('logged_in');
     };
 
@@ -351,7 +322,8 @@ const AppContent: React.FC = () => {
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
-            case 'admin': return currentUser.isAdmin ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p>Acesso negado.</p>;
+            case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Acesso negado. Esta área é restrita.</p>;
+            case 'admin': return currentUser.role === 'Super Admin' ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado. Apenas o Master TI tem acesso a esta área.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage trainings={companyData.trainings} /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage polls={companyData.polls} /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage policies={companyData.documents} /> : null;
