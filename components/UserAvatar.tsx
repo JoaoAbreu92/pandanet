@@ -150,6 +150,16 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
   // Se tiver imagem de anel customizada cadastrada pelo administrador ou informada por prop
   if (activeRingUrl) {
+    let customBadgeStyle = {};
+    let hasCustomColor = false;
+    if (activeRingUrl.includes('#color=')) {
+      const colorPart = activeRingUrl.split('#color=')[1];
+      if (colorPart) {
+        customBadgeStyle = { backgroundColor: decodeURIComponent(colorPart) };
+        hasCustomColor = true;
+      }
+    }
+
     return (
       <div className={`relative inline-block select-none ${sizeClasses[size]} ${className}`}>
         {/* Avatar interno com preenchimento para caber dentro da moldura */}
@@ -166,7 +176,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
         {/* Badge de Nível */}
         <div
-          className={`absolute rounded-full flex items-center justify-center font-extrabold text-white border-white dark:border-slate-950 z-20 ${badgeClasses[size]} ${badgeBg} shadow-md`}
+          className={`absolute rounded-full flex items-center justify-center font-extrabold text-white border-white dark:border-slate-950 z-20 ${badgeClasses[size]} ${hasCustomColor ? '' : badgeBg} shadow-md`}
+          style={customBadgeStyle}
           title={`Nível ${level} - ${currentLevelConfig.name}`}
         >
           {level}

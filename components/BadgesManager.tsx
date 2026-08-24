@@ -1901,14 +1901,32 @@ export const EloDesignGenerator: React.FC<EloDesignGeneratorProps> = ({
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-750 dark:text-slate-300 mb-1">Estrelas Ornamentais ({starsCount})</label>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="5"
-                                    value={starsCount}
-                                    onChange={(e) => setStarsCount(Number(e.target.value))}
-                                    className="w-full h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
-                                />
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="5"
+                                        value={starsCount}
+                                        onChange={(e) => setStarsCount(Number(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-255 rounded-lg appearance-none cursor-pointer accent-brand-primary"
+                                    />
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="5"
+                                        value={starsCount}
+                                        onChange={(e) => {
+                                            const rawVal = e.target.value;
+                                            if (rawVal === '') {
+                                                setStarsCount(0);
+                                                return;
+                                            }
+                                            const val = Math.max(0, Math.min(5, Number(rawVal)));
+                                            setStarsCount(val);
+                                        }}
+                                        className="w-12 border border-slate-200 dark:border-slate-700 rounded-lg px-1.5 py-0.5 text-xs bg-white dark:bg-slate-750 text-slate-800 dark:text-white text-center shrink-0"
+                                    />
+                                </div>
                             </div>
                         </div>
 
