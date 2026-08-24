@@ -663,7 +663,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     </button>
                 </div>
 
-                <div className="p-4 space-y-2">
+                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                     <button onClick={() => { setView('compose'); setComposeTo(''); setComposeSubject(''); setComposeBody(''); }} className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg font-medium shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-2 mb-4">
                         <PencilSquareIcon className="w-5 h-5" />
                         Escrever
