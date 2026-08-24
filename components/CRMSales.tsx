@@ -19,7 +19,7 @@ type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscript
 const CRMSales: React.FC<{
     initialTab?: SalesTab,
     onViewCustomer?: (id: string) => void,
-    onNewRequest?: (type: string) => void,
+    onNewRequest?: (type: string, item?: any) => void,
     refreshTrigger?: number
 }> = ({ initialTab = 'invoices', onViewCustomer, onNewRequest, refreshTrigger = 0 }) => {
     const { currentUser } = useAuth();
@@ -337,14 +337,21 @@ const CRMSales: React.FC<{
                                     <td className="px-6 py-4 text-right opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                         <div className="flex items-center justify-end gap-1">
                                             <button
-                                                onClick={() => alert("Visualização completa em breve!")}
+                                                onClick={() => {
+                                                    if (item.customer_id) onViewCustomer?.(item.customer_id);
+                                                    else alert(`Visualização de ${activeTab} (${item.id}) em desenvolvimento.`);
+                                                }}
                                                 className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
                                                 title="Ver Detalhes"
                                             >
                                                 <DocumentTextIcon className="w-4 h-4" />
                                             </button>
                                             <button
-                                                onClick={() => alert("Janela de edição em breve!")}
+                                                onClick={() => {
+                                                    // Trigger existing modal but in Edit mode
+                                                    const type = activeTab.endsWith('s') ? activeTab.slice(0, -1) : activeTab;
+                                                    onNewRequest?.(type, item);
+                                                }}
                                                 className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg text-gray-400 hover:text-emerald-500 transition-colors"
                                                 title="Editar"
                                             >

@@ -699,10 +699,11 @@ const AppContent: React.FC = () => {
                         initialTab={currentPage === 'crm-sales' ? 'invoices' : currentPage.replace('crm-', '') as any}
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={(type) => {
+                        onNewRequest={(type, item) => {
                             if (type === 'item') setShowItemForm(true);
                             else if (type === 'subscription') setShowSubscriptionForm(true);
                             else setFinanceFormType(type as any);
+                            // TODO: Pass item to forms for editing
                         }}
                     />
                 );
@@ -712,7 +713,7 @@ const AppContent: React.FC = () => {
                         initialTab="subscriptions"
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={() => setShowSubscriptionForm(true)}
+                        onNewRequest={(type, item) => setShowSubscriptionForm(true)}
                     />
                 );
             case 'crm-contracts':
@@ -721,7 +722,7 @@ const AppContent: React.FC = () => {
                         initialTab="contracts"
                         onViewCustomer={handleViewCustomer}
                         refreshTrigger={crmRefreshTrigger}
-                        onNewRequest={() => setShowContractForm(true)}
+                        onNewRequest={(type, item) => setShowContractForm(true)}
                     />
                 );
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
