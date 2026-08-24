@@ -163,11 +163,11 @@ const QueuesTab: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                 <div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Filas de Atendimento</h3>
-                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie as filas para organizar os atendimentos com eficiência.</p>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 mt-1">Gerencie as filas para organizar os atendimentos com eficiência.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs uppercase tracking-widest"
+                    className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all duration-300 shadow-xl shadow-emerald-500/20 font-bold text-xs"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Fila
@@ -175,34 +175,34 @@ const QueuesTab: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando filas...</div>
+                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold text-xs opacity-50">Carregando filas...</div>
             ) : (
-                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-x-auto custom-scrollbar shadow-2xl">
+                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[1.2rem] sm:rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-x-auto custom-scrollbar shadow-2xl">
                         <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                             <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Nome</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Descrição</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Status</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400">Nome</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400">Descrição</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400">Status</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400">Ações</th>
                             </tr>
                         </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                 {queues.map((queue) => (
                                  <tr key={queue.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
-                                     <td className="px-8 py-6 whitespace-nowrap">
+                                     <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap">
                                         <div className="flex items-center">
-                                             <div className="w-4 h-4 rounded-full mr-4 shadow-[0_0_12px_rgba(0,0,0,0.2)] group-hover:scale-125 transition-transform" style={{ backgroundColor: queue.color, boxShadow: `0 0 15px ${queue.color}40` }}></div>
-                                                <span className="font-bold text-gray-900 dark:text-white tracking-tight text-base">{queue.name}</span>
+                                             <div className="w-4 h-4 rounded-full mr-3 sm:mr-4 shadow-[0_0_12px_rgba(0,0,0,0.2)] group-hover:scale-125 transition-transform" style={{ backgroundColor: queue.color, boxShadow: `0 0 15px ${queue.color}40` }}></div>
+                                                <span className="font-bold text-gray-900 dark:text-white tracking-tight text-sm sm:text-base">{queue.name}</span>
                                         </div>
                                     </td>
-                                     <td className="px-8 py-6 whitespace-nowrap text-[11px] font-bold text-gray-500 dark:text-gray-400 opacity-80 uppercase tracking-widest">
+                                     <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 opacity-80">
                                         {queue.description || '-'}
                                     </td>
-                                     <td className="px-8 py-6 whitespace-nowrap">
+                                     <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap">
                                         <button 
                                             onClick={() => handleToggleActive(queue)}
-                                                className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg border transition-all ${queue.is_active
+                                                 className={`px-2 sm:px-3 py-1 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-lg border transition-all ${queue.is_active
                                                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                      : 'bg-red-500/10 text-red-500 border-red-500/20'
                                             }`}
@@ -210,19 +210,19 @@ const QueuesTab: React.FC = () => {
                                             {queue.is_active ? 'Ativo' : 'Inativo'}
                                         </button>
                                     </td>
-                                     <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
-                                         <button onClick={() => handleOpenModal(queue)} className="p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-xl transition-all duration-300 mr-3">
-                                             <Edit2 className="w-4.5 h-4.5" />
+                                     <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap text-right text-sm font-medium">
+                                         <button onClick={() => handleOpenModal(queue)} className="p-2 sm:p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-[0.8rem] sm:rounded-xl transition-all duration-300 mr-2 sm:mr-3">
+                                             <Edit2 className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                                         </button>
-                                         <button onClick={() => handleDelete(queue.id)} className="p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-xl transition-all duration-300">
-                                             <Trash2 className="w-4.5 h-4.5" />
+                                         <button onClick={() => handleDelete(queue.id)} className="p-2 sm:p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-[0.8rem] sm:rounded-xl transition-all duration-300">
+                                             <Trash2 className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5" />
                                         </button>
                                     </td>
                                 </tr>
                             ))}
                                 {queues.length === 0 && (
                                 <tr>
-                                        <td colSpan={4} className="px-8 py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
+                                        <td colSpan={4} className="px-3 sm:px-8 py-10 sm:py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 opacity-50">
                                         Nenhuma fila cadastrada.
                                     </td>
                                 </tr>
@@ -235,34 +235,34 @@ const QueuesTab: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
-                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
-                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5 animate-in zoom-in duration-500">
+                        <div className="p-4 sm:p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                                 {editingQueue ? 'Editar Fila' : 'Nova Fila'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
-                                <X className="w-6 h-6" />
+                                <X className="w-5 h-5 sm:w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
+                        <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 overflow-y-auto custom-scrollbar">
                             <div>
-                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Fila</label>
+                                <label className="block text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">Nome da Fila</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400"
+                                    className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400 text-sm"
                                     placeholder="Ex: Suporte Técnico"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Descrição</label>
+                                <label className="block text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">Descrição</label>
                                 <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400 resize-none"
-                                    rows={3}
+                                    className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium placeholder-gray-400 resize-none text-sm"
+                                    rows={2}
                                     placeholder="Descrição opcional..."
                                 />
                             </div>
@@ -271,7 +271,7 @@ const QueuesTab: React.FC = () => {
                             <div className="space-y-4 border-t border-gray-100 dark:border-white/5 pt-6">
                                 <div className="flex justify-between items-center">
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Expediente Personalizado</label>
+                                        <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400">Expediente Personalizado</label>
                                         <p className="text-[10px] text-gray-400 mt-1">Defina horários de atendimento exclusivos para este setor.</p>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
@@ -315,7 +315,7 @@ const QueuesTab: React.FC = () => {
                                                                     }}
                                                                     className="rounded border-gray-300 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 bg-transparent"
                                                                 />
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Fechado</span>
+                                                                <span className="text-[10px] font-bold text-gray-500">Fechado</span>
                                                             </label>
 
                                                             {!dayConfig.closed && (
@@ -352,7 +352,7 @@ const QueuesTab: React.FC = () => {
                                         </div>
 
                                         <div className="pt-4 border-t border-gray-100 dark:border-white/5">
-                                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Mensagem de Ausência do Setor</label>
+                                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-2">Mensagem de Ausência do Setor</label>
                                             <textarea
                                                 value={awayMessage}
                                                 onChange={(e) => setAwayMessage(e.target.value)}
@@ -366,7 +366,7 @@ const QueuesTab: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Identidade Visual (Cor)</label>
+                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-4">Identidade Visual (Cor)</label>
                                 <div className="flex flex-wrap gap-4 p-6 bg-gray-50/50 dark:bg-white/5 rounded-3xl border border-gray-100 dark:border-white/5">
                                     {['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'].map((c) => (
                                         <button
@@ -380,18 +380,18 @@ const QueuesTab: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+                        <div className="p-4 sm:p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="w-full sm:w-auto justify-center px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em] flex items-center"
+                                className="w-full sm:w-auto justify-center px-6 sm:px-8 py-2.5 sm:py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs flex items-center"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="w-full sm:w-auto justify-center px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center"
+                                className="w-full sm:w-auto justify-center px-8 sm:px-10 py-2.5 sm:py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs shadow-xl shadow-emerald-500/20 flex items-center"
                             >
-                                <Check className="w-5 h-5 mr-3 shrink-0" />
+                                <Check className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 shrink-0" />
                                 Salvar Fila
                             </button>
                         </div>

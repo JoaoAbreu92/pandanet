@@ -129,6 +129,27 @@ const supabase = createClient(internalSupabaseUrl, supabaseKey ? supabaseKey.tri
 // Client for public Realtime websockets
 const realtimeSupabase = createClient(publicSupabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
+// --- AUTO-MIGRAÇÃO DE SCHEMA ---
+async function runAutoMigration() {
+    try {
+        console.log('[MIGRATION] Verificando e adicionando coluna chatbot_delay à public.whatsapp_settings...');
+        const { error } = await supabase.rpc('exec_sql', {
+            sql: 'ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_delay INTEGER DEFAULT 0;'
+        });
+        if (error) {
+            console.error('[MIGRATION] Erro ao executar RPC exec_sql para chatbot_delay:', error.message);
+        } else {
+            console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna chatbot_delay).');
+        }
+    } catch (err) {
+        console.error('[MIGRATION] Falha ao rodar auto-migração:', err.message);
+    }
+}
+runAutoMigration();
+
+// Cache em memória para IDs de mensagens processadas recentemente (anti-duplicação por concorrência)
+const recentMessageIds = new Set();
+
 global.realtimeStatus = {
     notifications: 'unknown',
     messages: 'unknown',
@@ -774,27 +795,16 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             if (sendReq.ok && !sendRes?.error) sendOk = true;
 
         } else {
-            // Tenta formato v1 PRIMEIRO (textMessage) - é o que esta versão da Evo requer
-            const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+            // Envia no formato padrão suportado por Evolution API v1.x (sem fallbacks cegos que causam reenvio duplo)
+            const sendReq = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
+                body: JSON.stringify({ number: phoneNumber, text: message })
             });
-            try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
-            console.log(`[SEND API] Resposta textMessage (${sendReqV1.status}):`, JSON.stringify(sendRes));
-
-            if (sendReqV1.ok && !sendRes?.error) {
+            try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
+            console.log(`[SEND API] Resposta sendText (${sendReq.status}):`, JSON.stringify(sendRes));
+            if (sendReq.ok && !sendRes?.error) {
                 sendOk = true;
-            } else {
-                // Tenta formato v2 como fallback (text direto)
-                const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                    method: 'POST',
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ number: phoneNumber, text: message })
-                });
-                try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
-                console.log(`[SEND API] Resposta text (${sendReqV2.status}):`, JSON.stringify(sendRes));
-                if (sendReqV2.ok && !sendRes?.error) sendOk = true;
             }
         }
 
@@ -1266,35 +1276,22 @@ async function dispatchTextEvolution(instanceName, phoneNumber, text) {
     let sendOk = false;
     let sendRes = {};
     try {
-        // Tenta formato v1 PRIMEIRO (textMessage)
-        const resV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        const res = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 number: cleanNumber,
-                textMessage: { text: text }
+                text: text
             })
         });
-        try { sendRes = await resV1.json(); } catch(e) { sendRes = {}; }
-        if (resV1.ok && !sendRes?.error) {
+        try { sendRes = await res.json(); } catch(e) { sendRes = {}; }
+        console.log(`[EVO DISPATCH] Resposta sendText (${res.status}):`, JSON.stringify(sendRes));
+        if (res.ok && !sendRes?.error) {
             sendOk = true;
-        } else {
-            console.warn(`[EVO DISPATCH] Formato v1 falhou para ${cleanNumber} (Status: ${resV1.status}). Tentando formato v2...`);
-            // Fallback para formato v2
-            const resV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                method: 'POST',
-                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    number: cleanNumber,
-                    text: text
-                })
-            });
-            try { sendRes = await resV2.json(); } catch(e) { sendRes = {}; }
-            if (resV2.ok && !sendRes?.error) sendOk = true;
         }
 
         if (!sendOk) {
-            console.error(`[EVO DISPATCH] FALHA TOTAL ao enviar para ${cleanNumber}. Resposta:`, JSON.stringify(sendRes));
+            console.error(`[EVO DISPATCH] FALHA ao enviar para ${cleanNumber}. Resposta:`, JSON.stringify(sendRes));
         }
     } catch (e) {
         console.error('[EVO DISPATCH] Erro de rede/conexão:', e.message);
@@ -1305,6 +1302,41 @@ async function dispatchTextEvolution(instanceName, phoneNumber, text) {
 async function sendBotMessage(text, conversation, companyId, connectionId) {
     if (!text) return;
     const instanceName = `conn_${connectionId}`;
+    
+    // Buscar delay do chatbot nas configurações da conexão
+    let delayMs = 0;
+    try {
+        const { data: settings } = await supabase
+            .from('whatsapp_settings')
+            .select('chatbot_delay')
+            .eq('id', connectionId)
+            .maybeSingle();
+        
+        if (settings && settings.chatbot_delay) {
+            delayMs = parseInt(settings.chatbot_delay, 10) * 1000;
+        }
+    } catch (delayErr) {
+        console.error('[CHATBOT] Erro ao carregar chatbot_delay:', delayErr.message);
+    }
+
+    if (delayMs > 0) {
+        console.log(`[CHATBOT] Aplicando delay de ${delayMs}ms. Enviando presença 'composing'...`);
+        const cleanNumber = conversation.contact_phone.replace(/\D/g, "");
+        try {
+            await fetch(`${evoUrl}/chat/sendPresence/${instanceName}`, {
+                method: 'POST',
+                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    number: cleanNumber,
+                    presence: 'composing',
+                    delay: delayMs
+                })
+            });
+        } catch (presErr) {
+            console.warn('[CHATBOT-PRESENCE] Erro ao enviar presença:', presErr.message);
+        }
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
     
     await dispatchTextEvolution(instanceName, conversation.contact_phone, text);
 
@@ -1775,6 +1807,16 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
     try {
         const isFromMe = message.key?.fromMe;
         let remoteJid = message.key?.remoteJid || '';
+        const msgId = message.key?.id;
+
+        if (msgId) {
+            if (recentMessageIds.has(msgId)) {
+                console.log(`[MSG] Ignorando processamento duplicado em concorrência para ID: ${msgId}`);
+                return;
+            }
+            recentMessageIds.add(msgId);
+            setTimeout(() => recentMessageIds.delete(msgId), 15000);
+        }
         
         // Ignorar broadcasts mas permitir grupos e @lid
         if (!remoteJid || remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) return;

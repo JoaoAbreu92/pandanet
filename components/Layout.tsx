@@ -66,10 +66,24 @@ const Layout: React.FC<LayoutProps> = ({
     onStartDirectChat
 }) => {
     const { realProfile } = useAuth();
-    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isSidebarOpen, setSidebarOpen] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('sidebar_open');
+            return saved !== null ? saved === 'true' : true;
+        }
+        return true;
+    });
     const [isRightSidebarOpen, setRightSidebarOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [isDebugOpen, setDebugOpen] = useState(false);
+
+    const toggleSidebar = () => {
+        const nextState = !isSidebarOpen;
+        setSidebarOpen(nextState);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('sidebar_open', String(nextState));
+        }
+    };
 
     const isMasterAdmin = realProfile?.email === 'ti@grupopixel.com.br';
 
@@ -81,9 +95,11 @@ const Layout: React.FC<LayoutProps> = ({
         }
     }, [currentPage, setCurrentPage]);
 
-    // Sincronizar abertura da sidebar
+    // Sincronizar abertura da sidebar (apenas no celular)
     React.useEffect(() => {
-        setSidebarOpen(false);
+        if (window.innerWidth < 768) {
+            setSidebarOpen(false);
+        }
     }, [currentPage]);
 
     return (
@@ -122,29 +138,7 @@ const Layout: React.FC<LayoutProps> = ({
                     />
                 )}
 
-                {/* Área invisível na extrema esquerda para acionar hover no desktop */}
-                <div
-                    className="hidden md:block fixed left-0 top-0 bottom-0 w-3 z-40 bg-transparent"
-                    onMouseEnter={() => {
-                        if (window.innerWidth >= 768) {
-                            setSidebarOpen(true);
-                        }
-                    }}
-                />
-
-                <div
-                    onMouseEnter={() => {
-                        if (window.innerWidth >= 768) {
-                            setSidebarOpen(true);
-                        }
-                    }}
-                    onMouseLeave={() => {
-                        if (window.innerWidth >= 768) {
-                            setSidebarOpen(false);
-                        }
-                    }}
-                    className="h-full z-45 flex-shrink-0"
-                >
+                <div className="h-full z-45 flex-shrink-0">
                     <Sidebar
                         isOpen={isSidebarOpen}
                         onNavigate={(page, context) => {
@@ -164,7 +158,7 @@ const Layout: React.FC<LayoutProps> = ({
 
                 <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
                     <Header
-                        onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+                        onToggleSidebar={toggleSidebar}
                         onToggleDebug={() => setDebugOpen(!isDebugOpen)}
                         currentUser={currentUser}
                         onLogout={onLogout}

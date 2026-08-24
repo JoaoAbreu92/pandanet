@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
             )}
             <div className="flex items-center justify-between h-16 px-6">
                 <div className="flex items-center">
-                    <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 md:hidden">
+                    <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
                         <Bars3Icon className="w-6 h-6" />
                     </button>
                     <div className="relative ml-6 hidden md:block group">

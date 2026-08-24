@@ -175,69 +175,69 @@ const UsersTab: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
                 <div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Usuários e Permissões</h3>
-                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 uppercase tracking-widest mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400 opacity-70 mt-1">Gerencie quem tem acesso ao WhatsPanda e suas permissões.</p>
                 </div>
             </div>
 
             {loading ? (
-                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-50">Carregando usuários...</div>
+                <div className="text-center py-20 text-gray-500 dark:text-gray-400 font-bold text-xs opacity-50">Carregando usuários...</div>
             ) : (
-                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-x-auto custom-scrollbar shadow-2xl">
+                    <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[1.2rem] sm:rounded-[2rem] border border-gray-100 dark:border-white/5 overflow-x-auto custom-scrollbar shadow-2xl">
                         <table className="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                             <thead className="bg-gray-50 dark:bg-transparent">
                             <tr>
-                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Usuário</th>
-                                    <th className="px-8 py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Permissões</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Ações</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400">Usuário</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400">Permissões</th>
+                                    <th className="px-3 sm:px-8 py-3 sm:py-5 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400">Ações</th>
                             </tr>
-                        </thead>
+                            </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                 {agents.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50">
+                                        <td colSpan={3} className="px-3 sm:px-8 py-10 sm:py-20 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500 opacity-50">
                                             Nenhum usuário configurado para o WhatsPanda.
                                         </td>
                                     </tr>
                                 )}
                             {agents.map((agent) => (
                                 <tr key={agent.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
-                                    <td className="px-8 py-6 whitespace-nowrap">
+                                    <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-12 w-12 group-hover:scale-110 transition-transform duration-500">
+                                            <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 group-hover:scale-110 transition-transform duration-500">
                                                 {agent.avatarUrl ? (
-                                                    <img className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white dark:ring-white/10 shadow-lg" src={agent.avatarUrl} alt="" />
+                                                    <img className="h-10 w-10 sm:h-12 sm:w-12 rounded-[0.8rem] sm:rounded-2xl object-cover ring-2 ring-white dark:ring-white/10 shadow-lg" src={agent.avatarUrl} alt="" />
                                                 ) : (
-                                                        <div className="h-12 w-12 rounded-2xl bg-gray-100 dark:bg-white/10 flex items-center justify-center border border-white/10 text-gray-500 dark:text-gray-400">
-                                                            <User className="w-6 h-6" />
-                                                    </div>
+                                                         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-[0.8rem] sm:rounded-2xl bg-gray-100 dark:bg-white/10 flex items-center justify-center border border-white/10 text-gray-500 dark:text-gray-400">
+                                                             <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="ml-5">
-                                                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{agent.name}</div>
-                                                <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-70">{agent.role}</div>
+                                            <div className="ml-3 sm:ml-5">
+                                                <div className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">{agent.name}</div>
+                                                <div className="text-[9px] sm:text-[10px] font-bold text-gray-500 dark:text-gray-400 opacity-70">{agent.role}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-6 whitespace-nowrap">
-                                        <div className="flex flex-wrap gap-2">
+                                    <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap">
+                                        <div className="flex flex-wrap gap-1 sm:gap-2">
                                             {agent.whatspanda_permissions?.can_manage_settings && (
-                                                <span className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center">
-                                                    <Shield className="w-3.5 h-3.5 mr-2" /> Admin
+                                                <span className="px-2 sm:px-3 py-1 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center">
+                                                    <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-2" /> Admin
                                                 </span>
                                             )}
                                             {agent.whatspanda_permissions?.can_view_chats && (
-                                                <span className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center">
-                                                    <MessageSquare className="w-3.5 h-3.5 mr-2" /> Chats
+                                                <span className="px-2 sm:px-3 py-1 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center">
+                                                    <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-2" /> Chats
                                                 </span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-8 py-6 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => handleOpenModal(agent)} className="p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-xl transition-all duration-300 mr-3">
-                                            <Edit2 className="w-4 h-4" />
+                                    <td className="px-3 sm:px-8 py-4 sm:py-6 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => handleOpenModal(agent)} className="p-2 sm:p-2.5 text-blue-500 hover:text-white bg-blue-500/5 hover:bg-blue-500 rounded-[0.8rem] sm:rounded-xl transition-all duration-300 mr-2 sm:mr-3">
+                                            <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                         </button>
-                                        <button onClick={() => handleRemoveAgent(agent.id)} className="p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-xl transition-all duration-300">
-                                            <Trash2 className="w-4 h-4" />
+                                        <button onClick={() => handleRemoveAgent(agent.id)} className="p-2 sm:p-2.5 text-red-500 hover:text-white bg-red-500/5 hover:bg-red-500 rounded-[0.8rem] sm:rounded-xl transition-all duration-300">
+                                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                         </button>
                                     </td>
                                 </tr>
@@ -250,22 +250,22 @@ const UsersTab: React.FC = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-500">
-                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
-                        <div className="p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                    <div className="bg-white dark:bg-slate-900/90 backdrop-blur-2xl rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/20 dark:border-white/5">
+                        <div className="p-4 sm:p-8 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                                 {editingAgent ? 'Editar Permissões' : 'Adicionar Usuário'}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all duration-300 text-gray-400 hover:text-gray-600 dark:hover:text-white">
-                                <X className="w-6 h-6" />
+                                <X className="w-5 h-5 sm:w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="p-8 overflow-y-auto space-y-10 custom-scrollbar">
+                        <div className="p-4 sm:p-8 overflow-y-auto space-y-6 sm:space-y-10 custom-scrollbar">
                             {/* User Select */}
                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Funcionário</label>
+                                <label className="block text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 sm:mb-4">Funcionário</label>
                                 <select 
-                                    className="w-full px-6 py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium appearance-none"
+                                    className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium appearance-none"
                                     value={selectedEmployeeId}
                                     onChange={(e) => setSelectedEmployeeId(e.target.value)}
                                     disabled={!!editingAgent}
@@ -279,10 +279,10 @@ const UsersTab: React.FC = () => {
 
                             {/* Allowed Queues */}
                             <div>
-                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Filas de Atendimento (Setores)</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 bg-gray-50/50 dark:bg-white/5 mb-8">
+                                <h4 className="text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 sm:mb-4">Filas de Atendimento (Setores)</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 border border-gray-100 dark:border-white/5 rounded-[1.2rem] sm:rounded-[2rem] p-4 sm:p-6 bg-gray-50/50 dark:bg-white/5 mb-6 sm:mb-8">
                                     {queues.length === 0 ? (
-                                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest col-span-full py-4 text-center opacity-50 italic">Nenhuma fila configurada.</p>
+                                        <p className="text-[10px] text-gray-400 font-bold col-span-full py-4 text-center opacity-50 italic">Nenhuma fila configurada.</p>
                                     ) : (
                                         queues.map((queue) => (
                                             <div key={queue.id} className="flex items-center group/item hover:translate-x-1 transition-transform">
@@ -312,10 +312,10 @@ const UsersTab: React.FC = () => {
 
                             {/* Allowed Channels */}
                             <div>
-                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Canais Permitidos</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 bg-gray-50/50 dark:bg-white/5">
+                                <h4 className="text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 sm:mb-4">Canais Permitidos</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 border border-gray-100 dark:border-white/5 rounded-[1.2rem] sm:rounded-[2rem] p-4 sm:p-6 bg-gray-50/50 dark:bg-white/5">
                                     {channels.length === 0 ? (
-                                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest col-span-full py-4 text-center opacity-50 italic">Nenhum canal configurado.</p>
+                                        <p className="text-[10px] text-gray-400 font-bold col-span-full py-4 text-center opacity-50 italic">Nenhum canal configurado.</p>
                                     ) : (
                                         channels.map((channel) => (
                                             <div key={channel.id} className="flex items-center group/item hover:translate-x-1 transition-transform">
@@ -335,7 +335,7 @@ const UsersTab: React.FC = () => {
                                                 />
                                                 <label htmlFor={`channel-${channel.id}`} className="ml-4 text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer group-hover/item:text-emerald-500 transition-colors">
                                                     {channel.connection_name} <br />
-                                                    <span className="text-[9px] text-gray-500 dark:text-gray-500 uppercase tracking-widest font-bold opacity-60">({channel.channel_type || 'whatsapp'})</span>
+                                                    <span className="text-[9px] text-gray-500 dark:text-gray-500 font-bold opacity-60">({channel.channel_type || 'whatsapp'})</span>
                                                 </label>
                                             </div>
                                         ))
@@ -345,8 +345,8 @@ const UsersTab: React.FC = () => {
 
                             {/* Permissions Toggles */}
                              <div>
-                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Permissões de Acesso</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                                <h4 className="text-[10px] sm:text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-4 sm:mb-6">Permissões de Acesso</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 sm:gap-x-12 gap-y-4 sm:gap-y-8">
                                     {[
                                         { key: 'can_view_contacts', label: 'Ver Contatos', desc: 'Visualizar lista de contatos.' },
                                         { key: 'can_edit_contacts', label: 'Editar Contatos', desc: 'Criar e editar contatos.' },
@@ -371,8 +371,8 @@ const UsersTab: React.FC = () => {
                                                 />
                                             </div>
                                             <div className="ml-4 text-sm">
-                                                <label htmlFor={perm.key} className="font-bold text-gray-900 dark:text-white group-hover/perm:text-emerald-500 transition-colors cursor-pointer tracking-tight">{perm.label}</label>
-                                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest opacity-60 mt-1">{perm.desc}</p>
+                                                <label htmlFor={perm.key} className="font-bold text-gray-900 dark:text-white group-hover/perm:text-emerald-500 transition-colors cursor-pointer">{perm.label}</label>
+                                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 opacity-60 mt-1">{perm.desc}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -380,19 +380,19 @@ const UsersTab: React.FC = () => {
                              </div>
                         </div>
 
-                        <div className="p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+                        <div className="p-4 sm:p-8 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="w-full sm:w-auto justify-center px-8 py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs uppercase tracking-[0.2em] flex items-center"
+                                className="w-full sm:w-auto justify-center px-6 sm:px-8 py-2.5 sm:py-3.5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10 rounded-2xl transition-all font-bold text-xs flex items-center"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={!selectedEmployeeId}
-                                className="w-full sm:w-auto justify-center px-10 py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full sm:w-auto justify-center px-8 sm:px-10 py-2.5 sm:py-3.5 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all font-bold text-xs shadow-xl shadow-emerald-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Check className="w-5 h-5 mr-3 shrink-0" />
+                                <Check className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 shrink-0" />
                                 Salvar Permissões
                             </button>
                         </div>

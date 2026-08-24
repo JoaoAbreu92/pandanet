@@ -20,6 +20,7 @@ interface WhatsAppSettingsData {
     keyword_transfers?: any[];
     close_message?: string;
     isolate_chat_history?: boolean;
+    chatbot_delay?: number;
 }
 
 const DAYS_OF_WEEK = [
@@ -48,6 +49,7 @@ const GeneralTab: React.FC = () => {
     const [rejectionMessage, setRejectionMessage] = useState('');
     const [autoAssign, setAutoAssign] = useState(false);
     const [isolateChatHistory, setIsolateChatHistory] = useState(false);
+    const [chatbotDelay, setChatbotDelay] = useState(0);
 
     // Transfer Settings State
     const [transferMessageClient, setTransferMessageClient] = useState('Seu atendimento foi transferido para {target}. Por favor, aguarde.');
@@ -79,7 +81,7 @@ const GeneralTab: React.FC = () => {
             // Fetch WhatsApp connection settings
             const { data: settingsData, error: settingsError } = await supabase
                 .from('whatsapp_settings')
-                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers, close_message, isolate_chat_history')
+                .select('id, connection_name, phone_number, business_hours_start, business_hours_end, business_hours, away_message, reject_calls, rejection_message, auto_assign, transfer_message_client, transfer_message_agent, send_transfer_message_to_client, keyword_transfers, close_message, isolate_chat_history, chatbot_delay')
                 .eq('company_id', companyId);
 
             if (settingsError) throw settingsError;
@@ -124,6 +126,7 @@ const GeneralTab: React.FC = () => {
         setRejectionMessage(conn.rejection_message || '');
         setAutoAssign(!!conn.auto_assign);
         setIsolateChatHistory(!!conn.isolate_chat_history);
+        setChatbotDelay(conn.chatbot_delay || 0);
         setTransferMessageClient(conn.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.');
         setTransferMessageAgent(conn.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.');
         setSendTransferMessageToClient(conn.send_transfer_message_to_client !== false);
@@ -208,6 +211,7 @@ const GeneralTab: React.FC = () => {
             rejection_message: rejectionMessage,
             auto_assign: autoAssign,
             isolate_chat_history: isolateChatHistory,
+            chatbot_delay: chatbotDelay,
             transfer_message_client: transferMessageClient,
             transfer_message_agent: transferMessageAgent,
             send_transfer_message_to_client: sendTransferMessageToClient,
@@ -248,7 +252,7 @@ const GeneralTab: React.FC = () => {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500 animate-pulse">
                 <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-                <p className="text-xs font-bold uppercase tracking-widest opacity-60">Carregando configurações gerais...</p>
+                <p className="text-xs font-bold uppercase opacity-60">Carregando configurações gerais...</p>
             </div>
         );
     }
@@ -256,7 +260,7 @@ const GeneralTab: React.FC = () => {
     if (connections.length === 0) {
         return (
             <div className="text-center py-20 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-100 dark:border-white/5 p-8 shadow-2xl">
-                <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] opacity-50 mb-2">Nenhum canal configurado</p>
+                <p className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase opacity-50 mb-2">Nenhum canal configurado</p>
                 <p className="text-xs text-gray-500">Conecte um canal de atendimento em "Canais" antes de definir os parâmetros gerais.</p>
             </div>
         );
@@ -270,7 +274,7 @@ const GeneralTab: React.FC = () => {
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
                         <Sliders className="w-5 h-5 text-emerald-500" /> Parâmetros do Canal
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest mt-1">Selecione o canal para ajustar o comportamento automático.</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase mt-1">Selecione o canal para ajustar o comportamento automático.</p>
                 </div>
                 <div className="relative min-w-[240px]">
                     <select
@@ -291,8 +295,8 @@ const GeneralTab: React.FC = () => {
 
 
                 {/* Away Message */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                         <MessageSquare className="w-5 h-5 text-amber-500" /> Mensagem de Ausência
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes que entrarem em contato fora do horário de atendimento.</p>
@@ -309,8 +313,8 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Close Message */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                         <MessageSquare className="w-5 h-5 text-emerald-500" /> Mensagem de Encerramento
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Resposta automática enviada aos clientes no WhatsApp assim que o atendimento for encerrado pelo atendente.</p>
@@ -327,9 +331,9 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Call Rejection */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
                     <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                             <VolumeX className="w-5 h-5 text-red-500" /> Rejeição de Chamadas
                         </h4>
                         <label htmlFor="reject-calls-toggle" className="relative inline-flex items-center cursor-pointer">
@@ -358,9 +362,9 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Auto Assign */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
                     <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                             <UserCheck className="w-5 h-5 text-indigo-500" /> Atribuição Automática
                         </h4>
                         <label htmlFor="auto-assign-toggle" className="relative inline-flex items-center cursor-pointer">
@@ -378,9 +382,9 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Isolate Chat History */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
                     <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                             <Sliders className="w-5 h-5 text-indigo-500" /> Privacidade de Histórico
                         </h4>
                         <label htmlFor="isolate-history-toggle" className="relative inline-flex items-center cursor-pointer">
@@ -397,10 +401,34 @@ const GeneralTab: React.FC = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Se ativado, as mensagens trocadas em um setor (ex: Financeiro) ficam invisíveis para atendentes de outros setores (ex: Suporte) mesmo que pertençam ao mesmo contato de WhatsApp.</p>
                 </div>
 
+                {/* Chatbot Delay Settings */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                    <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-emerald-500" /> Configurações do Chatbot
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed">Defina o tempo de espera (delay) em segundos que o chatbot deve aguardar antes de responder às mensagens do cliente.</p>
+                    
+                    <div className="space-y-2">
+                        <label htmlFor="chatbot-delay-input" className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">
+                            Delay do Chatbot (segundos)
+                        </label>
+                        <input
+                            type="number"
+                            id="chatbot-delay-input"
+                            min="0"
+                            max="60"
+                            value={chatbotDelay}
+                            onChange={(e) => setChatbotDelay(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            placeholder="Ex: 3"
+                            className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all text-sm font-semibold"
+                        />
+                    </div>
+                </div>
+
                 {/* Keyword Transfers Configuration */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
                     <div>
-                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                             <Key className="w-5 h-5 text-emerald-500" /> Transferência por Palavra-Chave (IA/Regras)
                         </h4>
                         <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed mt-1">
@@ -411,7 +439,7 @@ const GeneralTab: React.FC = () => {
                     {/* Form to add a new rule */}
                     <div className="bg-gray-100/30 dark:bg-white/5 p-6 rounded-2xl border border-gray-100/50 dark:border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                         <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">
                                 Palavra-Chave / Frase
                             </label>
                             <input
@@ -423,7 +451,7 @@ const GeneralTab: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">
                                 Destinar Para
                             </label>
                             <select
@@ -439,7 +467,7 @@ const GeneralTab: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">
                                 Escolha o Destino
                             </label>
                             {newTargetType === 'queue' ? (
@@ -470,7 +498,7 @@ const GeneralTab: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={handleAddKeywordRule}
-                                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md"
+                                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-md"
                             >
                                 Adicionar Regra
                             </button>
@@ -479,14 +507,14 @@ const GeneralTab: React.FC = () => {
 
                     {/* Table / List of current rules */}
                     <div className="space-y-4 pt-2">
-                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Regras de Redirecionamento Ativas</h5>
+                        <h5 className="text-[10px] font-bold text-gray-400 uppercase">Regras de Redirecionamento Ativas</h5>
                         {keywordTransfers.length === 0 ? (
                             <p className="text-xs text-gray-400 font-medium italic">Nenhuma regra de palavra-chave configurada para este canal.</p>
                         ) : (
                             <div className="overflow-hidden rounded-2xl border border-gray-100 dark:border-white/5">
                                 <table className="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr className="bg-gray-150/50 dark:bg-white/3 border-b border-gray-150 dark:border-white/5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                        <tr className="bg-gray-150/50 dark:bg-white/3 border-b border-gray-150 dark:border-white/5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">
                                             <th className="py-3.5 px-6">Palavra-Chave</th>
                                             <th className="py-3.5 px-6">Tipo</th>
                                             <th className="py-3.5 px-6">Encaminhar Para</th>
@@ -505,7 +533,7 @@ const GeneralTab: React.FC = () => {
                                                 <tr key={rule.id} className="hover:bg-gray-50/50 dark:hover:bg-white/3 transition-colors font-semibold dark:text-white">
                                                     <td className="py-3.5 px-6 font-mono text-emerald-500">{rule.keyword}</td>
                                                     <td className="py-3.5 px-6">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${rule.target_type === 'queue'
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${rule.target_type === 'queue'
                                                             ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
                                                             : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
                                                             }`}>
@@ -533,9 +561,9 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Transfer Message Configurations */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
                     <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                             <MessageSquare className="w-5 h-5 text-indigo-500" /> Mensagens de Transferência de Atendimento
                         </h4>
                         <label htmlFor="send-transfer-msg-toggle" className="relative inline-flex items-center cursor-pointer">
@@ -555,7 +583,7 @@ const GeneralTab: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">
                                 Mensagem Enviada ao Cliente (WhatsApp)
                             </label>
                             <textarea
@@ -569,7 +597,7 @@ const GeneralTab: React.FC = () => {
                             <p className="text-[9px] text-gray-400 mt-1 font-bold">Use as tags: <code className="text-emerald-500">{'{target}'}</code> para o destino.</p>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">
                                 Mensagem Interna no Histórico (Chat)
                             </label>
                             <textarea
@@ -585,10 +613,10 @@ const GeneralTab: React.FC = () => {
                 </div>
 
                 {/* Expedientes Complexos por Dia e Setor */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6 md:col-span-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase flex items-center gap-2">
                                 <Clock className="w-5 h-5 text-emerald-500 animate-pulse" /> Expedientes Avançados por Dia e Setor
                             </h4>
                             <p className="text-xs text-gray-500 dark:text-gray-400 opacity-80 leading-relaxed mt-1">
@@ -709,7 +737,7 @@ const GeneralTab: React.FC = () => {
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="w-full sm:w-auto justify-center px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto justify-center px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase rounded-2xl transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {saving ? <RefreshCw className="w-5 h-5 animate-spin shrink-0" /> : <Save className="w-5 h-5 shrink-0" />}
                     Salvar Parâmetros

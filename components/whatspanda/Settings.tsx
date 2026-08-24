@@ -20,19 +20,19 @@ const Settings: React.FC = () => {
                     <span className="text-4xl font-bold text-red-500">!</span>
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-3">Acesso Negado</h2>
-                <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs opacity-70">Você não tem permissão para acessar esta área.</p>
+                <p className="text-gray-500 dark:text-gray-400 font-bold text-xs opacity-70">Você não tem permissão para acessar esta área.</p>
             </div>
         );
     }
 
     return (
-        <div className="p-10 h-full flex flex-col overflow-hidden dark:bg-transparent transition-colors duration-500">
-            <div className="mb-10 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Configurações</h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie usuários, setores, etiquetas e chatbot do seu atendimento.</p>
+        <div className="p-4 md:p-10 h-full flex flex-col overflow-hidden dark:bg-transparent transition-colors duration-500">
+            <div className="mb-6 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl p-5 md:p-8 rounded-[1.2rem] md:rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
+                <h2 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Configurações</h2>
+                <p className="text-xs md:text-sm font-bold text-gray-500 dark:text-gray-400 opacity-80 mt-1">Gerencie usuários, setores, etiquetas e chatbot do seu atendimento.</p>
             </div>
             
-            <div className="flex space-x-10 mb-10 px-4 overflow-x-auto no-scrollbar">
+            <div className="flex space-x-4 md:space-x-10 mb-6 px-2 overflow-x-auto no-scrollbar">
                 <div className="flex min-w-max">
                     {[
                         { id: 'users', label: 'Usuários' },
@@ -45,7 +45,7 @@ const Settings: React.FC = () => {
                         <button 
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`pb-4 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
+                            className={`pb-4 px-2 text-[11px] font-semibold transition-all relative whitespace-nowrap ${
                                 activeTab === tab.id 
                                 ? 'text-emerald-500'
                                 : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
