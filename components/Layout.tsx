@@ -54,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({
     }, []);
 
     return (
-        <div className="flex h-screen w-full bg-brand-secondary dark:bg-gray-900">
+        <div className="flex h-screen w-full bg-gradient-to-br from-slate-50 via-gray-100 to-slate-200 dark:bg-gray-900">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
                 <div

@@ -12,7 +12,7 @@ import {
     TrashIcon,
     UserGroupIcon,
     XMarkIcon,
-    PhotoIcon,
+    SparklesIcon,
 } from './icons';
 import type { Conversation, Message, Employee } from '../types';
 
@@ -20,25 +20,30 @@ const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '�
 const availableEmojis = [
     '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
     '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
-    '😋', '😛', '😝', '😜', '🤪', 'Mw', '😔', '😪', '🤤', '😴',
-    '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵',
-    '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', 'wv', '☹️', '😮',
-    '😯', '😲', '😳', '🥺', 'mV', '😨', 'mw', '😥', '😢', '😭',
-    '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡',
-    '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺',
-    '👻', '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽',
-    '🙀', '😿', '😾', '👋', '🤚', 'Mw', '✋', '🖖', '👌', '🤏',
-    '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇',
-    '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲',
-    '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', 'Foot',
-    '👂', '🦻', 'Nose', '🧠', '🫀', '🫁', 'Tooth', 'Bone', 'Eyes',
-    'Eye', 'Tongue', 'Mouth', 'Lip', 'Baby', 'Child', 'Boy', 'Girl',
-    'Person', 'Blond', 'Man', 'Beard', 'Redhead', 'Woman', 'Older_Adult', 'Old_Man',
-    'Old_Woman', 'Frown', 'Pout', 'Gesturing_NO', 'Gesturing_OK', 'Tipping_Hand', 'Raising_Hand', 'Deaf_Person',
-    'Bowing', 'Facepalming', 'Shrugging', 'Health_Worker', 'Student', 'Teacher', 'Judge', 'Farmer',
-    'Cook', 'Mechanic', 'Factory_Worker', 'Office_Worker', 'Scientist', 'Software_Engineer', 'Singer', 'Artist',
-    'Pilot', 'Astronaut', 'Firefighter', 'Police_Officer', 'Detective', 'Guard', 'Ninja', 'Construction_Worker',
-    'Prince', 'Princess', 'Person_Wearing_Turban', 'Person_With_Veil'];
+    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+    '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+    '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+    '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+    '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+    '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+    '🥴', '🤢', '🤮', 'sneezing_face', 'mask', 'thermometer', 'head_bandage',
+    'money_mouth_face', 'cowboy_hat_face', 'smiling_imp', 'imp', 'skull', 'skull_and_crossbones',
+    'poop', 'clown_face', 'ogre', 'goblin', 'ghost', 'alien', 'space_invader', 'robot',
+    'jack_o_lantern', 'smiley_cat', 'smile_cat', 'joy_cat', 'heart_eyes_cat', 'smirk_cat',
+    'kissing_cat', 'scream_cat', 'crying_cat_face', 'pouting_cat', 'open_hands', 'raised_hands',
+    'clap', 'thumbsup', 'thumbsdown', 'punch', 'fist', 'left_facing_fist', 'right_facing_fist',
+    'fingers_crossed', 'v', 'love_you_gesture', 'metal', 'ok_hand', 'pinching_hand', 'pinched_fingers',
+    'muscle', 'mechanical_arm', 'leg', 'mechanical_leg', 'foot', 'ear', 'ear_with_hearing_aid',
+    'nose', 'brain', 'anatomical_heart', 'lungs', 'tooth', 'bone', 'eyes', 'eye', 'tongue',
+    'mouth', 'lips', 'baby', 'child', 'boy', 'girl', 'person', 'blond_haired_person', 'man',
+    'bearded_person', 'red_haired_person', 'woman', 'older_person', 'old_man', 'old_woman',
+    'frown', 'person_pouting', 'person_gesturing_no', 'person_gesturing_ok', 'person_tipping_hand',
+    'person_raising_hand', 'deaf_person', 'person_bowing', 'person_facepalming', 'person_shrugging',
+    'health_worker', 'student', 'teacher', 'judge', 'farmer', 'cook', 'mechanic', 'factory_worker',
+    'office_worker', 'scientist', 'technologist', 'singer', 'artist', 'pilot', 'astronaut',
+    'firefighter', 'police_officer', 'detective', 'guard', 'ninja', 'construction_worker', 'prince',
+    'princess', 'person_wearing_turban', 'person_with_skullcap', 'woman_with_headscarf'
+];
 
 const NOTE_COLORS = [
     { id: 'blue', bg: 'bg-blue-100', border: 'border-blue-200' },
@@ -296,7 +301,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
             </div>
 
             {/* Middle: Chat Area */}
-            <div className={`flex-1 flex-col bg-brand-secondary ${selectedConversationId !== null ? 'flex' : 'hidden md:flex'}`}>
+            <div className={`flex-1 flex-col bg-[#C6D8E3] ${selectedConversationId !== null ? 'flex' : 'hidden md:flex'}`}>
                 {selectedConversation ? (
                     <>
                         <div className="flex items-center justify-between p-4 bg-white border-b">
@@ -370,7 +375,7 @@ const Messages: React.FC<MessagesProps> = ({ conversations, setConversations, cu
                                     <FaceSmileIcon className="w-6 h-6" />
                                 </button>
                                 <button type="button" onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }} className="p-2 text-gray-500 hover:text-brand-primary" title="Stickers & GIFs">
-                                    <PhotoIcon className="w-6 h-6" />
+                                    <SparklesIcon className="w-6 h-6" />
                                 </button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
