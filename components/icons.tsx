@@ -86,4 +86,9 @@ export {
   BookOpenIcon,
   SunIcon,
   MoonIcon,
+  ArrowTrendingUpIcon,
+  Bars3BottomLeftIcon,
+  FunnelIcon,
+  PhoneIcon,
+  GlobeAsiaAustraliaIcon,
 } from '@heroicons/react/24/outline';

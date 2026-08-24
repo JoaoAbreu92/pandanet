@@ -798,6 +798,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Mensagens / Chat" id="messages" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Calendário Corp." id="calendar" icon={CalendarDaysIcon} />
                 <Toggle label="E-mail Integrado" id="email" icon={EnvelopeIcon} />
+                <Toggle label="Módulo CRM (Perfex)" id="crm" icon={BuildingOfficeIcon} />
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />

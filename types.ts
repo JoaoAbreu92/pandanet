@@ -40,7 +40,21 @@ export type Page =
   | 'kpi-dashboard'
   | 'job-manager'
   | 'whatspanda'
-  | 'manual-usuario';
+  | 'manual-usuario'
+  // CRM Pages
+  | 'crm-dashboard'
+  | 'crm-customers'
+  | 'crm-sales'
+  | 'crm-proposals'
+  | 'crm-estimates'
+  | 'crm-invoices'
+  | 'crm-payments'
+  | 'crm-credit-notes'
+  | 'crm-items'
+  | 'crm-subscriptions'
+  | 'crm-contracts'
+  | 'crm-tasks'
+  | 'crm-calendar';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -752,4 +766,70 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
   };
   tags?: WhatsAppConversationTag[];
   notes_count?: number;
+}
+
+// CRM Specific Types
+export interface CRMCustomer {
+  id: string;
+  company_id: string;
+  name: string;
+  vat?: string;
+  phone?: string;
+  website?: string;
+  groups?: string[];
+  currency: string;
+  default_language: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  billing_address: any;
+  shipping_address: any;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
+export interface CRMTask {
+  id: string;
+  company_id: string;
+  title: string;
+  description?: string;
+  status: 'not_started' | 'in_progress' | 'awaiting_feedback' | 'completed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  start_date?: string;
+  due_date?: string;
+  created_by?: string;
+  assigned_to?: string;
+  rel_id?: string;
+  rel_type?: string;
+  is_public: boolean;
+  created_at: string;
+}
+
+export interface CRMInvoice {
+  id: string;
+  company_id: string;
+  customer_id: string;
+  number: string;
+  status: 'unpaid' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'draft';
+  date: string;
+  due_date: string;
+  total: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface CRMProposal {
+  id: string;
+  company_id: string;
+  rel_id: string;
+  rel_type: string;
+  subject: string;
+  status: 'draft' | 'sent' | 'open' | 'revised' | 'declined' | 'accepted';
+  date: string;
+  open_till: string;
+  total: number;
+  currency: string;
+  created_at: string;
 }
