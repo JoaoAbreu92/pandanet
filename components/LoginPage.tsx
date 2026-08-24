@@ -1,30 +1,74 @@
 
+
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import Logo from './Logo';
 import { useLanguage } from './LanguageContext';
 
 const LoginPage: React.FC = () => {
+    const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { language, setLanguage, t } = useLanguage();
+    const [message, setMessage] = useState<string | null>(null);
+    const { language, setLanguage } = useLanguage();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setMessage(null);
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        if (isSignUp) {
+            if (password !== confirmPassword) {
+                setError(language === 'pt' ? 'Senhas não conferem.' : language === 'en' ? 'Passwords do not match.' : 'Las contraseñas no coinciden.');
+                setLoading(false);
+                return;
+            }
+            // Sign Up Logic
+            const { error: signUpError } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: name,
+                    }
+                }
+            });
 
-        if (error) {
-            setError(error.message);
+            if (signUpError) {
+                setError(signUpError.message);
+            } else {
+                setMessage(language === 'pt'
+                    ? 'Cadastro realizado! Verifique seu email para confirmar.'
+                    : language === 'en'
+                        ? 'Sign up successful! Please check your email to confirm.'
+                        : '¡Registro exitoso! Verifique su correo para confirmar.');
+                setIsSignUp(false); // Switch back to login for UX
+            }
+        } else {
+            // Login Logic
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (signInError) {
+                setError(signInError.message);
+            }
         }
         setLoading(false);
+    };
+
+    const toggleMode = () => {
+        setIsSignUp(!isSignUp);
+        setError(null);
+        setMessage(null);
+        setPassword('');
+        setConfirmPassword('');
     };
 
     return (
@@ -37,9 +81,9 @@ const LoginPage: React.FC = () => {
                         onChange={(e) => setLanguage(e.target.value as 'pt' | 'en' | 'es')}
                         className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-primary focus:border-brand-primary sm:text-sm rounded-md bg-white text-gray-700 cursor-pointer"
                     >
-                        <option value="pt">🇧🇷 PT</option>
-                        <option value="en">🇺🇸 EN</option>
-                        <option value="es">🇪u0053 ES</option>
+                        <option value="pt">🇧🇷 Brasil</option>
+                        <option value="en">🇺🇸 USA</option>
+                        <option value="es">🇪🇸 España</option>
                     </select>
                 </div>
             </div>
@@ -50,15 +94,39 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div>
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-                        {language === 'pt' ? 'Entrar na sua conta' : language === 'en' ? 'Sign in to your account' : 'Iniciar sesión'}
+                        {isSignUp
+                            ? (language === 'pt' ? 'Crie sua conta' : language === 'en' ? 'Create your account' : 'Crea tu cuenta')
+                            : (language === 'pt' ? 'Entrar na sua conta' : language === 'en' ? 'Sign in to your account' : 'Iniciar sesión')
+                        }
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
                         Pixel Intranet
                     </p>
                 </div>
-                <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-                    <input type="hidden" name="remember" value="true" />
+
+                {message && (
+                    <div className="text-green-600 text-sm text-center bg-green-50 p-2 rounded border border-green-200">
+                        {message}
+                    </div>
+                )}
+
+                <form className="mt-8 space-y-6" onSubmit={handleAuth}>
                     <div className="rounded-md shadow-sm -space-y-px">
+                        {isSignUp && (
+                            <div>
+                                <label htmlFor="name" className="sr-only">Nome Completo</label>
+                                <input
+                                    id="name"
+                                    name="name"
+                                    type="text"
+                                    required={isSignUp}
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
+                                    placeholder={language === 'pt' ? 'Nome Completo' : language === 'en' ? 'Full Name' : 'Nombre Completo'}
+                                />
+                            </div>
+                        )}
                         <div>
                             <label htmlFor="email-address" className="sr-only">Email</label>
                             <input
@@ -69,7 +137,7 @@ const LoginPage: React.FC = () => {
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
+                                className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 ${!isSignUp ? 'rounded-t-md' : ''} focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm`}
                                 placeholder="Email"
                             />
                         </div>
@@ -79,14 +147,29 @@ const LoginPage: React.FC = () => {
                                 id="password"
                                 name="password"
                                 type="password"
-                                autoComplete="current-password"
+                                autoComplete={isSignUp ? "new-password" : "current-password"}
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
+                                className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 ${!isSignUp ? 'rounded-b-md' : ''} focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm`}
                                 placeholder={language === 'pt' ? 'Senha' : language === 'en' ? 'Password' : 'Contraseña'}
                             />
                         </div>
+                        {isSignUp && (
+                            <div>
+                                <label htmlFor="confirm-password" className="sr-only">{language === 'pt' ? 'Confirmar Senha' : language === 'en' ? 'Confirm Password' : 'Confirmar Contraseña'}</label>
+                                <input
+                                    id="confirm-password"
+                                    name="confirm-password"
+                                    type="password"
+                                    required={isSignUp}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-brand-primary focus:border-brand-primary focus:z-10 sm:text-sm"
+                                    placeholder={language === 'pt' ? 'Confirmar Senha' : language === 'en' ? 'Confirm Password' : 'Confirmar Contraseña'}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {error && (
@@ -102,12 +185,29 @@ const LoginPage: React.FC = () => {
                             className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-primary hover:bg-emerald-600'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200`}
                         >
                             {loading
-                                ? (language === 'pt' ? 'Entrando...' : language === 'en' ? 'Signing in...' : 'Iniciando...')
-                                : (language === 'pt' ? 'Entrar' : language === 'en' ? 'Sign in' : 'Iniciar sesión')}
+                                ? (language === 'pt' ? 'Processando...' : language === 'en' ? 'Processing...' : 'Procesando...')
+                                : (isSignUp
+                                    ? (language === 'pt' ? 'Cadastrar' : language === 'en' ? 'Sign Up' : 'Registrarse')
+                                    : (language === 'pt' ? 'Entrar' : language === 'en' ? 'Sign in' : 'Iniciar sesión'))
+                            }
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-center">
+                        <button
+                            type="button"
+                            onClick={toggleMode}
+                            className="text-sm font-medium text-brand-primary hover:text-brand-secondary focus:outline-none underline"
+                        >
+                            {isSignUp
+                                ? (language === 'pt' ? 'Já tem uma conta? Entre aqui' : language === 'en' ? 'Already have an account? Sign in' : '¿Ya tienes cuenta? Inicia sesión')
+                                : (language === 'pt' ? 'Não tem acesso? Cadastre-se' : language === 'en' ? 'No access? Sign up' : '¿No tienes acceso? Regístrate')
+                            }
                         </button>
                     </div>
                 </form>
             </div>
+
 
             <div className="mt-8 text-center text-xs text-gray-500">
                 &copy; 2026 Pixel Intranet. All rights reserved.
