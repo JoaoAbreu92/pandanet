@@ -80,26 +80,37 @@ async function authMiddleware(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      console.error('[AUTH] Supabase error:', error?.message);
-      if (!JWT_SECRET) return res.status(401).json({ error: 'Server misconfigured' });
+    // 1. Tenta JWT local PRIMEIRO (rápido, sem rede, funciona dentro do Docker)
+    if (JWT_SECRET) {
       try {
-        const decodedUser = jwt.verify(token, JWT_SECRET);
-        req.user = { id: decodedUser.sub, email: decodedUser.email, role: decodedUser.role };
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = { id: decoded.sub, email: decoded.email, role: decoded.role };
+        console.log(`[AUTH] JWT local OK para user: ${req.user.email || req.user.id}`);
       } catch (jwtErr) {
-        console.error('[AUTH] JWT verification failed:', jwtErr.message);
-        return res.status(401).json({ error: 'Invalid token (JWT)' });
+        // JWT inválido, tenta Supabase como fallback
+        console.warn('[AUTH] JWT local falhou, tentando Supabase:', jwtErr.message);
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+          console.error('[AUTH] Supabase também falhou:', error?.message);
+          return res.status(401).json({ error: 'Token inválido. Faça login novamente.' });
+        }
+        req.user = user;
+        console.log(`[AUTH] Supabase auth OK para user: ${req.user.email}`);
       }
     } else {
+      // Sem JWT_SECRET configurado, usa apenas Supabase
+      console.warn('[AUTH] JWT_SECRET não configurado! Usando apenas Supabase auth.');
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) {
+        console.error('[AUTH] Supabase error (sem JWT_SECRET):', error?.message);
+        return res.status(401).json({ error: 'Servidor mal configurado ou token inválido.' });
+      }
       req.user = user;
     }
 
-    // --- Enterprise Isolation Validation ---
+    // --- Validação de Isolamento Multi-tenant ---
     const { companyId } = req.params;
     if (companyId) {
-      // Fetch profile to check permissions and company_id
       const { data: profile, error: profileErr } = await supabase
         .from('profiles')
         .select('company_id, role, is_admin, is_company_admin')
@@ -107,29 +118,24 @@ async function authMiddleware(req, res, next) {
         .single();
 
       if (profileErr || !profile) {
-        // Special case for Master Admin TI email if profile doesn't exist yet
         const isMasterAdmin = req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
         if (!isMasterAdmin) {
-          console.error('[AUTH] Profile not found or error:', profileErr?.message);
-          return res.status(403).json({ error: 'Forbidden: Profile not found' });
+          console.error('[AUTH] Perfil não encontrado:', profileErr?.message);
+          return res.status(403).json({ error: 'Forbidden: Perfil não encontrado' });
         }
-        // Master Admin can use any companyId
       } else {
         const isMasterAdmin = profile.role === 'Super Admin' || req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
-        const isCompanyAdmin = profile.is_company_admin || profile.is_admin;
-        
-        // If not Master and trying to access another company
         if (!isMasterAdmin && profile.company_id !== companyId) {
-          console.warn(`[AUTH] Access denied: User ${req.user.id} (Company ${profile.company_id}) tried to access Company ${companyId}`);
-          return res.status(403).json({ error: 'Forbidden: Cross-company access denied' });
+          console.warn(`[AUTH] Acesso negado: User ${req.user.id} (Empresa ${profile.company_id}) tentou acessar Empresa ${companyId}`);
+          return res.status(403).json({ error: 'Forbidden: Acesso a outra empresa negado' });
         }
       }
     }
 
     next();
   } catch (error) {
-    console.error('[AUTH] Fatal error:', error.message);
-    return res.status(401).json({ error: 'Invalid token' });
+    console.error('[AUTH] Erro fatal no middleware:', error.message);
+    return res.status(401).json({ error: 'Erro de autenticação interno' });
   }
 }
 
