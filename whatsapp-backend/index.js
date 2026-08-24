@@ -410,10 +410,9 @@ async function runChatbot(message, conversation, companyId, connectionId) {
                 // Node de mensagem ou menu: Enviar resposta e salvar estado
                 const replyText = node.content?.text || "";
                 if (replyText) {
-                    // Buscar settings para pegar a URL da Evolution
-                    if (settings) {
-                        const instanceName = `conn_${connectionId}`;
-                        await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                    // Enviar resposta usando as URLs e chaves globais
+                    const instanceName = `conn_${connectionId}`;
+                    await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
                             method: 'POST',
                             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -430,7 +429,6 @@ async function runChatbot(message, conversation, companyId, connectionId) {
                             is_from_customer: false,
                             sent_by: null // 'null' indica que foi o bot
                         });
-                    }
                 }
                 await supabase.from('whatsapp_conversations').update({ chatbot_node_id: node.id }).eq('id', conversation.id);
             }

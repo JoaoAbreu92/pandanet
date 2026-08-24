@@ -190,65 +190,65 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     );
 
     return (
-        <div className="flex h-full flex-col bg-[#0f111a] text-gray-300 overflow-hidden font-sans">
+        <div className="flex h-full flex-col bg-white dark:bg-[#0f111a] text-gray-700 dark:text-gray-300 overflow-hidden font-sans transition-colors duration-300">
             {/* Toolbar - Estilo Print 2 */}
-            <div className="p-4 flex flex-wrap gap-2 items-center bg-[#161925] border-b border-gray-800">
+            <div className="p-4 flex flex-wrap gap-2 items-center bg-gray-50 dark:bg-[#161925] border-b border-gray-200 dark:border-gray-800">
                 <button 
                     onClick={handleSyncContacts}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2d3245] hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent hover:bg-gray-100 dark:hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase transition-all shadow-sm"
                 >
-                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-4 h-4 text-emerald-500 ${syncing ? 'animate-spin' : ''}`} />
                     Sincronizar Contatos
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3245] hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase opacity-50 cursor-not-allowed">
+                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
                     <RefreshCw className="w-4 h-4" /> Sincronizar Grupos
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3245] hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase opacity-50 cursor-not-allowed">
+                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
                     <RefreshCw className="w-4 h-4 transform rotate-90" /> Importar
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3245] hover:bg-[#3d445f] rounded-lg text-xs font-bold uppercase opacity-50 cursor-not-allowed">
+                <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#2d3245] border border-gray-200 dark:border-transparent rounded-lg text-xs font-bold uppercase opacity-40 cursor-not-allowed shadow-sm">
                     <RefreshCw className="w-4 h-4 transform -rotate-90" /> Exportar
                 </button>
                 <button 
                     onClick={() => handleOpenModal()}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#10b981] hover:bg-[#059669] text-white rounded-lg text-xs font-bold uppercase ml-auto"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#10b981] hover:bg-[#059669] text-white rounded-lg text-xs font-bold uppercase ml-auto shadow-md"
                 >
                     <Plus className="w-4 h-4" /> Adicionar
                 </button>
             </div>
 
             {/* Filtros */}
-            <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-[#0f111a]">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-[#0f111a]">
                 <div className="relative col-span-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input 
                         type="text" 
                         placeholder="Localizar contato..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-[#161925] border border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-emerald-500 outline-none transition-all"
+                        className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-emerald-500 outline-none transition-all dark:text-white"
                     />
                 </div>
                 <div className="relative">
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <select className="w-full bg-[#161925] border border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none">
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none dark:text-white">
                         <option>Etiquetas</option>
                     </select>
                 </div>
                 <div className="relative">
-                    <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <select className="w-full bg-[#161925] border border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none">
+                    <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <select className="w-full bg-gray-50 dark:bg-[#161925] border border-gray-200 dark:border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm appearance-none outline-none dark:text-white">
                         <option>Carteira</option>
                     </select>
                 </div>
             </div>
 
             {/* Tabela de Contatos */}
-            <div className="flex-1 overflow-auto bg-[#0f111a] custom-scrollbar">
+            <div className="flex-1 overflow-auto bg-white dark:bg-[#0f111a] custom-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[1000px]">
-                    <thead className="sticky top-0 bg-[#0f111a] border-b border-gray-800 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    <thead className="sticky top-0 bg-gray-50 dark:bg-[#0f111a] border-b border-gray-200 dark:border-gray-800 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-500 z-10">
                         <tr>
-                            <th className="p-4 w-12"><input type="checkbox" className="rounded bg-gray-800 border-gray-700" /></th>
+                            <th className="p-4 w-12"><input type="checkbox" className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700" /></th>
                             <th className="p-4">Nome</th>
                             <th className="p-4">WhatsApp</th>
                             <th className="p-4">Carteira</th>
@@ -258,22 +258,22 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                             <th className="p-4 text-right">Ações</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-800/50">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
                         {filteredContacts.map(contact => (
-                            <tr key={contact.id} className="hover:bg-[#161925] transition-colors group">
-                                <td className="p-4"><input type="checkbox" className="rounded bg-gray-800 border-gray-700" /></td>
+                            <tr key={contact.id} className="hover:bg-gray-50 dark:hover:bg-[#161925] transition-colors group">
+                                <td className="p-4"><input type="checkbox" className="rounded border-gray-300 dark:bg-gray-800 dark:border-gray-700" /></td>
                                 <td className="p-4 flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs font-bold border border-gray-700">
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
                                         {contact.name?.charAt(0) || <User className="w-4 h-4" />}
                                     </div>
-                                    <span className="text-sm font-medium">{contact.name}</span>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-200">{contact.name}</span>
                                 </td>
-                                <td className="p-4 text-xs font-mono text-emerald-500">{contact.phone}</td>
-                                <td className="p-4"><span className="text-xs text-gray-500 italic">Nenhuma</span></td>
+                                <td className="p-4 text-xs font-mono text-emerald-600 dark:text-emerald-500 font-semibold">{contact.phone}</td>
+                                <td className="p-4"><span className="text-xs text-gray-400 dark:text-gray-500 italic">Nenhuma</span></td>
                                 <td className="p-4">
                                     <div className="flex gap-1">
                                         {contact.tags?.map(t => (
-                                            <div key={t} className="w-2 h-2 rounded-full" style={{ backgroundColor: availableTags.find(at => at.id === t)?.color || '#ccc' }} />
+                                            <div key={t} title={availableTags.find(at => at.id === t)?.name} className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: availableTags.find(at => at.id === t)?.color || '#ccc' }} />
                                         ))}
                                     </div>
                                 </td>
@@ -281,7 +281,8 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                 <td className="p-4 text-center">
                                     <button 
                                         onClick={() => toggleBlock(contact)}
-                                        className={`transition-colors p-1 rounded ${contact.is_blocked ? 'text-red-500' : 'text-emerald-500'}`}
+                                        className={`transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 ${contact.is_blocked ? 'text-red-500' : 'text-emerald-500'}`}
+                                        title={contact.is_blocked ? 'Desbloquear' : 'Bloquear'}
                                     >
                                         <Ban className="w-5 h-5" />
                                     </button>
@@ -289,18 +290,15 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                 <td className="p-4 text-right">
                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button 
-                                            onClick={() => {
-                                                // Trigger Whats Talk logic would go here
-                                                alert('Iniciando conversa...');
-                                            }}
-                                            className="p-1.5 hover:bg-emerald-500/10 text-emerald-500 rounded"
+                                            onClick={() => alert('Iniciando conversa...')}
+                                            className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg transition-all"
                                         >
                                             <MessageSquare className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleOpenModal(contact)} className="p-1.5 hover:bg-blue-500/10 text-blue-500 rounded">
+                                        <button onClick={() => handleOpenModal(contact)} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-blue-600 dark:text-blue-500 rounded-lg transition-all">
                                             <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleDelete(contact.id)} className="p-1.5 hover:bg-red-500/10 text-red-500 rounded">
+                                        <button onClick={() => handleDelete(contact.id)} className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-500 rounded-lg transition-all">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -313,24 +311,26 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
 
             {/* Modal de Edição Reformulado - Estilo Print 3 */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-800 flex flex-col max-h-[90vh]">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+                    <div className="bg-white dark:bg-[#161a27] rounded-xl shadow-2xl w-full max-w-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300">
                         {/* Header do Modal */}
-                        <div className="flex items-center gap-3 p-4 border-b border-gray-800">
-                            <UserPlus className="w-5 h-5 text-gray-400" />
-                            <h3 className="text-lg font-bold text-white flex-1">Editar Contato</h3>
-                            <div className="flex items-center gap-1">
-                                <button className="p-2 hover:bg-emerald-500/10 text-emerald-500 rounded-lg">
+                        <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
+                            <UserPlus className="w-5 h-5 text-emerald-500" />
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex-1">
+                                {editingContact ? 'Editar Contato' : 'Adicionar Contato'}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <button className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg transition-all">
                                     <MessageSquare className="w-5 h-5" />
                                 </button>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 text-gray-400 rounded-lg">
+                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-400 dark:text-gray-500 hover:text-red-500 rounded-lg transition-all">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-800 bg-[#1e2335]">
+                        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1e2335]">
                             {[
                                 { id: 'dados', label: 'DADOS CONTATO', icon: User },
                                 { id: 'kanban', label: 'KANBAN', icon: LayoutGrid },
@@ -342,21 +342,21 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                     onClick={() => setActiveTab(tab.id as any)}
                                     className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 border-b-2 transition-all ${
                                         activeTab === tab.id 
-                                        ? 'border-emerald-500 text-white' 
-                                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                                        ? 'border-emerald-500 text-emerald-600 dark:text-white' 
+                                        : 'border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
                                     }`}
                                 >
                                     <tab.icon className="w-4 h-4" />
-                                    <span className="text-[9px] font-bold tracking-wider">{tab.label}</span>
+                                    <span className="text-[9px] font-extrabold tracking-wider">{tab.label}</span>
                                 </button>
                             ))}
                         </div>
 
                         {/* Conteúdo do Modal */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-white dark:bg-transparent">
                             {activeTab === 'dados' && (
                                 <div className="space-y-6">
-                                    <div className="bg-[#11141d] p-4 rounded-lg border border-gray-800 relative">
+                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
                                         <div className="absolute left-4 top-1/2 -translate-y-1/2">
                                             <User className="w-4 h-4 text-emerald-500" />
                                         </div>
@@ -365,31 +365,31 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                             placeholder="Nome 👶"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none"
+                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none text-gray-900 dark:text-white"
                                         />
                                     </div>
 
-                                    <div className="bg-[#11141d] p-4 rounded-lg border border-gray-800 relative">
+                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
                                         <input 
                                             type="text" 
                                             placeholder="WhatsApp"
                                             value={phone}
                                             onChange={(e) => setPhone(e.target.value)}
-                                            className="w-full bg-transparent pl-4 pr-10 py-1 text-sm outline-none"
+                                            className="w-full bg-transparent pl-4 pr-10 py-1 text-sm outline-none text-gray-900 dark:text-white font-mono"
                                         />
                                         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                                             <MessageSquare className="w-4 h-4 text-emerald-500" />
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-500/80">
-                                        <div className={`w-8 h-4 rounded-full relative transition-colors ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-700'}`} onClick={() => setIgnoreContact(!ignoreContact)}>
-                                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ignoreContact ? 'right-0.5' : 'left-0.5'}`} />
+                                    <div className="flex items-center gap-3 text-[11px] font-bold text-emerald-600 dark:text-emerald-500/80 px-2 cursor-pointer select-none" onClick={() => { /* Op op op */ }}>
+                                        <div className={`w-10 h-5 rounded-full relative transition-all duration-300 ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
+                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${ignoreContact ? 'left-6' : 'left-1'}`} />
                                         </div>
-                                        <MessageSquare className="w-3 h-3" /> Validar se o número possui WhatsApp
+                                        <span className="flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Validar se o número possui WhatsApp</span>
                                     </div>
 
-                                    <div className="bg-[#11141d] p-4 rounded-lg border border-gray-800 relative">
+                                    <div className="bg-gray-50 dark:bg-[#11141d] p-4 rounded-xl border border-gray-200 dark:border-gray-800 relative group focus-within:border-emerald-500 transition-all">
                                         <div className="absolute left-4 top-1/2 -translate-y-1/2">
                                             <Mail className="w-4 h-4 text-emerald-500" />
                                         </div>
@@ -398,33 +398,33 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                             placeholder="E-mail"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none"
+                                            className="w-full bg-transparent pl-10 pr-4 py-1 text-sm outline-none text-gray-900 dark:text-white"
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
-                                                <Ban className="w-3 h-3" /> Ignorar contato
+                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                                <Ban className="w-3.5 h-3.5 text-red-400" /> Ignorar contato
                                             </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-colors ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-700'}`} onClick={() => setIgnoreContact(!ignoreContact)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ignoreContact ? 'right-0.5' : 'left-0.5'}`} />
+                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${ignoreContact ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setIgnoreContact(!ignoreContact)}>
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ignoreContact ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
-                                                <RefreshCw className="w-3 h-3" /> Desativar Transcrição
+                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                                <RefreshCw className="w-3.5 h-3.5 text-blue-400" /> Desativar Transcrição
                                             </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-colors ${disableTranscription ? 'bg-emerald-500' : 'bg-gray-700'}`} onClick={() => setDisableTranscription(!disableTranscription)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableTranscription ? 'right-0.5' : 'left-0.5'}`} />
+                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${disableTranscription ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setDisableTranscription(!disableTranscription)}>
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableTranscription ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
-                                                <LayoutGrid className="w-3 h-3" /> Desativar KANBAN
+                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                                <LayoutGrid className="w-3.5 h-3.5 text-purple-400" /> Desativar KANBAN
                                             </span>
-                                            <div className={`w-8 h-4 rounded-full relative transition-colors ${disableKanban ? 'bg-emerald-500' : 'bg-gray-700'}`} onClick={() => setDisableKanban(!disableKanban)}>
-                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableKanban ? 'right-0.5' : 'left-0.5'}`} />
+                                            <div className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${disableKanban ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`} onClick={() => setDisableKanban(!disableKanban)}>
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${disableKanban ? 'left-4.5 translate-x-1' : 'left-0.5'}`} />
                                             </div>
                                         </div>
                                     </div>
@@ -433,11 +433,11 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
 
                             {activeTab === 'kanban' && (
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mover para Estágio Kanban</label>
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Mover para Estágio Kanban</label>
                                     <select 
                                         value={selectedQueue}
                                         onChange={(e) => setSelectedQueue(e.target.value)}
-                                        className="w-full bg-[#11141d] border border-gray-800 rounded-lg p-3 text-sm outline-none"
+                                        className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm outline-none text-gray-900 dark:text-white appearance-none"
                                     >
                                         <option value="">Selecione um Estágio...</option>
                                         {availableQueues.map(q => (
@@ -448,7 +448,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                             )}
 
                             {activeTab === 'etiqueta' && (
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {availableTags.map(tag => (
                                         <button
                                             key={tag.id}
@@ -456,40 +456,46 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
                                                 if (selectedTags.includes(tag.id)) setSelectedTags(selectedTags.filter(id => id !== tag.id));
                                                 else setSelectedTags([...selectedTags, tag.id]);
                                             }}
-                                            className={`p-3 rounded-lg border flex items-center gap-2 transition-all ${
-                                                selectedTags.includes(tag.id) ? 'bg-emerald-500/10 border-emerald-500' : 'bg-[#11141d] border-gray-800'
+                                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                                                selectedTags.includes(tag.id) 
+                                                ? 'bg-emerald-500/10 border-emerald-500/50 ring-1 ring-emerald-500/20' 
+                                                : 'bg-gray-50 dark:bg-[#11141d] border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
                                             }`}
                                         >
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                                            <span className="text-xs font-bold uppercase tracking-widest">{tag.name}</span>
+                                            <div className="w-3.5 h-3.5 rounded-full shadow-sm" style={{ backgroundColor: tag.color }} />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{tag.name}</span>
+                                            {selectedTags.includes(tag.id) && <Check className="w-3.5 h-3.5 ml-auto text-emerald-500" />}
                                         </button>
                                     ))}
+                                    {availableTags.length === 0 && (
+                                        <div className="col-span-2 py-8 text-center text-gray-400 italic text-xs">Nenhuma etiqueta cadastrada.</div>
+                                    )}
                                 </div>
                             )}
 
                             {activeTab === 'anotacoes' && (
                                 <textarea 
-                                    placeholder="Escreva anotações aqui..."
+                                    placeholder="Escreva anotações internas sobre este contato..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full bg-[#11141d] border border-gray-800 rounded-lg p-4 text-sm outline-none resize-none h-48 focus:border-emerald-500"
+                                    className="w-full bg-gray-50 dark:bg-[#11141d] border border-gray-200 dark:border-gray-800 rounded-xl p-4 text-sm outline-none resize-none h-48 focus:border-emerald-500 transition-all text-gray-900 dark:text-white"
                                 />
                             )}
                         </div>
 
                         {/* Footer do Modal */}
-                        <div className="p-4 border-t border-gray-800 flex justify-end gap-3">
+                        <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-transparent">
                             <button 
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2"
+                                className="px-6 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all shadow-sm"
                             >
                                 <X className="w-4 h-4" /> Cancelar
                             </button>
                             <button 
                                 onClick={handleSave}
-                                className="px-6 py-2 bg-dark hover:bg-black text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 border border-gray-700"
+                                className="px-8 py-2.5 bg-[#161a27] dark:bg-emerald-500 hover:bg-black dark:hover:bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 transition-all border border-gray-700 dark:border-transparent shadow-lg"
                             >
-                                <Check className="w-4 h-4" /> Salvar
+                                <Check className="w-4 h-4" /> {editingContact ? 'Salvar Alterações' : 'Criar Contato'}
                             </button>
                         </div>
                     </div>
@@ -497,13 +503,16 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             )}
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #2d3245; border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3d445f; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
             `}</style>
         </div>
     );
 };
 
 export default Contacts;
+
