@@ -11,8 +11,13 @@ interface LogoProps {
 
 const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLogo }) => {
     return (
-        <div className={`flex items-center ${className}`}>
+        <div className={`flex flex-col items-center ${className}`}>
             <img src={companyLogo || logoSrc} alt="Logo" className="h-12 w-auto object-contain" />
+            {showText && (
+                <span className="text-[10px] text-gray-400 font-medium tracking-wider -mt-1">
+                    v1.0.8-beta
+                </span>
+            )}
         </div>
     );
 };
