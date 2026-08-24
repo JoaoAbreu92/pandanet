@@ -436,13 +436,43 @@ const Channels: React.FC = () => {
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Canais de Atendimento</h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie seus números de WhatsApp e redes sociais.</p>
                         </div>
-                        {!isGhostMode && channels.length === 0 && (
-                            <button
-                                onClick={handleNew}
-                                className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
-                            >
-                                <Plus className="w-4 h-4" /> Adicionar Canal
-                            </button>
+                        {!isGhostMode && (
+                            <div className="flex flex-col items-end gap-2">
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                                    {channels.length}/{whatsappLimit} canal(is) usados
+                                </p>
+                                <div className="flex gap-2 flex-wrap justify-end">
+                                    {([
+                                        { type: 'whatsapp',  label: 'WhatsApp',  icon: <Smartphone className="w-4 h-4" />, color: 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' },
+                                        { type: 'telegram',  label: 'Telegram',  icon: <Send className="w-4 h-4" />,        color: 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' },
+                                        { type: 'instagram', label: 'Instagram', icon: <Instagram className="w-4 h-4" />,   color: 'bg-pink-500 hover:bg-pink-600 shadow-pink-500/20' },
+                                        { type: 'messenger', label: 'Messenger', icon: <MessageCircle className="w-4 h-4 fill-current" />, color: 'bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/20' },
+                                    ] as const).map(platform => (
+                                        <button
+                                            key={platform.type}
+                                            onClick={() => {
+                                                if (channels.length >= whatsappLimit) {
+                                                    alert(`Ops! Seu plano atual tem limite de ${whatsappLimit} canal(is).\n\nPara adicionar mais, entre em contato com nosso time comercial.`);
+                                                    return;
+                                                }
+                                                setCurrentId(null);
+                                                setChannelType(platform.type as any);
+                                                setConnectionName('');
+                                                setPhoneNumber('');
+                                                setApiToken('');
+                                                setRejectCalls(false);
+                                                setRejectionMessage('No momento não atendemos ligações por este canal. Por favor, envie uma mensagem de texto.');
+                                                setView('form');
+                                            }}
+                                            className={`${platform.color} text-white px-4 py-2.5 rounded-2xl font-bold text-[10px] uppercase tracking-widest transition-all duration-300 shadow-xl flex items-center gap-2`}
+                                            title={`Adicionar canal ${platform.label}`}
+                                        >
+                                            {platform.icon}
+                                            <span className="hidden sm:inline">{platform.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
 
