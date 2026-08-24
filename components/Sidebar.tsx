@@ -350,6 +350,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="directory" label="Colaboradores" icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />
                     <NavItem page="org-chart" label={t('sidebar.org_chart')} icon={ArrowPathIcon} permission="viewOrgChart" featureId="org-chart" />
                     <NavItem page="meu-rh" label={t('sidebar.meu_rh')} icon={BuildingOfficeIcon} permission="viewMeuRH" featureId="meu-rh" />
+                    <NavItem page="forms" label="Solicitações" icon={DocumentTextIcon} permission="viewForms" featureId="meu-rh" />
                     <NavItem page="jobs" label={t('sidebar.jobs')} icon={RocketLaunchIcon} permission="viewJobs" featureId="jobs" />
                     <NavItem page="training" label={t('sidebar.training')} icon={RocketLaunchIcon} permission="viewTraining" featureId="training" />
                     <NavItem page="surveys" label={t('sidebar.surveys_internal')} icon={ChatBubbleLeftRightIcon} permission="viewSurveys" featureId="surveys" />

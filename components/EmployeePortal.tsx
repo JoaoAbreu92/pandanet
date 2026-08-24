@@ -11,10 +11,12 @@ import {
     ClockIcon,
     XCircleIcon,
     HeartIcon,
-    StarIcon
+    StarIcon,
+    DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import HRCalculatorAI from './HRCalculatorAI';
+import FormsPage from './FormsPage';
 
 interface Payslip {
     id: string;
@@ -93,7 +95,7 @@ const statusConfig = {
 
 const EmployeePortal: React.FC = () => {
     const { profile } = useAuth();
-    const [activeSection, setActiveSection] = useState<'payroll' | 'vacation' | 'documents' | 'timebank' | 'benefits' | 'performance'>('payroll');
+    const [activeSection, setActiveSection] = useState<'payroll' | 'vacation' | 'documents' | 'timebank' | 'benefits' | 'performance' | 'requests'>('payroll');
     const [loading, setLoading] = useState(true);
 
     // Data states
@@ -300,6 +302,7 @@ const EmployeePortal: React.FC = () => {
         { key: 'timebank', label: 'Banco de Horas', icon: ClockIcon, perm: 'action_register_hours' },
         { key: 'benefits', label: 'Meus Benefícios', icon: HeartIcon, perm: null },
         { key: 'performance', label: 'Metas e Avaliações', icon: StarIcon, perm: null },
+        { key: 'requests', label: 'Solicitações', icon: DocumentTextIcon, perm: null },
     ].filter(item => {
         if (item.perm) {
             return (profile?.permissions as any)?.[item.perm] !== false;
@@ -959,6 +962,13 @@ const EmployeePortal: React.FC = () => {
                                         })()}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* SOLICITAÇÕES */}
+                        {activeSection === 'requests' && (
+                            <div className="p-8 space-y-6">
+                                <FormsPage />
                             </div>
                         )}
                     </div>

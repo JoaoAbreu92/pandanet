@@ -8,7 +8,7 @@ interface VacationRequest {
   days_requested: number; status: string; notes: string | null; response_notes: string | null;
   created_at: string; profiles?: { full_name: string; avatar_url: string | null };
 }
-interface Employee { id: string; full_name: string; avatar_url: string | null; email: string; }
+interface Employee { id: string; full_name: string; avatar_url: string | null; email: string; department_id?: string | null; }
 
 const HRManager: React.FC = () => {
   const { profile } = useAuth();
@@ -39,6 +39,8 @@ const HRManager: React.FC = () => {
   const [docTargetDepts, setDocTargetDepts] = useState<string[]>([]);
   const [departments, setDepartments] = useState<{id: string; name: string}[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [docShowDeptFilter, setDocShowDeptFilter] = useState(false);
+  const [docSelectedDeptFilter, setDocSelectedDeptFilter] = useState('');
 
   // Payslips state
   const [payslips, setPayslips] = useState<any[]>([]);
@@ -69,6 +71,12 @@ const HRManager: React.FC = () => {
   const [ebDesc, setEbDesc] = useState('');
   const [ebStartDate, setEbStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [savingEb, setSavingEb] = useState(false);
+  const [ebTargetType, setEbTargetType] = useState<'all' | 'users' | 'departments'>('all');
+  const [ebTargetUsers, setEbTargetUsers] = useState<string[]>([]);
+  const [ebTargetDepts, setEbTargetDepts] = useState<string[]>([]);
+  const [ebUserSearch, setEbUserSearch] = useState('');
+  const [ebShowDeptFilter, setEbShowDeptFilter] = useState(false);
+  const [ebSelectedDeptFilter, setEbSelectedDeptFilter] = useState('');
 
   // Novo: Metas/Desempenho Admin State
   const [evaluations, setEvaluations] = useState<any[]>([]);
@@ -87,6 +95,12 @@ const HRManager: React.FC = () => {
   const [newCompetency, setNewCompetency] = useState('');
   const [showCompetenciesModal, setShowCompetenciesModal] = useState(false);
   const [customScores, setCustomScores] = useState<Record<string, string>>({});
+  const [evTargetType, setEvTargetType] = useState<'all' | 'users' | 'departments'>('all');
+  const [evTargetUsers, setEvTargetUsers] = useState<string[]>([]);
+  const [evTargetDepts, setEvTargetDepts] = useState<string[]>([]);
+  const [evUserSearch, setEvUserSearch] = useState('');
+  const [evShowDeptFilter, setEvShowDeptFilter] = useState(false);
+  const [evSelectedDeptFilter, setEvSelectedDeptFilter] = useState('');
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3000);
@@ -146,7 +160,7 @@ const HRManager: React.FC = () => {
 
   const fetchEmployees = async () => {
     const { data } = await supabase.from('profiles')
-      .select('id, full_name, avatar_url, email')
+      .select('id, full_name, avatar_url, email, department_id')
       .eq('company_id', profile!.company_id!);
     if (data) setEmployees(data);
   };
@@ -217,22 +231,44 @@ const HRManager: React.FC = () => {
   };
 
   const saveEmployeeBenefit = async () => {
-    if (!ebEmployee || !ebName) { showToast('Selecione o funcionário e insira o nome do benefício.', false); return; }
+    if (!ebName) { showToast('Insira o nome do benefício.', false); return; }
+
+    // Resolve target employees
+    let targetEmployeeIds: string[] = [];
+    if (ebTargetType === 'all') {
+      targetEmployeeIds = employees.map(e => e.id);
+    } else if (ebTargetType === 'departments') {
+      targetEmployeeIds = employees
+        .filter(e => e.department_id && ebTargetDepts.includes(e.department_id))
+        .map(e => e.id);
+    } else if (ebTargetType === 'users') {
+      targetEmployeeIds = ebTargetUsers;
+    }
+
+    if (targetEmployeeIds.length === 0) {
+      showToast('Selecione pelo menos um colaborador para vincular o benefício.', false);
+      return;
+    }
+
     setSavingEb(true);
-    const { error } = await supabase.from('hr_employee_benefits').insert({
+    const rows = targetEmployeeIds.map(empId => ({
       company_id: profile!.company_id!,
-      employee_id: ebEmployee,
+      employee_id: empId,
       name: ebName,
       value: ebValue ? parseFloat(ebValue) : null,
       description: ebDesc || null,
       start_date: ebStartDate || null,
       status: 'ativo'
-    });
+    }));
+
+    const { error } = await supabase.from('hr_employee_benefits').insert(rows);
     setSavingEb(false);
-    if (error) { showToast('Erro ao salvar benefício.', false); }
-    else {
-      showToast('Benefício vinculado!');
+    if (error) {
+      showToast('Erro ao salvar benefício.', false);
+    } else {
+      showToast('Benefício vinculado com sucesso!');
       setEbName(''); setEbValue(''); setEbDesc('');
+      setEbTargetUsers([]); setEbTargetDepts([]); setEbTargetType('all');
       fetchEmployeeBenefits();
     }
   };
@@ -281,14 +317,31 @@ const HRManager: React.FC = () => {
   };
 
   const saveEvaluation = async () => {
-    if (!evEmployee || !evTitle) { showToast('Selecione o funcionário e insira o título.', false); return; }
+    if (!evTitle) { showToast('Insira o título.', false); return; }
+
+    // Resolve target employees
+    let targetEmployeeIds: string[] = [];
+    if (evTargetType === 'all') {
+      targetEmployeeIds = employees.map(e => e.id);
+    } else if (evTargetType === 'departments') {
+      targetEmployeeIds = employees
+        .filter(e => e.department_id && evTargetDepts.includes(e.department_id))
+        .map(e => e.id);
+    } else if (evTargetType === 'users') {
+      targetEmployeeIds = evTargetUsers;
+    }
+
+    if (targetEmployeeIds.length === 0) {
+      showToast('Selecione pelo menos um colaborador para cadastrar a avaliação/meta.', false);
+      return;
+    }
+
     setSavingEv(true);
-    
     const isCustom = competencies.length > 0;
-    
-    const { error } = await supabase.from('hr_evaluations').insert({
+
+    const rows = targetEmployeeIds.map(empId => ({
       company_id: profile!.company_id!,
-      employee_id: evEmployee,
+      employee_id: empId,
       title: evTitle,
       type: evType,
       status: evStatus,
@@ -300,12 +353,16 @@ const HRManager: React.FC = () => {
       custom_scores: (evType === 'competencia' && isCustom) ? customScores : {},
       feedback_text: evFeedbackText || null,
       created_by: profile!.id
-    });
+    }));
+
+    const { error } = await supabase.from('hr_evaluations').insert(rows);
     setSavingEv(false);
-    if (error) { showToast('Erro ao salvar avaliação.', false); }
-    else {
-      showToast('Avaliação/Meta cadastrada!');
+    if (error) {
+      showToast('Erro ao salvar avaliação.', false);
+    } else {
+      showToast('Avaliação/Meta cadastrada com sucesso!');
       setEvTitle(''); setEvProgress('0'); setEvFeedbackText('');
+      setEvTargetUsers([]); setEvTargetDepts([]); setEvTargetType('all');
       const resetScores: Record<string, string> = {};
       competencies.forEach(c => { resetScores[c] = '10'; });
       setCustomScores(resetScores);
@@ -632,17 +689,111 @@ const HRManager: React.FC = () => {
                 {/* Pessoas específicas */}
                 {docTargetType === 'users' && (
                   <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecione os funcionários</p>
-                    <input
-                      type="text"
-                      value={userSearch}
-                      onChange={e => setUserSearch(e.target.value)}
-                      placeholder="Buscar funcionário..."
-                      className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    />
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecione os funcionários</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDocTargetUsers(employees.map(emp => emp.id))}
+                          className="px-2 py-1 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Selecionar Todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDocTargetUsers([])}
+                          className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Limpar Seleção
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={e => setUserSearch(e.target.value)}
+                        placeholder="Buscar funcionário..."
+                        className="flex-1 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setDocShowDeptFilter(!docShowDeptFilter); setDocSelectedDeptFilter(''); }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                          docShowDeptFilter
+                            ? 'bg-emerald-500 text-white border-emerald-500'
+                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-brand-primary'
+                        }`}
+                      >
+                        📁 Filtrar por Setor
+                      </button>
+                    </div>
+
+                    {docShowDeptFilter && (
+                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-550 uppercase tracking-wide">Escolha um Setor para Filtrar</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setDocSelectedDeptFilter('')}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                              docSelectedDeptFilter === ''
+                                ? 'bg-brand-primary text-white border-brand-primary'
+                                : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            Todos os Setores
+                          </button>
+                          {departments.map(dept => (
+                            <button
+                              key={dept.id}
+                              type="button"
+                              onClick={() => setDocSelectedDeptFilter(dept.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                docSelectedDeptFilter === dept.id
+                                  ? 'bg-brand-primary text-white border-brand-primary'
+                                  : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {dept.name}
+                            </button>
+                          ))}
+                        </div>
+                        {docSelectedDeptFilter && (
+                          <div className="flex gap-2 pt-1 border-t dark:border-white/5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === docSelectedDeptFilter).map(emp => emp.id);
+                                setDocTargetUsers(prev => Array.from(new Set([...prev, ...deptEmpIds])));
+                              }}
+                              className="px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-[10px] font-bold rounded"
+                            >
+                              Selecionar Todos deste Setor
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === docSelectedDeptFilter).map(emp => emp.id);
+                                setDocTargetUsers(prev => prev.filter(id => !deptEmpIds.includes(id)));
+                              }}
+                              className="px-2 py-0.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded"
+                            >
+                              Desmarcar Todos deste Setor
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
                       {employees
-                        .filter(emp => emp.full_name.toLowerCase().includes(userSearch.toLowerCase()))
+                        .filter(emp => {
+                          const matchesSearch = emp.full_name.toLowerCase().includes(userSearch.toLowerCase());
+                          const matchesDept = !docSelectedDeptFilter || emp.department_id === docSelectedDeptFilter;
+                          return matchesSearch && matchesDept;
+                        })
                         .map(emp => (
                           <div
                             key={emp.id}
@@ -845,13 +996,194 @@ const HRManager: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl p-6 space-y-4 max-w-2xl">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white">Vincular Benefício ao Funcionário</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Funcionário</label>
-                <select value={ebEmployee} onChange={e => setEbEmployee(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                  <option value="">Selecione...</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                </select>
+              <div className="md:col-span-2 border-b dark:border-white/5 pb-4">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">📤 Vincular para</label>
+                <div className="flex gap-2 flex-wrap mb-3">
+                  {(['all', 'departments', 'users'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setEbTargetType(t); setEbTargetUsers([]); setEbTargetDepts([]); setEbUserSearch(''); }}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        ebTargetType === t
+                          ? 'bg-brand-primary text-white border-brand-primary'
+                          : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-brand-primary hover:text-brand-primary'
+                      }`}
+                    >
+                      {t === 'all' ? '🌐 Todos os funcionários' : t === 'departments' ? '🏢 Setor específico' : '👤 Pessoas específicas'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Setor */}
+                {ebTargetType === 'departments' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Selecione os setores</p>
+                    <div className="flex flex-wrap gap-2">
+                      {departments.map(dept => (
+                        <button
+                          key={dept.id}
+                          type="button"
+                          onClick={() => setEbTargetDepts(prev =>
+                            prev.includes(dept.id) ? prev.filter(id => id !== dept.id) : [...prev, dept.id]
+                          )}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            ebTargetDepts.includes(dept.id)
+                              ? 'bg-emerald-500 text-white border-emerald-500'
+                              : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-emerald-400'
+                          }`}
+                        >
+                          {ebTargetDepts.includes(dept.id) ? '✓ ' : ''}{dept.name}
+                        </button>
+                      ))}
+                      {departments.length === 0 && <p className="text-xs text-gray-400">Nenhum setor cadastrado.</p>}
+                    </div>
+                    {ebTargetDepts.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-2">
+                        {ebTargetDepts.length} setor(es) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Pessoas específicas */}
+                {ebTargetType === 'users' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecione os funcionários</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEbTargetUsers(employees.map(emp => emp.id))}
+                          className="px-2 py-1 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Selecionar Todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEbTargetUsers([])}
+                          className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Limpar Seleção
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <input
+                        type="text"
+                        value={ebUserSearch}
+                        onChange={e => setEbUserSearch(e.target.value)}
+                        placeholder="Buscar funcionário..."
+                        className="flex-1 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setEbShowDeptFilter(!ebShowDeptFilter); setEbSelectedDeptFilter(''); }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                          ebShowDeptFilter
+                            ? 'bg-emerald-500 text-white border-emerald-500'
+                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-brand-primary'
+                        }`}
+                      >
+                        📁 Filtrar por Setor
+                      </button>
+                    </div>
+
+                    {ebShowDeptFilter && (
+                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-550 uppercase tracking-wide">Escolha um Setor para Filtrar</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEbSelectedDeptFilter('')}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                              ebSelectedDeptFilter === ''
+                                ? 'bg-brand-primary text-white border-brand-primary'
+                                : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            Todos os Setores
+                          </button>
+                          {departments.map(dept => (
+                            <button
+                              key={dept.id}
+                              type="button"
+                              onClick={() => setEbSelectedDeptFilter(dept.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                ebSelectedDeptFilter === dept.id
+                                  ? 'bg-brand-primary text-white border-brand-primary'
+                                  : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {dept.name}
+                            </button>
+                          ))}
+                        </div>
+                        {ebSelectedDeptFilter && (
+                          <div className="flex gap-2 pt-1 border-t dark:border-white/5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === ebSelectedDeptFilter).map(emp => emp.id);
+                                setEbTargetUsers(prev => Array.from(new Set([...prev, ...deptEmpIds])));
+                              }}
+                              className="px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-[10px] font-bold rounded"
+                            >
+                              Selecionar Todos deste Setor
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === ebSelectedDeptFilter).map(emp => emp.id);
+                                setEbTargetUsers(prev => prev.filter(id => !deptEmpIds.includes(id)));
+                              }}
+                              className="px-2 py-0.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded"
+                            >
+                              Desmarcar Todos deste Setor
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                      {employees
+                        .filter(emp => {
+                          const matchesSearch = emp.full_name.toLowerCase().includes(ebUserSearch.toLowerCase());
+                          const matchesDept = !ebSelectedDeptFilter || emp.department_id === ebSelectedDeptFilter;
+                          return matchesSearch && matchesDept;
+                        })
+                        .map(emp => (
+                          <div
+                            key={emp.id}
+                            onClick={() => setEbTargetUsers(prev =>
+                              prev.includes(emp.id) ? prev.filter(id => id !== emp.id) : [...prev, emp.id]
+                            )}
+                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                              ebTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+                                : 'hover:bg-gray-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              ebTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                              {ebTargetUsers.includes(emp.id) && <span className="text-white text-xs">✓</span>}
+                            </div>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">{emp.full_name}</span>
+                          </div>
+                        ))}
+                    </div>
+                    {ebTargetUsers.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        {ebTargetUsers.length} funcionário(s) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Nome do Benefício</label>
@@ -909,13 +1241,194 @@ const HRManager: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl p-6 space-y-4 max-w-2xl">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white">Cadastrar Avaliação / Meta de Desempenho</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Funcionário</label>
-                <select value={evEmployee} onChange={e => setEvEmployee(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                  <option value="">Selecione...</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                </select>
+              <div className="md:col-span-2 border-b dark:border-white/5 pb-4">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">📤 Vincular para</label>
+                <div className="flex gap-2 flex-wrap mb-3">
+                  {(['all', 'departments', 'users'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setEvTargetType(t); setEvTargetUsers([]); setEvTargetDepts([]); setEvUserSearch(''); }}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        evTargetType === t
+                          ? 'bg-brand-primary text-white border-brand-primary'
+                          : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-brand-primary hover:text-brand-primary'
+                      }`}
+                    >
+                      {t === 'all' ? '🌐 Todos os funcionários' : t === 'departments' ? '🏢 Setor específico' : '👤 Pessoas específicas'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Setor */}
+                {evTargetType === 'departments' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Selecione os setores</p>
+                    <div className="flex flex-wrap gap-2">
+                      {departments.map(dept => (
+                        <button
+                          key={dept.id}
+                          type="button"
+                          onClick={() => setEvTargetDepts(prev =>
+                            prev.includes(dept.id) ? prev.filter(id => id !== dept.id) : [...prev, dept.id]
+                          )}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            evTargetDepts.includes(dept.id)
+                              ? 'bg-emerald-500 text-white border-emerald-500'
+                              : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-emerald-400'
+                          }`}
+                        >
+                          {evTargetDepts.includes(dept.id) ? '✓ ' : ''}{dept.name}
+                        </button>
+                      ))}
+                      {departments.length === 0 && <p className="text-xs text-gray-400">Nenhum setor cadastrado.</p>}
+                    </div>
+                    {evTargetDepts.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-2">
+                        {evTargetDepts.length} setor(es) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Pessoas específicas */}
+                {evTargetType === 'users' && (
+                  <div className="bg-gray-50 dark:bg-slate-800/40 rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecione os funcionários</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEvTargetUsers(employees.map(emp => emp.id))}
+                          className="px-2 py-1 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Selecionar Todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEvTargetUsers([])}
+                          className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Limpar Seleção
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <input
+                        type="text"
+                        value={evUserSearch}
+                        onChange={e => setEvUserSearch(e.target.value)}
+                        placeholder="Buscar funcionário..."
+                        className="flex-1 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-gray-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setEvShowDeptFilter(!evShowDeptFilter); setEvSelectedDeptFilter(''); }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                          evShowDeptFilter
+                            ? 'bg-emerald-500 text-white border-emerald-500'
+                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-brand-primary'
+                        }`}
+                      >
+                        📁 Filtrar por Setor
+                      </button>
+                    </div>
+
+                    {evShowDeptFilter && (
+                      <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-550 uppercase tracking-wide">Escolha um Setor para Filtrar</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEvSelectedDeptFilter('')}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                              evSelectedDeptFilter === ''
+                                ? 'bg-brand-primary text-white border-brand-primary'
+                                : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            Todos os Setores
+                          </button>
+                          {departments.map(dept => (
+                            <button
+                              key={dept.id}
+                              type="button"
+                              onClick={() => setEvSelectedDeptFilter(dept.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                evSelectedDeptFilter === dept.id
+                                  ? 'bg-brand-primary text-white border-brand-primary'
+                                  : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {dept.name}
+                            </button>
+                          ))}
+                        </div>
+                        {evSelectedDeptFilter && (
+                          <div className="flex gap-2 pt-1 border-t dark:border-white/5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === evSelectedDeptFilter).map(emp => emp.id);
+                                setEvTargetUsers(prev => Array.from(new Set([...prev, ...deptEmpIds])));
+                              }}
+                              className="px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-[10px] font-bold rounded"
+                            >
+                              Selecionar Todos deste Setor
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const deptEmpIds = employees.filter(emp => emp.department_id === evSelectedDeptFilter).map(emp => emp.id);
+                                setEvTargetUsers(prev => prev.filter(id => !deptEmpIds.includes(id)));
+                              }}
+                              className="px-2 py-0.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold rounded"
+                            >
+                              Desmarcar Todos deste Setor
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                      {employees
+                        .filter(emp => {
+                          const matchesSearch = emp.full_name.toLowerCase().includes(evUserSearch.toLowerCase());
+                          const matchesDept = !evSelectedDeptFilter || emp.department_id === evSelectedDeptFilter;
+                          return matchesSearch && matchesDept;
+                        })
+                        .map(emp => (
+                          <div
+                            key={emp.id}
+                            onClick={() => setEvTargetUsers(prev =>
+                              prev.includes(emp.id) ? prev.filter(id => id !== emp.id) : [...prev, emp.id]
+                            )}
+                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                              evTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+                                : 'hover:bg-gray-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              evTargetUsers.includes(emp.id)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}>
+                              {evTargetUsers.includes(emp.id) && <span className="text-white text-xs">✓</span>}
+                            </div>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">{emp.full_name}</span>
+                          </div>
+                        ))}
+                    </div>
+                    {evTargetUsers.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        {evTargetUsers.length} funcionário(s) selecionado(s)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Tipo de Registro</label>
