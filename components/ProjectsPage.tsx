@@ -19,7 +19,8 @@ import {
     ClipboardDocumentCheckIcon,
     ChartBarIcon,
     PaperAirplaneIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    ExclamationTriangleIcon
 } from './icons';
 import type { Employee } from '../types';
 
@@ -119,14 +120,18 @@ const getRelativeTime = (dateString: string) => {
 
 interface ProjectsPageProps {
     defaultTab?: 'kanban' | 'planning' | 'list' | 'calendar' | 'timesheet';
+    customFeatures?: Record<string, any>;
 }
 
-const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
+const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures }) => {
     const { currentUser } = useAuth();
     const { showToast } = useToast();
 
     // Estado principal
     const [projects, setProjects] = useState<Project[]>([]);
+
+    const isProjectsLimited = (customFeatures?.projects as any) === 'limited';
+    const reachedProjectLimit = isProjectsLimited && projects.length >= 3;
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('pixel_selected_project');
@@ -1080,17 +1085,24 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
                 </div>
 
                 {!selectedProject && (
-                    <button
-                        onClick={() => {
-                            setEditingProject(null);
-                            setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
-                            setIsProjectModalOpen(true);
-                        }}
-                        className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-250 transition-all active:scale-95"
-                    >
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Novo Projeto</span>
-                    </button>
+                    reachedProjectLimit ? (
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-250 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2">
+                            <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                            <span>Limite do plano (3 projetos ativos) atingido. Faça upgrade para ilimitado.</span>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setEditingProject(null);
+                                setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
+                                setIsProjectModalOpen(true);
+                            }}
+                            className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-250 transition-all active:scale-95"
+                        >
+                            <PlusIcon className="w-5 h-5" />
+                            <span>Novo Projeto</span>
+                        </button>
+                    )
                 )}
             </div>
 

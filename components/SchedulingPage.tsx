@@ -16,7 +16,11 @@ import {
 } from './icons';
 import type { SchedulingEventType, SchedulingBooking, SchedulingTemplate } from '../types';
 
-const SchedulingPage: React.FC = () => {
+interface SchedulingPageProps {
+    customFeatures?: Record<string, any>;
+}
+
+const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
     const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
     const [activeTab, setActiveTab] = useState<'events' | 'bookings' | 'templates' | 'settings'>('events');
@@ -30,6 +34,9 @@ const SchedulingPage: React.FC = () => {
 
     // Data lists
     const [eventTypes, setEventTypes] = useState<SchedulingEventType[]>([]);
+
+    const isSchedulingLimited = (customFeatures?.scheduling as any) === 'limited';
+    const reachedLimit = isSchedulingLimited && eventTypes.length >= 2;
     const [bookings, setBookings] = useState<SchedulingBooking[]>([]);
     const [templates, setTemplates] = useState<SchedulingTemplate[]>([]);
     const [emailAccounts, setEmailAccounts] = useState<any[]>([]);
@@ -826,28 +833,35 @@ const SchedulingPage: React.FC = () => {
                 
                 <div className="flex gap-2">
                     {activeTab === 'events' && (
-                        <button
-                            onClick={() => {
-                                setEditingEvent(null);
-                                setEventForm({
-                                    name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
-                                    requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
-                                    availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
-                                    is_active: true,
-                                    has_capacity_limit: false,
-                                    capacity_limit: 0,
-                                    show_capacity_to_guest: true,
-                                    has_lunch_break: false,
-                                    lunch_start_time: '12:00',
-                                    lunch_end_time: '13:00'
-                                });
-                                setShowEventModal(true);
-                            }}
-                            className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-primary/20 flex items-center gap-2 transition-all hover:scale-[1.02]"
-                        >
-                            <PlusIcon className="w-5 h-5" />
-                            Criar Nova Agenda
-                        </button>
+                        reachedLimit ? (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2">
+                                <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                                <span>Limite do plano (2 agendas ativas) atingido. Faça upgrade para ilimitado.</span>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    setEditingEvent(null);
+                                    setEventForm({
+                                        name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
+                                        requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
+                                        availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
+                                        is_active: true,
+                                        has_capacity_limit: false,
+                                        capacity_limit: 0,
+                                        show_capacity_to_guest: true,
+                                        has_lunch_break: false,
+                                        lunch_start_time: '12:00',
+                                        lunch_end_time: '13:00'
+                                    });
+                                    setShowEventModal(true);
+                                }}
+                                className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-primary/20 flex items-center gap-2 transition-all hover:scale-[1.02]"
+                            >
+                                <PlusIcon className="w-5 h-5" />
+                                Criar Nova Agenda
+                            </button>
+                        )
                     )}
                     {activeTab === 'templates' && (
                         <button
@@ -1375,14 +1389,21 @@ const SchedulingPage: React.FC = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">É pago? *</label>
-                                    <select 
-                                        value={eventForm.is_paid ? 'true' : 'false'}
-                                        onChange={e => setEventForm({ ...eventForm, is_paid: e.target.value === 'true' })}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
-                                    >
-                                        <option value="false">Não (Gratuito)</option>
-                                        <option value="true">Sim (Pago)</option>
-                                    </select>
+                                    {isSchedulingLimited ? (
+                                        <div className="w-full bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-500 font-semibold flex flex-col justify-center">
+                                            <span>Não (Gratuito) 🔒</span>
+                                            <span className="text-[9px] text-amber-500 font-black mt-1">Cobranças exigem o plano completo.</span>
+                                        </div>
+                                    ) : (
+                                        <select 
+                                            value={eventForm.is_paid ? 'true' : 'false'}
+                                            onChange={e => setEventForm({ ...eventForm, is_paid: e.target.value === 'true' })}
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
+                                        >
+                                            <option value="false">Não (Gratuito)</option>
+                                            <option value="true">Sim (Pago)</option>
+                                        </select>
+                                    )}
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Valor de Reserva (R$)</label>

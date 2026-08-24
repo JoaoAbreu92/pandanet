@@ -697,8 +697,11 @@ const AppContent: React.FC = () => {
         };
 
         const featureId = featureMap[permission];
-        if (featureId && currentCompany?.custom_features && currentCompany.custom_features[featureId] === false) {
-            return false;
+        if (featureId && currentCompany?.custom_features) {
+            const feat = currentCompany.custom_features[featureId] as any;
+            if (feat === false || feat === 'disabled') {
+                return false;
+            }
         }
 
         return true;
@@ -743,15 +746,21 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" /> : null;
-            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" /> : null;
-            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" /> : null;
-            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" /> : null;
-            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" /> : null;
+            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" customFeatures={currentCompany?.custom_features} /> : null;
+            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" customFeatures={currentCompany?.custom_features} /> : null;
+            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" customFeatures={currentCompany?.custom_features} /> : null;
+            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" customFeatures={currentCompany?.custom_features} /> : null;
+            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" customFeatures={currentCompany?.custom_features} /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
-            case 'scheduling': return <SchedulingPage />;
+            case 'scheduling': {
+                const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
+                if (schedulingFeat === false || schedulingFeat === 'disabled') {
+                    return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
+                }
+                return <SchedulingPage customFeatures={currentCompany?.custom_features} />;
+            }
             case 'scheduling-book': return <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={false} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;

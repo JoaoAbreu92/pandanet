@@ -460,7 +460,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     // Forms State
     const [formData, setFormData] = useState<any>({});
-    const [featuresState, setFeaturesState] = useState<Record<string, boolean>>({});
+    const [featuresState, setFeaturesState] = useState<Record<string, any>>({});
 
     // Helpers
     const openModal = (type: string, company: Company | null = null, planId: string | null = null) => {
@@ -492,10 +492,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     emailLimit: (plan.emailLimit || 1).toString(),
                     price: (plan.price || 0).toString() 
                 });
-                setFeaturesState((plan.features || {}) as Record<string, boolean>);
+                setFeaturesState((plan.features || {}) as Record<string, any>);
             }
         } else if (type === 'config' && company) {
-            setFeaturesState((company.custom_features || company.plan?.features || {}) as Record<string, boolean>);
+            setFeaturesState((company.custom_features || company.plan?.features || {}) as Record<string, any>);
         } else if (type === 'newUpdate') {
             setFormData({ version: SYSTEM_VERSION, description: '' });
         } else if (type === 'createAnnouncement') {
@@ -982,6 +982,38 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             </div>
         );
 
+        const SelectLevelToggle = ({ label, id, icon: Icon }: { label: string, id: string, icon?: any }) => {
+            const currentValue = featuresState[id];
+            // Normalize: true -> 'complete', false/undefined/null -> 'disabled', string -> string
+            let valStr = 'disabled';
+            if (currentValue === true || currentValue === 'complete') valStr = 'complete';
+            else if (currentValue === 'limited') valStr = 'limited';
+            
+            return (
+                <div className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg transition-colors col-span-full md:col-span-1 border border-dashed border-gray-100 dark:border-gray-800 my-1">
+                    <div className="flex items-center gap-3">
+                        {Icon && <Icon className="w-5 h-5 text-brand-primary" />}
+                        <span className="text-sm text-gray-700 dark:text-gray-200 font-bold">{label}</span>
+                    </div>
+                    <select
+                        value={valStr}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setFeaturesState(prev => ({ 
+                                ...prev, 
+                                [id]: val === 'complete' ? true : (val === 'disabled' ? false : 'limited') 
+                            }));
+                        }}
+                        className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand-primary font-bold text-slate-700 dark:text-slate-200"
+                    >
+                        <option value="disabled">🚫 Desabilitado</option>
+                        <option value="limited">⚠️ Com Limites</option>
+                        <option value="complete">🚀 Completo</option>
+                    </select>
+                </div>
+            );
+        };
+
         const SectionTitle = ({ title }: { title: string }) => (
             <h5 className="font-bold text-gray-400 dark:text-gray-500 text-[10px] uppercase tracking-widest col-span-full mt-6 mb-2 border-b border-gray-100 dark:border-gray-700 pb-1">{title}</h5>
         );
@@ -996,7 +1028,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Módulo CRM (Perfex)" id="crm" icon={BuildingOfficeIcon} />
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
-                <Toggle label="Gestão de Projetos" id="projects" icon={ClipboardDocumentCheckIcon} />
+                
+                <SelectLevelToggle label="Agendamentos" id="scheduling" icon={CalendarDaysIcon} />
+                <SelectLevelToggle label="Gestão de Projetos" id="projects" icon={ClipboardDocumentCheckIcon} />
+                
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />
                 <Toggle label="WhatsPanda (CRM)" id="whatspanda" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Assistente IA (Panda)" id="ai_assistant" icon={SparklesIcon} />

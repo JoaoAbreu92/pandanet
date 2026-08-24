@@ -120,7 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         }
         // Se a feature não foi aprovada pelo SaaS, não exibir
         if (featureId && customFeatures) {
-            if (customFeatures[featureId] === false) {
+            const feat = customFeatures[featureId] as any;
+            if (feat === false || feat === 'disabled') {
                 return null;
             }
         }
@@ -192,7 +193,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
         if (featureId) {
-            const isExplicitlyDisabled = customFeatures && customFeatures[featureId] === false;
+            const feat = customFeatures ? (customFeatures[featureId] as any) : null;
+            const isExplicitlyDisabled = feat === false || feat === 'disabled';
             if (isExplicitlyDisabled) {
                 return null;
             }
@@ -280,17 +282,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission={true} />
+                <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission={true} featureId="scheduling" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
                     {hasSelectedProject && (
                         <>
-                            <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />
+                            {(customFeatures?.projects as any) !== 'limited' && <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />}
                             <NavItem page="projects-list" label="Lista" icon={ListBulletIcon} permission="viewProjects" featureId="projects" />
                             <NavItem page="projects-calendar" label="Calendário" icon={CalendarIcon} permission="viewProjects" featureId="projects" />
-                            <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />
+                            {(customFeatures?.projects as any) !== 'limited' && <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />}
                         </>
                     )}
                 </NavMenu>
