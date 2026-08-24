@@ -142,5 +142,12 @@ CREATE POLICY "Leitura pública de configurações por empresa" ON public.schedu
 -- Adicionar colunas de unidade de duração e desativação de horários se não existirem
 ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS duration_unit TEXT DEFAULT 'minutes';
 ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS disable_time_slots BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS has_capacity_limit BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS capacity_limit INTEGER DEFAULT 0;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS show_capacity_to_guest BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS has_lunch_break BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_start_time TEXT DEFAULT '12:00';
+ALTER TABLE public.scheduling_event_types ADD COLUMN IF NOT EXISTS lunch_end_time TEXT DEFAULT '13:00';
+
 
 
