@@ -563,7 +563,7 @@ BEGIN
         SELECT tablename 
         FROM pg_tables 
         WHERE schemaname = 'public' 
-        AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings')
+        AND tablename NOT IN ('plans', 'companies', 'profiles', 'system_updates', 'system_settings', 'email_settings')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_policy ON public.%I', t);
         
@@ -618,6 +618,46 @@ $$;
 -- Conceder permissões para a nova função
 GRANT EXECUTE ON FUNCTION public.update_user_hierarchy(UUID, UUID, UUID, BOOLEAN) TO authenticated, service_role;
 
+-- 4. Definir políticas de RLS seguras para email_settings
+DROP POLICY IF EXISTS tenant_isolation_policy ON public.email_settings;
+DROP POLICY IF EXISTS email_settings_select_policy ON public.email_settings;
+DROP POLICY IF EXISTS email_settings_write_policy ON public.email_settings;
+DROP POLICY IF EXISTS email_settings_all_policy ON public.email_settings;
+
+CREATE POLICY email_settings_select_policy ON public.email_settings
+FOR SELECT
+USING (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND (
+            (email_permissions->>'can_view_all_accounts')::boolean = TRUE
+            AND company_id = email_settings.company_id
+        )
+    )
+    OR EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND COALESCE(email_permissions->'allowed_accounts', '[]'::jsonb) ? email_settings.id::text
+    )
+);
+
+CREATE POLICY email_settings_all_policy ON public.email_settings
+FOR ALL
+USING (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+)
+WITH CHECK (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+);
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
+-- 6. Drop UNIQUE constraint on email_settings.user_id to support multiple email accounts per user
+ALTER TABLE public.email_settings DROP CONSTRAINT IF EXISTS email_settings_user_id_key;
 

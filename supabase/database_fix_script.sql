@@ -568,7 +568,7 @@ CREATE TABLE IF NOT EXISTS public.calendar_invites (
 
 CREATE TABLE IF NOT EXISTS public.email_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES public.profiles(id) UNIQUE,
+    user_id UUID REFERENCES public.profiles(id),
     imap_host TEXT,
     imap_port INTEGER,
     imap_user TEXT,
