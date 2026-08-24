@@ -775,6 +775,8 @@ export interface WhatsAppConversation {
   is_muted?: boolean; // Novo: silenciar notificações
   is_group?: boolean;
   last_away_message_at?: string | null;
+  protocol_number?: string | null;
+  protocol_created_at?: string | null;
 }
 
 export interface WhatsAppMessage {

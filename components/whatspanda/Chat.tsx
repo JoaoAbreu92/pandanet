@@ -2863,8 +2863,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <div className="absolute bottom-[100%] left-2 right-2 sm:left-4 sm:right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
                   <div className="flex border-b border-slate-100 dark:border-white/5">
                     <button
-                      onClick={() => setStickerTab('emoji')}
-                      className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'emoji' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
+                      onClick={() => setStickerTab('emojis')}
+                      className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'emojis' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
                     >
                       Emojis & Gifs
                     </button>
@@ -2877,7 +2877,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   </div>
 
                   <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar">
-                    {stickerTab === 'emoji' ? (
+                    {stickerTab === 'emojis' ? (
                       <div className="grid grid-cols-6 gap-2">
                         {['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉', '👏', '🤝', '✅', '❌', '💯', '⭐', '💡', '🚀', '👀', '📌'].map((emoji, i) => (
                           <button
