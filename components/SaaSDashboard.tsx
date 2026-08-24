@@ -421,8 +421,18 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             .select('*')
             .eq('company_id', companyId);
 
-        if (error) console.error("Error fetching users", error);
-        else setCompanyUsers(data as unknown as Employee[] || []);
+        if (error) {
+            console.error("Error fetching users", error);
+        } else {
+            // Map database columns to the component's expected Employee interface
+            const mappedUsers = (data || []).map((user: any) => ({
+                ...user,
+                name: user.full_name,
+                isCompanyAdmin: user.is_company_admin,
+                avatarUrl: user.avatar_url
+            }));
+            setCompanyUsers(mappedUsers as unknown as Employee[]);
+        }
     };
 
     const handleImpersonateUser = (user: Employee) => {
@@ -445,7 +455,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             alert("Erro ao atualizar permissão: " + error.message);
         } else {
             // Update local state
-            setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, is_company_admin: !currentStatus } : u));
+            setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, isCompanyAdmin: !currentStatus, is_company_admin: !currentStatus } : u));
         }
     };
 
