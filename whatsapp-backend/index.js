@@ -288,7 +288,6 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
 
                 console.log(`[SYNC] Chat sincronizado para ${fromPhone} (sem histórico).`);
-            }
         }
         console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso! (Light)`);
     } catch (err) {
