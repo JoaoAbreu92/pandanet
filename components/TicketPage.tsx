@@ -41,7 +41,7 @@ const TicketPage: React.FC = () => {
             // Fetch Employees for assignment dropdown
             const { data: employeesData } = await supabase
                 .from('profiles')
-                .select('id, full_name, avatar_url, role, team')
+                .select('id, full_name, avatar_url, role, team, department_id')
                 .eq('company_id', currentUser.company_id);
 
             if (employeesData) {
@@ -51,12 +51,13 @@ const TicketPage: React.FC = () => {
                     role: e.role,
                     team: e.team,
                     avatarUrl: e.avatar_url,
-                    email: '', // Not needed
+                    email: '',
                     joinDate: '',
                     birthDate: '',
                     isAdmin: false,
                     permissions: {} as any,
-                    following: []
+                    following: [],
+                    department_id: e.department_id
                 })));
             }
 

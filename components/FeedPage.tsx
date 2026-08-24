@@ -7,7 +7,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon } from './icons';
-import type { Post, Employee, Event, Recognition, PostComment, PostReaction } from '../types';
+import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page } from '../types';
 
 export const PostCard: React.FC<{
     post: Post;
@@ -158,11 +158,12 @@ interface FeedPageProps {
     onAddRecognition?: (rec: Recognition) => void;
     posts?: Post[];
     setPosts?: (posts: Post[]) => void;
+    onNavigate: (page: Page, context?: any) => void;
 }
 
 // Widget de Clima removido a pedido do usuário
 
-const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
+const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, context?: any) => void }> = ({ users, onNavigate }) => {
     const onlineUsers = users.filter(u => u.isOnline);
     // Sugerimos pessoas que NÃO estão online no momento para "descobrir"
     const suggestedUsers = users.filter(u => !u.isOnline).slice(0, 10);
@@ -177,7 +178,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
                     <div className="space-y-3">
                         <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Online Agora</p>
                         {onlineUsers.map(user => (
-                            <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <div className="relative">
                                     <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
@@ -186,7 +187,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
                                     <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
                                     <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
                                 </div>
-                            </a>
+                            </div>
                         ))}
                     </div>
                 )}
@@ -197,13 +198,13 @@ const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
                         <p className="text-xs text-gray-400 italic">Nenhum outro usuário encontrado.</p>
                     ) : (
                         displaySuggestions.map(user => (
-                            <a key={user.id} href={`/profile/${user.id}`} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
+                            <div key={user.id} onClick={() => onNavigate('profile', user.id)} className="flex items-center space-x-3 group hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
                                 <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-brand-text truncate group-hover:text-brand-primary transition-colors">{user.name}</p>
                                     <p className="text-xs text-brand-subtle-text truncate">{user.role}</p>
                                 </div>
-                            </a>
+                            </div>
                         ))
                     )}
                 </div>
@@ -213,7 +214,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[] }> = ({ users }) => {
     );
 };
 
-const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition }) => {
+const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition, onNavigate }) => {
     const { addNotification } = useNotifications();
     const [posts, setPosts] = useState<Post[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
@@ -539,19 +540,21 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                 <div className="lg:col-span-2 space-y-6">
                     <EventsCarouselMini events={events} />
-                    <OnlineUsersWidget users={allEmployees} />
+                    <div className="lg:block hidden space-y-6">
+                        <OnlineUsersWidget users={allEmployees} onNavigate={onNavigate} />
+                    </div>
                 </div>
-            </div>
 
-            {showRecognitionModal && (
-                <RecognitionModal
-                    isOpen={showRecognitionModal}
-                    onClose={() => setShowRecognitionModal(false)}
-                    onSubmit={(data) => { handleRecognitionSubmit(data as any); setShowRecognitionModal(false); }}
-                    employees={allEmployees}
-                    currentUserId={currentUser.id}
-                />
-            )}
+                {showRecognitionModal && (
+                    <RecognitionModal
+                        isOpen={showRecognitionModal}
+                        onClose={() => setShowRecognitionModal(false)}
+                        onSubmit={(data) => { handleRecognitionSubmit(data as any); setShowRecognitionModal(false); }}
+                        employees={allEmployees}
+                        currentUserId={currentUser.id}
+                    />
+                )}
+            </div>
         </div>
     );
 };

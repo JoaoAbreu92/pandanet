@@ -64,8 +64,21 @@ const AppContent: React.FC = () => {
     const [isImpersonating, setIsImpersonating] = useState(false);
     const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
 
-    const [currentPage, setCurrentPage] = useState<Page>('home');
-    const [pageContext, setPageContext] = useState<any>(null);
+    const [currentPage, setCurrentPage] = useState<Page>(() => {
+        const saved = localStorage.getItem('pixel_current_page');
+        if (saved && ['home', 'feed', 'messages', 'chamados', 'calendario', 'diretorio', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
+            return saved as Page;
+        }
+        return 'home';
+    });
+    const [pageContext, setPageContext] = useState<any>(() => {
+        const saved = localStorage.getItem('pixel_page_context');
+        try {
+            return saved ? JSON.parse(saved) : null;
+        } catch {
+            return null;
+        }
+    });
 
     const [companyData, setCompanyData] = useState<AppData | null>(null);
     const [companySettings, setCompanySettings] = useState<any>(null);
@@ -228,6 +241,13 @@ const AppContent: React.FC = () => {
     const handleNavigate = useCallback((page: Page, context?: any) => {
         setCurrentPage(page);
         setPageContext(context ?? null);
+        localStorage.setItem('pixel_current_page', page);
+        if (context) {
+            localStorage.setItem('pixel_page_context', JSON.stringify(context));
+        } else {
+            localStorage.removeItem('pixel_page_context');
+        }
+        window.scrollTo(0, 0);
     }, []);
 
     const handleUpdateUser = (updatedUser: Employee) => {
@@ -316,10 +336,9 @@ const AppContent: React.FC = () => {
         if (!currentUser || !companyData) return null;
 
         const canAccess = (permission: keyof EmployeePermissions) => {
-            // 1. Check if user has explicit permission
-            if (!currentUser?.permissions[permission]) return false;
+            if (currentUser.role === 'Super Admin') return true;
+            if (currentUser.permissions?.[permission] === false) return false;
 
-            // 2. Check if feature is disabled for the company
             const featureMap: Record<string, string> = {
                 'viewMessages': 'messages',
                 'viewCalendar': 'calendar',
@@ -342,11 +361,11 @@ const AppContent: React.FC = () => {
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
-            case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} onAddRecognition={handleAddRecognition} />;
-            case 'messages': return canAccess('viewMessages') ? <Messages /> : null;
-            case 'tickets': return canAccess('openTickets') ? <TicketPage /> : null;
-            case 'calendar': return canAccess('viewCalendar') ? <CalendarPage /> : null;
-            case 'directory': return canAccess('viewDirectory') ? <DirectoryPage employees={companyData.employees} /> : null;
+            case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
+            case 'messages': return <Messages />;
+            case 'chamados': return <TicketPage currentUser={currentUser} companyData={companyData} />;
+            case 'calendario': return <CalendarPage events={companyData.events} />;
+            case 'diretorio': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
             case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;
@@ -356,7 +375,9 @@ const AppContent: React.FC = () => {
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
-            case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
+            case 'profile':
+                const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
+                return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
             case 'admin': return (currentUser.isAdmin || currentUser.is_company_admin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={currentCompany.custom_features} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
