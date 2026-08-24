@@ -145,7 +145,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
                     ...p,
                     userLimit: p.user_limit,
-                    whatsappLimit: p.whatsapp_limit || 1, // Novo mapeamento
+                    whatsappLimit: p.whatsapp_limit || 1,
+                    emailLimit: p.email_limit || 1,
                     price: p.price
                 }));
                 setLocalPlans(mappedPlans);
@@ -482,6 +483,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     name: plan.name, 
                     userLimit: plan.userLimit.toString(), 
                     whatsappLimit: (plan.whatsappLimit || 1).toString(),
+                    emailLimit: (plan.emailLimit || 1).toString(),
                     price: (plan.price || 0).toString() 
                 });
                 setFeaturesState((plan.features || {}) as Record<string, boolean>);
@@ -812,7 +814,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         const planData = {
             name: formData.name,
             user_limit: parseInt(formData.userLimit) || 0,
-            whatsapp_limit: parseInt(formData.whatsappLimit) || 1, // Novo campo
+            whatsapp_limit: parseInt(formData.whatsappLimit) || 1,
+            email_limit: parseInt(formData.emailLimit) || 1,
             price: parseFloat(formData.price) || 0,
             features: featuresState
         };
@@ -1969,6 +1972,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     <div>
                                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Canais WhatsApp</label>
                                         <input type="number" placeholder="Ex: 5" value={formData.whatsappLimit || ''} onChange={(e) => handleInputChange('whatsappLimit', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Limite de E-mails</label>
+                                        <input type="number" placeholder="Ex: 5" value={formData.emailLimit || ''} onChange={(e) => handleInputChange('emailLimit', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
                                     </div>
                                 </div>
 
