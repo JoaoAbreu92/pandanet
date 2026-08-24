@@ -1545,6 +1545,53 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     setCustomStickers(prev => prev.filter(s => s !== url));
   };
 
+  const isPlaceholderMediaText = (text?: string | null) => {
+    if (!text) return true;
+    const trimmed = text.trim();
+    return /^\[Mídia:?.*\]$/i.test(trimmed) || /^\[Arquivo\/Mídia\]$/i.test(trimmed) || trimmed === '[Mídia]';
+  };
+
+  const handleDownloadMedia = async (e: React.MouseEvent, rawUrl?: string | null, defaultFilename?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!rawUrl) return;
+    const url = fixMediaUrl(rawUrl);
+    if (!url) return;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      
+      let filename = defaultFilename;
+      if (!filename) {
+        const urlParts = url.split('/');
+        const lastPart = urlParts[urlParts.length - 1]?.split('?')[0];
+        filename = lastPart || 'download';
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+      console.warn('Direct fetch download failed, using fallback trigger:', err);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.download = defaultFilename || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const handleUploadSticker = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2512,15 +2559,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             playsInline
                             className="rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] hover:opacity-90 transition-opacity border-0 shadow-none bg-transparent"
                           />
-                          <a 
-                            href={fixMediaUrl(msg.media_url)} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          <button 
+                            type="button"
+                            onClick={(e) => handleDownloadMedia(e, msg.media_url, `gif_${msg.id}.mp4`)}
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md cursor-pointer"
+                            title="Baixar Mídia"
                           >
                             <Download className="w-4 h-4" />
-                          </a>
+                          </button>
                         </div>
                       ) : (msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
                         <div className={`relative group inline-block`} onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'image' })}>
@@ -2538,15 +2584,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               target.title = 'Erro ao carregar imagem';
                             }}
                           />
-                          <a 
-                            href={fixMediaUrl(msg.media_url)} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute bottom-2 right-2 p-1.5 bg-black/40 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          <button 
+                            type="button"
+                            onClick={(e) => handleDownloadMedia(e, msg.media_url, `imagem_${msg.id}.jpg`)}
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md cursor-pointer"
+                            title="Baixar Imagem"
                           >
                             <Download className="w-4 h-4" />
-                          </a>
+                          </button>
                         </div>
                       ) : (msg.media_type?.includes('audio') || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(ogg|mp3|wav|m4a)$/i))) ? (
                         <div className="flex flex-col gap-1 min-w-[200px] p-1">
@@ -2555,15 +2600,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               <Volume2 className="w-3.5 h-3.5" />
                               <span>Áudio</span>
                             </div>
-                            <a 
-                              href={fixMediaUrl(msg.media_url)} 
-                              download 
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="text-[10px] text-slate-400 hover:text-emerald-500 transition-colors"
+                            <button 
+                              type="button"
+                              onClick={(e) => handleDownloadMedia(e, msg.media_url, `audio_${msg.id}.mp3`)}
+                              className="text-slate-400 hover:text-emerald-500 transition-colors p-1 cursor-pointer"
+                              title="Baixar Áudio"
                             >
-                              <Download className="w-3 h-3" />
-                            </a>
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity">
                             <source src={fixMediaUrl(msg.media_url)} />
@@ -2588,13 +2632,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-white border-b-[6px] border-b-transparent ml-1" />
                             </div>
                           </div>
+                          <button 
+                            type="button"
+                            onClick={(e) => handleDownloadMedia(e, msg.media_url, `video_${msg.id}.mp4`)}
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md cursor-pointer"
+                            title="Baixar Vídeo"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                         </div>
                       ) : msg.media_url ? (
-                        <a 
-                          href={fixMediaUrl(msg.media_url)} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-white/10 dark:bg-white/5 rounded-xl border border-white/20 hover:border-emerald-400 transition-all group"
+                        <div 
+                          onClick={(e) => handleDownloadMedia(e, msg.media_url)}
+                          className="flex items-center gap-3 p-3 bg-white/10 dark:bg-white/5 rounded-xl border border-white/20 hover:border-emerald-400 transition-all group cursor-pointer"
                         >
                           <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg group-hover:scale-110 transition-transform">
                             <FileIcon className="w-6 h-6" />
@@ -2604,7 +2654,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             <p className="text-[10px] opacity-60 uppercase font-bold tracking-tighter">Clique para baixar</p>
                           </div>
                           <Download className="w-4 h-4 opacity-40 group-hover:opacity-100" />
-                        </a>
+                        </div>
                       ) : null}
 
                       {editingMessageId === msg.id ? (
@@ -2636,7 +2686,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </div>
                       ) : (
                         <>
-                          {msg.message_text && (
+                          {msg.message_text && !isPlaceholderMediaText(msg.message_text) && (
                             <p 
                               style={{ fontSize: `${chatFontSize}px` }}
                               className={`font-medium leading-relaxed whitespace-pre-wrap ${(msg.media_type === 'sticker' || msg.media_type === 'gif' || msg.media_url?.toLowerCase().endsWith('.gif')) ? 'mt-2 p-3 bg-emerald-100/90 dark:bg-emerald-500/20 rounded-2xl text-slate-800 dark:text-emerald-50' : ''}`}
@@ -3604,15 +3654,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               <video src={selectedMedia.url} controls autoPlay className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl outline-none" />
             ) : null}
             
-            <a 
-              href={selectedMedia.url} 
-              download 
-              target="_blank" 
-              rel="noreferrer"
-              className="absolute bottom-4 right-4 p-3 bg-emerald-500 hover:bg-emerald-600 rounded-full text-white shadow-lg transition-transform hover:scale-110 flex items-center gap-2"
+            <button 
+              type="button"
+              onClick={(e) => handleDownloadMedia(e, selectedMedia.url)} 
+              className="absolute bottom-4 right-4 p-3 bg-emerald-500 hover:bg-emerald-600 rounded-full text-white shadow-lg transition-transform hover:scale-110 flex items-center gap-2 cursor-pointer"
+              title="Baixar mídia"
             >
               <Download className="w-5 h-5" />
-            </a>
+            </button>
           </div>
         </div>
       )}

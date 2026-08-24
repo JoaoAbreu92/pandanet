@@ -2319,7 +2319,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                 else if (mimeType.includes('video/')) mediaType = 'video';
             }
             
-            if (!text) text = `[Mídia: ${mediaType}]`;
+            if (!text) text = null;
             
             console.log(`[MEDIA] Mídia detectada: ${mediaType} na mensagem ${msgId}`);
             
