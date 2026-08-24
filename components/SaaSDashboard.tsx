@@ -577,47 +577,35 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         if (modalOpen.createCompany) {
             const selectedPlan = localPlans.find(p => p.name === formData.plan);
 
-            const newCompany = {
-                name: formData.name,
-                status: 'active',
-                cnpj: formData.cnpj,
-                plan_id: selectedPlan?.id,
-                domain: formData.domain,
-                responsible_name: formData.responsibleName,
-                responsible_email: formData.responsibleEmail,
-                subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                settings: { companyName: formData.name }
-            };
-
-            const { data, error } = await supabase.from('companies').insert([newCompany]).select();
-
-            if (error) {
-                showToast('Erro ao criar empresa: ' + error.message, 'error');
+            if (!formData.name || !formData.domain || !formData.responsibleEmail || !formData.adminPassword) {
+                showToast('Preencha todos os campos obrigatórios (Nome, Domínio, E-mail e Senha)', 'error');
                 return;
             }
-            if (data) {
-                // Tentar encontrar e atualizar o usuário responsável SE já existir
-                if (formData.responsibleEmail) {
-                    try {
-                        const { error: updateError } = await supabase.from('profiles')
-                            .update({
-                                role: 'admin',
-                                is_admin: true,
-                                is_company_admin: true,
-                                company_id: data[0].id,
-                            })
-                            .ilike('email', formData.responsibleEmail.trim()); // ilike for case insensitive
 
-                        if (updateError) console.log("Usuário responsável ainda não existe ou erro ao atualizar:", updateError.message);
-                        else console.log("Usuário responsável atualizado para admin.");
-                    } catch (err) {
-                        console.log("Erro silencioso ao tentar atualizar admin:", err);
-                    }
-                }
+            console.log("[SaaS] Chamando RPC create_company_with_admin...");
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_company_with_admin', {
+                p_company_name: formData.name,
+                p_company_domain: formData.domain,
+                p_company_cnpj: formData.cnpj || '',
+                p_plan_id: selectedPlan?.id,
+                p_admin_email: formData.responsibleEmail,
+                p_admin_password: formData.adminPassword,
+                p_admin_name: formData.responsibleName || formData.name
+            });
 
-                showToast('Empresa criada com sucesso!', 'success');
-                fetchData();
+            if (rpcError) {
+                showToast('Erro ao criar empresa e admin: ' + rpcError.message, 'error');
+                console.error("RPC Error:", rpcError);
+                return;
             }
+
+            if (rpcData && !rpcData.success) {
+                showToast('Erro interno: ' + rpcData.error, 'error');
+                return;
+            }
+
+            showToast('Empresa e Administrador criados com sucesso!', 'success');
+            fetchData();
         } else if (modalOpen.edit && selectedCompany) {
             const selectedPlan = localPlans.find(p => p.name === formData.plan); // Find plan by name
 
@@ -1579,9 +1567,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     <textarea rows={4} value={formData.content || ''} onChange={(e) => handleInputChange('content', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
                                 </div>
                                 <input type="text" placeholder={t('dashboard.whatsapp')} value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
-                                <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">{t('dashboard.responsible')}</h4>
-                                    <input type="text" placeholder={t('dashboard.responsible_name')} value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
-                                    <input type="email" placeholder={t('dashboard.responsible_email')} value={formData.responsibleEmail || ''} onChange={(e) => handleInputChange('responsibleEmail', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                    <div className="pt-4 border-t">
+                                        <h4 className="font-bold text-gray-700 mb-2">Dados do Administrador da Empresa</h4>
+                                        <input type="text" placeholder="Nome Completo do Admin" value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
+                                        <input type="email" placeholder="E-mail de Login do Admin" value={formData.responsibleEmail || ''} onChange={(e) => handleInputChange('responsibleEmail', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
+                                        <input type="password" placeholder="Senha de Acesso do Admin" value={formData.adminPassword || ''} onChange={(e) => handleInputChange('adminPassword', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                        <p className="text-[10px] text-gray-400 mt-1 italic">* O administrador poderá alterar esses dados após o primeiro login.</p>
                                 </div>
                             </>
                         )}
