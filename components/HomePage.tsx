@@ -339,7 +339,77 @@ const MasterBanner: React.FC = () => {
     );
 };
 
+interface RecentBadgeAward {
+    id: string;
+    reason: string;
+    created_at: string;
+    company_badges: {
+        name: string;
+        icon: string;
+        color: string;
+    };
+    recipient: {
+        full_name: string;
+        avatar_url: string;
+    };
+    awarder: {
+        full_name: string;
+    } | null;
+}
+
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser }) => {
+    const [recentAwards, setRecentAwards] = useState<RecentBadgeAward[]>([]);
+
+    useEffect(() => {
+        const fetchRecentAwards = async () => {
+            if (!currentUser?.company_id) return;
+            try {
+                const threeDaysAgo = new Date();
+                threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+                const { data, error } = await supabase
+                    .from('user_badges')
+                    .select(`
+                        id,
+                        reason,
+                        created_at,
+                        company_badges (
+                            name,
+                            icon,
+                            color
+                        ),
+                        recipient:profiles!user_id (
+                            full_name,
+                            avatar_url
+                        ),
+                        awarder:profiles!awarded_by (
+                            full_name
+                        )
+                    `)
+                    .eq('company_id', currentUser.company_id)
+                    .gte('created_at', threeDaysAgo.toISOString())
+                    .order('created_at', { ascending: false });
+
+                if (data) {
+                    setRecentAwards(data as any[]);
+                }
+            } catch (err) {
+                console.error('Error fetching recent awards:', err);
+            }
+        };
+
+        fetchRecentAwards();
+
+        const channel = supabase
+            .channel('public:user_badges_home')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges' }, () => fetchRecentAwards())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [currentUser?.company_id]);
+
     return (
         <div className="space-y-8">
             {/* Banner Master - visível para todos, editável só pelo Masteradmin/GrupoPixel */}
@@ -352,6 +422,74 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                 {/* Main Column */}
                 <div className="lg:col-span-2 space-y-8">
                     <Announcements onNavigate={onNavigate} />
+
+                    {recentAwards.length > 0 && (
+                        <div className="space-y-4 bg-gradient-to-r from-amber-500/5 via-rose-500/5 to-amber-500/5 dark:from-slate-800/20 dark:via-slate-900/30 dark:to-slate-800/20 p-5 rounded-3xl border border-amber-200/40 dark:border-amber-500/10 backdrop-blur-sm shadow-sm">
+                            <div className="flex items-center space-x-2 px-1">
+                                <span className="text-xl">🎉</span>
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider">
+                                        Conquistas Recentes da Empresa
+                                    </h4>
+                                    <p className="text-[10px] text-slate-550 dark:text-slate-400 font-bold">
+                                        Destaques dos últimos 3 dias
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 gap-4">
+                                {recentAwards.map(award => {
+                                    const badge = award.company_badges;
+                                    const recipient = award.recipient;
+                                    const awarder = award.awarder;
+                                    if (!badge || !recipient) return null;
+                                    
+                                    const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
+                                    
+                                    return (
+                                        <div 
+                                            key={award.id}
+                                            className="flex flex-col md:flex-row items-center gap-5 p-5 bg-white/95 dark:bg-slate-900/95 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 relative overflow-hidden"
+                                        >
+                                            <div className="absolute top-2.5 right-2.5 bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm animate-pulse">
+                                                Destaque
+                                            </div>
+
+                                            {/* Left: Badge Icon */}
+                                            <div className="flex-shrink-0 relative">
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-amber-400/25 rounded-full blur-xl -z-10 animate-pulse"></div>
+                                                <div className={`w-20 h-20 rounded-2xl ${badge.color} border flex items-center justify-center text-4xl shadow-md select-none transform hover:scale-105 hover:rotate-2 transition-all duration-305 cursor-pointer animate-float overflow-hidden`}>
+                                                    {isUrl ? (
+                                                        <img src={badge.icon} className="w-full h-full object-cover rounded-2xl border border-white/10" alt={badge.name} />
+                                                    ) : (
+                                                        badge.icon
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Details */}
+                                            <div className="flex-1 min-w-0 text-left space-y-2">
+                                                <h5 className="text-base font-black text-slate-850 dark:text-white leading-tight">
+                                                    {recipient.full_name} recebeu o selo "{badge.name}"!
+                                                </h5>
+                                                
+                                                <p className="text-xs text-slate-650 dark:text-slate-350 italic line-clamp-2 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100/50 dark:border-slate-750/50 font-medium">
+                                                    "{award.reason}"
+                                                </p>
+                                                
+                                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500">
+                                                    <span>Concedido por {awarder?.full_name || 'Administrador'}</span>
+                                                    <span>•</span>
+                                                    <span>{new Date(award.created_at).toLocaleDateString('pt-BR')}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <RecognitionWall />
                 </div>
                 {/* Right Sidebar */}
