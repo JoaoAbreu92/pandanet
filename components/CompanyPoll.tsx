@@ -54,7 +54,7 @@ const CompanyPoll: React.FC = () => {
         question: pollData.question,
         options: (optionsData || []).map(opt => ({
           id: opt.id,
-          text: opt.option_text,
+          text: opt.option_text || opt.text, // Handle both possible column names
           votes: (votesData || []).filter(v => v.option_id === opt.id).length
         }))
       };

@@ -205,10 +205,12 @@ const EventsPage: React.FC = () => {
                     end_time: isoStart,
                     location: newEvent.location,
                     category: newEvent.category,
-                    imageUrl: newEvent.imageUrl,
+                    type: newEvent.category, // Fallback for 'type' column
+                    image_url: newEvent.imageUrl, // Snake case standard
+                    imageUrl: newEvent.imageUrl, // Fallback for camelCase column
                     company_id: currentUser.company_id,
                     attendees: [],
-                    invited_ids: [],
+                    invited_ids: [], // Ensure this is sent
                     declined: []
                 }])
                 .select()
