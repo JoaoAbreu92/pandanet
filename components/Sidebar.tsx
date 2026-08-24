@@ -24,7 +24,8 @@ import {
     FaceSmileIcon,
     LifebuoyIcon,
     UserGroupIcon,
-    EnvelopeIcon
+    EnvelopeIcon,
+    PlayIcon
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
@@ -141,6 +142,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" featureId="equip" />
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
+                    <NavItem page="manual-usuario" label="Manual do Usuário" icon={PlayIcon} permission={true} />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
                     <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>

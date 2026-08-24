@@ -37,7 +37,8 @@ export type Page =
   | 'meu-rh'
   | 'org-chart'
   | 'kpi-dashboard'
-  | 'job-manager';
+  | 'job-manager'
+  | 'manual-usuario';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -494,6 +495,34 @@ export interface WellnessItem {
   linkUrl?: string;
   linkText?: string;
 }
+
+export interface ManualVideo {
+  id: string;
+  title: string;
+  url: string; // YouTube URL
+  thumbnail: string;
+  duration: string;
+  category: string;
+  description: string;
+}
+
+export interface ManualCategory {
+  id: string;
+  title: string;
+  description: string;
+  icon: string; // Icon name from our library
+  type: 'video' | 'patch' | 'info';
+}
+
+export interface UpdatePatch {
+  id: string;
+  version: string;
+  date: string;
+  title: string;
+  description: string;
+  changes: string[];
+}
+
 
 export interface Job {
   id: string;

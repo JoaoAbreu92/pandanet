@@ -79,4 +79,8 @@ export {
   EllipsisVerticalIcon,
   IdentificationIcon,
   PaintBrushIcon,
+  PlayIcon,
+  AcademicCapIcon,
+  LightBulbIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';

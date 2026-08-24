@@ -42,6 +42,7 @@ import JobsPage from './components/JobsPage.tsx';
 import EmployeePortal from './components/EmployeePortal.tsx';
 import OrgChartPage from './components/OrgChartPage.tsx';
 import KPIDashboard from './components/KPIDashboard.tsx';
+import ManualPage from './components/ManualPage.tsx';
 
 
 const AppContent: React.FC = () => {
@@ -190,7 +191,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -563,6 +564,7 @@ const AppContent: React.FC = () => {
             case 'meu-rh': return <EmployeePortal />;
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
+            case 'manual-usuario': return <ManualPage />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
         }
     };
