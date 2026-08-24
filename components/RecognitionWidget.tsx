@@ -36,7 +36,7 @@ const RecognitionWidget: React.FC<RecognitionWidgetProps> = ({ recognitions, onR
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+        <div className="premium-card p-4">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-gray-700 text-sm uppercase flex items-center">
                     <SparklesIcon className="w-5 h-5 mr-2 text-amber-500" />

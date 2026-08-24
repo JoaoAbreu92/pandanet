@@ -58,6 +58,7 @@ interface Note {
     id: number;
     text: string;
     colorId: string;
+    createdAt: number;
 }
 
 interface MessagesProps {
@@ -69,7 +70,14 @@ const Messages: React.FC<MessagesProps> = () => {
     const { addNotification } = useNotifications();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null); // Alterado para string (UUID)
+    const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+    // Ref para evitar stale closure no Realtime
+    const selectedConvRef = useRef<string | null>(null);
+    useEffect(() => {
+        selectedConvRef.current = selectedConversationId;
+    }, [selectedConversationId]);
+    // Alterado para string (UUID)
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessageText, setNewMessageText] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -78,16 +86,24 @@ const Messages: React.FC<MessagesProps> = () => {
     const [stickerTab, setStickerTab] = useState<'gallery' | 'saved'>('gallery');
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
     const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
-    const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
     const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
     const [loading, setLoading] = useState(false);
 
     // Sticky Notes State (Local Storage)
     const [notes, setNotes] = useState<Note[]>(() => {
-        const saved = localStorage.getItem('sticky_notes');
-        return saved ? JSON.parse(saved) : [];
+        try {
+            const saved = localStorage.getItem('sticky_notes');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to parse sticky notes', e);
+        }
+        return [];
     });
+
+    useEffect(() => {
+        localStorage.setItem('sticky_notes', JSON.stringify(notes));
+    }, [notes]);
     const [newNoteText, setNewNoteText] = useState('');
     const [noteWarning, setNoteWarning] = useState(false);
 
@@ -299,8 +315,14 @@ const Messages: React.FC<MessagesProps> = () => {
                 }
             }));
 
-            // Filter out failures
-            setConversations(fullConversations.filter(c => c !== null) as Conversation[]);
+            // Filter out nulls and conversations with "Usuário Excluído" or "Usuário Desconhecido"
+            const filteredConversations = fullConversations.filter((c: any) =>
+                c !== null &&
+                c.participantName !== 'Usuário Excluído' &&
+                c.participantName !== 'Usuário Desconhecido'
+            );
+
+            setConversations(filteredConversations as Conversation[]);
 
         } catch (error) {
             console.error('Erro crítico ao buscar conversas:', error);
@@ -315,9 +337,12 @@ const Messages: React.FC<MessagesProps> = () => {
         const channel = supabase
             .channel('public:conversations')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
                 fetchConversations(); // Atualiza última mensagem na lista
-                if (selectedConversationId) fetchMessages(selectedConversationId); // Atualiza visão do Chat
+                // Usa a Ref para sempre ter o ID mais atual
+                if (selectedConvRef.current) {
+                    fetchMessages(selectedConvRef.current);
+                }
             })
             .subscribe();
 
@@ -332,7 +357,7 @@ const Messages: React.FC<MessagesProps> = () => {
             const { data, error } = await supabase
                 .from('messages')
                 .select(`
-                    id, text, created_at, sender_id, file_url, file_type, reactions,
+                    id, text, created_at, sender_id, file_url, file_type, reactions, sender_deleted_at,
                     profiles:sender_id(full_name, avatar_url)
                 `)
                 .eq('conversation_id', convId)
@@ -614,11 +639,11 @@ const Messages: React.FC<MessagesProps> = () => {
                 return;
             }
             // FIFO: Remove a primeira, adiciona a nova
-            const newNote: Note = { id: Date.now(), text: newNoteText, colorId: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].id };
+            const newNote: Note = { id: Date.now(), text: newNoteText, colorId: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].id, createdAt: Date.now() };
             setNotes(prev => [...prev.slice(1), newNote]);
             setNoteWarning(false);
         } else {
-            const newNote: Note = { id: Date.now(), text: newNoteText, colorId: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].id };
+            const newNote: Note = { id: Date.now(), text: newNoteText, colorId: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].id, createdAt: Date.now() };
             setNotes(prev => [...prev, newNote]);
         }
         setNewNoteText('');
@@ -669,8 +694,9 @@ const Messages: React.FC<MessagesProps> = () => {
                 <div className={`flex flex-col relative ${isMe ? 'items-end' : 'items-start'}`}>
                     {/* Balão informativo para o destinatário */}
                     {!isMe && message.sender_deleted_at && (
-                        <div className="bg-orange-50 text-orange-700 text-[10px] px-2 py-1 rounded-full mb-1 border border-orange-100 animate-pulse">
-                            {message.senderName} apagou esta mensagem. Ela sumirá em {timeLeft ? formatTime(timeLeft) : '...'}
+                        <div className="bg-red-50 text-red-600 text-[10px] font-bold px-3 py-1 rounded-full mb-1 border border-red-200 animate-pulse flex items-center gap-1 shadow-sm">
+                            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                            {message.senderName} apagou esta mensagem para todos. Ela sumirá permanentemente em {timeLeft ? formatTime(timeLeft) : '...'}
                         </div>
                     )}
 
@@ -685,7 +711,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                 <p className="truncate">{message.replyingTo.text}</p>
                             </div>
                         )}
-                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-sm border border-gray-100`}>
+                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
                             {/* Check if text is a single image URL */}
                             {(() => {
                                 const isImageUrl = (text: string) => {
@@ -730,7 +756,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                 </div>
                             ) : null}
                         </div>
-                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-40 hover:opacity-100 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                        <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
                             <div className="flex items-center p-1 space-x-0.5">
                                 {availableReactions.map(emoji => (
                                     <button
@@ -797,7 +823,7 @@ const Messages: React.FC<MessagesProps> = () => {
                                 // Online status logic would require presence tracking (realtime), omitted for basic scope
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
-                                        <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
+                                        <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 premium-card ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
                                             <div className="relative">
                                                 <img src={conv.participantAvatarUrl} alt={conv.participantName} className={`w-10 h-10 rounded-full border-2 border-gray-400`} />
                                                 {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
@@ -953,7 +979,7 @@ const Messages: React.FC<MessagesProps> = () => {
                             {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
                             <div ref={messagesEndRef} />
                         </div>
-                        <div className="p-4 bg-white border-t">
+                        <div className="p-4 bg-white border-t border-gray-100 z-10 relative shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
                             {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                             {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                             <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
@@ -1045,9 +1071,14 @@ const Messages: React.FC<MessagesProps> = () => {
 
             {/* Right Sidebar: Sticky Notes (Local Only) */}
             <div className="hidden lg:flex flex-col w-72 bg-gray-50 border-l p-4 overflow-hidden">
-                <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                    <span className="text-xl">📝</span> Notas Rápidas
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                        <span className="text-xl">📝</span> Notas Rápidas
+                    </h3>
+                    {notes.length > 0 && (
+                        <button onClick={() => setNotes([])} className="text-[10px] text-red-500 hover:underline uppercase font-bold">Limpar</button>
+                    )}
+                </div>
 
                 {noteWarning && (
                     <div className="mb-4 p-3 bg-orange-100 border-l-4 border-orange-500 text-orange-700 text-xs rounded animate-pulse">

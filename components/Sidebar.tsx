@@ -95,7 +95,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700
+        <aside className={`transition-all duration-300 flex-shrink-0 flex flex-col shadow-xl bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700 premium-card
             fixed md:relative z-50 h-full
             ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}>

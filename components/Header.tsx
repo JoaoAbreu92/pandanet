@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
     const { language, setLanguage, t } = useLanguage();
 
     return (
-        <header className="bg-white border-b flex-shrink-0 relative z-20 dark:bg-gray-800 dark:border-gray-700">
+        <header className="bg-white border-b flex-shrink-0 relative z-20 dark:bg-gray-800 dark:border-gray-700 premium-card">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">

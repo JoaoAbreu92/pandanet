@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import Card from './Card';
 import type { Employee, Plan } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
@@ -325,8 +327,59 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         setModalOpen(true);
     };
 
-    const handleDelete = async (userId: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este usuário?")) {
+    const generatePDFHistory = async (userId: string, userName: string) => {
+        const doc = new jsPDF();
+        doc.setFontSize(18);
+        doc.text(`Histórico de Conversas - ${userName}`, 14, 22);
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, 14, 30);
+
+        try {
+            // Busca mensagens enviadas por este usuário ou recebidas em conversas que ele participa
+            const { data: messages, error } = await supabase
+                .from('messages')
+                .select(`
+                    id, 
+                    text, 
+                    created_at, 
+                    sender_id,
+                    profiles:sender_id(full_name),
+                    conversation:conversation_id(
+                        conversation_participants(user_id, profiles(full_name))
+                    )
+                `)
+                .or(`sender_id.eq.${userId},conversation_id.in.(select conversation_id from conversation_participants where user_id = '${userId}')`)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+
+            const tableData = messages?.map(m => [
+                new Date(m.created_at).toLocaleString('pt-BR'),
+                (m.profiles as any)?.full_name || 'Usuário Excluído',
+                m.text
+            ]) || [];
+
+            (doc as any).autoTable({
+                startY: 40,
+                head: [['Data/Hora', 'Remetente', 'Mensagem']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillStyle: '#10b981' }
+            });
+
+            doc.save(`historico_${userName.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+        } catch (err) {
+            console.error('Erro ao gerar PDF:', err);
+            alert('Não foi possível gerar o PDF de histórico.');
+        }
+    };
+
+    const handleDelete = async (userId: string, userName: string) => {
+        if (window.confirm(`AVISO CRÍTICO: Você está prestes a apagar TODOS os dados de ${userName}. Isto é permanente e afetará todo o banco de dados. \n\nUm PDF com o histórico de conversas será gerado antes da exclusão. Continuar?`)) {
+
+            await generatePDFHistory(userId, userName);
+
             try {
                 const { error } = await supabase.from('profiles').delete().eq('id', userId);
                 if (error) throw error;
@@ -376,7 +429,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                                     <td className="px-6 py-4">{user.isAdmin ? 'Sim' : 'Não'}</td>
                                     <td className="px-6 py-4 text-right space-x-1">
                                         <button onClick={() => handleEdit(user)} className="p-2 text-brand-subtle-text hover:text-brand-primary"><PencilIcon className="w-5 h-5" /></button>
-                                        <button onClick={() => handleDelete(user.id)} className="p-2 text-brand-subtle-text hover:text-red-500"><TrashIcon className="w-5 h-5" /></button>
+                                        <button onClick={() => handleDelete(user.id, user.name)} className="p-2 text-brand-subtle-text hover:text-red-500"><TrashIcon className="w-5 h-5" /></button>
                                     </td>
                                 </tr>
                             ))}

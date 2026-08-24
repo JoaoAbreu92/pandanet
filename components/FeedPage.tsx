@@ -374,13 +374,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 const filePath = `${currentUser.id}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
-                    .from('chat-media')
+                    .from('feed-media')
                     .upload(filePath, mediaFile.file);
 
                 if (uploadError) throw uploadError;
 
                 const { data: { publicUrl } } = supabase.storage
-                    .from('chat-media')
+                    .from('feed-media')
                     .getPublicUrl(filePath);
 
                 if (publicUrl) uploadedMediaUrl = publicUrl;
@@ -575,7 +575,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                 <div className="lg:col-span-8 space-y-6">
                     <Card title="" className="p-0 border-none shadow-sm overflow-visible">
-                        <div className="p-4 bg-white rounded-xl shadow-sm border relative">
+                        <div className="premium-card p-4 mb-6">
                             <div className="flex space-x-4 mb-4">
                                 <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover" />
                                 <div className="flex-1 relative">
@@ -620,6 +620,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 </div>
                                 <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center space-x-2 px-6 py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95"><PaperAirplaneIcon className="w-5 h-5" /><span>Publicar</span></button>
                             </div>
+                            <div className="mt-4 flex items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 pt-3">
+                                <div className="flex items-center space-x-1">
+                                    <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></div>
+                                    <span>Posts expiram automaticamente em 90 dias (Sistema FIFO)</span>
+                                </div>
+                                <span className="italic">Rede social corporativa organizada e eficiente</span>
+                            </div>
 
                             <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
                             <input type="file" ref={videoInputRef as any} className="hidden" accept="video/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'video', file }); }} />
@@ -659,8 +666,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         <OnlineUsersWidget users={allEmployees} onNavigate={onNavigate} />
                     </div>
                 </div>
+            </div>
 
-                {showRecognitionModal && (
+            {
+                showRecognitionModal && (
                     <RecognitionModal
                         isOpen={showRecognitionModal}
                         onClose={() => setShowRecognitionModal(false)}
@@ -668,8 +677,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         employees={allEmployees}
                         currentUserId={currentUser.id}
                     />
-                )}
-            </div>
+                )
+            }
         </div>
     );
 };
