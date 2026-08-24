@@ -219,13 +219,25 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
                         if (inviteError) {
                             console.error('Error creating invites:', inviteError);
-                            // Se falhar a tabela (não existir), ainda assim o evento foi criado pelo fallback invited_ids
+                        } else {
+                            // NOTIFICAR CONVIDADOS
+                            for (const userId of finalAttendees.filter(id => id !== currentUser.id)) {
+                                addNotification({
+                                    user_id: userId,
+                                    type: 'event',
+                                    title: 'Novo Convite de Evento',
+                                    description: `Você foi convidado para o evento: ${newEventData.title}`,
+                                    avatarUrl: currentUser?.avatarUrl,
+                                    link: 'calendar'
+                                });
+                            }
                         }
                     }
                 }
 
                 setCreateModalOpen(false);
-                window.location.reload();
+                // Pequeno delay para garantir que as notificações foram enviadas antes do reload
+                setTimeout(() => window.location.reload(), 500);
             }
         } catch (err) { console.error(err); }
     };
@@ -245,10 +257,25 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
             if (error) throw error;
 
+            // NOTIFICAR O CRIADOR DO EVENTO
+            if (selectedEvent.id) {
+                const { data: eventData } = await supabase.from('events').select('creator_id, title').eq('id', selectedEvent.id).single();
+                if (eventData && eventData.creator_id !== currentUser.id) {
+                    addNotification({
+                        user_id: eventData.creator_id,
+                        type: 'event',
+                        title: `Evento ${status === 'accepted' ? 'Aceito' : 'Recusado'}`,
+                        description: `${currentUser.name} ${status === 'accepted' ? 'confirmou presença' : 'recusou o convite'} para o evento: ${eventData.title}`,
+                        avatarUrl: currentUser?.avatarUrl,
+                        link: 'calendar'
+                    });
+                }
+            }
+
             setRSVPModalOpen(false);
             setDeclineReason('');
             setDetailModalOpen(false);
-            window.location.reload();
+            setTimeout(() => window.location.reload(), 500);
         } catch (err) {
             console.error('Error updating RSVP:', err);
         }

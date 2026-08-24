@@ -133,7 +133,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
 
         { id: 'users', label: 'Usuários', category: 'Pessoas' },
         { id: 'departments', label: 'Departamentos', category: 'Pessoas' },
-        { id: 'teams', label: 'Equipes', category: 'Pessoas' },
+        { id: 'teams', label: 'Equipes / Organograma', category: 'Pessoas' },
         { id: 'training', label: 'Treinamentos', category: 'Pessoas' },
         { id: 'jobs', label: 'Gestão de Vagas', category: 'Pessoas', featureId: 'jobs' },
         { id: 'hr', label: 'Gestão RH', category: 'Pessoas' },
@@ -178,7 +178,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'departments':
                 return <DepartmentManager companyId={company.id!} />;
             case 'teams':
-                return <TeamManager users={employees} setUsers={setEmployees} />;
+                return <TeamManager users={employees} setUsers={setEmployees} onNavigate={onNavigate} />;
             case 'forms':
                 return <FormSubmissionsManager />;
             case 'marketplace':
