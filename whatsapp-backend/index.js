@@ -312,67 +312,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             }
         }
 
-        // 2. Buscar chats da Evolution API
-        const chatRes = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, {
-            headers: { 'apikey': evoKey }
-        });
-        
-        if (!chatRes.ok) {
-            console.error(`[SYNC] Erro ao buscar chats: ${chatRes.statusText}`);
-            return;
-        }
-        
-        let chats = await chatRes.json();
-        if (chats && !Array.isArray(chats) && Array.isArray(chats.data)) chats = chats.data;
-        
-        if (!Array.isArray(chats)) {
-            console.log(`[SYNC] Nenhum chat retornado ou formato inválido.`);
-            return;
-        }
-
-        console.log(`[SYNC] [Empresa: ${companyId}] ${chats.length} chats encontrados.`);
-        
-        // 3. Processar cada chat
-        for (const chat of chats) {
-            const remoteJid = chat.id || chat.remoteJid;
-            if (!remoteJid || remoteJid.includes('@g.us')) continue;
-            
-            const fromPhone = remoteJid.split('@')[0];
-            const contactName = chat.name || contactsMap[remoteJid] || fromPhone;
-            const unreadCount = chat.unreadCount || 0;
-            const timestamp = chat.conversationTimestamp ? new Date(chat.conversationTimestamp * 1000).toISOString() : new Date().toISOString();
-
-            // Sincronizar Conversa
-            let { data: existingConv } = await supabase
-                .from('whatsapp_conversations')
-                .select('id')
-                .eq('company_id', companyId)
-                .eq('contact_phone', fromPhone)
-                .maybeSingle();
-
-            let conversationId;
-            if (!existingConv) {
-                const { data: newConv } = await supabase.from('whatsapp_conversations').insert({
-                    company_id: companyId,
-                    contact_phone: fromPhone,
-                    contact_name: contactName,
-                    status: 'aberto',
-                    unread_count: unreadCount,
-                    connection_id: connectionId,
-                    last_message_at: timestamp
-                }).select().single();
-                conversationId = newConv?.id;
-            } else {
-                conversationId = existingConv.id;
-                await supabase.from('whatsapp_conversations').update({
-                    last_message_at: timestamp,
-                    unread_count: unreadCount
-                }).eq('id', conversationId);
-            }
-
-                console.log(`[SYNC] Chat sincronizado para ${fromPhone} (sem histórico).`);
-        }
-        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso! (Light)`);
+        // Chat syncing disabled per user request. 
+        // Only contacts are synchronized now.
+        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso! Apenas contatos foram sincronizados.`);
     } catch (err) {
         console.error(`[SYNC] Erro durante a sincronização:`, err.message);
     }
