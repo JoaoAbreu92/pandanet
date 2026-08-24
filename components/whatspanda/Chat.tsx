@@ -1208,68 +1208,91 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!selectedConversation || isGhostMode) return;
     setTransferLoading(true);
     try {
-      // 1. Resolver o nome do destino
-      let targetName = 'outro';
-      if (type === 'agent') {
-        const agent = agents.find((a: any) => a.id === targetId);
-        targetName = agent?.full_name || 'outro atendente';
-      } else {
-        const queue = queues.find((q: any) => q.id === targetId);
-        targetName = queue?.name || 'outro setor';
+      const senderName = activeProfile?.full_name || profile?.full_name || 'Atendente';
+      const senderId = activeProfile?.id || profile?.id;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      // 1. Tentar transferir via endpoint do backend (seguro contra RLS e automático)
+      let backendSuccess = false;
+      if (token) {
+        try {
+          const resp = await fetch('/api/whatsapp/conversations/transfer', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              conversationId: selectedConversation.id,
+              targetId,
+              type,
+              senderName,
+              senderId
+            })
+          });
+
+          if (resp.ok) {
+            backendSuccess = true;
+          }
+        } catch (apiErr) {
+          console.warn('[TRANSFER] Backend API indisponível, tentando via Supabase direto:', apiErr);
+        }
       }
 
-      // 2. Buscar configurações de transferência do canal
-      const { data: connSettings } = await supabase
-        .from('whatsapp_settings')
-        .select('transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
-        .eq('id', selectedConversation.connection_id)
-        .maybeSingle();
+      // 2. Fallback via Supabase se o backend não respondeu
+      if (!backendSuccess) {
+        let targetName = 'outro';
+        if (type === 'agent') {
+          const agent = agents.find((a: any) => a.id === targetId);
+          targetName = agent?.full_name || 'outro atendente';
+        } else {
+          const queue = queues.find((q: any) => q.id === targetId);
+          targetName = queue?.name || 'outro setor';
+        }
 
-      const clientTpl = connSettings?.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.';
-      const agentTpl = connSettings?.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.';
-      const sendToClient = connSettings?.send_transfer_message_to_client !== false;
+        const { data: connSettings } = await supabase
+          .from('whatsapp_settings')
+          .select('transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
+          .eq('id', selectedConversation.connection_id)
+          .maybeSingle();
 
-      const senderName = activeProfile?.full_name || profile?.full_name || 'Atendente';
-      const formattedClient = clientTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
-      const formattedAgent = agentTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
+        const clientTpl = connSettings?.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.';
+        const agentTpl = connSettings?.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.';
+        const sendToClient = connSettings?.send_transfer_message_to_client !== false;
 
-      // 3. Atualizar a conversa no banco
-      const updateData: any = type === 'agent'
-        ? { assigned_to: targetId }
-        : { queue_id: targetId, assigned_to: null };
-      
-      const { error } = await supabase
-        .from('whatsapp_conversations')
-        .update(updateData)
-        .eq('id', selectedConversation.id);
+        const formattedClient = clientTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
+        const formattedAgent = agentTpl.replace(/{target}/g, targetName).replace(/{sender}/g, senderName);
 
-      if (error) throw error;
+        const updateData: any = type === 'agent'
+          ? { assigned_to: targetId, status: 'aberto' }
+          : { queue_id: targetId, assigned_to: null, status: 'aberto' };
 
-      // 4. Inserir log interno no chat
-      const logQueueId = type === 'queue' ? targetId : selectedConversation.queue_id;
-      await supabase.from('whatsapp_messages').insert({
-        conversation_id: selectedConversation.id,
-        company_id: currentUser?.company_id || profile?.company_id,
-        message_text: formattedAgent,
-        is_from_customer: false,
-        sent_by: activeProfile?.id || profile?.id,
-        queue_id: logQueueId || null
-      });
+        const { error } = await supabase
+          .from('whatsapp_conversations')
+          .update(updateData)
+          .eq('id', selectedConversation.id);
 
-      // 5. Enviar mensagem de transferência ao cliente via WhatsApp
-      if (sendToClient) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        if (token) {
+        if (error) throw error;
+
+        const logQueueId = type === 'queue' ? targetId : selectedConversation.queue_id;
+        await supabase.from('whatsapp_messages').insert({
+          conversation_id: selectedConversation.id,
+          company_id: currentUser?.company_id || profile?.company_id,
+          message_text: formattedAgent,
+          is_from_customer: false,
+          sent_by: senderId || null,
+          queue_id: logQueueId || null
+        });
+
+        if (sendToClient && token) {
           fetch(`/api/whatsapp/messages/send/${selectedConversation.id}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ 
-              message: formattedClient
-            })
+            body: JSON.stringify({ message: formattedClient })
           }).catch(e => console.error('Error sending client transfer message:', e));
         }
       }
@@ -1278,7 +1301,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setTransferSearch('');
       setTimeout(() => fetchConversations(), 300);
     } catch (err: any) {
-      alert('Erro ao transferir: ' + err.message);
+      alert('Erro ao transferir: ' + (err.message || err));
     } finally {
       setTransferLoading(false);
     }

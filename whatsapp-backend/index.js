@@ -2978,6 +2978,96 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
     }
 }
 
+app.post('/conversations/transfer', async (req, res) => {
+    const { conversationId, targetId, type, senderName, senderId } = req.body;
+    if (!conversationId || !targetId || !type) {
+        return res.status(400).json({ error: 'Faltam parâmetros obrigatórios (conversationId, targetId, type).' });
+    }
+
+    try {
+        // 1. Buscar a conversa
+        const { data: conv, error: convErr } = await supabase
+            .from('whatsapp_conversations')
+            .select('*')
+            .eq('id', conversationId)
+            .single();
+
+        if (convErr || !conv) {
+            return res.status(404).json({ error: 'Conversa não encontrada.' });
+        }
+
+        // 2. Resolver nome do destino
+        let targetName = 'outro';
+        if (type === 'agent') {
+            const { data: agent } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', targetId)
+                .maybeSingle();
+            targetName = agent?.full_name || 'outro atendente';
+        } else {
+            const { data: queue } = await supabase
+                .from('queues')
+                .select('name')
+                .eq('id', targetId)
+                .maybeSingle();
+            targetName = queue?.name || 'outro setor';
+        }
+
+        // 3. Buscar configurações do canal
+        const { data: connSettings } = await supabase
+            .from('whatsapp_settings')
+            .select('transfer_message_client, transfer_message_agent, send_transfer_message_to_client')
+            .eq('id', conv.connection_id)
+            .maybeSingle();
+
+        const clientTpl = connSettings?.transfer_message_client || 'Seu atendimento foi transferido para {target}. Por favor, aguarde.';
+        const agentTpl = connSettings?.transfer_message_agent || 'Atendimento transferido para {target} por {sender}.';
+        const sendToClient = connSettings?.send_transfer_message_to_client !== false;
+
+        const sName = senderName || 'Atendente';
+        const formattedClient = clientTpl.replace(/{target}/g, targetName).replace(/{sender}/g, sName);
+        const formattedAgent = agentTpl.replace(/{target}/g, targetName).replace(/{sender}/g, sName);
+
+        // 4. Atualizar a conversa com chave de serviço (imune a RLS)
+        const updateData = type === 'agent'
+            ? { assigned_to: targetId, status: 'aberto' }
+            : { queue_id: targetId, assigned_to: null, status: 'aberto' };
+
+        const { error: updateErr } = await supabase
+            .from('whatsapp_conversations')
+            .update(updateData)
+            .eq('id', conversationId);
+
+        if (updateErr) throw updateErr;
+
+        // 5. Inserir log interno
+        const logQueueId = type === 'queue' ? targetId : conv.queue_id;
+        await supabase.from('whatsapp_messages').insert({
+            conversation_id: conversationId,
+            company_id: conv.company_id,
+            message_text: formattedAgent,
+            is_from_customer: false,
+            sent_by: senderId || null,
+            queue_id: logQueueId || null
+        });
+
+        // 6. Enviar mensagem via WhatsApp ao cliente se ativado
+        if (sendToClient && conv.contact_phone) {
+            const instanceName = `conn_${conv.connection_id}`;
+            dispatchTextEvolution(instanceName, conv.contact_phone, formattedClient).catch(err => {
+                console.error('[TRANSFER] Erro ao enviar mensagem de transferência via WhatsApp:', err.message);
+            });
+        }
+
+        console.log(`[TRANSFER] Conversa ${conversationId} transferida com sucesso para ${type} ${targetName} (${targetId})`);
+        return res.json({ success: true, targetName });
+    } catch (err) {
+        console.error('[TRANSFER] Erro na transferência:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/sync-contacts/:companyId/:connectionId', async (req, res) => {
     const { companyId, connectionId } = req.params;
     try {
