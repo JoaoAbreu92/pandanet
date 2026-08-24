@@ -331,6 +331,16 @@ export interface Ticket {
 
 export type CalendarEventCategory = 'Reunião' | 'Evento da Empresa' | 'Feriado' | 'Aniversário';
 
+export interface CalendarInvite {
+  id: string;
+  event_id: string;
+  user_id: string;
+  status: 'pending' | 'accepted' | 'declined';
+  decline_reason?: string;
+  invitee_name?: string; // Para exibir na UI
+  invitee_avatar?: string;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -342,6 +352,7 @@ export interface CalendarEvent {
   attendees: Employee[];
   invitedIds?: string[];
   notes: string;
+  invites?: CalendarInvite[]; // Relacionados via nova tabela
 }
 
 export interface ResourceDocument {

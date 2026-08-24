@@ -13,7 +13,11 @@ import {
     CalendarDaysIcon,
     ClockIcon,
     MapPinIcon,
-    DocumentTextIcon
+    DocumentTextIcon,
+    CheckIcon,
+    XMarkIcon,
+    UserPlusIcon,
+    UserGroupIcon as HeroUserGroupIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
 import { supabase } from '../supabaseClient';
@@ -62,6 +66,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+    const [isRSVPModalOpen, setRSVPModalOpen] = useState(false);
+    const [declineReason, setDeclineReason] = useState('');
     const [newEventData, setNewEventData] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
@@ -94,7 +100,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             const { data: depts } = await supabase.from('departments').select('*').eq('company_id', currentUser.company_id);
             if (depts) setDepartments(depts);
 
-            const { data: evts } = await supabase.from('events').select('*').eq('company_id', currentUser.company_id);
+            const { data: evts } = await supabase.from('events').select('*, calendar_invites(*)').eq('company_id', currentUser.company_id);
             if (evts) {
                 const empsMap = emps || [];
                 const formattedEvents: CalendarEvent[] = evts.map((e: any) => ({
@@ -111,7 +117,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         avatarUrl: emp.avatar_url
                     } as Employee)),
                     invitedIds: e.invited_ids || [],
-                    notes: e.description || ''
+                    notes: e.description || '',
+                    invites: (e.calendar_invites || []).map((inv: any) => {
+                        const invitee = empsMap.find((emp: any) => emp.id === inv.user_id);
+                        return {
+                            id: inv.id,
+                            event_id: inv.event_id,
+                            user_id: inv.user_id,
+                            status: inv.status,
+                            decline_reason: inv.decline_reason,
+                            invitee_name: invitee?.full_name,
+                            invitee_avatar: invitee?.avatar_url
+                        };
+                    })
                 }));
                 setEvents(formattedEvents);
             }
@@ -152,11 +170,59 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 creator_id: currentUser.id
             }).select();
 
-            if (data) {
+            if (data && data[0]) {
+                const eventId = data[0].id;
+
+                // Criar convites na tabela calendar_invites
+                if (finalAttendees.length > 0) {
+                    const invites = finalAttendees
+                        .filter(id => id !== currentUser.id)
+                        .map(userId => ({
+                            event_id: eventId,
+                            user_id: userId,
+                            status: 'pending'
+                        }));
+
+                    if (invites.length > 0) {
+                        const { error: inviteError } = await supabase
+                            .from('calendar_invites')
+                            .insert(invites);
+
+                        if (inviteError) {
+                            console.error('Error creating invites:', inviteError);
+                            // Se falhar a tabela (não existir), ainda assim o evento foi criado pelo fallback invited_ids
+                        }
+                    }
+                }
+
                 setCreateModalOpen(false);
                 window.location.reload();
             }
         } catch (err) { console.error(err); }
+    };
+
+    const handleRSVP = async (status: 'accepted' | 'declined') => {
+        if (!currentUser?.id || !selectedEvent) return;
+
+        try {
+            const { error } = await supabase
+                .from('calendar_invites')
+                .update({
+                    status,
+                    decline_reason: status === 'declined' ? declineReason : null
+                })
+                .eq('event_id', selectedEvent.id)
+                .eq('user_id', currentUser.id);
+
+            if (error) throw error;
+
+            setRSVPModalOpen(false);
+            setDeclineReason('');
+            setDetailModalOpen(false);
+            window.location.reload();
+        } catch (err) {
+            console.error('Error updating RSVP:', err);
+        }
     };
 
     const allCalendarEvents = useMemo(() => {
@@ -380,6 +446,56 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     </select>
                                 </div>
                             </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Equipe/Departamento</label>
+                                <select
+                                    name="departmentId"
+                                    value={newEventData.departmentId}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none"
+                                >
+                                    <option value="">Nenhum departamento específico</option>
+                                    {departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Convidar Usuários</label>
+                                <div className="bg-slate-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-transparent focus-within:ring-2 focus-within:ring-brand-primary transition-all">
+                                    {employees.filter(emp => emp.id !== currentUser?.id).map(emp => (
+                                        <label key={emp.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded-xl cursor-pointer transition-colors group">
+                                            <input
+                                                type="checkbox"
+                                                checked={newEventData.attendees.includes(emp.id)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setNewEventData(prev => ({
+                                                        ...prev,
+                                                        attendees: checked
+                                                            ? [...prev.attendees, emp.id]
+                                                            : prev.attendees.filter(id => id !== emp.id)
+                                                    }));
+                                                }}
+                                                className="w-4 h-4 text-brand-primary border-slate-300 rounded focus:ring-brand-primary"
+                                            />
+                                            <div className="flex items-center space-x-2">
+                                                {emp.avatarUrl ? (
+                                                    <img src={emp.avatarUrl} className="w-6 h-6 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                        {emp.name?.charAt(0)}
+                                                    </div>
+                                                )}
+                                                <span className="text-sm font-semibold text-slate-700 group-hover:text-brand-primary transition-colors">{emp.name}</span>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={() => setCreateModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-600 transition-all">CANCELAR</button>
                                 <button type="submit" className="px-8 py-4 text-sm font-black text-white bg-slate-900 rounded-2xl hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">SALVAR EVENTO</button>
@@ -415,8 +531,103 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                     <span>{selectedEvent.notes}</span>
                                 </div>
                             )}
+
+                            {/* Status dos Convidados */}
+                            <div className="space-y-3 pt-4">
+                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                    <UsersIcon className="w-3 h-3" /> Convidados
+                                </p>
+                                <div className="space-y-2">
+                                    {selectedEvent.invites && selectedEvent.invites.length > 0 ? (
+                                        selectedEvent.invites.map(inv => (
+                                            <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                                                <div className="flex items-center gap-2">
+                                                    {inv.invitee_avatar ? (
+                                                        <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                            {inv.invitee_name?.charAt(0)}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-slate-700">{inv.invitee_name}</span>
+                                                        {inv.status === 'declined' && inv.decline_reason && (
+                                                            <span className="text-[9px] text-red-500 italic">" {inv.decline_reason} "</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {inv.status === 'accepted' && <CheckIcon className="w-4 h-4 text-emerald-500" />}
+                                                    {inv.status === 'declined' && <XMarkIcon className="w-4 h-4 text-red-500" />}
+                                                    {inv.status === 'pending' && <ClockIcon className="w-4 h-4 text-slate-300" />}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-[10px] text-slate-400 italic">Sem convidados externos</p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
+
+                        {/* RSVP Action para o usuário logado */}
+                        {(() => {
+                            const myInvite = selectedEvent.invites?.find(inv => inv.user_id === currentUser?.id);
+                            if (myInvite && myInvite.status === 'pending') {
+                                return (
+                                    <div className="mt-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-pulse-slow">
+                                        <p className="text-xs font-bold text-emerald-800 mb-3 text-center uppercase tracking-wide">Você foi convidado!</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleRSVP('accepted')}
+                                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl font-bold text-xs uppercase transition-all shadow-md shadow-emerald-100"
+                                            >
+                                                Confirmar
+                                            </button>
+                                            <button
+                                                onClick={() => setRSVPModalOpen(true)}
+                                                className="flex-1 bg-white hover:bg-red-50 text-red-500 p-3 rounded-xl font-bold text-xs uppercase border border-red-100 transition-all"
+                                            >
+                                                Recusar
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+
                         <button onClick={() => setDetailModalOpen(false)} className="w-full mt-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-xl">FECHAR</button>
+                    </div>
+                </div>
+            )}
+
+            {isRSVPModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 relative animate-scale-in">
+                        <button onClick={() => setRSVPModalOpen(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition-colors"><XCircleIcon className="w-8 h-8" /></button>
+                        <div className="mb-6">
+                            <h3 className="text-2xl font-black text-slate-800">Recusar Convite</h3>
+                            <p className="text-slate-500 font-medium text-sm">Por favor, informe o motivo da recusa:</p>
+                        </div>
+                        <div className="space-y-4">
+                            <textarea
+                                value={declineReason}
+                                onChange={(e) => setDeclineReason(e.target.value)}
+                                className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-slate-800 focus:ring-2 focus:ring-brand-primary transition-all font-semibold h-32 resize-none"
+                                placeholder="Ex: Estarei em outra reunião externa..."
+                            ></textarea>
+                            <div className="flex gap-3">
+                                <button onClick={() => setRSVPModalOpen(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:text-slate-600">CANCELAR</button>
+                                <button
+                                    onClick={() => handleRSVP('declined')}
+                                    disabled={!declineReason.trim()}
+                                    className="flex-1 py-4 text-sm font-black text-white bg-red-500 rounded-2xl hover:bg-red-600 shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    RECUSAR
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

@@ -509,6 +509,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             setNewPostContent('');
             setMediaFile(null);
             setMentions([]);
+            fetchPosts(); // Refresh immediately for the author
         } catch (error: any) {
             console.error('Error creating post:', error);
             alert('Erro ao publicar post: ' + (error.message || 'Erro desconhecido.'));
@@ -611,7 +612,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const handleSubmitComment = async (postId: string, text: string) => {
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
-            await supabase.from('comments').insert({ post_id: postId, author_id: currentUser.id, company_id: profile?.company_id, content: text });
+            const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: currentUser.id, company_id: profile?.company_id, content: text });
+            if (!error) fetchPosts(); // Refresh immediately to show the comment
         } catch (err) {
             console.error(err);
         }

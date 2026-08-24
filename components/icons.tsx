@@ -10,6 +10,7 @@ export {
   MagnifyingGlassIcon as SearchIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  CheckIcon,
   BuildingOfficeIcon,
   CurrencyDollarIcon,
   TrashIcon,
