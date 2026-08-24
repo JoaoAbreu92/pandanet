@@ -507,22 +507,29 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     useEffect(() => {
         fetchConversations();
 
+        console.log("[Realtime] Iniciando subscription para usuário:", currentUser.id);
+
         // Subscrição para atualizações de novas conversas/mensagens
         const channel = supabase
             .channel('public:messages_and_convs')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
-                console.log("Mudança em conversas detectada:", payload);
+                console.log("[Realtime] Mudança em conversas detectada:", payload);
                 fetchConversations();
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
                 const newMsg = payload.new as any;
+                console.log("[Realtime] Nova mensagem recebida:", newMsg);
+                console.log("[Realtime] Conversa ativa:", selectedConvRef.current);
+                console.log("[Realtime] Conversa da mensagem:", newMsg.conversation_id);
 
                 // Se a mensagem não for minha, notificar
                 if (newMsg.sender_id !== currentUser.id) {
+                    console.log("[Realtime] Mensagem de outro usuário, tocando som");
                     playNotificationSound('message');
 
                     // Notificação de Desktop se não for a conversa ativa
                     if (newMsg.conversation_id !== selectedConvRef.current) {
+                        console.log("[Realtime] Mostrando notificação desktop");
                         try {
                             const { data: sender } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', newMsg.sender_id).single();
                             showDesktopNotification(
@@ -530,20 +537,44 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 newMsg.text || 'Enviou um anexo',
                                 sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.full_name || 'U')}`
                             );
-                        } catch (e) { }
+                        } catch (e) {
+                            console.error("[Realtime] Erro ao buscar dados do remetente:", e);
+                        }
                     }
+                } else {
+                    console.log("[Realtime] Mensagem própria, não notificar");
                 }
 
+                console.log("[Realtime] Atualizando conversas...");
                 fetchConversations();
+                
                 if (selectedConvRef.current === newMsg.conversation_id) {
+                    console.log("[Realtime] Atualizando mensagens da conversa ativa");
                     fetchMessages(selectedConvRef.current);
+                } else {
+                    console.log("[Realtime] Mensagem de outra conversa, não atualizar");
                 }
             })
-            .subscribe();
+            .subscribe((status, err) => {
+                console.log("[Realtime] Status da subscription:", status);
+                if (err) {
+                    console.error("[Realtime] Erro na subscription:", err);
+                }
+                if (status === 'SUBSCRIBED') {
+                    console.log("[Realtime] ✅ Conectado com sucesso!");
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error("[Realtime] ❌ Erro no canal!");
+                } else if (status === 'TIMED_OUT') {
+                    console.error("[Realtime] ⏱️ Timeout na conexão!");
+                } else if (status === 'CLOSED') {
+                    console.warn("[Realtime] 🔌 Canal fechado");
+                }
+            });
 
         return () => {
+            console.log("[Realtime] Removendo subscription");
             supabase.removeChannel(channel);
-        }
+        };
     }, [currentUser.id]); // Re-executa se usuário mudar (raro)
 
     // Buscar Mensagens quando conversa selecionada
@@ -640,7 +671,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
              messages[messages.length - 1]?.sender === 'me');
         
         if (shouldScroll) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            // Scroll instantâneo sem animação
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
             isInitialLoad.current = false;
         }
         
