@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import type { Employee, AIMessage } from '../types';
-import { XMarkIcon, PaperAirplaneIcon, SparklesIcon } from './icons';
+import { XMarkIcon, PaperAirplaneIcon, SparklesIcon, ChevronDownIcon, TrashIcon } from './icons';
 
 interface AIAssistantProps {
     currentUser: Employee;
@@ -20,11 +20,64 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const behavior = currentUser.ai_behavior || 'popup';
     const provider = currentUser.ai_provider || 'gemini';
 
+    const [agents, setAgents] = useState<any[]>([]);
+    const [currentAgent, setCurrentAgent] = useState<any>(null);
+    const [showAgentManager, setShowAgentManager] = useState(false);
+    const [newAgentName, setNewAgentName] = useState('');
+    const [newAgentPrompt, setNewAgentPrompt] = useState('');
+
+    // Tooltip state
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipDismissed, setTooltipDismissed] = useState(false);
+
     useEffect(() => {
         if (hasAIEnabled) {
             fetchMessages();
+            fetchAgents();
         }
     }, [hasAIEnabled, currentUser.id]);
+
+    useEffect(() => {
+        if (!isOpen && !tooltipDismissed && !showTooltip) {
+            const timer = setInterval(() => {
+                setShowTooltip(true);
+            }, 10000);
+            return () => clearInterval(timer);
+        }
+    }, [isOpen, tooltipDismissed, showTooltip]);
+
+    const fetchAgents = async () => {
+        const { data } = await supabase
+            .from('ai_agents')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: true });
+        if (data) setAgents(data);
+    };
+
+    const createAgent = async () => {
+        if (!newAgentName) return;
+        const { data, error } = await supabase.from('ai_agents').insert({
+            user_id: currentUser.id,
+            name: newAgentName,
+            system_prompt: newAgentPrompt,
+            avatar_url: '/logo.png'
+        }).select().single();
+
+        if (data) {
+            setAgents(prev => [...prev, data]);
+            setNewAgentName('');
+            setNewAgentPrompt('');
+            setShowAgentManager(false);
+            setCurrentAgent(data);
+        }
+    };
+
+    const deleteAgent = async (id: string) => {
+        await supabase.from('ai_agents').delete().eq('id', id);
+        setAgents(prev => prev.filter(a => a.id !== id));
+        if (currentAgent?.id === id) setCurrentAgent(null);
+    };
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,11 +85,18 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
 
     const fetchMessages = async () => {
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('ai_messages')
                 .select('*')
-                .eq('user_id', currentUser.id)
-                .order('created_at', { ascending: true });
+                .eq('user_id', currentUser.id);
+
+            if (currentAgent) {
+                query = query.eq('agent_id', currentAgent.id);
+            } else {
+                query = query.is('agent_id', null);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: true });
             
             if (error) throw error;
             if (data) setMessages(data);
@@ -44,6 +104,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             console.error("Error fetching AI messages:", err);
         }
     };
+
+    useEffect(() => {
+        if (hasAIEnabled) fetchMessages();
+    }, [currentAgent]);
 
     const handleSend = async () => {
         if (!input.trim() || !hasAIEnabled) return;
@@ -76,14 +140,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             if (provider === 'gemini') {
                 const cleanKey = currentUser.ai_api_key.trim();
 
+                const systemPrompt = currentAgent?.system_prompt || "Você é o Panda IA, um assistente prestativo da intranet PandaNet.";
+                const prompt = `System Instructions: ${systemPrompt}\n\nUser Question: ${userText}`;
+
                 // Using the specific v1beta endpoint structure exactly as documented in Google AI Studio
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${cleanKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{
                             parts: [{
-                                text: userText
+                                text: prompt
                             }]
                         }]
                     })
@@ -99,6 +166,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 
             } else if (provider === 'openai') {
                 const cleanKey = currentUser.ai_api_key.trim();
+                const systemPrompt = currentAgent?.system_prompt || "Você é o Panda IA, um assistente prestativo da intranet PandaNet.";
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
@@ -107,7 +175,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                     },
                     body: JSON.stringify({
                         model: 'gpt-4o',
-                        messages: [{ role: 'user', content: userText }]
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: userText }
+                        ]
                     })
                 });
 
@@ -124,7 +195,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             const { data: insertedAiMsg } = await supabase.from('ai_messages').insert({
                 user_id: currentUser.id,
                 role: 'assistant',
-                content: aiResponseText
+                content: aiResponseText,
+                agent_id: currentAgent?.id || null
             }).select().single();
 
             if (insertedAiMsg) {
@@ -136,7 +208,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                     user_id: currentUser.id,
                     role: 'assistant',
                     content: aiResponseText,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    agent_id: currentAgent?.id || null
                 }]);
             }
 
@@ -162,19 +235,95 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 border-l border-t border-slate-200 dark:border-slate-800 shadow-2xl">
             {/* Header */}
             <div className="flex justify-between items-center p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden border-2 border-emerald-500">
-                        <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDdvMnAxaXNid28xb3VyeWh1anZlcmkxdGk0MmxjOHV2dDNlbnIzZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/iU18n02qI9A5qf63fQ/giphy.webp" alt="Panda AI" className="w-8 h-8 object-contain" />
+                <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setShowAgentManager(!showAgentManager)}>
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center overflow-hidden border-2 border-emerald-500 group-hover:scale-110 transition-transform">
+                        <img src={currentAgent?.avatar_url || "/logo.png"} alt="Panda AI" className="w-8 h-8 object-contain" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-800 dark:text-white">Panda IA</h3>
+                        <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-1">
+                            {currentAgent?.name || "Panda IA"}
+                            <ChevronDownIcon className="w-3 h-3 text-slate-400 group-hover:text-emerald-500" />
+                        </h3>
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Online e pronto para ajudar</p>
                     </div>
                 </div>
-                <button onClick={toggleOpen} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
-                    <XMarkIcon className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={toggleOpen} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                        <XMarkIcon className="w-6 h-6" />
+                    </button>
+                </div>
             </div>
+
+            {/* Agent Manager Overlay */}
+            {showAgentManager && (
+                <div className="absolute inset-0 z-20 bg-black/40 animate-fade-in flex items-start justify-center pt-16 p-4">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-4 overflow-hidden flex flex-col max-h-[70%]">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-bold dark:text-white uppercase text-xs tracking-widest text-slate-500">Agentes de IA</h4>
+                            <button onClick={() => setShowAgentManager(false)}><XMarkIcon className="w-4 h-4 text-slate-400" /></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-4 custom-scrollbar">
+                            <button
+                                onClick={() => { setCurrentAgent(null); setShowAgentManager(false); }}
+                                className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${!currentAgent ? 'bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'}`}
+                            >
+                                <img src="/logo.png" className="w-8 h-8 object-contain" />
+                                <div className="text-left">
+                                    <p className="text-sm font-bold dark:text-white">Panda IA (Padrão)</p>
+                                    <p className="text-[10px] text-slate-500">Assistente geral</p>
+                                </div>
+                            </button>
+
+                            {agents.map(agent => (
+                                <div key={agent.id} className="group relative">
+                                    <button
+                                        onClick={() => { setCurrentAgent(agent); setShowAgentManager(false); }}
+                                        className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${currentAgent?.id === agent.id ? 'bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'}`}
+                                    >
+                                        <img src={agent.avatar_url} className="w-8 h-8 rounded-full object-cover bg-slate-100" />
+                                        <div className="text-left">
+                                            <p className="text-sm font-bold dark:text-white">{agent.name}</p>
+                                            <p className="text-[10px] text-slate-500 truncate max-w-[180px]">{agent.system_prompt}</p>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => deleteAgent(agent.id)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="border-t dark:border-slate-700 pt-4 space-y-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Criar Novo Agente</p>
+                            <input
+                                type="text"
+                                placeholder="Nome do Agente"
+                                value={newAgentName}
+                                onChange={e => setNewAgentName(e.target.value)}
+                                className="w-full text-xs p-2.5 rounded-lg border dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            />
+                            <textarea
+                                placeholder="Instruções / Personalidade"
+                                value={newAgentPrompt}
+                                onChange={e => setNewAgentPrompt(e.target.value)}
+                                className="w-full text-xs p-2.5 rounded-lg border dark:border-slate-700 dark:bg-slate-900 dark:text-white resize-none"
+                                rows={2}
+                            />
+                            <button
+                                onClick={createAgent}
+                                disabled={!newAgentName}
+                                className="w-full bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                Criar Agente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -247,20 +396,35 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     // Render Floating Button when closed
     if (!isOpen) {
         return (
-            <button 
-                onClick={toggleOpen}
-                className="fixed bottom-6 right-6 z-50 p-0 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 bg-white border-2 border-emerald-500"
-            >
-                <img 
-                    src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDdvMnAxaXNid28xb3VyeWh1anZlcmkxdGk0MmxjOHV2dDNlbnIzZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/iU18n02qI9A5qf63fQ/giphy.webp" 
-                    alt="Panda IA" 
-                    className="w-16 h-16 object-contain p-1" 
-                />
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
-                </span>
-            </button>
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 translate-y-[20px] animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
+                {showTooltip && (
+                    <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-2xl shadow-2xl border border-emerald-100 dark:border-emerald-900/50 flex items-center gap-2 animate-bounce-slow relative">
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Precisa de ajuda?</p>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowTooltip(false); setTooltipDismissed(true); }}
+                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"
+                        >
+                            <XMarkIcon className="w-3 h-3" />
+                        </button>
+                        {/* Tooltip Tail */}
+                        <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-white dark:bg-slate-800 border-r border-b border-emerald-100 dark:border-emerald-900/50 rotate-45"></div>
+                    </div>
+                )}
+                <button
+                    onClick={toggleOpen}
+                    className="w-16 h-16 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 bg-white border-2 border-emerald-500 overflow-hidden flex items-center justify-center p-1 group"
+                >
+                    <img 
+                        src="/logo.png"
+                        alt="Panda IA" 
+                        className="w-12 h-12 object-contain group-hover:rotate-12 transition-transform"
+                    />
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+                    </span>
+                </button>
+            </div>
         );
     }
 

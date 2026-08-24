@@ -79,7 +79,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // --- Components ---
 
-const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
+const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentUser, pageContext }) => {
     const { t, language } = useLanguage();
     const { showToast } = useToast();
     const { setModuleUnreadCount } = useNotifications();
@@ -149,6 +149,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [pageSize, setPageSize] = useState(10); // User requested 10
     const [totalEmails, setTotalEmails] = useState(0);
     const [unseenCount, setUnseenCount] = useState(0);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [filterTag, setFilterTag] = useState<string | null>(null);
@@ -375,6 +376,15 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setBodyError(err.message || "Falha ao carregar conteúdo do e-mail.");
         } finally {
             setLoadingBody(false);
+            // Mark global notification as read if it looks like an email notification
+            if (currentUser?.id) {
+                supabase.from('notifications')
+                    .update({ is_read: true })
+                    .eq('user_id', currentUser.id)
+                    .eq('is_read', false)
+                    .or(`link.eq./email,link.eq./email?uid=${uid}`)
+                    .then(() => { });
+            }
         }
     };
 
@@ -448,13 +458,22 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         }
 
         // Call Server
-        await callEmailServer('flags', {
-            config: settings,
-            uids: [email.uid],
-            operation: add ? 'add' : 'remove',
-            flags: [flag],
-            path: currentFolder
-        });
+        try {
+            const { error } = await callEmailServer('flags', {
+                config: settings,
+                uids: [email.uid],
+                operation: add ? 'add' : 'remove',
+                flags: [flag],
+                path: currentFolder
+            });
+            if (error) {
+                console.error("[EmailPage] Error updating flags on server:", error);
+                showToast(`Erro ao sincronizar status no servidor: ${error.message}`, 'error');
+                // Revert optimistic update? For now just log, but in a real app we should revert.
+            }
+        } catch (err) {
+            console.error("[EmailPage] Exception in toggleFlag:", err);
+        }
     };
 
     const markAllAsRead = async () => {
@@ -720,6 +739,18 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     useEffect(() => {
         if (savedImapUser) fetchEmails();
     }, [page, pageSize, currentFolder]);
+
+    // Handle initial email from context (notifications)
+    useEffect(() => {
+        if (pageContext?.uid && emails.length > 0) {
+            const email = emails.find(e => e.uid === pageContext.uid);
+            if (email) {
+                setSelectedEmail(email);
+                setView('read');
+                fetchEmailBody(email.uid, currentFolder);
+            }
+        }
+    }, [pageContext, emails.length]);
 
     const handleAddRecipientTag = (type: 'to' | 'cc' | 'bcc', value: string) => {
         const email = value.trim().replace(/[,;]$/, ''); // Remove trailing comma or semicolon
@@ -1071,17 +1102,27 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     <div className="p-4 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-white/50 dark:bg-[#020617]/60 backdrop-blur-xl z-20 sticky top-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedEmailUids.length > 0 && selectedEmailUids.length === filteredEmails.length}
-                                    onChange={toggleSelectAll}
-                                    className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all"
-                                    title="Selecionar todos"
-                                />
+                                {isSelectionMode ? (
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedEmailUids.length > 0 && selectedEmailUids.length === filteredEmails.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all"
+                                        title="Selecionar todos"
+                                    />
+                                ) : (
+                                    <button
+                                        onClick={() => setIsSelectionMode(true)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand-primary transition-all"
+                                        title="Selecionar e-mails"
+                                    >
+                                        <TagIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                                 <h2 className="font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>
                             </div>
                             <div className="flex items-center gap-3">
-                                {selectedEmailUids.length > 0 && (
+                                {isSelectionMode && selectedEmailUids.length > 0 && (
                                     <button
                                         onClick={deleteSelectedEmails}
                                         className="p-1 px-2 text-red-500 hover:bg-red-50 rounded-lg flex items-center gap-1 transition-all"
@@ -1091,13 +1132,22 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         <span className="text-[10px] font-black uppercase tracking-widest">{selectedEmailUids.length}</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={markAllAsRead}
-                                    className="text-[10px] font-black text-brand-primary hover:text-emerald-500 uppercase tracking-widest transition-colors"
-                                    title="Marcar todos como lidos"
-                                >
-                                    Lidos
-                                </button>
+                                {isSelectionMode ? (
+                                    <button
+                                        onClick={() => { setIsSelectionMode(false); setSelectedEmailUids([]); }}
+                                        className="text-[10px] font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                ) : (
+                                        <button
+                                            onClick={markAllAsRead}
+                                            className="text-[10px] font-black text-brand-primary hover:text-emerald-500 uppercase tracking-widest transition-colors"
+                                            title="Marcar todos como lidos"
+                                        >
+                                            Lidos
+                                        </button>
+                                )}
                             </div>
                         </div>
                         <div className="relative">
@@ -1133,14 +1183,16 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
                                         : 'border-transparent hover:bg-white dark:hover:bg-white/5'} ${!(email.flags || []).includes('\\Seen') ? 'bg-emerald-50/40 dark:bg-brand-primary/10' : ''}`}
                                 >
-                                    <div className="flex flex-col mt-0.5" onClick={(e) => e.stopPropagation()}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedEmailUids.includes(email.uid)}
-                                            onChange={() => toggleEmailSelection(email.uid)}
-                                            className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all transition-opacity duration-200"
-                                        />
-                                    </div>
+                                    {isSelectionMode && (
+                                        <div className="flex flex-col mt-0.5" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedEmailUids.includes(email.uid)}
+                                                onChange={() => toggleEmailSelection(email.uid)}
+                                                className="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer transition-all transition-opacity duration-200"
+                                            />
+                                        </div>
+                                    )}
                                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                                         <div className="flex justify-between items-start">
                                             <div className={`text-sm truncate pr-2 tracking-tight ${!(email.flags || []).includes('\\Seen') ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>

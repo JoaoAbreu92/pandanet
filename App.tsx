@@ -762,7 +762,7 @@ const AppContent: React.FC = () => {
             case 'manual-usuario': return <ManualPage />;
             case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda /> : null;
 
-            case 'email': return <EmailPage currentUser={currentUser} />;
+            case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
         }
     };
