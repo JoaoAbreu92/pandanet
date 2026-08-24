@@ -26,7 +26,7 @@ const supabase = createClient(supabaseUrl, supabaseKey.trim());
 const sessions = new Map();
 // Map to track reconnection attempts
 const reconnectionAttempts = new Map();
-const MAX_RECONNECTION_ATTEMPTS = 3;
+const MAX_RECONNECTION_ATTEMPTS = 10;
 
 async function connectToWhatsApp(companyId) {
     if (!companyId) {
@@ -81,7 +81,8 @@ async function connectToWhatsApp(companyId) {
                     connectToWhatsApp(companyId);
                 } else {
                     console.log(`[RECONNECTION] Max attempts (${MAX_RECONNECTION_ATTEMPTS}) reached for company ${companyId}. Stopping.`);
-                    await updateCompanySettings(companyId, { is_connected: false, qr_code: null });
+                    // Do NOT clear QR code here, so user has time to scan it even if backend stops retrying temporarily
+                    await updateCompanySettings(companyId, { is_connected: false });
                     reconnectionAttempts.delete(companyId);
                 }
             } else {
