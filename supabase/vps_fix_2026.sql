@@ -318,16 +318,53 @@ END;
 $$;
 
 -- 3. RLS FIXES
--- Allow admins to update any profile in their company
+-- Clean up all existing policies on public.profiles to prevent recursion
 DROP POLICY IF EXISTS "Admin manage all profiles in company" ON public.profiles;
-CREATE POLICY "Admin manage all profiles in company" ON public.profiles
-FOR ALL USING (
-    EXISTS (
-        SELECT 1 FROM profiles 
-        WHERE id = auth.uid() 
-        AND (is_admin = TRUE OR is_company_admin = TRUE)
-        AND company_id = public.profiles.company_id
-    )
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view profiles in same company" ON public.profiles;
+DROP POLICY IF EXISTS "Manage Profile Insertion" ON public.profiles;
+DROP POLICY IF EXISTS "Manage Profile Updates" ON public.profiles;
+DROP POLICY IF EXISTS "Manage Profile Deletion" ON public.profiles;
+DROP POLICY IF EXISTS "Super Admin can update all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Super Admins can update any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Super Admin can view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "View Profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Update Own Profile" ON public.profiles;
+DROP POLICY IF EXISTS "Insert Own Profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Authenticated users can view profiles" ON public.profiles;
+
+-- Create clean, recursion-free policies
+CREATE POLICY "profiles_select_policy" ON public.profiles
+FOR SELECT TO authenticated
+USING (
+    company_id = public.get_user_company_id()
+    OR public.is_super_admin()
+);
+
+CREATE POLICY "profiles_insert_policy" ON public.profiles
+FOR INSERT TO authenticated
+WITH CHECK (
+    public.is_company_admin(company_id)
+    OR auth.uid() = id
+);
+
+CREATE POLICY "profiles_update_policy" ON public.profiles
+FOR UPDATE TO authenticated
+USING (
+    public.is_company_admin(company_id)
+    OR auth.uid() = id
+)
+WITH CHECK (
+    public.is_company_admin(company_id)
+    OR auth.uid() = id
+);
+
+CREATE POLICY "profiles_delete_policy" ON public.profiles
+FOR DELETE TO authenticated
+USING (
+    public.is_company_admin(company_id)
 );
 
 -- Ensure execute permissions
@@ -365,19 +402,11 @@ ON public.personal_notes
 FOR ALL 
 USING (
     auth.uid() = user_id 
-    OR EXISTS (
-        SELECT 1 FROM public.profiles 
-        WHERE profiles.id = auth.uid() 
-        AND (profiles.role = 'Super Admin' OR profiles.email = 'ti@grupopixel.com.br')
-    )
+    OR public.is_super_admin()
 )
 WITH CHECK (
     auth.uid() = user_id 
-    OR EXISTS (
-        SELECT 1 FROM public.profiles 
-        WHERE profiles.id = auth.uid() 
-        AND (profiles.role = 'Super Admin' OR profiles.email = 'ti@grupopixel.com.br')
-    )
+    OR public.is_super_admin()
 );
 
 -- 3. PROJECT TASK-SPECIFIC CHECKLIST ITEMS SUPPORT
@@ -431,21 +460,62 @@ $function$;
 -- 7. CHAT GROUP SYNC RLS POLICIES FOR TEAMS
 -- ==========================================
 -- 7.1 Helper function to check company admin status
-CREATE OR REPLACE FUNCTION public.is_company_admin(comp_id uuid)
+CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
+SET search_path = public
+STABLE
+AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
-    AND company_id = comp_id
-    AND is_admin = true
+    AND role = 'Super Admin'
+  ) OR (
+    auth.jwt() ->> 'email' = 'ti@grupopixel.com.br'
   );
 END;
-$function$;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_admin_in_profile()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND (is_admin = true OR is_company_admin = true OR role = 'Super Admin' OR role = 'admin' OR role = 'Company Admin')
+  ) OR (
+    auth.jwt() ->> 'email' = 'ti@grupopixel.com.br'
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_company_admin(comp_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+BEGIN
+  IF public.is_super_admin() OR auth.jwt() ->> 'email' = 'ti@grupopixel.com.br' THEN
+    RETURN TRUE;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND company_id = comp_id
+    AND (is_admin = true OR is_company_admin = true OR role = 'admin' OR role = 'Company Admin')
+  );
+END;
+$$;
 
 -- 7.2 Clear legacy policies
 DROP POLICY IF EXISTS "Company admins can view conversations" ON public.conversations;
@@ -583,14 +653,8 @@ BEGIN
               AND column_name = 'company_id'
         ) THEN
             EXECUTE format('CREATE POLICY tenant_isolation_policy ON public.%I 
-                            USING (company_id = public.get_user_company_id() OR EXISTS (
-                                SELECT 1 FROM public.profiles 
-                                WHERE id = auth.uid() AND is_admin = TRUE
-                            )) 
-                            WITH CHECK (company_id = public.get_user_company_id() OR EXISTS (
-                                SELECT 1 FROM public.profiles 
-                                WHERE id = auth.uid() AND is_admin = TRUE
-                            ))', t);
+                            USING (company_id = public.get_user_company_id() OR public.is_admin_in_profile()) 
+                            WITH CHECK (company_id = public.get_user_company_id() OR public.is_admin_in_profile())', t);
         END IF;
     END LOOP;
 END;
