@@ -113,7 +113,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         blood_type: '',
                         marital_status: '',
                         education_level: '',
-                        status: 'active'
+                        status: 'active',
+                        ai_api_key: data?.ai_api_key || null,
+                        ai_provider: data?.ai_provider || null,
+                        ai_behavior: data?.ai_behavior || null,
                     };
                     setProfile(masterAdmin);
                     return;
@@ -159,7 +162,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     bio: data.bio || '',
                     isCompanyAdmin: data.is_company_admin || false,
                     company_id: data.company_id,
-                    status: data.status
+                    status: data.status,
+                    ai_api_key: data.ai_api_key || null,
+                    ai_provider: data.ai_provider || null,
+                    ai_behavior: data.ai_behavior || null,
                 };
                 setProfile(employee);
             }
