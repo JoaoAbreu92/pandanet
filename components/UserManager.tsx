@@ -542,7 +542,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     const handleDelete = async (userId: string, userName: string) => {
         if (!window.confirm(`Tem certeza que deseja excluir permanentemente o usuário ${userName}? Esta ação não pode ser desfeita.`)) return;
 
-        console.log(`[UserManager] Iniciando backup e deleção: ${userName} (${userId})`);
+        console.log(`[UserManager] Iniciando backup e deleção via Database RPC: ${userName} (${userId})`);
 
         try {
             // 1. Limpeza do JSONB da Empresa (Legacy cache)
@@ -561,13 +561,13 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 }
             }
 
-            // 2. Deletar na tabela Profiles
-            console.log(`[UserManager] Deletando usuário no Supabase: ${userId}`);
-            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            // 2. Chamar a Database RPC para deletar de forma segura (Auth + Profiles)
+            console.log(`[UserManager] Chamando Database Function (RPC) para deletar: ${userId}`);
+            const { error } = await supabase.rpc('delete_user_admin', { target_user_id: userId });
 
             if (error) {
-                console.error("[UserManager] Erro Supabase:", error);
-                throw error;
+                console.error("[UserManager] Erro no RPC:", error);
+                throw new Error(error.message || "Falha ao chamar a função de exclusão no banco.");
             }
 
             console.log("[UserManager] Sucesso!");
@@ -575,7 +575,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             alert("Usuário excluído com sucesso.");
         } catch (err: any) {
             console.error("[UserManager] Erro fatal:", err);
-            alert("Erro ao excluir: " + (err.message || "Erro desconhecido."));
+            alert("Erro ao excluir: " + (err.message || "Você não tem permissão ou houve um erro no servidor."));
         }
     };
 

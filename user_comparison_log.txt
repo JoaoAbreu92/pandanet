@@ -1,0 +1,10 @@
+--- PROFILES TABLE (Current Content) ---
+- Cleber Rhenius (recursoshumanos@acrilight.com.br) [ID: 0ba6e4b2-47ca-4941-bd00-026a6ee1a9d5]
+- Joao Henrique Abreu (ti@acrilight.com.br) [ID: 25b5c189-6357-450b-9b49-887697b7c474]
+- teste (teste@acrilight.com.br) [ID: 3c213e0d-bd12-4915-973e-61cae56adf27]
+- teste  (teste@acrilight.com.br) [ID: f50bdc51-490f-440d-aa2f-2efc16cdc045]
+
+--- COMPANIES JSONB DATA ---
+- Lorena Milani TEST (qualidade@acrilight.com.br) [ID: 3a70fe40-7ac7-4759-9f69-4e6695dca8a8]
+- Cleber Rhenius (recursoshumanos@acrilight.com.br) [ID: 0ba6e4b2-47ca-4941-bd00-026a6ee1a9d5]
+- Joao Henrique Abreu (ti@acrilight.com.br) [ID: 25b5c189-6357-450b-9b49-887697b7c474]
