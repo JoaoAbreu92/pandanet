@@ -510,32 +510,33 @@ const AppContent: React.FC = () => {
         if (companyData) setCompanyData({ ...companyData, tiRequests: newRequests });
     };
 
-    const handleJoinEvent = (eventId: number) => {
+    const handleJoinEvent = (eventId: number | string) => {
         if (!companyData || !currentUser) return;
         const updatedEvents = companyData.events.map(event => {
-            if (event.id === eventId) {
-                const isAttending = event.attendees.includes(currentUser.id);
+            if (String(event.id) === String(eventId)) {
+                // Cast to avoid string/number mismatch
+                const isAttending = (event.attendees as string[]).includes(String(currentUser.id));
                 const newAttendees = isAttending
                     ? event.attendees.filter(id => String(id) !== String(currentUser.id))
                     : [...event.attendees, String(currentUser.id)];
-                return { ...event, attendees: newAttendees };
+                return { ...event, attendees: newAttendees } as any;
             }
             return event;
         });
-        setCompanyData({ ...companyData, events: updatedEvents });
+        setCompanyData({ ...companyData, events: updatedEvents as any });
     };
 
-    const handleDeclineEvent = (eventId: number, reason: string) => {
+    const handleDeclineEvent = (eventId: number | string, reason: string) => {
         if (!companyData || !currentUser) return;
         const updatedEvents = companyData.events.map(event => {
-            if (event.id === eventId) {
+            if (String(event.id) === String(eventId)) {
                 const newAttendees = event.attendees.filter(id => String(id) !== String(currentUser.id));
                 const newDeclined = [...(event.declined || []).filter(d => String(d.userId) !== String(currentUser.id)), { userId: currentUser.id, reason }];
-                return { ...event, attendees: newAttendees, declined: newDeclined };
+                return { ...event, attendees: newAttendees, declined: newDeclined } as any;
             }
             return event;
         });
-        setCompanyData({ ...companyData, events: updatedEvents });
+        setCompanyData({ ...companyData, events: updatedEvents as any });
     };
 
     const handleAddRecognition = (rec: Recognition) => {
@@ -577,7 +578,7 @@ const AppContent: React.FC = () => {
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
 
             case 'tickets': return <TicketPage />;
-            case 'calendar': return <CalendarPage events={companyData.events} currentUser={currentUser} />;
+            case 'calendar': return <CalendarPage events={companyData.events as unknown as CalendarEvent[]} currentUser={currentUser} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
             case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
@@ -609,7 +610,7 @@ const AppContent: React.FC = () => {
             case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda /> : null;
 
             case 'email': return <EmailPage currentUser={currentUser} />;
-            default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
+            default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
         }
     };
 

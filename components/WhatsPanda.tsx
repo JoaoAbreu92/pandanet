@@ -75,52 +75,83 @@ const WhatsPanda: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden relative">
-      {/* WhatsPanda Sub-Sidebar - Hidden on small screens to save space */}
-      <div className="hidden md:flex w-20 bg-white border-r border-gray-200 flex-col items-center py-6 gap-6 z-20 shadow-sm">
-        <div className="mb-4">
-          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
-            <LayoutGrid className="w-6 h-6" />
-          </div>
-          </div>
+    <div className="flex h-screen bg-[#F4F7F6] overflow-hidden relative font-sans text-brand-text">
+      {/* WhatsPanda Sidebar - Izing Pro Style (Desktop) */}
+      <div className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col py-6 px-4 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
 
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setCurrentView(item.view as View)}
-            className={`p-3 rounded-xl transition-all duration-200 group relative ${currentView === item.view
-              ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
-              : 'text-gray-400 hover:bg-green-50 hover:text-green-600'
-              }`}
-            title={item.label}
-            >
-            <item.icon className="w-6 h-6" />
-            {/* Tooltip */}
-            <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
-              {item.label}
-            </div>
-          </button>
-        ))}
-      </div>
+        {/* Header / Logo Area */}
+        <div className="flex items-center gap-3 px-2 mb-8 mt-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+            <MessageCircle className="w-5 h-5 fill-current" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight leading-none">WhatsPanda</h1>
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-600">Pro</span>
+          </div>
+        </div>
 
-      {/* Mobile Menu - Shown only on small screens */}
-      {menuItems.length > 0 && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 flex justify-around items-center z-50">
+        {/* Navigation Menu */}
+        <div className="flex flex-col gap-1.5 flex-1 mt-2">
+          <div className="px-3 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-widest mt-2">Menu Principal</div>
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setCurrentView(item.view as View)}
-              className={`p-2 flex flex-col items-center justify-center transition-all ${currentView === item.view ? 'text-green-600' : 'text-gray-400'}`}
+              className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative
+                ${currentView === item.view
+                  ? 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500/20'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                }`}
             >
-              <item.icon className="w-6 h-6" />
-              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+              <div className={`${currentView === item.view ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors duration-200`}>
+                <item.icon className="w-5 h-5" strokeWidth={currentView === item.view ? 2.5 : 2} />
+              </div>
+              <span className={`text-sm font-medium ${currentView === item.view ? 'font-bold' : ''}`}>
+                {item.label}
+              </span>
+
+              {/* Active Indicator Line */}
+              {currentView === item.view && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-500 rounded-r-md" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Current User Info (Optional footer area) */}
+        <div className="mt-auto pt-4 border-t border-gray-100 flex items-center gap-3 px-2">
+          <img
+            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name}&background=10b981&color=fff`}
+            alt="Avatar"
+            className="w-9 h-9 rounded-full ring-2 ring-emerald-50"
+          />
+          <div className="flex flex-col truncate">
+            <span className="text-sm font-bold text-gray-800 truncate">{profile?.full_name || 'Usuário'}</span>
+            <span className="text-[10px] text-gray-400 truncate uppercase font-semibold">{profile?.role || 'Atendente'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu - Shown only on small screens */}
+      {menuItems.length > 0 && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white border-t border-gray-100 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setCurrentView(item.view as View)}
+              className={`p-2 flex flex-col items-center justify-center transition-all min-w-[64px] rounded-xl
+                ${currentView === item.view ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'}
+              `}
+            >
+              <item.icon className={`w-5 h-5 mb-1 ${currentView === item.view ? 'animate-bounce-slight' : ''}`} strokeWidth={currentView === item.view ? 2.5 : 2} />
+              <span className={`text-[10px] ${currentView === item.view ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
             </button>
           ))}
         </div>
       )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-16 md:pb-0' : ''}`}>
+      <div className={`flex-1 overflow-hidden relative ${menuItems.length > 0 ? 'pb-[72px] md:pb-0' : ''} bg-[#F4F7F6]`}>
         {renderView()}
       </div>
     </div>

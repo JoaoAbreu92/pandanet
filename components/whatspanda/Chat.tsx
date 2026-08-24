@@ -27,7 +27,7 @@ import ContactSidebar from './ContactSidebar';
 
 const Chat: React.FC = () => {
   const { user, profile } = useAuth();
-  const permissions = profile?.whatspanda_permissions || {};
+  const permissions = (profile?.whatspanda_permissions as any) || {};
   const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
   const canSendMessages = isAdmin || permissions.can_send_messages !== false; // Default true if undefined? No, types say boolean. Let's assume false default if not admin.
   // Actually, UsersTab set defaults.
@@ -162,26 +162,25 @@ const Chat: React.FC = () => {
   const filteredConversations = conversations.filter(c => c.status === activeTab);
 
   return (
-    <div className="flex h-full bg-gray-100 overflow-hidden relative">
+    <div className="flex h-full bg-[#f8fafc] overflow-hidden relative font-sans text-brand-text">
       {/* Sidebar: Conversations List */}
-      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-1/4 bg-white border-r border-gray-200 flex-col`}>
+      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[360px] bg-white border-r border-slate-200 flex-col shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10`}>
         {/* Header - SIMPLIFIED for sub-view (main header handled by layout) */}
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="p-4 border-b border-slate-200 bg-white">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              Conversas
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 tracking-tight">
+              Atendimentos
             </h2>
-            <div className={`w-3 h-3 rounded-full ${settings?.is_connected ? 'bg-green-500' : 'bg-red-500'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
+            <div className={`w-2 h-2 rounded-full ring-4 shadow-sm ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-50' : 'bg-red-500 ring-red-50'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
           </div>
           
           {/* Tabs */}
-          <div className="flex bg-gray-200 rounded-lg p-1">
+          <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
             {(['aberto', 'pendente', 'fechado'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-1 text-sm font-medium rounded-md capitalize ${
-                  activeTab === tab ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg capitalize transition-all duration-200 ${activeTab === tab ? 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] text-emerald-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
                 }`}
               >
                 {tab}
@@ -191,91 +190,104 @@ const Chat: React.FC = () => {
         </div>
 
         {/* Search */}
-        <div className="p-2 border-b border-gray-100">
-            <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+        <div className="p-3 border-b border-slate-100 bg-white">
+          <div className="relative group">
+            <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
                 <input 
                     type="text" 
-                    placeholder="Buscar conversa..." 
-                    className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Buscar atendimento..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
                 />
             </div>
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-2 bg-slate-50">
           {filteredConversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => setSelectedConversation(conv)}
-              className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                selectedConversation?.id === conv.id ? 'bg-green-50 border-l-4 border-l-green-600' : ''
+              className={`p-3 rounded-xl border cursor-pointer hover:shadow-md transition-all duration-300 relative overflow-hidden ${selectedConversation?.id === conv.id ? 'bg-white border-emerald-500 shadow-[0_4px_20px_rgba(16,185,129,0.08)]' : 'bg-white border-slate-200 shadow-sm hover:border-emerald-300'
               }`}
             >
-              <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-gray-900">{conv.contact_name || conv.contact_phone}</h3>
-                <span className="text-xs text-gray-400">
+              {/* Active bar */}
+              {selectedConversation?.id === conv.id && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
+              )}
+
+              <div className="flex justify-between items-start mb-1">
+                <h3 className={`font-bold text-sm truncate pr-2 ${selectedConversation?.id === conv.id ? 'text-emerald-700' : 'text-slate-800'}`}>
+                  {conv.contact_name || conv.contact_phone}
+                </h3>
+                <span className={`text-[10px] font-semibold whitespace-nowrap mt-0.5 ${selectedConversation?.id === conv.id ? 'text-emerald-600' : 'text-slate-400'}`}>
                     {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
               <div className="flex justify-between items-center mt-1">
-                <p className="text-sm text-gray-500 truncate w-32">
+                <p className="text-xs text-slate-500 truncate max-w-[140px] font-medium">
                     {conv.contact_phone}
                 </p>
-                {conv.unread_count > 0 && (
-                  <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    {conv.unread_count}
+                {conv.unread_count > 0 ? (
+                  <span className="bg-emerald-500 text-white text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 rounded-full text-center shadow-sm">
+                    {conv.unread_count > 99 ? '99+' : conv.unread_count}
                   </span>
+                ) : (
+                  selectedConversation?.id === conv.id ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : null
                 )}
               </div>
             </div>
           ))}
           {filteredConversations.length === 0 && (
-              <div className="p-8 text-center text-gray-400 text-sm">
-                  Nenhuma conversa {activeTab}.
+            <div className="p-8 text-center text-slate-400 mt-4">
+              <div className="w-12 h-12 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <MessageCircle className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-medium">Nenhum atendimento {activeTab}.</p>
               </div>
           )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#efeae2]`}>
+      <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#F3F6F8] relative`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
+        <div className="absolute inset-0 bg-white/70 pointer-events-none" /> {/* Overlay to soften the background */}
+
         {selectedConversation ? (
-          <>
+          <div className="relative z-10 flex flex-col h-full"> {/* Container for z-index */}
             {/* Chat Header */}
-            <div className="p-3 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
+            <div className="px-5 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200 flex justify-between items-center shadow-sm z-20">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedConversation(null)}
-                  className="p-2 md:hidden hover:bg-gray-100 rounded-full text-gray-600 mr-1"
+                  className="p-2 -ml-2 md:hidden hover:bg-slate-100 rounded-full text-slate-600 transition-colors"
                 >
-                  <ArrowLeft className="w-6 h-6" />
+                  <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 shrink-0">
+                <div className="w-11 h-11 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white shadow-sm overflow-hidden">
                   <User className="w-6 h-6" />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{selectedConversation.contact_name}</h3>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-gray-500 truncate">{selectedConversation.contact_phone}</p>
+                <div className="min-w-0 flex flex-col">
+                  <h3 className="font-bold text-slate-800 text-base truncate leading-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs font-semibold text-slate-500 truncate">{selectedConversation.contact_phone}</p>
                     {selectedConversation.assigned_user && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-100">
                         {selectedConversation.assigned_user.full_name}
                       </span>
                     )}
                     {selectedConversation.department && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-100">
                         {selectedConversation.department.name}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 {canTransfer && (
                   <button
                     onClick={() => setShowTransferModal(true)}
-                    className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+                    className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-indigo-600 transition-colors"
                     title="Transferir Atendimento"
                   >
                     <UserPlus className="w-5 h-5" />
@@ -283,7 +295,7 @@ const Chat: React.FC = () => {
                 )}
                 <button
                   onClick={() => setShowContactSidebar(!showContactSidebar)}
-                  className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+                  className={`p-2 rounded-full transition-colors ${showContactSidebar ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
                   title="Informações do Contato"
                 >
                   <Info className="w-5 h-5" />
@@ -292,24 +304,25 @@ const Chat: React.FC = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.is_from_customer ? 'justify-start' : 'justify-end'}`}
                 >
                   <div
-                    className={`max-w-[70%] rounded-lg p-3 shadow-sm relative ${
-                      msg.is_from_customer ? 'bg-white rounded-tl-none' : 'bg-[#d9fdd3] rounded-tr-none'
+                    className={`max-w-[75%] md:max-w-[60%] rounded-2xl px-4 py-2.5 shadow-sm relative filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.04)] ${msg.is_from_customer
+                      ? 'bg-white text-slate-800 rounded-tl-sm border border-slate-100'
+                      : 'bg-[#dafde0] text-slate-800 rounded-tr-sm border border-[#c4f2cd]'
                     }`}
                   >
-                    <p className="text-gray-800 text-sm">{msg.message_text}</p>
-                    <div className="flex justify-end items-center gap-1 mt-1">
-                      <span className="text-[10px] text-gray-500">
+                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.message_text}</p>
+                    <div className="flex justify-end items-center gap-1.5 mt-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {!msg.is_from_customer && (
-                        <CheckCheck className="w-3 h-3 text-blue-500" />
+                        <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
                       )}
                     </div>
                   </div>
@@ -319,70 +332,94 @@ const Chat: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-3 bg-white flex items-center gap-2">
-              <button
-                className={`p-2 rounded-full ${canSendMedia ? 'hover:bg-gray-100 text-gray-500' : 'opacity-50 cursor-not-allowed text-gray-300'}`}
-                disabled={!canSendMedia}
-                title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && canSendMessagesResult && handleSendMessage()}
-                placeholder={canSendMessagesResult ? "Digite uma mensagem..." : "Apenas leitura"}
-                disabled={!canSendMessagesResult}
-                className="flex-1 py-2 px-4 bg-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-200 disabled:text-gray-500"
-              />
-              <button 
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || !canSendMessagesResult}
-                className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transform transition-transform active:scale-95"
-                title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
-              >
-                <Send className="w-5 h-5" />
-              </button>
+            <div className="px-4 py-3 bg-white border-t border-slate-200 z-20 flex gap-2">
+              <div className="flex-1 bg-slate-50 rounded-2xl flex items-end p-1.5 border border-slate-200 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-50 focus-within:bg-white transition-all">
+                <button
+                  className={`p-2 rounded-xl transition-colors ${canSendMedia ? 'hover:bg-slate-200 text-slate-500 hover:text-slate-700' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                  disabled={!canSendMedia}
+                  title={!canSendMedia ? "Sem permissão para enviar mídia" : "Anexar"}
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      canSendMessagesResult && handleSendMessage();
+                    }
+                  }}
+                  placeholder={canSendMessagesResult ? "Escreva uma mensagem..." : "Apenas leitura"}
+                  disabled={!canSendMessagesResult}
+                  className="flex-1 max-h-32 min-h-[40px] py-2 px-3 bg-transparent text-sm resize-none focus:outline-none disabled:text-slate-500"
+                  rows={1}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || !canSendMessagesResult}
+                  className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:bg-slate-300 disabled:cursor-not-allowed transform transition-all active:scale-95 shadow-md shadow-emerald-500/20 mb-px"
+                  title={!canSendMessagesResult ? "Sem permissão para enviar mensagens" : "Enviar"}
+                >
+                  <Send className="w-5 h-5 ml-0.5" />
+                </button>
+              </div>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500 bg-[#f0f2f5] border-b-[6px] border-green-500">
-            <MessageCircle className="w-16 h-16 text-gray-300 mb-4" />
-            <h2 className="text-2xl font-light text-gray-600">WhatsPanda</h2>
-            <p className="text-sm mt-2">Escolha uma conversa para começar o atendimento.</p>
+            <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
+              <div className="bg-white/60 backdrop-blur-md p-10 rounded-3xl shadow-xl flex flex-col items-center max-w-sm text-center border border-white/40">
+                <div className="w-20 h-20 bg-gradient-to-tr from-emerald-100 to-emerald-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner ring-1 ring-emerald-100">
+                  <MessageCircle className="w-10 h-10 text-emerald-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">WhatsPanda Pro</h2>
+                <p className="text-sm font-medium text-slate-500 leading-relaxed">Selecione um atendimento ao lado para visualizar as mensagens e interagir com o cliente.</p>
+              </div>
           </div>
         )}
       </div>
 
-      {/* Right Sidebar: Contact Info (Optional/Collapsible) */}
+      {/* Right Sidebar: Contact Info */}
       {selectedConversation && (
-        <div className="w-1/4 bg-white border-l border-gray-200 p-4 hidden xl:block">
-            <div className="flex flex-col items-center mb-6">
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-3">
-                     <User className="w-10 h-10 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold">{selectedConversation.contact_name}</h3>
-                <p className="text-gray-500 text-sm">{selectedConversation.contact_phone}</p>
+        <div className={`w-[280px] bg-white border-l border-slate-200 flex flex-col transition-all duration-300 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
+          {/* Contact Header Component / Modal Wrapper Alternative */}
+          <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center xl:hidden">
+            <span className="font-bold text-slate-700">Detalhes</span>
+            <button onClick={() => setShowContactSidebar(false)} className="p-1 hover:bg-slate-200 rounded-lg text-slate-500"><CheckCheck className="w-5 h-5" /></button>
+          </div>
+
+          <div className="p-6 flex flex-col items-center border-b border-slate-100">
+            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4 ring-4 ring-white shadow-md">
+              <User className="w-12 h-12 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 text-center leading-tight">{selectedConversation.contact_name || 'Sem nome'}</h3>
+            <p className="text-slate-500 text-sm font-semibold mt-1">{selectedConversation.contact_phone}</p>
             </div>
 
-            <div className="space-y-4">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Detalhes</h4>
-                    <div className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-                        <Clock className="w-4 h-4" />
-                        <span>Criado em: {new Date(selectedConversation.last_message_at).toLocaleDateString()}</span>
+          <div className="p-6 flex-1 overflow-y-auto space-y-5">
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Informações do Ticket</h4>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-3">
+                <div className="flex items-center gap-3 text-sm text-slate-700">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-500">Última Interação</span>
+                    <span className="font-semibold">{new Date(selectedConversation.last_message_at).toLocaleDateString()} às {new Date(selectedConversation.last_message_at).toLocaleTimeString().slice(0, 5)}</span>
+                  </div>
+                </div>
                     </div>
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Ações</h4>
-                    <button className="w-full text-left text-sm text-red-600 hover:bg-red-50 p-2 rounded transition-colors">
-                        Fechar Conversa
-                    </button>
-                    <button className="w-full text-left text-sm text-gray-700 hover:bg-gray-200 p-2 rounded transition-colors">
-                        Ver Perfil Completo
-                    </button>
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Ações Rápidas</h4>
+              <div className="space-y-2">
+                <button className="w-full flex items-center justify-center py-2.5 px-4 bg-emerald-50 text-emerald-700 font-bold text-sm rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
+                  Ver Perfil CRM
+                </button>
+                <button className="w-full flex items-center justify-center py-2.5 px-4 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors border border-red-100">
+                  Encerrar Atendimento
+                </button>
+              </div>
                 </div>
             </div>
         </div>
@@ -402,14 +439,6 @@ const Chat: React.FC = () => {
               fetchMessages(selectedConversation.id);
             }
           }}
-        />
-      )}
-
-      {/* Contact Sidebar */}
-      {showContactSidebar && selectedConversation && (
-        <ContactSidebar
-          conversation={selectedConversation}
-          onClose={() => setShowContactSidebar(false)}
         />
       )}
     </div>
