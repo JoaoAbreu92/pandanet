@@ -19,13 +19,18 @@ const Channels: React.FC = () => {
     const [rejectionMessage, setRejectionMessage] = useState('No momento não atendemos ligações por este canal. Por favor, envie uma mensagem de texto.');
 
     useEffect(() => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+
+        if (!companyId) {
+            console.log('[Channels] No company_id available yet, skipping setup');
+            return;
+        }
+
+        console.log('[Channels] Setting up Realtime subscription for company:', companyId);
         fetchSettings();
 
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
-        console.log('[Channels] Setting up Realtime subscription for company:', companyId);
-
         const subscription = supabase
-            .channel('whatsapp_settings_qr')
+            .channel(`whatsapp_settings_qr_${companyId}`)
             .on('postgres_changes', {
                 event: 'UPDATE',
                 schema: 'public',
@@ -46,9 +51,10 @@ const Channels: React.FC = () => {
             .subscribe();
 
         return () => {
+            console.log('[Channels] Cleaning up Realtime subscription');
             supabase.removeChannel(subscription);
         };
-    }, [profile, user]);
+    }, [profile?.company_id, user?.user_metadata?.company_id]); // Only re-run if company_id changes
 
     const fetchSettings = async () => {
         setLoading(true);
@@ -89,9 +95,13 @@ const Channels: React.FC = () => {
 
     const startSession = async (companyId: string) => {
         try {
-            await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start`, { method: 'POST' });
+            console.log('[startSession] Calling backend API for company:', companyId);
+            const response = await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start`, { method: 'POST' });
+            console.log('[startSession] Response status:', response.status);
+            const data = await response.text();
+            console.log('[startSession] Response:', data);
         } catch (error) {
-            console.error('Erro ao iniciar sessão:', error);
+            console.error('[startSession] Error:', error);
         }
     };
 
@@ -112,7 +122,7 @@ const Channels: React.FC = () => {
         }
 
         const companyId = profile?.company_id || user?.user_metadata?.company_id || '15d38706-59a6-43b8-9366-2371904d90ce'; 
-        // Fallback for dev/demo if profile not loaded yet, or strictly require it.
+        console.log('[handleSaveConfig] Company ID:', companyId);
 
         const updates = {
             company_id: companyId,
@@ -123,14 +133,18 @@ const Channels: React.FC = () => {
             updated_at: new Date().toISOString()
         };
 
+        console.log('[handleSaveConfig] Upserting settings:', updates);
+
         const { error } = await supabase
             .from('whatsapp_settings')
             .upsert(updates, { onConflict: 'company_id' });
 
         if (error) {
-            console.error('Error saving settings:', error);
+            console.error('[handleSaveConfig] Error saving settings:', error);
             alert(`Erro ao salvar configurações: ${error.message}`);
         } else {
+            console.log('[handleSaveConfig] Settings saved successfully');
+            console.log('[handleSaveConfig] Starting session for company:', companyId);
             // Trigger backend session start
             await startSession(companyId);
             setStep('qr');
