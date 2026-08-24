@@ -48,6 +48,9 @@ import CRMCustomers from './components/CRMCustomers';
 import CRMCustomerDetail from './components/CRMCustomerDetail';
 import CRMNewCustomerForm from './components/CRMNewCustomerForm';
 import CRMFinanceForm from './components/CRMFinanceForm';
+import CRMItemForm from './components/CRMItemForm';
+import CRMSubscriptionForm from './components/CRMSubscriptionForm';
+import CRMContractForm from './components/CRMContractForm';
 import CRMCalendar from './components/CRMCalendar';
 import CRMSales from './components/CRMSales';
 import WhatsPanda from './components/WhatsPanda.tsx';
@@ -563,6 +566,31 @@ const AppContent: React.FC = () => {
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<CRMCustomer | null>(null);
     const [financeFormType, setFinanceFormType] = useState<'invoice' | 'proposal' | 'estimate' | null>(null);
+    const [showItemForm, setShowItemForm] = useState(false);
+    const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
+    const [showContractForm, setShowContractForm] = useState(false);
+    const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>([]);
+
+    const fetchCRMCustomers = useCallback(async () => {
+        if (!currentUser?.company_id) return;
+        try {
+            const { data, error } = await supabase
+                .from('crm_customers')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('name');
+            if (error) throw error;
+            setCrmCustomers(data || []);
+        } catch (error) {
+            console.error('Error fetching CRM customers:', error);
+        }
+    }, [currentUser?.company_id]);
+
+    useEffect(() => {
+        if (currentUser?.company_id) {
+            fetchCRMCustomers();
+        }
+    }, [currentUser?.company_id, fetchCRMCustomers]);
 
     const handleViewCustomer = async (customerOrId: CRMCustomer | string) => {
         if (typeof customerOrId === 'string') {
@@ -655,9 +683,29 @@ const AppContent: React.FC = () => {
                     />
                 );
             case 'crm-subscriptions':
-                return <CRMSales initialTab="subscriptions" />;
+                return (
+                    <CRMSales
+                        initialTab="subscriptions"
+                        onViewCustomer={handleViewCustomer}
+                        onNewRequest={() => setShowSubscriptionForm(true)}
+                    />
+                );
+            case 'crm-items':
+                return (
+                    <CRMSales
+                        initialTab="items"
+                        onViewCustomer={handleViewCustomer}
+                        onNewRequest={() => setShowItemForm(true)}
+                    />
+                );
             case 'crm-contracts':
-                return <CRMSales initialTab="contracts" />;
+                return (
+                    <CRMSales
+                        initialTab="contracts"
+                        onViewCustomer={handleViewCustomer}
+                        onNewRequest={() => setShowContractForm(true)}
+                    />
+                );
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
@@ -780,14 +828,47 @@ const AppContent: React.FC = () => {
             >
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
-                {isNewCustomerModalOpen && <CRMNewCustomerForm onClose={() => setIsNewCustomerModalOpen(false)} />}
+
+                {isNewCustomerModalOpen && (
+                    <CRMNewCustomerForm
+                        onClose={() => setIsNewCustomerModalOpen(false)}
+                        onSuccess={() => {
+                            setIsNewCustomerModalOpen(false);
+                            fetchCRMCustomers();
+                        }}
+                    />
+                )}
+
                 {financeFormType && (
                     <CRMFinanceForm
                         type={financeFormType}
-                        customers={(companyData?.employees as any[] || [])} // Simplification for now, should be real customers
+                        customers={crmCustomers}
                         currentUser={currentUser}
                         onClose={() => setFinanceFormType(null)}
-                        onSave={(data) => console.log('Saving finance data:', data)}
+                        onSuccess={() => {
+                            setFinanceFormType(null);
+                        }}
+                    />
+                )}
+
+                {showItemForm && (
+                    <CRMItemForm
+                        onClose={() => setShowItemForm(false)}
+                        onSave={() => setShowItemForm(false)}
+                    />
+                )}
+
+                {showSubscriptionForm && (
+                    <CRMSubscriptionForm
+                        onClose={() => setShowSubscriptionForm(false)}
+                        onSave={() => setShowSubscriptionForm(false)}
+                    />
+                )}
+
+                {showContractForm && (
+                    <CRMContractForm
+                        onClose={() => setShowContractForm(false)}
+                        onSave={() => setShowContractForm(false)}
                     />
                 )}
             </Layout>

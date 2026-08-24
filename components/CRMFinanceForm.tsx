@@ -28,12 +28,12 @@ interface CRMItemLine {
 interface CRMFinanceFormProps {
     type: 'invoice' | 'proposal' | 'estimate';
     onClose: () => void;
-    onSave: (data: any) => void;
+    onSuccess: (data: any) => void;
     customers: CRMCustomer[];
     currentUser: Employee;
 }
 
-const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSave, customers, currentUser }) => {
+const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSuccess, customers, currentUser }) => {
     const [formData, setFormData] = useState({
         subject: '',
         customer_id: '',
@@ -105,8 +105,8 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSave, 
 
         try {
             // Logic to persist in Supabase would go here based on 'type'
-            // For now, we call the onSave prop
-            onSave({ ...formData, subTotal, total });
+            // For now, we call the onSuccess prop
+            onSuccess({ ...formData, subTotal, total });
             toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} salva com sucesso!`);
             onClose();
         } catch (error) {

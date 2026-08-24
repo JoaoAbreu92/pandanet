@@ -8,12 +8,13 @@ import {
     ChevronRightIcon,
     DocumentTextIcon,
     CurrencyDollarIcon,
-    CalendarDaysIcon
+    CalendarDaysIcon,
+    QueueListIcon
 } from '../components/icons';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
-type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscriptions' | 'contracts';
+type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscriptions' | 'contracts' | 'items';
 
 const CRMSales: React.FC<{
     initialTab?: SalesTab,
@@ -30,6 +31,7 @@ const CRMSales: React.FC<{
         { id: 'proposals', label: 'Propostas', icon: DocumentTextIcon, table: 'crm_proposals' },
         { id: 'estimates', label: 'Estimativas', icon: DocumentTextIcon, table: 'crm_estimates' },
         { id: 'invoices', label: 'Faturas', icon: BanknotesIcon, table: 'crm_invoices' },
+        { id: 'items', label: 'Itens', icon: QueueListIcon, table: 'crm_items' },
         { id: 'payments', label: 'Pagamentos', icon: CurrencyDollarIcon, table: 'crm_payments' },
         { id: 'subscriptions', label: 'Assinaturas', icon: CalendarDaysIcon, table: 'crm_subscriptions' },
         { id: 'contracts', label: 'Contratos', icon: DocumentTextIcon, table: 'crm_contracts' },
@@ -43,15 +45,27 @@ const CRMSales: React.FC<{
             const currentTab = tabs.find(t => t.id === activeTab);
             if (!currentTab) return;
 
-            let query = supabase
-                .from(currentTab.table)
-                .select('*, customer:crm_customers(name), project:crm_projects(name)')
-                .eq('company_id', currentUser.company_id);
+            let query;
 
-            if (activeTab === 'contracts') {
+            if (activeTab === 'items') {
+                query = supabase
+                    .from('crm_items')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+            } else if (activeTab === 'contracts') {
                 query = supabase
                     .from('crm_contracts')
                     .select('*, customer:crm_customers(name)')
+                    .eq('company_id', currentUser.company_id);
+            } else if (activeTab === 'payments') {
+                query = supabase
+                    .from('crm_payments')
+                    .select('*, customer:crm_customers(name), invoice:crm_invoices(id)')
+                    .eq('company_id', currentUser.company_id);
+            } else {
+                query = supabase
+                    .from(currentTab.table)
+                    .select('*, customer:crm_customers(name), project:crm_projects(name)')
                     .eq('company_id', currentUser.company_id);
             }
 
@@ -61,6 +75,42 @@ const CRMSales: React.FC<{
             setData(result || []);
         } catch (error) {
             console.error(`Error fetching ${activeTab}:`, error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMarkAsPaid = async (invoice: any) => {
+        if (!currentUser?.company_id) return;
+
+        try {
+            setLoading(true);
+            // 1. Update invoice status
+            const { error: invError } = await supabase
+                .from('crm_invoices')
+                .update({ status: 'paid' })
+                .eq('id', invoice.id);
+
+            if (invError) throw invError;
+
+            // 2. Create payment record
+            const { error: payError } = await supabase
+                .from('crm_payments')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    invoice_id: invoice.id,
+                    customer_id: invoice.customer_id,
+                    amount: invoice.total,
+                    payment_mode: 'Manual',
+                    date: new Date().toISOString().split('T')[0],
+                    note: 'Pagamento registrado via sistema CRM'
+                }]);
+
+            if (payError) throw payError;
+
+            fetchData();
+        } catch (error) {
+            console.error('Error marking as paid:', error);
         } finally {
             setLoading(false);
         }
@@ -119,17 +169,21 @@ const CRMSales: React.FC<{
             {/* List Control actions */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800">
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => {
-                            if (['proposals', 'estimates', 'invoices'].includes(activeTab)) {
-                                onNewRequest?.(activeTab.slice(0, -1));
-                            }
-                        }}
-                        className="flex items-center gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg"
-                    >
-                        <PlusIcon className="w-4 h-4" />
-                        Nova {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}
-                    </button>
+                    {activeTab !== 'payments' && (
+                        <button
+                            onClick={() => {
+                                if (['proposals', 'estimates', 'invoices', 'subscriptions', 'items'].includes(activeTab)) {
+                                    // Remove trailing 's' for simple type names
+                                    const type = activeTab.endsWith('s') ? activeTab.slice(0, -1) : activeTab;
+                                    onNewRequest?.(type);
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg"
+                        >
+                            <PlusIcon className="w-4 h-4" />
+                            Novo {tabs.find(t => t.id === activeTab)?.label.slice(0, -1)}
+                        </button>
+                    )}
                     <button className="flex items-center gap-2 text-gray-600 dark:text-slate-300 px-4 py-2.5 rounded-lg font-bold text-xs border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all">
                         <ArrowPathIcon className="w-4 h-4" />
                     </button>
@@ -156,59 +210,118 @@ const CRMSales: React.FC<{
                         <thead className="bg-gray-50 dark:bg-slate-800/50 text-[10px] uppercase text-gray-400 font-bold border-b border-gray-100 dark:border-slate-800">
                             <tr>
                                 <th className="px-6 py-4">#</th>
-                                <th className="px-6 py-4">Valor</th>
-                                <th className="px-6 py-4">Imposto total</th>
-                                <th className="px-6 py-4">Data</th>
-                                <th className="px-6 py-4">Cliente</th>
-                                <th className="px-6 py-4">Projeto</th>
-                                <th className="px-6 py-4">Data de vencimento</th>
+                                {activeTab === 'items' ? (
+                                    <>
+                                        <th className="px-6 py-4">Descrição</th>
+                                        <th className="px-6 py-4">Taxa</th>
+                                        <th className="px-6 py-4">Unidade</th>
+                                        <th className="px-6 py-4">Grupo</th>
+                                    </>
+                                ) : activeTab === 'subscriptions' ? (
+                                    <>
+                                        <th className="px-6 py-4">Assinatura</th>
+                                        <th className="px-6 py-4">Cliente</th>
+                                        <th className="px-6 py-4">Quantidade</th>
+                                        <th className="px-6 py-4">Próximo Faturamento</th>
+                                    </>
+                                ) : (
+                                    <>
+                                                <th className="px-6 py-4">Valor</th>
+                                                <th className="px-6 py-4">Imposto total</th>
+                                                <th className="px-6 py-4">Data</th>
+                                                <th className="px-6 py-4">Cliente</th>
+                                                <th className="px-6 py-4">Projeto</th>
+                                                <th className="px-6 py-4">Data de vencimento</th>
+                                    </>
+                                )}
                                 <th className="px-6 py-4">Status</th>
+                                {activeTab === 'invoices' && <th className="px-6 py-4 text-center">Ações</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800 text-xs">
                             {data.map((item, idx) => (
-                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors group">
                                     <td className="px-6 py-4 font-bold text-blue-500">
                                         {activeTab === 'invoices' ? `INV-${item.id.slice(0, 6)}` :
                                             activeTab === 'proposals' ? `PROP-${item.id.slice(0, 6)}` :
-                                                activeTab === 'estimates' ? `EST-${item.id.slice(0, 6)}` : item.id.slice(0, 8)}
+                                                activeTab === 'estimates' ? `EST-${item.id.slice(0, 6)}` :
+                                                    activeTab === 'items' ? `ITEM-${item.id.slice(0, 6)}` : item.id.slice(0, 8)}
                                     </td>
-                                    <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
-                                        {item.total ? `R$ ${item.total.toLocaleString()}` :
-                                            item.value ? `R$ ${item.value.toLocaleString()}` : '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-400">
-                                        {item.total_tax ? `R$ ${item.total_tax.toLocaleString()}` : 'R$ 0,00'}
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-500">
-                                        {new Date(item.date || item.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {item.customer?.name ? (
-                                            <button
-                                                onClick={() => onViewCustomer?.(item.customer_id)}
-                                                className="text-blue-500 font-medium hover:underline"
-                                            >
-                                                {item.customer.name}
-                                            </button>
+
+                                    {activeTab === 'items' ? (
+                                        <>
+                                            <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">{item.description}</td>
+                                            <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
+                                                {Number(item.rate || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500">{item.unit || '-'}</td>
+                                            <td className="px-6 py-4 text-gray-500">{item.group_name || '-'}</td>
+                                        </>
+                                    ) : activeTab === 'subscriptions' ? (
+                                        <>
+                                            <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">{item.name}</td>
+                                            <td className="px-6 py-4">
+                                                <button onClick={() => onViewCustomer?.(item.customer_id)} className="text-blue-500 hover:underline">{item.customer?.name || item.customer_id}</button>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500">{item.quantity}</td>
+                                            <td className="px-6 py-4 text-gray-500">
+                                                {item.next_billing_cycle ? new Date(item.next_billing_cycle).toLocaleDateString() : '-'}
+                                            </td>
+                                            </>
                                         ) : (
-                                            <span className="text-gray-400">{item.customer_id || '-'}</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-400">
-                                        {item.project?.name || '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-500">
-                                        {item.duedate || item.open_till ? new Date(item.duedate || item.open_till).toLocaleDateString() : '-'}
-                                    </td>
+                                            <>
+                                                    <td className="px-6 py-4 font-bold text-gray-700 dark:text-slate-200">
+                                                        {item.total ? `R$ ${item.total.toLocaleString()}` :
+                                                            item.value ? `R$ ${item.value.toLocaleString()}` :
+                                                                item.amount ? `R$ ${item.amount.toLocaleString()}` : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-gray-400">
+                                                        {item.total_tax ? `R$ ${item.total_tax.toLocaleString()}` : 'R$ 0,00'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-gray-500">
+                                                        {new Date(item.date || item.created_at).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {item.customer?.name ? (
+                                                            <button
+                                                                onClick={() => onViewCustomer?.(item.customer_id)}
+                                                                className="text-blue-500 font-medium hover:underline"
+                                                            >
+                                                                {item.customer.name}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-400">{item.customer_id || '-'}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-gray-400">
+                                                        {item.project?.name || '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-gray-500">
+                                                        {item.duedate || item.open_till ? new Date(item.duedate || item.open_till).toLocaleDateString() : '-'}
+                                                    </td>
+                                        </>
+                                    )}
+
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${['paid', 'accepted', 'active'].includes(item.status) ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' :
-                                                ['unpaid', 'declined', 'expired'].includes(item.status) ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
-                                                    'bg-orange-100 dark:bg-orange-900/30 text-orange-600'
+                                            ['unpaid', 'declined', 'expired'].includes(item.status) ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
+                                                'bg-orange-100 dark:bg-orange-900/30 text-orange-600'
                                             }`}>
                                             {item.status}
                                         </span>
                                     </td>
+                                    {activeTab === 'invoices' && (
+                                        <td className="px-6 py-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {item.status === 'unpaid' && (
+                                                <button
+                                                    onClick={() => handleMarkAsPaid(item)}
+                                                    className="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-2 py-1 rounded shadow-sm"
+                                                >
+                                                    Pagar
+                                                </button>
+                                            )}
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                             {data.length === 0 && !loading && (

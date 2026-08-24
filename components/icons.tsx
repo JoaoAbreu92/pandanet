@@ -91,4 +91,5 @@ export {
   FunnelIcon,
   PhoneIcon,
   GlobeAsiaAustraliaIcon,
+  QueueListIcon,
 } from '@heroicons/react/24/outline';
