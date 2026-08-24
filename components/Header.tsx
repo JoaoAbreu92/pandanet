@@ -111,7 +111,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             title="Ativar e Testar Notificações do Windows"
                         >
                             <PlayCircleIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">Ativar Notificações</span>
+                            <span className="hidden sm:inline">{t('header.notifications_activate')}</span>
                         </button>
                         <div
                             className="relative"
@@ -126,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                                 <div className="absolute right-0 top-full pt-4 w-48 z-[100] animate-fade-in-down">
                                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
                                         <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
-                                            Escolher Toque
+                                            {t('header.notifications_choose_sound')}
                                         </div>
                                         {availableSounds?.map((sound) => (
                                             <button

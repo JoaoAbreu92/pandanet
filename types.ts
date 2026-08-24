@@ -17,7 +17,8 @@ export type Page =
   | 'onboarding'
   | 'ti-dashboard'
   | 'ti-requests'
-  | 'profile-page' // Era apenas 'profile' mas mantido consistente
+  | 'profile-page'
+  | 'saas-dashboard'
   | 'admin'
   | 'announcement-detail'
   | 'documentos'

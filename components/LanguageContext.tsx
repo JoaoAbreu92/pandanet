@@ -38,6 +38,8 @@ export const translations = {
         'theme.light': 'Claro',
         'theme.dark': 'Escuro',
         'language.select': 'Idioma',
+        'header.notifications_activate': 'Ativar Notificações',
+        'header.notifications_choose_sound': 'Escolher Toque',
 
         // Modules
         'users.title': 'Gerenciar Usuários',
@@ -147,6 +149,8 @@ export const translations = {
         'theme.light': 'Light',
         'theme.dark': 'Dark',
         'language.select': 'Language',
+        'header.notifications_activate': 'Activate Notifications',
+        'header.notifications_choose_sound': 'Choose Sound',
 
         // Modules
         'users.title': 'Manage Users',
@@ -256,6 +260,8 @@ export const translations = {
         'theme.light': 'Claro',
         'theme.dark': 'Oscuro',
         'language.select': 'Idioma',
+        'header.notifications_activate': 'Activar Notificaciones',
+        'header.notifications_choose_sound': 'Elegir Tono',
 
         // Modules
         'users.title': 'Gestionar Usuarios',

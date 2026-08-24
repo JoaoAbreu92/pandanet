@@ -61,13 +61,22 @@ const AppContent: React.FC = () => {
     const [companyLoading, setCompanyLoading] = useState(false);
     const [initError, setInitError] = useState<string | null>(null);
 
-    const [theme, setTheme] = useState<'light'>('light');
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+        }
+        return 'light';
+    });
     const [isShaking, setIsShaking] = useState(false);
 
     useEffect(() => {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-    }, []);
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
 
     // Global Nudge Listener
     useEffect(() => {
@@ -186,7 +195,7 @@ const AppContent: React.FC = () => {
     }, [currentUser?.id, currentUser?.company_id]);
 
     const toggleTheme = () => {
-        setTheme('light');
+        setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
 
     const [isImpersonating, setIsImpersonating] = useState(false);
@@ -194,7 +203,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -507,8 +516,8 @@ const AppContent: React.FC = () => {
             if (event.id === eventId) {
                 const isAttending = event.attendees.includes(currentUser.id);
                 const newAttendees = isAttending
-                    ? event.attendees.filter(id => id !== currentUser.id)
-                    : [...event.attendees, currentUser.id];
+                    ? event.attendees.filter(id => String(id) !== String(currentUser.id))
+                    : [...event.attendees, String(currentUser.id)];
                 return { ...event, attendees: newAttendees };
             }
             return event;
@@ -520,8 +529,8 @@ const AppContent: React.FC = () => {
         if (!companyData || !currentUser) return;
         const updatedEvents = companyData.events.map(event => {
             if (event.id === eventId) {
-                const newAttendees = event.attendees.filter(id => id !== currentUser.id);
-                const newDeclined = [...(event.declined || []).filter(d => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
+                const newAttendees = event.attendees.filter(id => String(id) !== String(currentUser.id));
+                const newDeclined = [...(event.declined || []).filter(d => String(d.userId) !== String(currentUser.id)), { userId: currentUser.id, reason }];
                 return { ...event, attendees: newAttendees, declined: newDeclined };
             }
             return event;
@@ -579,7 +588,7 @@ const AppContent: React.FC = () => {
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={handleUpdateTIRequests} currentUser={currentUser} /> : null;
-            case 'profile':
+            case 'profile-page':
                 const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
                 return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} onImpersonate={handleImpersonateStart} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
