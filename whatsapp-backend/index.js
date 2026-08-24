@@ -25,7 +25,7 @@ const evoUrl = process.env.EVOLUTION_API_URL || 'http://evolution-api:8080';
 const evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
 // Public URL or internal Docker network URL so Evolution can reach us
 // For internal docker network:
-const backendWebhookBaseUrl = process.env.BACKEND_WEBHOOK_URL || 'http://pandanet_backend:3000';
+const backendWebhookBaseUrl = process.env.BACKEND_WEBHOOK_URL || 'http://whatsapp-backend:3000';
 
 app.set('trust proxy', 1);
 
