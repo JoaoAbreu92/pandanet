@@ -283,9 +283,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
 interface MessagesProps {
     initialConversationId?: string;
+    onMinimizeConversation?: (id: string, name: string, avatarUrl: string, participantId?: string) => void;
 }
 
-const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
+const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeConversation }) => {
     const { currentUser, profile, isGhostMode } = useAuth();
     const { showToast } = useToast();
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
@@ -1648,6 +1649,25 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
+                                {selectedConversation && (
+                                    <button
+                                        onClick={() => {
+                                            if (onMinimizeConversation) {
+                                                onMinimizeConversation(
+                                                    selectedConversation.id,
+                                                    selectedConversation.participantName,
+                                                    selectedConversation.participantAvatarUrl,
+                                                    selectedConversation.participantId
+                                                );
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-primary/10 hover:text-brand-primary transition-all border border-slate-200 dark:border-slate-700"
+                                        title="Minimizar para bolha flutuante"
+                                    >
+                                        <ChevronDownIcon className="w-4 h-4" />
+                                        <span className="hidden sm:inline">MINIMIZAR</span>
+                                    </button>
+                                )}
                                 {(currentUser.id === masterAdminId || selectedConversation?.participantId === masterAdminId) && !selectedConversation?.is_closed && (
                                     <button 
                                         onClick={handleCloseConversation}

@@ -253,6 +253,10 @@ export interface Employee {
   isAdmin: boolean;
   isCompanyAdmin?: boolean; // Changed from is_company_admin
   isOnline?: boolean;
+  full_name?: string;
+  plan_email_limit?: number;
+  plan_whatsapp_limit?: number;
+  notification_sound?: string;
   permissions: EmployeePermissions;
   whatspanda_permissions?: WhatsAppPermissions; // New field
   email_permissions?: any; // New field for multi-email support
@@ -682,6 +686,7 @@ export interface WhatsAppConversation {
   last_message_at: string;
   unread_count: number;
   is_muted?: boolean; // Novo: silenciar notificações
+  is_group?: boolean;
 }
 
 export interface WhatsAppMessage {
@@ -804,3 +809,10 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
   hourly_rate?: number;
   created_at: string;
 }
+
+export interface ActiveChatHead {
+  conversationId: string;
+  participantName: string;
+  participantAvatarUrl: string;
+  participantId?: string;
+}

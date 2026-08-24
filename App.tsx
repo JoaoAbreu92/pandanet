@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest } from './types';
+import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, ActiveChatHead } from './types';
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
@@ -51,6 +51,8 @@ import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
 import PersonalNotesPage from './components/PersonalNotesPage';
 import ProjectsPage from './components/ProjectsPage';
+import FloatingChatHeads from './components/FloatingChatHeads';
+
 
 
 const AppContent: React.FC = () => {
@@ -486,6 +488,35 @@ const AppContent: React.FC = () => {
         window.scrollTo(0, 0);
     }, []);
 
+    const [chatHeads, setChatHeads] = useState<ActiveChatHead[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('pixel_chat_heads');
+            return saved ? JSON.parse(saved) : [];
+        }
+        return [];
+    });
+    const [expandedChatHeadId, setExpandedChatHeadId] = useState<string | null>(null);
+
+    const handleMinimizeConversation = useCallback((conversationId: string, participantName: string, participantAvatarUrl: string, participantId?: string) => {
+        setChatHeads(prev => {
+            if (prev.some(ch => ch.conversationId === conversationId)) return prev;
+            const updated = [...prev, { conversationId, participantName, participantAvatarUrl, participantId }];
+            localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+            return updated;
+        });
+        handleNavigate('home');
+    }, [handleNavigate]);
+
+    const handleCloseChatHead = useCallback((conversationId: string) => {
+        setChatHeads(prev => {
+            const updated = prev.filter(ch => ch.conversationId !== conversationId);
+            localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+            return updated;
+        });
+        setExpandedChatHeadId(prev => prev === conversationId ? null : prev);
+    }, []);
+
+
     const handleUpdateUser = (updatedUser: Employee) => {
         if (companyData) {
             setCompanyData({
@@ -634,7 +665,7 @@ const AppContent: React.FC = () => {
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
-            case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
+            case 'messages': return <Messages initialConversationId={pageContext?.conversationId} onMinimizeConversation={handleMinimizeConversation} />;
             case 'support-inbox': return <SupportInbox onNavigate={handleNavigate} />;
 
             case 'tickets': return <TicketPage />;
@@ -786,6 +817,14 @@ const AppContent: React.FC = () => {
                 {renderPage()}
                 <AIAssistant currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
                 <AICorrector currentUser={currentUser} isAIEnabled={currentCompany?.custom_features?.ai_assistant !== false} />
+                <FloatingChatHeads
+                    chatHeads={chatHeads}
+                    expandedChatHeadId={expandedChatHeadId}
+                    setChatHeads={setChatHeads}
+                    setExpandedChatHeadId={setExpandedChatHeadId}
+                    onCloseChatHead={handleCloseChatHead}
+                    currentUser={currentUser}
+                />
 
             </Layout>
         );

@@ -390,7 +390,7 @@ const EditItemModal: React.FC<{
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Condição</label>
-                            <select value={condition} onChange={e => setCondition(e.target.value)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                            <select value={condition} onChange={e => setCondition(e.target.value as any)} className="mt-1 block w-full border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-700 text-brand-text dark:text-gray-100 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
                                 <option>Novo</option>
                                 <option>Quase Novo</option>
                                 <option>Bom</option>
