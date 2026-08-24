@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { supabase } from '../supabaseClient';
+import { supabase, downloadFile } from '../supabaseClient';
 import { 
     DocumentIcon, 
     CalendarIcon, 
@@ -254,17 +254,7 @@ const EmployeePortal: React.FC = () => {
         if (!error) { showToast('Solicitação cancelada.'); fetchVacation(); }
     };
 
-    const downloadFile = async (url: string, fileName: string) => {
-        try {
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            link.target = '_blank';
-            link.click();
-        } catch {
-            showToast('Erro ao baixar arquivo.', 'error');
-        }
-    };
+
 
     // Admin: upload payslip
     const handlePayslipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

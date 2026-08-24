@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import HRCalculatorAI from './HRCalculatorAI';
 
@@ -998,17 +998,20 @@ const HRManager: React.FC = () => {
                 <h4 className="font-bold text-gray-800 dark:text-white text-sm md:text-base">{viewingDocName || 'Visualizar Documento'}</h4>
               </div>
               <div className="flex items-center gap-2">
-                <a href={viewingDocUrl} download target="_blank" rel="noreferrer" className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                <button 
+                  onClick={() => downloadFile(viewingDocUrl!, viewingDocName || 'documento')}
+                  className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   Baixar Arquivo
-                </a>
+                </button>
                 <button onClick={() => { setViewingDocUrl(null); setViewingDocName(null); }} className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
             </div>
             <div className="flex-1 bg-gray-100 dark:bg-slate-950 relative">
-              <iframe src={viewingDocUrl} className="w-full h-full border-0 bg-white dark:bg-slate-900" title="Visualizador de Documento" />
+              <iframe src={getCleanImageUrl(viewingDocUrl)} className="w-full h-full border-0 bg-white dark:bg-slate-900" title="Visualizador de Documento" />
             </div>
           </div>
         </div>
