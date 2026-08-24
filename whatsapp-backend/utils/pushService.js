@@ -61,7 +61,8 @@ async function sendPushNotification(token, title, body, data = {}) {
             priority: 'high',
             notification: {
                 sound: 'default',
-                clickAction: 'FCM_PLUGIN_ACTIVITY'
+                clickAction: 'FCM_PLUGIN_ACTIVITY',
+                channelId: 'default'
             }
         },
         apns: {
