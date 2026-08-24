@@ -4,6 +4,31 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.1.3 beta
+01/06/2026
+🗞️ Nota de Atualização - PandaNet v1.1.3 Beta
+Esta atualização traz o novo e revolucionário módulo de Agendamentos, inspirado no Cal.com, além de melhorias no gerenciamento de projetos e correções essenciais de usabilidade e segurança.
+
+🚀 O que há de novo?
+
+📅 Módulo de Agendamentos (Cal.com clone)
+Integramos um sistema profissional de agendamento de horários:
+- Configuração de Agendas: Crie links para reuniões ou eventos definindo duração, descrição e disponibilidade.
+- Agendamento Pago: Suporte a agendamentos pagos com simulação integrada de checkout via Pix (QR Code e Copia e Cola).
+- Links Públicos de Reserva: Compartilhe o link da sua agenda para que convidados externos escolham o melhor horário sem precisar de login.
+- Confirmações via E-mail: Dispare e-mails automáticos ao aprovar reservas, usando modelos de e-mail customizados e dinâmicos (placeholders como {guest_name}, {booking_date}, etc.).
+- Controle de Acesso: Apenas o anfitrião e os administradores da empresa têm acesso às configurações e reservas.
+
+📊 Painel de Projetos Aprimorado
+- Planejamento e Kanban: Melhorias na navegação de cartões, timesheets e métricas de projetos.
+- Visibilidade e Controle: Acesso integrado ao calendário de projetos diretamente no menu lateral.
+
+🛡️ Correções de Segurança e Perfil
+- Exclusão de Usuários Segura: Correção dos erros de chave estrangeira que impediam a exclusão de perfis (nudges, mensagens, reply_to agora são tratados de forma limpa).
+- Gestão de Avatares: Novo fluxo de criação de usuários sem imagens aleatórias automáticas (pravatar), exibindo círculos de iniciais organizados e limpos.
+
+---
+
 Versão 1.1.2 beta
 07/04/2026
 🗞️ Nota de Atualização - PandaNet v1.1.2 Beta
