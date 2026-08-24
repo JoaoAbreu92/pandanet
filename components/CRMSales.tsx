@@ -15,7 +15,7 @@ import { useAuth } from './AuthContext';
 
 type SalesTab = 'proposals' | 'estimates' | 'invoices' | 'payments' | 'subscriptions' | 'contracts';
 
-const CRMSales: React.FC<{ initialTab?: SalesTab }> = ({ initialTab = 'invoices' }) => {
+const CRMSales: React.FC<{ initialTab?: SalesTab, onViewCustomer?: (id: string) => void }> = ({ initialTab = 'invoices', onViewCustomer }) => {
     const { currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState<SalesTab>(initialTab);
     const [searchQuery, setSearchQuery] = useState('');
@@ -172,8 +172,17 @@ const CRMSales: React.FC<{ initialTab?: SalesTab }> = ({ initialTab = 'invoices'
                                     <td className="px-6 py-4 text-gray-500">
                                         {new Date(item.date || item.created_at).toLocaleDateString()}
                                     </td>
-                                    <td className="px-6 py-4 text-blue-500 font-medium">
-                                        {item.customer?.name || item.customer_id || '-'}
+                                    <td className="px-6 py-4">
+                                        {item.customer?.name ? (
+                                            <button
+                                                onClick={() => onViewCustomer?.(item.customer_id)}
+                                                className="text-blue-500 font-medium hover:underline"
+                                            >
+                                                {item.customer.name}
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-400">{item.customer_id || '-'}</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-gray-400">
                                         {item.project?.name || '-'}

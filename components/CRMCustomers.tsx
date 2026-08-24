@@ -17,9 +17,16 @@ import {
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabaseClient';
 import { CRMCustomer } from '../types';
+import { useToast } from './ToastContext';
 
-const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }) => {
+interface CRMCustomersProps {
+    onNewCustomer: () => void;
+    onViewCustomer: (customer: CRMCustomer) => void;
+}
+
+const CRMCustomers: React.FC<CRMCustomersProps> = ({ onNewCustomer, onViewCustomer }) => {
     const { currentUser } = useAuth();
+    const { showToast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [customers, setCustomers] = useState<CRMCustomer[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,12 +40,14 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
             const { data, error } = await supabase
                 .from('crm_customers')
                 .select('*')
-                .eq('company_id', currentUser.company_id);
+                .eq('company_id', currentUser.company_id)
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
             setCustomers(data || []);
         } catch (error) {
             console.error('Error fetching customers:', error);
+            showToast('Erro ao carregar clientes', 'error');
         } finally {
             setLoading(false);
         }
@@ -47,6 +56,25 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
     useEffect(() => {
         fetchCustomers();
     }, [currentUser?.company_id]);
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.')) return;
+
+        try {
+            const { error } = await supabase
+                .from('crm_customers')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
+            showToast('Cliente excluído com sucesso');
+            setCustomers(customers.filter(c => c.id !== id));
+        } catch (error) {
+            console.error('Error deleting customer:', error);
+            showToast('Erro ao excluir cliente', 'error');
+        }
+    };
 
     const activeCustomers = customers.filter(c => c.status === 'active');
     const inactiveCustomers = customers.filter(c => c.status === 'inactive');
@@ -123,7 +151,12 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
                     </div>
                     <div className="flex items-center gap-1 border border-gray-200 dark:border-slate-700 rounded-lg p-1">
                         <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-400"><EllipsisVerticalIcon className="w-4 h-4" /></button>
-                        <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-400"><ArrowPathIcon className="w-4 h-4" /></button>
+                        <button
+                            onClick={fetchCustomers}
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-400"
+                        >
+                            <ArrowPathIcon className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -156,11 +189,33 @@ const CRMCustomers: React.FC<{ onNewCustomer: () => void }> = ({ onNewCustomer }
                                     <td className="px-6 py-4 text-gray-400 font-medium">{idx + 1}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-gray-700 dark:text-slate-200 group-hover:text-blue-500 cursor-pointer">{c.name}</span>
-                                            <div className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="text-[10px] text-gray-400 hover:text-blue-500 font-bold uppercase transition-colors">Editar</button>
+                                            <span
+                                                onClick={() => onViewCustomer(c)}
+                                                className="font-bold text-gray-700 dark:text-slate-200 group-hover:text-blue-500 cursor-pointer transition-colors"
+                                            >
+                                                {c.name}
+                                            </span>
+                                            <div className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                <button
+                                                    onClick={() => onViewCustomer(c)}
+                                                    className="text-[10px] text-gray-400 hover:text-blue-500 font-bold uppercase transition-colors"
+                                                >
+                                                    View
+                                                </button>
                                                 <span className="text-gray-200 dark:text-slate-800">|</span>
-                                                <button className="text-[10px] text-gray-400 hover:text-red-500 font-bold uppercase transition-colors">Excluir</button>
+                                                <button
+                                                    onClick={() => onViewCustomer(c)} // Contacts tab later
+                                                    className="text-[10px] text-gray-400 hover:text-blue-500 font-bold uppercase transition-colors"
+                                                >
+                                                    Contacts
+                                                </button>
+                                                <span className="text-gray-200 dark:text-slate-800">|</span>
+                                                <button
+                                                    onClick={() => handleDelete(c.id)}
+                                                    className="text-[10px] text-gray-400 hover:text-red-500 font-bold uppercase transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
                                             </div>
                                         </div>
                                     </td>

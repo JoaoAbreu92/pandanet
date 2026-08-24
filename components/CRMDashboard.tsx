@@ -53,7 +53,14 @@ const CRMDashboard: React.FC = () => {
         completedTasks: 0,
         totalTasks: 0
     });
+    const [financials, setFinancials] = useState({
+        pending: 0,
+        overdue: 0,
+        paid: 0
+    });
     const [invoiceVision, setInvoiceVision] = useState<any[]>([]);
+    const [estimateVision, setEstimateVision] = useState<any[]>([]);
+    const [proposalVision, setProposalVision] = useState<any[]>([]);
     const [leadVision, setLeadVision] = useState<any[]>([]);
     const [recentTasks, setRecentTasks] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -65,68 +72,104 @@ const CRMDashboard: React.FC = () => {
             try {
                 setLoading(true);
 
-                // 1. Fetch Invoices
-                const { data: invoices } = await supabase
-                    .from('crm_invoices')
-                    .select('*')
-                    .eq('company_id', currentUser.company_id);
-
-                // 2. Fetch Leads
-                const { data: leads } = await supabase
-                    .from('crm_leads')
-                    .select('*')
-                    .eq('company_id', currentUser.company_id);
-
-                // 3. Fetch Projects
-                const { data: projects } = await supabase
-                    .from('crm_projects')
-                    .select('*')
-                    .eq('company_id', currentUser.company_id);
-
-                // 4. Fetch Tasks
-                const { data: tasks } = await supabase
-                    .from('crm_tasks')
-                    .select('*')
-                    .eq('company_id', currentUser.company_id);
+                // Fetch everything in parallel
+                const [
+                    { data: invoices },
+                    { data: leads },
+                    { data: projects },
+                    { data: tasks },
+                    { data: proposals },
+                    { data: estimates }
+                ] = await Promise.all([
+                    supabase.from('crm_invoices').select('*').eq('company_id', currentUser.company_id),
+                    supabase.from('crm_leads').select('*').eq('company_id', currentUser.company_id),
+                    supabase.from('crm_projects').select('*').eq('company_id', currentUser.company_id),
+                    supabase.from('crm_tasks').select('*').eq('company_id', currentUser.company_id),
+                    supabase.from('crm_proposals').select('*').eq('company_id', currentUser.company_id),
+                    supabase.from('crm_estimates').select('*').eq('company_id', currentUser.company_id)
+                ]);
 
                 // Calculate Stats
-                if (invoices && leads && projects && tasks) {
-                    const totalInv = invoices.length;
-                    const paidInv = invoices.filter(i => i.status === 'paid').length;
-                    const convLeads = leads.filter(l => l.status === 'customer' || l.converted).length;
-                    const activeProj = projects.filter(p => p.status === 'in_progress' || p.status === 'not_started').length;
-                    const completedT = tasks.filter(t => t.status === 'completed').length;
+                const totalInv = invoices?.length || 0;
+                const unpaidInv = invoices?.filter(i => i.status === 'unpaid' || i.status === 'overdue' || i.status === 'partially_paid').length || 0;
+                const convLeads = leads?.filter(l => l.status === 'customer' || l.converted).length || 0;
+                const activeProj = projects?.filter(p => p.status === 'in_progress' || p.status === 'not_started').length || 0;
+                const completedT = tasks?.filter(t => t.status === 'completed').length || 0;
 
-                    setStats({
-                        totalInvoices: totalInv,
-                        paidInvoices: paidInv,
-                        convertedLeads: convLeads,
-                        activeProjects: activeProj,
-                        completedTasks: completedT,
-                        totalTasks: tasks.length
-                    });
+                setStats({
+                    totalInvoices: totalInv,
+                    paidInvoices: unpaidInv, // Using this for "Aguardando Pagamento" widget
+                    convertedLeads: convLeads,
+                    activeProjects: activeProj,
+                    completedTasks: completedT,
+                    totalTasks: tasks?.length || 0
+                });
 
-                    // Vision Data - Invoices
-                    const invStatuses = [
-                        { id: 'draft', name: 'Rascunho', color: '#94a3b8' },
-                        { id: 'unpaid', name: 'Não pago', color: '#ef4444' },
-                        { id: 'partially_paid', name: 'Parcialmente pago', color: '#f59e0b' },
-                        { id: 'overdue', name: 'Atrasado', color: '#dc2626' },
-                        { id: 'paid', name: 'Pago', color: '#10b981' },
-                    ];
+                // Financial Totals
+                const pendingSum = invoices?.filter(i => i.status === 'unpaid' || i.status === 'partially_paid').reduce((acc, curr) => acc + Number(curr.total), 0) || 0;
+                const overdueSum = invoices?.filter(i => i.status === 'overdue').reduce((acc, curr) => acc + Number(curr.total), 0) || 0;
+                const paidSum = invoices?.filter(i => i.status === 'paid').reduce((acc, curr) => acc + Number(curr.total), 0) || 0;
+                setFinancials({ pending: pendingSum, overdue: overdueSum, paid: paidSum });
 
-                    const newInvoiceVision = invStatuses.map(s => {
-                        const count = invoices.filter(i => i.status === s.id).length;
-                        return {
-                            name: s.name,
-                            value: count,
-                            percentage: totalInv > 0 ? Math.round((count / totalInv) * 100) : 0,
-                            color: s.color
-                        };
-                    });
-                    setInvoiceVision(newInvoiceVision);
+                // Vision Data - Invoices
+                const invStatuses = [
+                    { id: 'draft', name: 'Rascunho', color: '#94a3b8' },
+                    { id: 'unpaid', name: 'Não pago', color: '#ef4444' },
+                    { id: 'partially_paid', name: 'Parcialmente pago', color: '#f59e0b' },
+                    { id: 'overdue', name: 'Atrasado', color: '#dc2626' },
+                    { id: 'paid', name: 'Pago', color: '#10b981' },
+                ];
+                setInvoiceVision(invStatuses.map(s => {
+                    const count = invoices?.filter(i => i.status === s.id).length || 0;
+                    return {
+                        name: s.name,
+                        value: count,
+                        percentage: totalInv > 0 ? Math.round((count / totalInv) * 100) : 0,
+                        color: s.color
+                    };
+                }));
 
-                    // Vision Data - Leads
+                // Vision Data - Estimates
+                const estStatuses = [
+                    { id: 'draft', name: 'Rascunho', color: '#94a3b8' },
+                    { id: 'sent', name: 'Enviado', color: '#3b82f6' },
+                    { id: 'expired', name: 'Expirado', color: '#ef4444' },
+                    { id: 'declined', name: 'Recusado', color: '#dc2626' },
+                    { id: 'accepted', name: 'Aceito', color: '#10b981' },
+                ];
+                const totalEst = estimates?.length || 0;
+                setEstimateVision(estStatuses.map(s => {
+                    const count = estimates?.filter(e => e.status === s.id).length || 0;
+                    return {
+                        name: s.name,
+                        value: count,
+                        percentage: totalEst > 0 ? Math.round((count / totalEst) * 100) : 0,
+                        color: s.color
+                    };
+                }));
+
+                // Vision Data - Proposals
+                const propStatuses = [
+                    { id: 'draft', name: 'Rascunho', color: '#94a3b8' },
+                    { id: 'sent', name: 'Enviado', color: '#3b82f6' },
+                    { id: 'open', name: 'Aberto', color: '#0ea5e9' },
+                    { id: 'revised', name: 'Revisado', color: '#6366f1' },
+                    { id: 'declined', name: 'Recusado', color: '#ef4444' },
+                    { id: 'accepted', name: 'Aceito', color: '#10b981' },
+                ];
+                const totalProp = proposals?.length || 0;
+                setProposalVision(propStatuses.map(s => {
+                    const count = proposals?.filter(p => p.status === s.id).length || 0;
+                    return {
+                        name: s.name,
+                        value: count,
+                        percentage: totalProp > 0 ? Math.round((count / totalProp) * 100) : 0,
+                        color: s.color
+                    };
+                }));
+
+                // Vision Data - Leads
+                if (leads) {
                     const leadStatuses = [
                         { id: 'new', name: 'Novo', color: '#3b82f6' },
                         { id: 'contacted', name: 'Contactado', color: '#6366f1' },
@@ -141,8 +184,10 @@ const CRMDashboard: React.FC = () => {
                         value: leads.filter(l => l.status === s.id).length,
                         color: s.color
                     })));
+                }
 
-                    // Recent Tasks
+                // Recent Tasks
+                if (tasks) {
                     const sortedTasks = [...tasks].sort((a, b) =>
                         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                     ).slice(0, 5);
@@ -253,36 +298,28 @@ const CRMDashboard: React.FC = () => {
                 {/* Vision Cards Column */}
                 <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
                     <VisionCard title="Visão geral da fatura" items={invoiceVision} icon={DocumentTextIcon} />
-                    <VisionCard title="Visão geral da estimativa" items={[
-                        { name: 'Rascunho', value: 4, percentage: 40, color: '#94a3b8' },
-                        { name: 'Não enviado', value: 4, percentage: 40, color: '#475569' },
-                        { name: 'Enviado', value: 1, percentage: 10, color: '#3b82f6' },
-                        { name: 'Expirado', value: 0, percentage: 0, color: '#ef4444' },
-                        { name: 'Recusado', value: 5, percentage: 50, color: '#dc2626' },
-                        { name: 'Aceito', value: 0, percentage: 0, color: '#10b981' },
-                    ]} icon={DocumentTextIcon} />
-                    <VisionCard title="Visão geral da proposta" items={[
-                        { name: 'Rascunho', value: 0, percentage: 0, color: '#94a3b8' },
-                        { name: 'Enviado', value: 1, percentage: 50, color: '#3b82f6' },
-                        { name: 'Abrir', value: 1, percentage: 50, color: '#0ea5e9' },
-                        { name: 'Revisado', value: 0, percentage: 0, color: '#6366f1' },
-                        { name: 'Recusado', value: 0, percentage: 0, color: '#ef4444' },
-                        { name: 'Aceito', value: 0, percentage: 0, color: '#10b981' },
-                    ]} icon={DocumentTextIcon} />
+                    <VisionCard title="Visão geral da estimativa" items={estimateVision} icon={DocumentTextIcon} />
+                    <VisionCard title="Visão geral da proposta" items={proposalVision} icon={DocumentTextIcon} />
 
                     {/* Pending Totals Row */}
                     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm">
                             <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">Faturas pendentes</p>
-                            <p className="text-xl font-bold text-gray-800 dark:text-white">$ 22.212,00</p>
+                            <p className="text-xl font-bold text-gray-800 dark:text-white">
+                                {financials.pending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm">
                             <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">Faturas vencidas</p>
-                            <p className="text-xl font-bold text-red-500">$ 0,00</p>
+                            <p className="text-xl font-bold text-red-500">
+                                {financials.overdue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm">
                             <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">Faturas pagas</p>
-                            <p className="text-xl font-bold text-emerald-500">US$ 37.590,00</p>
+                            <p className="text-xl font-bold text-emerald-500">
+                                {financials.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
                         </div>
                     </div>
                 </div>

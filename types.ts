@@ -54,7 +54,8 @@ export type Page =
   | 'crm-subscriptions'
   | 'crm-contracts'
   | 'crm-tasks'
-  | 'crm-calendar';
+  | 'crm-calendar'
+  | 'crm-customer-detail';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 

@@ -45,12 +45,14 @@ import KPIDashboard from './components/KPIDashboard.tsx';
 import ManualPage from './components/ManualPage.tsx';
 import CRMDashboard from './components/CRMDashboard';
 import CRMCustomers from './components/CRMCustomers';
+import CRMCustomerDetail from './components/CRMCustomerDetail';
 import CRMNewCustomerForm from './components/CRMNewCustomerForm';
 import CRMCalendar from './components/CRMCalendar';
 import CRMSales from './components/CRMSales';
 import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
 import AIAssistant from './components/AIAssistant';
+import { CRMCustomer } from './types';
 
 
 const AppContent: React.FC = () => {
@@ -558,6 +560,26 @@ const AppContent: React.FC = () => {
     };
 
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState<CRMCustomer | null>(null);
+
+    const handleViewCustomer = async (customerOrId: CRMCustomer | string) => {
+        if (typeof customerOrId === 'string') {
+            // Se receber apenas o ID (ex: do módulo de Vendas), busca os dados completos
+            const { data, error } = await supabase
+                .from('crm_customers')
+                .select('*')
+                .eq('id', customerOrId)
+                .single();
+
+            if (!error && data) {
+                setSelectedCustomer(data);
+                setCurrentPage('crm-customer-detail');
+            }
+        } else {
+            setSelectedCustomer(customerOrId);
+            setCurrentPage('crm-customer-detail');
+        }
+    };
 
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
@@ -601,10 +623,22 @@ const AppContent: React.FC = () => {
             case 'crm-dashboard':
                 return <CRMDashboard />;
             case 'crm-customers':
-                return <CRMCustomers onNewCustomer={() => setIsNewCustomerModalOpen(true)} />;
+                return <CRMCustomers
+                    onNewCustomer={() => setIsNewCustomerModalOpen(true)}
+                    onViewCustomer={handleViewCustomer}
+                />;
+            case 'crm-customer-detail':
+                return selectedCustomer ? (
+                    <CRMCustomerDetail
+                        customer={selectedCustomer}
+                        onClose={() => setCurrentPage('crm-customers')}
+                        onUpdate={() => { }}
+                    />
+                ) : <CRMCustomers onNewCustomer={() => setIsNewCustomerModalOpen(true)} onViewCustomer={handleViewCustomer} />;
             case 'crm-calendar':
                 return <CRMCalendar />;
             case 'crm-sales':
+                return <CRMSales initialTab={pageContext?.salesTab} onViewCustomer={handleViewCustomer} />;
             case 'crm-invoices':
             case 'crm-proposals':
             case 'crm-estimates':
