@@ -749,6 +749,7 @@ export interface WhatsAppSettings {
   channel_type?: 'whatsapp' | 'telegram' | 'instagram' | 'messenger';
   api_token?: string;
   last_sync_error?: string;
+  pairing_code?: string;
 }
 
 export interface WhatsAppQueue {

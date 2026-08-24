@@ -456,10 +456,11 @@ const router = express.Router();
 // API: Iniciar Sessão
 router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;
+  const { pairingNumber } = req.body;
   const instanceName = `conn_${connectionId}`;
   const webhookUrl = `${backendWebhookBaseUrl}/webhook/evolution/${companyId}/${connectionId}`;
 
-  console.log(`[START] Requisitando Evolution para ${instanceName}...`);
+  console.log(`[START] Requisitando Evolution para ${instanceName} (pairingNumber: ${pairingNumber || 'none'})...`);
 
   try {
     // 1. Tenta apagar a instância se já existir para forçar um recomeço limpo
@@ -473,13 +474,15 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
        headers: { 'apikey': evoKey }
     }).catch(() => {});
 
+    const isPairing = !!pairingNumber;
+
     // 2. Cria a instância com webhooks apontando para nós
     const createReq = await fetch(`${evoUrl}/instance/create`, {
         method: 'POST',
         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
             instanceName,
-            qrcode: true,
+            qrcode: !isPairing,
             integration: "WHATSAPP-BAILEYS",
             webhook: webhookUrl,
             events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT']
@@ -490,9 +493,37 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
     console.log('[EVOLUTION] Instância criada/buscada:', createRes);
 
     if (createReq.ok || createRes?.instance?.status) {
-        // Se ela já não estiver com QR Code engatilhado, chamamos connect (No Evolution API V2/V1 normal o create já gera o QR na resposta, mas o webhook recebe depois)
-        // Set explicitly to connecting in Supabase
-        await supabase.from('whatsapp_settings').update({ is_connected: false, qr_code: null }).eq('id', connectionId);
+        // Reset connection status in Supabase
+        await supabase.from('whatsapp_settings').update({ 
+            is_connected: false, 
+            qr_code: null,
+            pairing_code: null 
+        }).eq('id', connectionId);
+
+        if (isPairing) {
+            const cleanNumber = pairingNumber.replace(/\D/g, '');
+            console.log(`[START-PAIRING] Gerando código de pareamento para ${cleanNumber}...`);
+            
+            // Aguarda 2 segundos para o Evolution registrar a instância de forma limpa antes de gerar o código
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const connectReq = await fetch(`${evoUrl}/instance/connect/${instanceName}?number=${cleanNumber}`, {
+                method: 'GET',
+                headers: { 'apikey': evoKey }
+            });
+            const connectRes = await connectReq.json();
+            console.log('[EVOLUTION] Resposta do código de pareamento:', connectRes);
+
+            if (connectReq.ok && connectRes?.pairingCode) {
+                await supabase.from('whatsapp_settings').update({ 
+                    pairing_code: connectRes.pairingCode 
+                }).eq('id', connectionId);
+                return res.json({ status: 'success', pairingCode: connectRes.pairingCode });
+            } else {
+                return res.status(500).json({ error: 'Falha ao obter código de pareamento da Evolution API', detail: connectRes });
+            }
+        }
+
         res.json({ status: 'success', message: `Sessão iniciada.` });
     } else {
         res.status(500).json({ error: 'Falha ao criar instância Evolution', detail: createRes });
@@ -1828,7 +1859,7 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         console.log(`[WEBHOOK] Status de Conexão: "${state}"`);
 
         if (state === 'open' || state === 'connected') {
-            await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null }).eq('id', connectionId);
+            await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null, pairing_code: null }).eq('id', connectionId);
             // Disparar sincronização em background
             const instanceName = `conn_${connectionId}`;
             syncEvolutionData(instanceName, companyId, connectionId);

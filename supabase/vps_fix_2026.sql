@@ -890,8 +890,12 @@ CREATE POLICY "whatsapp_conversations_delete_policy"
     AND (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
   );
 
+-- 13. WHATSAPP SETTINGS PAIRING_CODE COLUMN
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS pairing_code TEXT;
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
 
 

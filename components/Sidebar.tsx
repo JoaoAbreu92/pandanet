@@ -106,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (['projects', 'projects-planning', 'projects-list', 'projects-calendar', 'projects-metrics'].includes(currentPage)) {
             setOpenMenus(prev => ({ ...prev, projects: true }));
         }
-        if (['messages', 'whatspanda', 'feed'].includes(currentPage)) {
+        if (['messages', 'feed'].includes(currentPage)) {
             setOpenMenus(prev => ({ ...prev, social: true }));
         }
         if (['scheduling', 'scheduling-events'].includes(currentPage)) {
@@ -224,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     (n.type && n.type.toLowerCase().includes(k))
                 );
             }).length;
-            menuBadgeCount = (moduleUnreadCounts['messages'] || 0) + (moduleUnreadCounts['whatspanda'] || 0) + feedBadgeCount;
+            menuBadgeCount = (moduleUnreadCounts['messages'] || 0) + feedBadgeCount;
         }
 
         return (
@@ -288,9 +288,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 className="flex-1 px-3 md:px-4 py-4 md:py-6 space-y-1.5 md:space-y-2 overflow-y-auto no-scrollbar"
             >
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
+                <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={WhatsAppIcon} permission="viewWhatsPanda" featureId="whatspanda" />
                 <NavMenu label="Social" icon={UserGroupIcon} menuKey="social" permission={true}>
                     <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
-                    <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={WhatsAppIcon} permission="viewWhatsPanda" featureId="whatspanda" />
                     <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
