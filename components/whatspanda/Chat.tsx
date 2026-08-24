@@ -49,7 +49,8 @@ import {
   Share,
   Share2,
   CornerUpRight,
-  Users
+  Users,
+  Reply
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -110,10 +111,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     };
   }, []);
 
-  // Message Context Menu & Edit/Delete States
+  // Message Context Menu & Edit/Delete/Reply States
   const [messageContextMenu, setMessageContextMenu] = useState<{ x: number, y: number, message: WhatsAppMessage } | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<WhatsAppMessage | null>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Voice messages state & refs
   const [isRecording, setIsRecording] = useState(false);
@@ -1825,6 +1828,36 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const handleSendReaction = async (targetMsg: WhatsAppMessage, emoji: string) => {
+    if (!selectedConversation || isGhostMode) return;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const targetSenderName = targetMsg.sender_name || targetMsg.sender_phone || (targetMsg.is_from_customer ? selectedConversation.contact_name : 'Atendente');
+      const targetText = targetMsg.message_text || (targetMsg.media_url ? '[Arquivo/Mídia]' : '');
+
+      if (token) {
+        fetch(`/api/whatsapp/messages/send/${selectedConversation.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ 
+            message: emoji,
+            quoted_message_text: targetText,
+            quoted_message_sender: targetSenderName
+          })
+        }).catch(e => console.error('Erro ao enviar reação:', e));
+      }
+      setMessageContextMenu(null);
+      setTimeout(() => fetchMessages(selectedConversation.id), 300);
+      setTimeout(() => messageInputRef.current?.focus(), 50);
+    } catch (err: any) {
+      console.error('Erro ao enviar reação:', err);
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
     if (isGhostMode) {
       alert('Modo Auditoria: O envio de mensagens está desabilitado.');
@@ -1840,6 +1873,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     const stickerUrl = type === 'sticker' ? content : null;
     const isSticker = type === 'sticker';
 
+    const currentReply = replyingTo;
+    const qText = currentReply ? (currentReply.message_text || (currentReply.media_url ? '[Arquivo/Mídia]' : '')) : undefined;
+    const qSender = currentReply ? (currentReply.sender_name || currentReply.sender_phone || (currentReply.is_from_customer ? selectedConversation.contact_name : 'Atendente')) : undefined;
 
     let messageWithSignature = messageText;
 
@@ -1908,7 +1944,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             body: JSON.stringify({ 
                 message: messageWithSignature,
                 mediaUrl: uploadedFileUrl || stickerUrl,
-                mediaType: type === 'sticker' ? 'sticker' : fileType
+                mediaType: type === 'sticker' ? 'sticker' : fileType,
+                quoted_message_text: qText,
+                quoted_message_sender: qSender
             })
         });
 
@@ -1926,15 +1964,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         setNewMessage('');
         setAttachedFile(null);
         setShowStickerPicker(false);
+        setReplyingTo(null);
         // Recarregar mensagens após o envio
         fetchMessages(selectedConversation.id);
         // Forçar scroll para baixo para ver a própria mensagem enviada
         scrollToBottom(true, 'smooth');
+        // Manter o foco no campo de digitação após dar Enter / enviar
+        setTimeout(() => messageInputRef.current?.focus(), 50);
     } catch (error: any) {
         console.error('Error sending message:', error);
         alert(`Erro ao enviar mensagem: ${error?.message || error}`);
     } finally {
         setIsSending(false);
+        setTimeout(() => messageInputRef.current?.focus(), 50);
     }
   };
 
@@ -2876,6 +2918,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
               )}
 
+              {/* Reply Preview */}
+              {replyingTo && (
+                <div className="mb-2 sm:mb-3 p-2.5 sm:p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-between border-l-4 border-emerald-500 border border-emerald-100 dark:border-emerald-500/20 animate-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Respondendo a {replyingTo.sender_name || replyingTo.sender_phone || (replyingTo.is_from_customer ? selectedConversation.contact_name : 'Atendente')}</span>
+                    </div>
+                    <p className="text-xs text-slate-700 dark:text-slate-200 font-medium truncate mt-0.5">
+                      {replyingTo.message_text || (replyingTo.media_url ? '[Arquivo/Mídia]' : '')}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setReplyingTo(null)} 
+                    className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-600 rounded-xl transition-all shrink-0"
+                    title="Cancelar resposta"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Attachment Preview */}
               {attachedFile && (
                 <div className="mb-2 sm:mb-3 p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-between border border-emerald-100 dark:border-emerald-500/20 animate-in slide-in-from-bottom-2">
@@ -3032,6 +3096,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     )}
 
                     <textarea
+                      ref={messageInputRef}
                       value={newMessage}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -3088,9 +3153,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       <button
                         type="button"
                         onClick={startRecording}
-                        disabled={!canSendMessagesResult || isSending}
-                        className="p-2 sm:p-2.5 md:p-3 bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded-full md:rounded-2xl hover:bg-slate-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-95 shrink-0"
-                        title={!canSendMessagesResult ? "Sem permissão para enviar áudios" : "Gravar Áudio"}
+                        disabled={!canSendMedia || isSending}
+                        className={`p-2 sm:p-2.5 md:p-3 rounded-full md:rounded-2xl transition-all duration-300 shrink-0 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
+                        title={!canSendMedia ? "Sem permissão para enviar áudio" : "Gravar Áudio"}
                       >
                         <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
@@ -3750,23 +3815,58 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         </div>
       )}
 
+      {/* Backdrop overlay for closing context menu when clicking outside */}
+      {messageContextMenu && (
+        <div 
+          className="fixed inset-0 z-[9998]" 
+          onClick={() => setMessageContextMenu(null)}
+        />
+      )}
+
       {/* Message Context Menu */}
       {messageContextMenu && (
         <div 
-          className="fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 w-48 animate-in fade-in zoom-in-95 duration-100 font-sans"
+          className="fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-100 font-sans overflow-hidden"
           style={{ 
             top: `${messageContextMenu.y}px`, 
             left: `${messageContextMenu.x}px` 
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Quick Emojis Bar */}
+          <div className="flex items-center justify-around px-2 py-1.5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
+            {['❤️', '👍', '👊', '😂', '😮', '🙏', '🔥', '👏'].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleSendReaction(messageContextMenu.message, emoji)}
+                className="text-base hover:scale-125 transition-transform p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10"
+                title={`Reagir com ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => {
+              setReplyingTo(messageContextMenu.message);
+              setMessageContextMenu(null);
+              setTimeout(() => messageInputRef.current?.focus(), 100);
+            }}
+            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2.5 transition-colors"
+          >
+            <Reply className="w-4 h-4 text-emerald-500" />
+            <span>Responder Mensagem</span>
+          </button>
+
           <button
             onClick={() => {
               setEditingMessageId(messageContextMenu.message.id);
               setEditingText(messageContextMenu.message.message_text || '');
               setMessageContextMenu(null);
             }}
-            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2.5 transition-colors"
+            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2.5 transition-colors border-t border-slate-100 dark:border-white/5"
           >
             <Edit2 className="w-4 h-4 text-slate-400" />
             <span>Editar Mensagem</span>

@@ -872,7 +872,7 @@ router.post('/sync-history/:companyId/:connectionId', authMiddleware, async (req
 // API: Enviar Mensagem
 router.post('/messages/send/:conversationId', authMiddleware, async (req, res) => {
     const { conversationId } = req.params;
-    const { message, mediaUrl, mediaType, keepClosed } = req.body;
+    const { message, mediaUrl, mediaType, keepClosed, quoted_message_text, quoted_message_sender } = req.body;
     const userId = req.user?.id; // from authMiddleware
 
     if (!message && !mediaUrl) {
@@ -1050,7 +1050,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 is_from_customer: false,
                 sent_by: userId,
                 whatsapp_message_id: sendRes?.key?.id || undefined,
-                queue_id: conv.queue_id || null
+                queue_id: conv.queue_id || null,
+                quoted_message_text: quoted_message_text || null,
+                quoted_message_sender: quoted_message_sender || null
             })
             .select()
             .single();
