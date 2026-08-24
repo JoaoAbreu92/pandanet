@@ -1443,6 +1443,81 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
     }
 });
 
+// API: Retornar ou redirecionar para a foto de perfil do WhatsApp via Evolution API
+router.get('/conversations/profile-picture/:phone', async (req, res) => {
+    const { phone } = req.params;
+    const token = req.query.token;
+    const cleanPhone = phone.replace(/\D/g, '');
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanPhone)}&background=random&color=fff`;
+
+    if (!token) {
+        return res.redirect(defaultAvatar);
+    }
+
+    try {
+        // Validar token JWT ou do Supabase
+        let userId = null;
+        if (JWT_SECRET) {
+            try {
+                const decoded = jwt.verify(token, JWT_SECRET);
+                userId = decoded.sub;
+            } catch (e) {
+                // Tenta Supabase getUser
+                const { data: { user } } = await supabaseAnon.auth.getUser(token);
+                if (user) userId = user.id;
+            }
+        } else {
+            const { data: { user } } = await supabaseAnon.auth.getUser(token);
+            if (user) userId = user.id;
+        }
+
+        if (!userId) {
+            return res.redirect(defaultAvatar);
+        }
+
+        // Buscar conversa
+        const { data: conv } = await supabase
+            .from('whatsapp_conversations')
+            .select('connection_id, contact_name, is_group')
+            .eq('contact_phone', cleanPhone)
+            .limit(1)
+            .maybeSingle();
+
+        const nameForAvatar = conv?.contact_name || cleanPhone;
+        const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForAvatar)}&background=E2E8F0&color=475569`;
+
+        if (!conv || !conv.connection_id) {
+            return res.redirect(fallback);
+        }
+
+        const instanceName = `conn_${conv.connection_id}`;
+        const number = conv.is_group ? `${cleanPhone}@g.us` : `${cleanPhone}@s.whatsapp.net`;
+
+        const evoUrl = `${process.env.EVOLUTION_API_URL || 'http://evolution-api:8080'}/chat/fetchProfilePictureUrl/${instanceName}`;
+        
+        const response = await fetch(evoUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123'
+            },
+            body: JSON.stringify({ number })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.profilePictureUrl) {
+                return res.redirect(data.profilePictureUrl);
+            }
+        }
+
+        return res.redirect(fallback);
+    } catch (err) {
+        console.error('[PROFILE-PICTURE] Erro:', err.message);
+        return res.redirect(defaultAvatar);
+    }
+});
+
 // API: Status de Conexão Realtime
 router.get('/realtime-status', (req, res) => {
     res.json({
@@ -3675,8 +3750,8 @@ app.post('/conversations/transfer', async (req, res) => {
             queue_id: logQueueId || null
         });
 
-        // 6. Enviar mensagem via WhatsApp ao cliente se ativado
-        if (sendToClient && conv.contact_phone) {
+        // 6. Enviar mensagem via WhatsApp ao cliente se ativado (apenas chats privados, não grupos)
+        if (sendToClient && conv.contact_phone && !conv.is_group) {
             const instanceName = `conn_${conv.connection_id}`;
             dispatchTextEvolution(instanceName, conv.contact_phone, formattedClient).catch(err => {
                 console.error('[TRANSFER] Erro ao enviar mensagem de transferência via WhatsApp:', err.message);

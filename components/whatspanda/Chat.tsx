@@ -84,6 +84,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [selectedMedia, setSelectedMedia] = useState<{ url: string, type: string } | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [authToken, setAuthToken] = useState<string>('');
 
   const [chatFontSize, setChatFontSize] = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -94,6 +95,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   });
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        setAuthToken(session.access_token);
+      }
+    });
+
     const handleFontSizeChange = () => {
       const saved = localStorage.getItem('whatspanda_chat_font_size');
       if (saved) {
@@ -1179,8 +1186,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       if (error) throw error;
 
-      // 1.1 Enviar mensagem de protocolo ao cliente se gerado agora
-      if (generatedProtocol) {
+      // 1.1 Enviar mensagem de protocolo ao cliente se gerado agora (apenas chats privados, não grupos)
+      if (generatedProtocol && !targetConv?.is_group) {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (token) {
@@ -1203,7 +1210,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
       const closeMsg = conn?.enable_close_message !== false ? conn?.close_message : null;
 
-      if (newStatus === 'fechado' && closeMsg && closeMsg.trim()) {
+      if (newStatus === 'fechado' && closeMsg && closeMsg.trim() && !targetConv?.is_group) {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (token) {
@@ -2421,8 +2428,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 <div className="flex items-center gap-2 overflow-hidden">
                   <div className="relative flex-shrink-0">
                     <img
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(conv.contact_name || conv.contact_phone || 'User')}&background=random`}
-                      className="w-8 h-8 rounded-full border border-slate-200"
+                      src={authToken ? `/api/whatsapp/conversations/profile-picture/${conv.contact_phone}?token=${encodeURIComponent(authToken)}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.contact_name || conv.contact_phone || 'User')}&background=random`}
+                      className="w-8 h-8 rounded-full border border-slate-200 object-cover"
                       alt={conv.contact_name || conv.contact_phone}
                     />
                     <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-px shadow-sm border border-slate-100">
@@ -2549,7 +2556,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gray-100 dark:bg-white/5 rounded-full hidden sm:flex items-center justify-center text-slate-400 shrink-0 ring-2 ring-white dark:ring-white/10 shadow-lg overflow-hidden transition-all duration-300">
-                      <User className="w-4 h-4 sm:w-6 sm:h-6" />
+                      {authToken ? (
+                        <img
+                          src={`/api/whatsapp/conversations/profile-picture/${selectedConversation.contact_phone}?token=${encodeURIComponent(authToken)}`}
+                          className="w-full h-full object-cover"
+                          alt={selectedConversation.contact_name}
+                        />
+                      ) : (
+                        <User className="w-4 h-4 sm:w-6 sm:h-6" />
+                      )}
                     </div>
                     <div className="min-w-0 flex flex-col flex-1">
                       <h3 className="font-bold text-slate-800 dark:text-white text-sm sm:text-lg truncate leading-tight tracking-tight">{selectedConversation.contact_name || selectedConversation.contact_phone}</h3>
@@ -3274,7 +3289,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
               <div className="p-8 flex flex-col items-center border-b border-slate-100 dark:border-white/5 bg-gradient-to-b from-slate-50/50 to-transparent dark:from-white/5">
                 <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-3xl flex items-center justify-center mb-6 ring-4 ring-white dark:ring-white/10 shadow-xl overflow-hidden transition-all duration-300 group">
-                  <User className="w-12 h-12 text-slate-300 group-hover:scale-110 transition-transform" />
+                  {authToken ? (
+                    <img
+                      src={`/api/whatsapp/conversations/profile-picture/${selectedConversation.contact_phone}?token=${encodeURIComponent(authToken)}`}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                      alt={selectedConversation.contact_name}
+                    />
+                  ) : (
+                    <User className="w-12 h-12 text-slate-300 group-hover:scale-110 transition-transform" />
+                  )}
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white text-center leading-tight tracking-tight">{selectedConversation.contact_name || 'Sem nome'}</h3>
                 <p className="text-emerald-500 dark:text-emerald-400 text-[10px] font-bold mt-2 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">{selectedConversation.contact_phone}</p>
