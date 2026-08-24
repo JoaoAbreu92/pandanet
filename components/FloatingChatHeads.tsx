@@ -259,7 +259,7 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
         <div className="fixed bottom-24 right-6 flex flex-col items-end space-y-4 z-[9999] pointer-events-none">
             {/* Expanded Mini Chat Box */}
             {expandedChatHeadId && activeExpandedHead && (
-                <div className="w-[330px] h-[420px] bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 flex flex-col overflow-hidden pointer-events-auto transform transition-all duration-300 animate-in slide-in-from-bottom-5">
+                <div className="w-[380px] h-[480px] bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 flex flex-col overflow-hidden pointer-events-auto transform transition-all duration-300 animate-in slide-in-from-bottom-5">
                     {/* Header */}
                     <div className="px-4 py-3 bg-gradient-to-r from-brand-primary/10 to-transparent border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
                         <div className="flex items-center space-x-2.5">
@@ -306,7 +306,7 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
                                 const isMe = msg.sender === 'me';
                                 return (
                                     <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                        <div className={`px-3 py-2 rounded-2xl max-w-[240px] text-sm break-words shadow-sm border ${
+                                        <div className={`px-3 py-2 rounded-2xl max-w-[290px] text-sm break-words shadow-sm border ${
                                             isMe
                                                 ? 'bg-brand-primary text-white border-transparent rounded-br-none'
                                                 : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border-gray-100 dark:border-white/5 rounded-bl-none'
@@ -357,7 +357,7 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
                             {/* Avatar Bubble */}
                             <button
                                 onClick={() => setExpandedChatHeadId(isExpanded ? null : ch.conversationId)}
-                                className={`w-12 h-12 rounded-full overflow-hidden border-2 shadow-lg focus:outline-none transition-all ${
+                                className={`w-16 h-16 rounded-full overflow-hidden border-2 shadow-lg focus:outline-none transition-all ${
                                     isExpanded
                                         ? 'border-brand-primary ring-4 ring-brand-primary/20 scale-[1.05]'
                                         : 'border-white dark:border-slate-800 hover:border-brand-primary'
