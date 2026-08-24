@@ -41,8 +41,8 @@ const CRMItemForm: React.FC<CRMItemFormProps> = ({ onClose, onSave }) => {
                 .from('crm_items')
                 .insert([{
                     company_id: currentUser.company_id,
-                    name: formData.name,
-                    description: formData.description,
+                    description: formData.name,       // 'description' is the name column in crm_items
+                    long_description: formData.description, // 'long_description' is the detailed description
                     rate: formData.rate,
                     tax_1: formData.tax_1,
                     tax_2: formData.tax_2,

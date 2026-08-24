@@ -1329,17 +1329,19 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 </div>
                             )}
                             {conversations.filter(c => {
-                                const shouldShow = !c.isGroup && c.is_closed !== true;
-                                if (c.participantName === 'Master Admin') {
-                                    console.log('Filtrando Master Admin:', { id: c.id, is_closed: c.is_closed, shouldShow });
-                                }
-                                return shouldShow;
+                                if (c.isGroup) return false;
+                                // Always show support conversations with master admin (even if closed)
+                                const isSupportConv = c.participantId === masterAdminId;
+                                if (isSupportConv) return true;
+                                // Hide regular closed conversations
+                                return c.is_closed !== true;
                             }).map(conv => {
-                                // Online status logic would require presence tracking (realtime), omitted for basic scope
+                                const isSupportConv = conv.participantId === masterAdminId;
                                 return (
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)} className="group px-2 py-1">
                                         <div className={`p-3 flex items-center space-x-3 cursor-pointer rounded-2xl transition-all duration-300 border ${selectedConversationId === conv.id
                                             ? 'bg-brand-primary/10 border-brand-primary/30 shadow-lg shadow-brand-primary/5'
+                                            : conv.is_closed && isSupportConv ? 'bg-gray-50 dark:bg-white/3 border-gray-200 dark:border-white/10 opacity-70'
                                             : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5'}`}>
                                             <div className="relative">
                                                 <img
@@ -1371,7 +1373,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                                         )}
                                                     </div>
                                                 </div>
-                                                <p className="text-sm text-brand-subtle-text truncate">{conv.lastMessage}</p>
+                                                <p className="text-sm text-brand-subtle-text truncate">
+                                                    {isSupportConv && conv.is_closed
+                                                        ? <span className="text-xs text-orange-500 font-semibold">⛔ Suporte Encerrado — clique para reabrir</span>
+                                                        : conv.lastMessage}
+                                                </p>
                                             </div>
                                         </div>
                                     </li>
