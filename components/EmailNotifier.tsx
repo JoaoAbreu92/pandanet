@@ -31,7 +31,7 @@ const EmailNotifier: React.FC = () => {
 
         const checkEmails = async () => {
             const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
-                `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
+                `${window.location.origin}/api/email`;
 
             try {
                 const session = await supabase.auth.getSession();

@@ -78,6 +78,18 @@ const ChatbotSettings: React.FC = () => {
         if (!error) fetchData();
     };
 
+    const handleDeleteFlow = async (flowId: string) => {
+        if (!window.confirm('Tem certeza que deseja excluir este fluxo e todos os seus passos?')) return;
+        const { error } = await supabase.from('whatsapp_chatbot_flows').delete().eq('id', flowId);
+        if (!error) {
+            setFlows(flows.filter(f => f.id !== flowId));
+            if (selectedFlow?.id === flowId) {
+                setSelectedFlow(null);
+                setNodes([]);
+            }
+        }
+    };
+
     const handleAddNode = async (type: ChatbotNode['type']) => {
         if (!selectedFlow) return;
 
@@ -129,14 +141,35 @@ const ChatbotSettings: React.FC = () => {
                                 onClick={() => { setSelectedFlow(flow); fetchNodes(flow.id); }}
                                 className={`p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedFlow?.id === flow.id ? 'bg-emerald-50 dark:bg-emerald-500/10 border-l-4 border-emerald-500' : ''}`}
                             >
-                                <div className="flex justify-between items-start">
+                                <div className="flex justify-between items-start group/flow">
                                     <span className="font-medium text-sm">{flow.name}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); handleToggleActive(flow); }}>
-                                        {flow.is_active ? <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" /> : <Pause className="w-4 h-4 text-slate-400" />}
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleToggleActive(flow); }}
+                                            title={flow.is_active ? "Desativar" : "Ativar"}
+                                        >
+                                            {flow.is_active ? <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" /> : <Pause className="w-4 h-4 text-slate-400" />}
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteFlow(flow.id); }}
+                                            className="opacity-0 group-hover/flow:opacity-100 p-1 text-red-400 hover:text-red-500 transition-all"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    <div className="m-4 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl space-y-2">
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase">Como funciona?</p>
+                        <ul className="text-[10px] text-slate-500 space-y-1 list-disc pl-3">
+                            <li>Crie um passo do tipo <b>Saudação</b> para ser a primeira mensagem.</li>
+                            <li>Use o <b>Menu</b> para dar opções numeradas ao cliente.</li>
+                            <li>Configure o <b>Próximo Passo</b> em cada opção para levar o cliente adiante.</li>
+                            <li>Use <b>Setor</b> ou <b>Usuário</b> para finalizar o robô e transferir o chat.</li>
+                        </ul>
                     </div>
                 </div>
 

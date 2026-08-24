@@ -87,9 +87,11 @@ async function authMiddleware(req, res, next) {
 app.get('/health', (req, res) => res.json({ status: 'ok', evolution_mode: true }));
 app.get('/', (req, res) => res.send('WhatsPanda Backend (Evolution Proxy) 🐼'));
 
+// --- ROUTES ---
+const router = express.Router();
+
 // API: Iniciar Sessão
-app.use('/sessions', apiLimiter);
-app.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
+router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;
   const instanceName = `conn_${connectionId}`;
   const webhookUrl = `${backendWebhookBaseUrl}/webhook/evolution/${companyId}/${connectionId}`;
@@ -139,7 +141,7 @@ app.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req,
 });
 
 // API: Parar Sessão
-app.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, res) => {
+router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, res) => {
   const { connectionId } = req.params;
   const instanceName = `conn_${connectionId}`;
 
@@ -159,6 +161,30 @@ app.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, 
     res.status(500).json({ error: 'Erro ao deslogar Evolution' });
   }
 });
+
+// API: Sincronizar
+router.post('/sync/:companyId/:connectionId', async (req, res) => {
+    const { companyId, connectionId } = req.params;
+    
+    // Buscar as configurações para obter o nome da instância
+    const { data: settings, error } = await supabase
+        .from('whatsapp_settings')
+        .select('instance_name')
+        .eq('id', connectionId)
+        .single();
+    
+    if (error || !settings) {
+        return res.status(404).json({ error: 'Conexão não encontrada' });
+    }
+
+    // Disparar sincronização
+    syncEvolutionData(settings.instance_name, companyId, connectionId);
+    
+    res.json({ status: 'Sync started' });
+});
+
+app.use('/whatsapp', router);
+app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 
 // ============================================
@@ -539,25 +565,6 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     }
 });
 
-app.post('/sync/:companyId/:connectionId', async (req, res) => {
-    const { companyId, connectionId } = req.params;
-    
-    // Buscar as configurações para obter o nome da instância
-    const { data: settings, error } = await supabase
-        .from('whatsapp_settings')
-        .select('instance_name')
-        .eq('id', connectionId)
-        .single();
-    
-    if (error || !settings) {
-        return res.status(404).json({ error: 'Conexão não encontrada' });
-    }
-
-    // Disparar sincronização
-    syncEvolutionData(settings.instance_name, companyId, connectionId);
-    
-    res.json({ status: 'Sync started' });
-});
 
 app.listen(port, () => {
   console.log(`🚀 Servidor WhatsPanda (Evolution Proxy) rodando na porta ${port}`);
