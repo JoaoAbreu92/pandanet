@@ -174,14 +174,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
     const handleSave = async () => {
         try {
-            const updates: any = {
-                ...tempUserData,
-                id: currentUser.id,
-                updated_at: new Date(),
-            };
-
+            console.log("[Profile] Iniciando salvamento...");
+            console.log("[Profile] Dados atuais:", tempUserData);
+            console.log("[Profile] Current User ID:", currentUser.id);
+            
             const dbUpdates: any = {
-                id: currentUser.id,
                 full_name: tempUserData.name,
                 role: tempUserData.role,
                 team: tempUserData.team,
@@ -191,27 +188,46 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 avatar_url: tempUserData.avatarUrl,
                 cover_url: tempUserData.coverUrl,
                 birth_date: tempUserData.birthDate,
+                join_date: tempUserData.joinDate,  // Adicionar campo de data de início
                 department_id: (tempUserData as any).department_id,
-                updated_at: new Date()
+                updated_at: new Date().toISOString()
             };
 
-            // Se o usuário já tiver um company_id no estado, mantemos ele no upsert
-            if (currentUser.company_id) {
-                dbUpdates.company_id = currentUser.company_id;
+            console.log("[Profile] Dados para atualizar:", dbUpdates);
+
+            // Usar UPDATE ao invés de UPSERT para melhor controle
+            const { data, error } = await supabase
+                .from('profiles')
+                .update(dbUpdates)
+                .eq('id', currentUser.id)
+                .select();
+
+            if (error) {
+                console.error("[Profile] Erro do Supabase:", error);
+                throw error;
             }
 
-            const { error } = await supabase
-                .from('profiles')
-                .upsert(dbUpdates, { onConflict: 'id' });
+            console.log("[Profile] Resposta do Supabase:", data);
 
-            if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error("Nenhum registro foi atualizado. Verifique as permissões RLS.");
+            }
 
+            // Atualizar estado local
             onUpdateUser(tempUserData);
+            
+            // Forçar refresh do perfil no AuthContext
+            if (refreshProfile) {
+                console.log("[Profile] Atualizando perfil no AuthContext...");
+                await refreshProfile();
+            }
+            
             setIsEditing(false);
             alert('Perfil atualizado com sucesso!');
+            
         } catch (error: any) {
-            console.error("Error updating profile:", error);
-            alert('Erro ao atualizar perfil.');
+            console.error("[Profile] Erro completo:", error);
+            alert(`Erro ao atualizar perfil: ${error.message || 'Erro desconhecido'}\n\nVerifique o console (F12) para mais detalhes.`);
         }
     };
 

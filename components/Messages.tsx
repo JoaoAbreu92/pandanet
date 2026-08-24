@@ -102,6 +102,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    
+    // Paginação de mensagens
+    const [messageLimit, setMessageLimit] = useState(50);
+    const [hasMoreMessages, setHasMoreMessages] = useState(false);
+    const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
 
     // MSN Nudge States
     const [nudgeCooldowns, setNudgeCooldowns] = useState<Record<string, number>>(() => {
@@ -266,6 +271,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const stickerUploadRefInput = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const typingTimeoutRef = useRef<any>(null);
+    
+    // Refs para controlar scroll automático
+    const isInitialLoad = useRef(true);
+    const lastMessageCount = useRef(0);
+    const previousConversationId = useRef<string | null>(null);
 
     const handleMouseEnterReaction = (msgId: string) => {
         if (stickerTimeoutRef.current) clearTimeout(stickerTimeoutRef.current);
@@ -386,6 +396,17 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             fetchEmployees();
         }
     }, [currentUser]);
+
+    // Restaurar última conversa selecionada do localStorage
+    useEffect(() => {
+        const lastConvId = localStorage.getItem('lastSelectedConversation');
+        if (lastConvId && conversations.length > 0 && !selectedConversationId) {
+            // Verificar se a conversa ainda existe
+            if (conversations.some(c => c.id === lastConvId)) {
+                setSelectedConversationId(lastConvId);
+            }
+        }
+    }, [conversations]); // Executa quando conversas são carregadas
 
     // Buscar Conversas
     const fetchConversations = async () => {
@@ -526,20 +547,31 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     }, [currentUser.id]); // Re-executa se usuário mudar (raro)
 
     // Buscar Mensagens quando conversa selecionada
-    const fetchMessages = async (convId: string) => {
+    const fetchMessages = async (convId: string, limit = messageLimit) => {
         try {
+            // Buscar limit + 1 para saber se há mais mensagens
             const { data, error } = await supabase
                 .from('messages')
                 .select(`
-                    id, text, created_at, sender_id, file_url, file_type, reactions, sender_deleted_at,
-                    profiles:sender_id(full_name, avatar_url)
+                    id, text, created_at, sender_id, file_url, file_type, reactions, sender_deleted_at, reply_to,
+                    profiles:sender_id(full_name, avatar_url),
+                    replied_message:reply_to(id, text, sender_id, file_url, file_type, profiles:sender_id(full_name))
                 `)
                 .eq('conversation_id', convId)
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false })  // Ordem decrescente para pegar as mais recentes
+                .limit(limit + 1);  // +1 para verificar se há mais
 
             if (error) throw error;
 
-            const formattedMessages: Message[] = data.map((m: any) => ({
+            // Verificar se há mais mensagens
+            const hasMore = data.length > limit;
+            setHasMoreMessages(hasMore);
+            
+            // Remover a mensagem extra se houver
+            const messagesToShow = hasMore ? data.slice(0, limit) : data;
+            
+            // Reverter ordem para exibir cronologicamente
+            const formattedMessages: Message[] = messagesToShow.reverse().map((m: any) => ({
                 id: m.id, // UUID
                 sender: m.sender_id === currentUser.id ? 'me' : 'other',
                 senderName: (m.profiles as any)?.full_name || 'Usuário Excluído',
@@ -549,6 +581,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
                 file: m.file_url ? { name: (m.file_type?.startsWith('image/') || m.file_type === 'sticker') ? 'Imagem' : 'Anexo', url: m.file_url, type: m.file_type } : undefined,
                 sender_deleted_at: m.sender_deleted_at,
+                reply_to: m.reply_to,
+                replied_message: m.replied_message ? {
+                    id: m.replied_message.id,
+                    text: m.replied_message.text,
+                    senderName: m.replied_message.profiles?.full_name || 'Usuário',
+                    file_url: m.replied_message.file_url,
+                    file_type: m.replied_message.file_type
+                } : undefined
             }));
 
             // Filter out messages that I deleted from MY view
@@ -569,12 +609,42 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     useEffect(() => {
         if (selectedConversationId) {
+            // Só resetar flag se for uma conversa diferente
+            if (previousConversationId.current !== selectedConversationId) {
+                isInitialLoad.current = true;
+                previousConversationId.current = selectedConversationId;
+                setMessageLimit(50); // Reset limit ao trocar de conversa
+            }
             fetchMessages(selectedConversationId);
         }
     }, [selectedConversationId]);
 
+    // Função para carregar mensagens antigas
+    const loadOlderMessages = async () => {
+        if (!selectedConversationId || loadingOlderMessages || !hasMoreMessages) return;
+        
+        setLoadingOlderMessages(true);
+        const newLimit = messageLimit + 50;
+        setMessageLimit(newLimit);
+        await fetchMessages(selectedConversationId, newLimit);
+        setLoadingOlderMessages(false);
+    };
+
+    // Auto-scroll inteligente: apenas no carregamento inicial ou ao enviar mensagem
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Scroll apenas se:
+        // 1. É o carregamento inicial da conversa
+        // 2. O número de mensagens aumentou E a última mensagem é minha
+        const shouldScroll = isInitialLoad.current || 
+            (messages.length > lastMessageCount.current && 
+             messages[messages.length - 1]?.sender === 'me');
+        
+        if (shouldScroll) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            isInitialLoad.current = false;
+        }
+        
+        lastMessageCount.current = messages.length;
     }, [messages]);
 
     // Deselecionar se a conversa for fechada (Suporte)
@@ -634,7 +704,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 text: stickerUrl || textToSend,
                 file_url: uploadedFileUrl || stickerUrl,
                 file_type: stickerUrl ? 'sticker' : fileType,
-                reactions: []
+                reactions: [],
+                reply_to: replyingToMessage?.id || null  // Adicionar referência à mensagem respondida
             });
 
             if (error) throw error;
@@ -729,6 +800,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     const handleSelectConversation = (convId: string) => {
         setSelectedConversationId(convId);
+        localStorage.setItem('lastSelectedConversation', convId);
         setActiveTab('conversations'); // Retorna para lista no mobile se necessário
     };
 
@@ -899,6 +971,23 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
         setNoteWarning(false);
     };
 
+    // Componente para exibir mensagem citada (no input de resposta)
+    const QuotedMessage: React.FC<{ message: Message; onClose: () => void }> = ({ message, onClose }) => (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg flex items-start justify-between mb-2">
+            <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-blue-700">{message.senderName}</p>
+                <p className="text-sm text-gray-700 truncate">
+                    {message.file?.url && !message.text ? 
+                        (message.file.type === 'sticker' || message.file.type?.startsWith('image/') ? '🖼️ Imagem' : '📎 Anexo') 
+                        : message.text || 'Mensagem'}
+                </p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-2 flex-shrink-0">
+                <XCircleIcon className="w-5 h-5" />
+            </button>
+        </div>
+    );
+
     const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
         const isMe = message.sender === 'me';
         const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -949,14 +1038,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     {!isMe && selectedConversation?.isGroup && (
                         <span className="text-[10px] text-gray-500 ml-1 mb-0.5">{message.senderName}</span>
                     )}
+                    
                     <div className="relative">
-                        {message.replyingTo && (
-                            <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md text-gray-500 border-l-2 border-green-400 ${isMe ? 'bg-emerald-100' : 'bg-gray-200'}`}>
-                                <p className="font-semibold">{message.replyingTo.senderName}</p>
-                                <p className="truncate">{message.replyingTo.text}</p>
+                        {/* Mensagem Respondida (Citada) */}
+                        {message.replied_message && (
+                            <div className={`text-xs p-2 rounded-t-lg max-w-xs sm:max-w-md border-l-4 mb-1 ${
+                                isMe ? 'bg-blue-100 border-blue-400' : 'bg-green-100 border-green-400'
+                            }`}>
+                                <p className="font-semibold text-gray-700">{message.replied_message.senderName}</p>
+                                <p className="truncate text-gray-600">
+                                    {message.replied_message.file_url && !message.replied_message.text ?
+                                        (message.replied_message.file_type === 'sticker' || message.replied_message.file_type?.startsWith('image/') ? 
+                                            '🖼️ Imagem' : '📎 Anexo')
+                                        : message.replied_message.text || 'Mensagem'}
+                                </p>
                             </div>
                         )}
-                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replyingTo ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
+                        
+                        <div className={`p-3 rounded-lg max-w-xs sm:max-w-md ${isMe ? 'bg-brand-primary text-white rounded-br-none' : 'bg-white text-brand-text rounded-bl-none'} ${message.replied_message ? 'rounded-t-none' : ''} shadow-md border premium-shadow ${!isMe && message.sender_deleted_at ? 'border-red-500 border-4 ring-2 ring-red-200' : 'border-gray-100'}`}>
                             {/* Check if text is a single image URL */}
                             {(() => {
                                 const isImageUrl = (text: string) => {
@@ -1296,7 +1395,33 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 )}
                             </div>
                         </div>
-                        <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar">
+                        <div 
+                            className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar"
+                            onScroll={(e) => {
+                                const target = e.currentTarget;
+                                // Detectar se chegou no topo (com margem de 100px)
+                                if (target.scrollTop < 100 && hasMoreMessages && !loadingOlderMessages) {
+                                    loadOlderMessages();
+                                }
+                            }}
+                        >
+                            {/* Indicador de carregamento de mensagens antigas */}
+                            {loadingOlderMessages && (
+                                <div className="text-center py-2">
+                                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
+                                    <p className="text-xs text-gray-500 mt-1">Carregando mensagens antigas...</p>
+                                </div>
+                            )}
+                            {hasMoreMessages && !loadingOlderMessages && (
+                                <div className="text-center py-2">
+                                    <button 
+                                        onClick={loadOlderMessages}
+                                        className="text-xs text-brand-primary hover:underline"
+                                    >
+                                        ↑ Carregar mensagens antigas
+                                    </button>
+                                </div>
+                            )}
                             {messages.map(msg => (<MessageBubble key={msg.id} message={msg} />))}
                             <div ref={messagesEndRef} />
                         </div>
@@ -1311,7 +1436,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                 </div>
                             ) : (
                                 <>
-                                    {replyingToMessage && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <div> <p className="font-semibold text-brand-primary">Respondendo a {replyingToMessage.senderName}</p> <p className="text-gray-600 truncate">{replyingToMessage.text}</p> </div> <button onClick={() => setReplyingToMessage(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
+                                    {replyingToMessage && (
+                                        <QuotedMessage 
+                                            message={replyingToMessage} 
+                                            onClose={() => setReplyingToMessage(null)} 
+                                        />
+                                    )}
                                     {attachedFile && (<div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm"> <div className="flex justify-between items-center"> <p className="text-gray-600">Anexo: {attachedFile.name}</p> <button onClick={() => setAttachedFile(null)}> <XCircleIcon className="w-5 h-5 text-gray-500 hover:text-red-500" /> </button> </div> </div>)}
                                     <form onSubmit={handleSendMessage} className="relative flex items-center space-x-3">
                                         {showEmojiPicker && (

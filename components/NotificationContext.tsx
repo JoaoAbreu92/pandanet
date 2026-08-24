@@ -148,16 +148,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const options = {
             body,
             icon: icon || '/logo.png',
+            badge: '/logo.png',
+            tag: 'pandanet-notification',
+            requireInteraction: false,
             silent: false
         };
 
         if (Notification.permission === 'granted') {
-            new Notification(title, options);
+            try {
+                const notification = new Notification(title, options);
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+                // Auto-fechar após 5 segundos
+                setTimeout(() => notification.close(), 5000);
+            } catch (error) {
+                console.error('[PandaNet] Erro ao criar notificação:', error);
+            }
         } else if (Notification.permission === 'default') {
+            // Solicitar permissão (necessário para Chrome)
             Notification.requestPermission().then(permission => {
                 if (permission === 'granted') {
-                    new Notification(title, options);
+                    try {
+                        const notification = new Notification(title, options);
+                        notification.onclick = () => {
+                            window.focus();
+                            notification.close();
+                        };
+                        setTimeout(() => notification.close(), 5000);
+                    } catch (error) {
+                        console.error('[PandaNet] Erro ao criar notificação após permissão:', error);
+                    }
                 }
+            }).catch(error => {
+                console.error('[PandaNet] Erro ao solicitar permissão:', error);
             });
         }
     }, []);
