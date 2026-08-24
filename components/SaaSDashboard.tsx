@@ -52,7 +52,7 @@ interface SaaSDashboardProps {
     onImpersonate?: (company: Company) => void;
 }
 
-type TabType = 'dashboard' | 'companies' | 'plans' | 'settings' | 'announcements';
+type TabType = 'dashboard' | 'companies' | 'plans' | 'settings' | 'announcements' | 'validations';
 type ModalType = 'createCompany' | 'edit' | 'delete' | 'disable' | 'stats' | 'addMonth' | 'config' | 'createPlan' | 'editPlan' | 'deletePlan' | 'users' | 'newUpdate' | 'newVideo' | 'createAnnouncement';
 
 // --- COLORS ---
@@ -97,6 +97,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [growthData, setGrowthData] = useState<any[]>([]);
     const [planDistribution, setPlanDistribution] = useState<any[]>([]);
     const [globalAnnouncements, setGlobalAnnouncements] = useState<any[]>([]);
+    const [pendingUsers, setPendingUsers] = useState<Employee[]>([]);
+    const [isValidating, setIsValidating] = useState<string | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
@@ -166,10 +168,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 console.error("Erro ao buscar status do WhatsApp:", e);
             }
 
-            // NEW: Fetch Global Announcements (mocking via common table or specific query)
-            // For now, let's fetch 'system' type announcements if we implement that, or just show last 5 created by superadmin
-            // We'll manage creation here.
-
+            // NEW: Fetch Pending Users
+            const { data: pendingData } = await supabase
+                .from('profiles')
+                .select('*, company:companies(*)')
+                .eq('status', 'pending');
+            if (pendingData) setPendingUsers(pendingData as any);
         } catch (error) {
             console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
         } finally {
@@ -456,6 +460,81 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         } else {
             // Update local state
             setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, isCompanyAdmin: !currentStatus, is_company_admin: !currentStatus } : u));
+        }
+    };
+
+    // --- Validação de Usuários ---
+    const handleApproveUser = async (user: Employee) => {
+        setIsValidating(user.id);
+        try {
+            let finalCompanyId = user.company_id;
+
+            // Se o usuário não tem empresa vinculada, tentamos criar uma baseada no domínio dele
+            if (!finalCompanyId && user.email) {
+                const domain = user.email.split('@')[1];
+
+                // Verificar se empresa já existe com esse domínio
+                const { data: existingComp } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .ilike('domain', domain)
+                    .single();
+
+                if (existingComp) {
+                    finalCompanyId = existingComp.id;
+                } else {
+                    // Criar nova empresa básica
+                    const { data: newComp, error: createError } = await supabase
+                        .from('companies')
+                        .insert([{
+                            name: domain.split('.')[0].toUpperCase(),
+                            domain: domain,
+                            status: 'active',
+                            plan_id: localPlans[0]?.id || null
+                        }])
+                        .select()
+                        .single();
+
+                    if (createError) throw createError;
+                    finalCompanyId = newComp.id;
+                }
+            }
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    status: 'active',
+                    company_id: finalCompanyId,
+                    is_company_admin: true // Primeiro usuário do domínio costuma ser admin
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+            showToast('Usuário aprovado com sucesso!', 'success');
+            fetchData();
+        } catch (error: any) {
+            showToast('Erro ao aprovar: ' + error.message, 'error');
+        } finally {
+            setIsValidating(null);
+        }
+    };
+
+    const handleRejectUser = async (userId: string) => {
+        if (!confirm('Tem certeza que deseja rejeitar este acesso?')) return;
+        setIsValidating(userId);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ status: 'rejected' })
+                .eq('id', userId);
+
+            if (error) throw error;
+            showToast('Acesso rejeitado.', 'info');
+            fetchData();
+        } catch (error: any) {
+            showToast('Erro ao rejeitar: ' + error.message, 'error');
+        } finally {
+            setIsValidating(null);
         }
     };
 
@@ -835,6 +914,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.companies_tab')}</button>
                     <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.plans_tab')}</button>
                     <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.announcements_tab')}</button>
+                    <button onClick={() => setActiveTab('validations')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'validations' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>Validações {pendingUsers.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingUsers.length}</span>}</button>
                     <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.settings_tab')}</button>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
@@ -1238,7 +1318,6 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         </div>
                     </div>
                 )}
-            </div>
 
             {/* GLOBAL ANNOUNCEMENTS */}
             {activeTab === 'announcements' && (
@@ -1267,7 +1346,81 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 </div>
             )}
 
-            {/* --- MODALS --- */}
+                {/* VALIDATIONS */}
+                {activeTab === 'validations' && (
+                    <div className="space-y-6 animate-fadeIn pb-20">
+                        <div className="flex items-center gap-2 mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
+                            <ShieldCheckIcon className="w-6 h-6 text-brand-primary" />
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Validação de Novos Cadastros</h2>
+                                <p className="text-xs text-gray-500 mt-1">Aprove ou rejeite solicitações de acesso pendentes no sistema.</p>
+                            </div>
+                        </div>
+
+                        {pendingUsers.length === 0 ? (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-dashed border-gray-200 dark:border-gray-700">
+                                <CheckCircleIcon className="w-12 h-12 text-green-500/20 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-gray-400">Tudo limpo por aqui!</h3>
+                                <p className="text-sm text-gray-400">Não há solicitações pendentes de validação no momento.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {pendingUsers.map((user: any) => (
+                                    <div key={user.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col group hover:shadow-lg transition-all duration-300">
+                                        <div className="p-6 flex-1">
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-lg">
+                                                    {(user.full_name || user.email || '?')[0].toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="font-bold text-gray-800 dark:text-white truncate">{user.full_name || 'Usuário s/ Nome'}</h4>
+                                                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="text-gray-400">Empresa Detectada:</span>
+                                                    <span className="font-bold text-gray-600 dark:text-gray-300">
+                                                        {user.company?.name || user.email?.split('@')[1] || 'Desconhecida'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="text-gray-400">Data do Cadastro:</span>
+                                                    <span className="text-gray-600 dark:text-gray-300">
+                                                        {new Date(user.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-gray-50 dark:bg-gray-700/30 flex gap-2">
+                                            <button
+                                                onClick={() => handleRejectUser(user.id)}
+                                                disabled={!!isValidating}
+                                                className="flex-1 py-2 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-100 dark:border-red-900/30 disabled:opacity-50"
+                                            >
+                                                Rejeitar
+                                            </button>
+                                            <button
+                                                onClick={() => handleApproveUser(user)}
+                                                disabled={!!isValidating}
+                                                className="flex-[2] py-2 rounded-lg text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 transition-all shadow-md hover:shadow-brand-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                                            >
+                                                {isValidating === user.id ? (
+                                                    <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <CheckCircleIcon className="w-3 h-3" />
+                                                )}
+                                                Aprovar Acesso
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}      {/* --- MODALS --- */}
             {modalOpen.stats && selectedCompany && (
                 <Modal onClose={closeModal} title={`Estatísticas: ${selectedCompany.name}`} width="max-w-2xl">
                     <div className="p-6">
@@ -1630,6 +1783,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 </Modal>
             )}
 
+            </div>
         </div>
     );
 };

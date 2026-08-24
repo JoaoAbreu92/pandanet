@@ -115,25 +115,18 @@ const KPIDashboard: React.FC = () => {
                     <div className="bg-brand-primary rounded-[32px] p-8 text-white shadow-xl shadow-brand-primary/20">
                         <CheckCircleIcon className="w-12 h-12 mb-6 opacity-80" />
                         <h3 className="text-xl font-bold mb-2">Desempenho Corporativo</h3>
-                        <p className="text-white/80 text-sm leading-relaxed mb-6">Seu time está 12% acima da média do último trimestre. Continue com o excelente trabalho!</p>
-                        <div className="inline-flex items-center px-4 py-2 bg-white/10 rounded-xl text-xs font-bold backdrop-blur-md">
-                            Atualizado há 14 minutos
-                        </div>
+                        <p className="text-white/80 text-sm leading-relaxed mb-6">Seu time está 12% acima da média do último trimestre.</p>
                     </div>
 
                     <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
                         <h3 className="font-bold text-gray-900 mb-6 flex items-center">
                             <ExclamationTriangleIcon className="w-5 h-5 mr-2 text-amber-500" />
-                            Atenção Requerida
+                            Alertas de Sistema
                         </h3>
                         <div className="space-y-4">
                             <div className="flex items-center p-4 bg-gray-50 rounded-2xl">
                                 <div className="w-2 h-2 rounded-full bg-amber-500 mr-3"></div>
-                                <span className="text-sm text-gray-700">Meta de Atendimento (Zendesk) está em 88%</span>
-                            </div>
-                            <div className="flex items-center p-4 bg-gray-50 rounded-2xl">
-                                <div className="w-2 h-2 rounded-full bg-red-500 mr-3"></div>
-                                <span className="text-sm text-gray-700">Taxa de Churn aumentou no último mês</span>
+                                <span className="text-sm text-gray-700">Meta de Atendimento está em 88%</span>
                             </div>
                         </div>
                     </div>

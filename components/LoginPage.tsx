@@ -43,7 +43,13 @@ const LoginPage: React.FC = () => {
             });
 
             if (signUpError) {
-                setError(signUpError.message);
+                let msg = signUpError.message;
+                if (msg.includes('Error sending confirmation email')) {
+                    msg = language === 'pt'
+                        ? '⚠️ Erro ao enviar e-mail de confirmação. O servidor de e-mail (SMTP) não está respondendo. Por favor, contate o Super Admin (ti@grupopixel.com.br) para validar seu acesso manualmente.'
+                        : '⚠️ Error sending confirmation email. SMTP server is not responding. Please contact Super Admin (ti@grupopixel.com.br) to validate your access manually.';
+                }
+                setError(msg);
             } else if (authData.user) {
                 // Try to find company by domain
                 const { data: companyData } = await supabase

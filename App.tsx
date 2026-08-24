@@ -800,15 +800,38 @@ const AppContent: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Aguardando Aprovação</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Aguardando Validação</h2>
                     <p className="text-gray-600 mb-8 leading-relaxed">
-                        Sua conta foi criada com sucesso! Agora, o administrador da sua empresa precisa aprovar seu acesso.
-                        Você receberá um e-mail assim que estiver tudo pronto.
+                        Seu cadastro foi recebido com sucesso! Para garantir a segurança da plataforma, um administrador do <b>Grupo Pixel</b> revisará seu acesso em breve.
                     </p>
-                    <button onClick={handleLogout} className="w-full px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all shadow-md mb-4">Voltar ao Login</button>
-                    <div className="text-sm text-gray-400">
-                        Empresa: {currentCompany?.name || 'Não vinculada'}
+                    <div className="bg-amber-50 rounded-xl p-4 mb-8 text-sm text-amber-800 text-left flex gap-3">
+                        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Você receberá um e-mail assim que sua conta for liberada. Geralmente leva menos de 24h.</span>
                     </div>
+                    <button onClick={handleLogout} className="w-full px-6 py-3 text-gray-500 font-medium hover:text-gray-700 transition-colors">Sair da Conta</button>
+                </div>
+            </div>
+        );
+    }
+
+    // Rejected Access Block
+    if (currentUser && currentUser.status === 'rejected') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Acesso Rejeitado</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed">
+                        Infelizmente, sua solicitação de acesso não foi aprovada pelo administrador do sistema.
+                        Se você acredita que isso é um erro, entre em contato com o suporte.
+                    </p>
+                    <button onClick={handleLogout} className="w-full px-6 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-all shadow-md">Voltar ao Login</button>
                 </div>
             </div>
         );

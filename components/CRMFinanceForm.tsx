@@ -59,6 +59,7 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
     const [subTotal, setSubTotal] = useState(0);
     const [total, setTotal] = useState(0);
     const [savedItems, setSavedItems] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (currentUser?.company_id) {
@@ -149,16 +150,55 @@ const CRMFinanceForm: React.FC<CRMFinanceFormProps> = ({ type, onClose, onSucces
 
 
     const handleSave = async () => {
-        if (!formData.customer_id) {
-            toast.error('Por favor, selecione um cliente.');
+        if (!currentUser?.company_id || !formData.customer_id) {
+            toast.error('Selecione um cliente e preencha os campos obrigatórios.');
             return;
         }
 
         try {
-            // Logic to persist in Supabase would go here based on 'type'
-            // For now, we call the onSuccess prop
-            onSuccess({ ...formData, subTotal, total });
-            toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} salva com sucesso!`);
+            setLoading(true);
+
+            // Determinar a tabela com base no tipo
+            const tableMap = {
+                invoice: 'crm_invoices',
+                proposal: 'crm_proposals',
+                estimate: 'crm_estimates'
+            };
+
+            const tableName = tableMap[type];
+
+            // Mapear dados do formulário para o banco
+            const dbData: any = {
+                company_id: currentUser.company_id,
+                customer_id: formData.customer_id,
+                subject: formData.subject,
+                date: formData.date,
+                currency: formData.currency,
+                status: formData.status,
+                assigned_to: formData.assigned_to,
+                subtotal: subTotal,
+                total: total,
+                items: formData.items, // Salvo como JSONB
+            };
+
+            // Campos específicos por tipo
+            if (type === 'invoice') {
+                dbData.duedate = formData.due_date;
+            } else if (type === 'proposal') {
+                dbData.open_till = formData.due_date; // Reusando campo date/vencimento
+            } else if (type === 'estimate') {
+                dbData.expiry_date = formData.due_date;
+            }
+
+            const { data: savedData, error } = await supabase
+                .from(tableName)
+                .insert([dbData])
+                .select();
+
+            if (error) throw error;
+
+            toast.success(`${type === 'invoice' ? 'Fatura' : type === 'proposal' ? 'Proposta' : 'Estimativa'} salva com sucesso!`);
+            onSuccess?.(savedData?.[0]);
             onClose();
         } catch (error) {
             console.error('Error saving finance form:', error);
