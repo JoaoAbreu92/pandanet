@@ -115,10 +115,21 @@ Deno.serve(async (req) => {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
 
-      // BREVO DETECT: Se o host contém 'brevo' ou se a senha começa com o prefixo da Brevo
+      // BREVO & MULTI-PASS DETECT
+      // Se o usuário digitar "senha:chave", dividimos. Se não, usamos a mesma para ambos.
+      let imapPass = settings.pass;
+      let smtpPass = settings.pass;
+
+      if (settings.pass?.includes(':')) {
+        const parts = settings.pass.split(':');
+        imapPass = parts[0];
+        smtpPass = parts[1];
+        console.log("[V33] Senhas múltiplas detectadas (Separadas por :)");
+      }
+
       const isBrevo = settings.smtp_host?.includes('brevo');
-      const hasBrevoKey = settings.brevo_api_key || settings.pass?.startsWith('xkeysib-');
-      const brevoKey = settings.brevo_api_key || (hasBrevoKey ? settings.pass : null);
+      const hasBrevoKey = settings.brevo_api_key || smtpPass?.startsWith('xkeysib-');
+      const brevoKey = settings.brevo_api_key || (hasBrevoKey ? smtpPass : null);
 
       let smtpResult: any;
       let imapResult: any;
@@ -147,7 +158,7 @@ Deno.serve(async (req) => {
             host: settings.smtp_host,
             port: settings.smtp_port,
             secure: useSmtpSsl,
-            auth: { user: settings.user, pass: settings.pass },
+            auth: { user: settings.user, pass: smtpPass }, // Usa smtpPass
             tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
             connectionTimeout: 10000,
           });
@@ -165,7 +176,6 @@ Deno.serve(async (req) => {
       if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error}`);
 
       const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
-      // FIX TYPO: Era imap_host no lugar de imap_port
       const imapProbe = useImapSsl ? await probeTls(settings.imap_host, settings.imap_port) : await testConnection(settings.imap_host, settings.imap_port);
 
       if (!imapProbe.ok) {
@@ -175,7 +185,7 @@ Deno.serve(async (req) => {
           host: settings.imap_host,
           port: settings.imap_port,
           secure: useImapSsl,
-          auth: { user: settings.user, pass: settings.pass },
+          auth: { user: settings.user, pass: imapPass }, // Usa imapPass
           logger: false,
           tls: { rejectUnauthorized: false, servername: settings.imap_host, minVersion: 'TLSv1.2' },
           connectionTimeout: 15000,
