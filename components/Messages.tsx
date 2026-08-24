@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { triggerEmojiAnimation } from './utils/emojiAnimation';
 import {
     FaceSmileIcon,
     PaperClipIcon,
@@ -25,7 +24,8 @@ import { useNotifications } from './NotificationContext';
 import { usePresence } from './PresenceContext';
 import { useToast } from './ToastContext';
 
-const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
+const quickReactions = ['👍', '❤️', '😂', '🔥', '😮'];
+const fullReactions = ['👍', '❤️', '😂', '🔥', '😮', '😢', '😡', '🤔', '🎉', '👀', '🚀', '💯', '🥳', '😍', '🙏', '💪', '🤝', '😎'];
 const availableEmojis = [
     '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
     '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
@@ -227,24 +227,33 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                             </div>
                         ) : null}
                     </div>
-                    <div className={`absolute top-0 -mt-8 flex items-center bg-white shadow-lg rounded-full border border-gray-100 transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
-                        <div className="flex items-center p-1 space-x-0.5">
-                            {availableReactions.map(emoji => (
+                    <div className={`absolute top-0 -mt-8 flex items-center transition-all duration-300 opacity-0 group-hover:opacity-100 z-50 ${isMe ? 'right-0' : 'left-0'}`}>
+                        <div className="flex items-center bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-1 gap-0.5">
+                            {quickReactions.map(emoji => (
                                 <button
                                     key={emoji}
-                                    onClick={(e) => {
-                                        triggerEmojiAnimation(emoji, e);
-                                        handleReact(message.id as string, emoji);
-                                    }}
-                                    className="p-1 px-1.5 text-lg hover:scale-125 transition-transform hover:bg-gray-100 rounded-full"
+                                    onClick={() => handleReact(message.id as string, emoji)}
+                                    className="w-8 h-8 text-lg flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95"
                                 >
                                     {emoji}
                                 </button>
                             ))}
-                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                            <div className="relative group/expand">
+                                <button className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-all text-xs font-bold">+</button>
+                                <div className="absolute bottom-full mb-2 right-0 hidden group-hover/expand:block animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 grid grid-cols-6 gap-1 min-w-[220px]">
+                                        {fullReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
+                                            <button key={emoji} onClick={() => handleReact(message.id as string, emoji)} className="text-lg w-8 h-8 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="w-px h-5 bg-white/10 mx-0.5"></div>
                             <button
                                 onClick={() => setReplyingToMessage(message)}
-                                className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-gray-100 rounded-full transition-colors"
+                                className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
                                 title="Responder"
                             >
                                 <ArrowUturnLeftIcon className="w-4 h-4" />
@@ -252,7 +261,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                             {isMe && (
                                 <button
                                     onClick={() => handleDeleteMessage(message.id as string)}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors"
+                                    className="p-1.5 text-white/50 hover:text-red-400 hover:bg-white/10 rounded-xl transition-colors"
                                     title="Apagar para mim"
                                 >
                                     <TrashIcon className="w-4 h-4" />

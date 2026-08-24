@@ -312,6 +312,13 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                     {language === 'pt' ? 'Notas Pessoais' : language === 'en' ? 'Personal Notes' : 'Notas Personales'}
                                 </button>
                                 
+                                <button type="button" onClick={() => { onNavigate('manual-usuario' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-blue-500">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                                    </svg>
+                                    {language === 'pt' ? 'Manual do Usuário' : language === 'en' ? 'User Manual' : 'Manual del Usuario'}
+                                </button>
+                                
                                 {/* Mobile Only Items */}
                                 <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
                                     <button onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">

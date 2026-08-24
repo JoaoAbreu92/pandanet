@@ -4,42 +4,6 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
-Versão 1.1.3 beta
-20/05/2026
-🗞️ Nota de Atualização - PandaNet v1.1.3 Beta
-Esta atualização foca na experiência social, na comunicação em tempo real e na produtividade individual dos colaboradores. Múltiplas áreas do ecossistema receberam melhorias visuais, novas funcionalidades e correções importantes.
-
-🚀 O que há de novo?
-
-😄 Reações com Animação em Todo o Ecossistema
-As reações por emoji foram aprimoradas e unificadas em todas as áreas de comunicação da plataforma:
-- Chat Interno: Ao reagir a uma mensagem, o emoji "voa" animado pela tela, tornando a interação mais expressiva e divertida.
-- WhatsPanda: As reações agora aparecem diretamente nas mensagens do WhatsApp, com animação de flutuação e persistência no banco de dados.
-- Feed Social: As reações em publicações do feed também receberam a animação de emoji flutuante.
-- Passagem do Mouse: Passe o mouse sobre qualquer mensagem para ver o painel de reações disponíveis.
-
-📅 Calendário: Notificação Visual de Eventos
-- Bolinha de Notificação: Dias com convites de eventos pendentes agora exibem uma bolinha vermelha no calendário, facilitando a identificação rápida de compromissos a confirmar.
-
-🗑️ Admin: Limpeza de Eventos Passados
-- Painel Administrativo: Administradores da empresa agora podem apagar em lote todos os eventos e reuniões com data já passada, mantendo o calendário sempre limpo e organizado.
-
-🖼️ Feed Social: Hover Refinado
-- Removido o efeito de "salto" (transform) ao passar o mouse sobre os cards do feed social. O comportamento agora é mais sutil, com apenas um sombreamento elegante, evitando distorção visual.
-
-📝 Notas Pessoais: Seu Bloco de Notas Privado
-Um novo menu exclusivo para cada colaborador, pensado para guardar informações importantes de forma segura e organizada:
-- Bloco de Notas Digital: Escreva livremente senhas, observações, lembretes e qualquer anotação pessoal diretamente na plataforma.
-- Separado por Abas: Organize suas notas em seções independentes para manter tudo categorizado.
-- Privacidade Garantida: Cada usuário acessa apenas as próprias notas.
-- Modo Auditoria: O Master Admin em Modo Fantasma também tem acesso às notas durante processos de auditoria.
-
-Nota: Esta é uma versão Beta em evolução contínua. Se encontrar qualquer comportamento inesperado, por favor, reporte à equipe técnica.
-
-PandaNet - Sua comunicação, sua segurança. 🐼🚀
-
----
-
 Versão 1.1.2 beta
 07/04/2026
 🗞️ Nota de Atualização - PandaNet v1.1.2 Beta

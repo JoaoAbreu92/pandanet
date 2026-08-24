@@ -270,7 +270,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" featureId="equip" />
                     <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
-                    <NavItem page="manual-usuario" label={t('sidebar.user_manual')} icon={PlayIcon} permission={true} />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
                     <NavItem page="infosec" label="Segurança Info." icon={ShieldCheckIcon} permission="viewInfoSec" featureId="infosec" />
                 </NavMenu>
@@ -293,18 +292,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     </>
                 )}
 
-                {(currentUser.isAdmin || currentUser.isCompanyAdmin) && (
-                    <button
-                        type="button"
-                        onClick={() => onNavigate('admin')}
-                        className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'admin' ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700'
-                            } ${isOpen ? '' : 'justify-center'}`}
-                        title={t('sidebar.admin')}
-                    >
-                        <ShieldCheckIcon className="w-6 h-6 flex-shrink-0" />
-                        {isOpen && <span className="ml-4 truncate">{t('sidebar.admin')}</span>}
-                    </button>
-                )}
             </nav>
             {/* Company Logo Footer */}
             <div className={`mt-auto p-3 lg:p-4 border-t border-gray-100 dark:border-white/5 text-center bg-white/50 dark:bg-white/5 backdrop-blur-sm 

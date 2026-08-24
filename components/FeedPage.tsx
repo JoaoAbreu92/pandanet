@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
-import { triggerEmojiAnimation } from './utils/emojiAnimation';
 import RecognitionWidget from './RecognitionWidget';
 import RecognitionModal from './RecognitionModal';
 import { supabase } from '../supabaseClient';
@@ -22,11 +21,13 @@ export const PostCard: React.FC<{
 }> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare, onDelete, isGhostMode }) => {
     const [commentText, setCommentText] = useState('');
     const [showReactionMenu, setShowReactionMenu] = useState(false);
-    const timeoutRef = useRef<any>(null);
+    const [showFullReactions, setShowFullReactions] = useState(false);
+    const reactionMenuRef = useRef<HTMLDivElement>(null);
     const commentInputRef = useRef<HTMLInputElement>(null);
     const { t } = useLanguage();
 
-    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀', '🚀', '💯'];
+    const quickReactions = ['👍', '❤️', '😂', '🔥', '😮'];
+    const allReactions = ['👍', '❤️', '😂', '🔥', '😮', '😢', '😡', '🤔', '🎉', '👀', '🚀', '💯', '🥳', '😍', '🙏', '💪', '🤝', '😎'];
 
     const handleCommentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,18 +37,17 @@ export const PostCard: React.FC<{
         }
     };
 
-    const handleMouseEnter = () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => {
-            setShowReactionMenu(true);
-        }, 1000);
-    };
-
-    const handleMouseLeave = () => {
-        timeoutRef.current = setTimeout(() => {
-            setShowReactionMenu(false);
-        }, 1500);
-    };
+    // Fechar popup ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (reactionMenuRef.current && !reactionMenuRef.current.contains(e.target as Node)) {
+                setShowReactionMenu(false);
+                setShowFullReactions(false);
+            }
+        };
+        if (showReactionMenu) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showReactionMenu]);
 
     const getEmbedUrl = (content: string) => {
         const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
@@ -85,7 +85,7 @@ export const PostCard: React.FC<{
     const isAuthor = currentUser.id === post.authorId;
 
     return (
-        <Card title="" className="pb-2 overflow-visible no-hover-transform">
+        <Card title="" className="pb-2 overflow-visible">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
                     <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
@@ -140,36 +140,45 @@ export const PostCard: React.FC<{
             </div>
 
             <div className="flex justify-around py-1 relative">
-                <div onMouseEnter={isGhostMode ? undefined : handleMouseEnter} onMouseLeave={isGhostMode ? undefined : handleMouseLeave} className="flex-1">
+                <div className="flex-1 relative" ref={reactionMenuRef}>
                     <button 
                         disabled={isGhostMode}
-                        onClick={(e) => {
-                            if (isGhostMode) return;
-                            const myReaction = post.reactions.find(r => r.userId === currentUser.id);
-                            if (myReaction) {
-                                onToggleReaction(post.id, myReaction.emoji);
-                            } else {
-                                triggerEmojiAnimation('👍', e);
-                                onToggleReaction(post.id, '👍');
-                            }
-                        }}
-                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                        onClick={() => { if (!isGhostMode) setShowReactionMenu(!showReactionMenu); }}
+                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
-                        <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-full p-2 flex space-x-2 animate-fade-in-up z-20">
-                            {reactions.map(emoji => (
-                                <button key={emoji} onClick={(e) => { triggerEmojiAnimation(emoji, e); onToggleReaction(post.id, emoji); setShowReactionMenu(false); }} className="text-2xl hover:scale-125 transition-transform duration-200 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full">
-                                    {emoji}
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 z-30 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex items-center gap-1">
+                                {quickReactions.map(emoji => (
+                                    <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-2xl w-10 h-10 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
+                                        {emoji}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setShowFullReactions(!showFullReactions)}
+                                    className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all text-sm font-bold"
+                                    title="Ver todos"
+                                >
+                                    {showFullReactions ? '✕' : '+'}
                                 </button>
-                            ))}
+                            </div>
+                            {showFullReactions && (
+                                <div className="grid grid-cols-6 gap-1 mt-2 pt-2 border-t border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
+                                    {allReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
+                                        <button key={emoji} onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} className="text-xl w-9 h-9 flex items-center justify-center hover:scale-[1.3] transition-all duration-200 hover:bg-white/10 rounded-xl active:scale-95">
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
-                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
+                <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98] transition-all duration-300">
                     <ChatBubbleLeftIcon className="w-5 h-5" /><span>{t('feed.comment')}</span>
                 </button>
-                <button onClick={() => isGhostMode ? null : onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
+                <button onClick={() => isGhostMode ? null : onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 active:scale-[0.98] transition-all duration-300">
                     <ShareIcon className="w-5 h-5" /><span>{t('feed.share')}</span>
                 </button>
             </div>
@@ -541,7 +550,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             fetchPosts(); // Refresh immediately for the author
         } catch (error: any) {
             console.error('Error creating post:', error);
-            alert('Erro ao publicar post: ' + (error.message || 'Erro desconhecido.'));
+            const msg = error.message || 'Erro desconhecido.';
+            if (msg.includes('row-level security') || msg.includes('security policy')) {
+                alert('Erro de permissão ao publicar. O bucket de mídia "feed-media" pode não estar configurado no banco de dados. Verifique as políticas de Storage no Supabase ou execute o script SQL de correção (MIGRATION_FEED_STORAGE.sql).');
+            } else {
+                alert('Erro ao publicar post: ' + msg);
+            }
         }
     };
 

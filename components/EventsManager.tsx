@@ -188,47 +188,19 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
         }
     };
 
-    const deletePastEvents = async () => {
-        if (!currentUser?.company_id) return;
-        if (!confirm('Deseja excluir permanentemente todas as reuniões e eventos passados?')) return;
-        try {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const { error } = await supabase
-                .from('events')
-                .delete()
-                .eq('company_id', currentUser.company_id)
-                .lt('date', todayStr);
-
-            if (error) throw error;
-            alert('Reuniões e eventos passados excluídos com sucesso!');
-            fetchEvents();
-        } catch (err) {
-            console.error('Error deleting past events:', err);
-            alert('Erro ao excluir eventos passados.');
-        }
-    };
-
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando gerenciador de eventos...</div>;
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-800">Gerenciar Eventos</h2>
-                <div className="flex space-x-3">
-                    <button
-                        onClick={deletePastEvents}
-                        className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-semibold"
-                    >
-                        Limpar Eventos Passados
-                    </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-emerald-600 transition-colors text-sm font-semibold"
-                    >
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Novo Evento
-                    </button>
-                </div>
+                <button
+                    onClick={() => handleOpenModal()}
+                    className="flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                >
+                    <PlusIcon className="w-5 h-5 mr-2" />
+                    Novo Evento
+                </button>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
