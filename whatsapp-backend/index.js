@@ -2973,7 +2973,7 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
 
     // ----- MENSAGEM RECEBIDA OU ENVIADA -----
     // Cobre event names de v1 e v2: messages.upsert, MESSAGES_UPSERT, messages_upsert, send.message, SEND_MESSAGE
-    const isMessageEvent = ['messages.upsert','messages_upsert','messages.update','send.message','send_message','message'].includes(event);
+    const isMessageEvent = ['messages.upsert','messages_upsert','message.upsert','message_upsert','messages.update','send.message','send_message','message'].includes(event);
     if (isMessageEvent) {
         // O payload pode vir como { messages: [msg] } ou { message: msg } ou direto
         let messages = [];
