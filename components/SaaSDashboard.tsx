@@ -1049,6 +1049,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             <div className="p-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[500px] overflow-y-auto custom-scrollbar">
                 <SectionTitle title="Módulos Gerais" />
                 <Toggle label="Feed de Notícias" id="feed" icon={NewspaperIcon} />
+                <Toggle label="Banners de Destaque" id="banners" icon={NewspaperIcon} />
                 <Toggle label="Mensagens / Chat" id="messages" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Calendário Corp." id="calendar" icon={CalendarDaysIcon} />
                 <Toggle label="E-mail Integrado" id="email" icon={EnvelopeIcon} />

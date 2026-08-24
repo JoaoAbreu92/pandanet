@@ -4,6 +4,40 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.1.6 beta
+19/06/2026
+🗞️ Nota de Atualização - PandaNet v1.1.6 Beta
+Esta grande atualização traz novas ferramentas de colaboração (Compartilhamento de Agendas e Barra de Presença), automações e inteligência avançada no WhatsPanda, além de polimentos estéticos e correções críticas no Modo Escuro e RH.
+
+🚀 O que há de novo?
+
+📅 Compartilhamento de Agenda Cooperativo
+- Conceda e Revoque Acesso: Novo modal de configurações permitindo selecionar com quais colegas de equipe compartilhar seu calendário.
+- Visualização Compartilhada: Dropdown de seleção de agendas de terceiros no topo da página.
+- Agendamento Direto: Permissão para adicionar compromissos diretamente na agenda compartilhada do colega.
+- Privacidade Garantida: Ocultação automática de eventos privados (`is_private = true`) e tarefas pessoais para outros colaboradores.
+
+🐼 WhatsPanda Avançado & Triagem IA (Gemini)
+- Templates de Chatbot Prontos: Lançamento do template dinâmico "Restaurante / Delivery" com fluxos funcionais.
+- Controle de Expediente Complexo: Configuração de horários de atendimento detalhados por dia da semana e setor (filas).
+- Triagem Inteligente: O Gemini analisa mensagens recebidas e, sabendo quais setores estão abertos ou fechados no momento (horário de Brasília), evita a transferência para setores inativos.
+- Toggle Rápido e Salvar Fluxo: Construtor visual de fluxos com toggle de ativação e botão de salvamento persistente.
+
+💬 Barra de Presença & Chat Flutuante (Chat Heads)
+- Lista Realtime de Contatos: Barra lateral direita dinâmica listando colaboradores online (bolinha verde) e offline.
+- Status Customizado: Defina uma frase personalizada na sua página de Perfil que será exibida para toda a empresa na barra lateral de presença.
+- Popover de Ações Rápidas: Clique em um contato para conversar (abrindo balão flutuante estilo Facebook de forma global) ou silenciá-lo.
+
+🎨 Destaques da Home & Modo Escuro
+- Reestruturação de Destaques: A página inicial agora exibe três blocos independentes (Vídeos da Empresa em carrossel, Projetos participados e anúncios do Marketplace).
+- Contraste Aprimorado no Dark Mode: Correções de CSS globais para garantir alta legibilidade de textos secundários, inputs e enquetes sob a classe `.dark`.
+
+📋 Recursos de RH (Competências e Ausências com Atestado)
+- Competências Customizadas: Permite que administradores definam até 10 competências da empresa. Notas de 1 a 10 + N/A com média calculada corretamente no gráfico de barras do colaborador.
+- Upload de Atestados Médicos: Solicitação de ausência com anexo de atestado (PDF/Imagem) salvo com segurança no bucket `hr-files`.
+
+---
+
 Versão 1.1.5 beta teste
 18/06/2026
 🗞️ Nota de Atualização - PandaNet v1.1.5 Beta Teste

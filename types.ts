@@ -255,6 +255,7 @@ export interface WhatsAppPermissions {
 export interface Employee {
   id: string;
   company_id?: string;
+  company?: Company;
   name: string;
   email: string;
   password?: string; // Não deve ser armazenado no estado do frontend em um app real
@@ -472,7 +473,7 @@ export interface FormSubmission {
   requesterId: string;
   requesterName: string;
   requesterAvatarUrl: string;
-  formType: 'Solicitação de Férias';
+  formType: 'Solicitação de Férias' | 'Solicitação de Ausência' | string;
   status: FormStatus;
   submittedAt: string; // YYYY-MM-DD
   // Form-specific data
@@ -481,6 +482,8 @@ export interface FormSubmission {
   reason?: string;
   sectorManager?: string; // New field
   employeeManager?: string; // New field
+  attachment_url?: string;
+  attachment_name?: string;
 }
 
 export type TIRequestStatus = 'Pendente' | 'Em Análise' | 'Aprovado' | 'Pedido Realizado' | 'Entregue' | 'Rejeitado' | 'Finalizado';

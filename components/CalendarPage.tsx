@@ -19,7 +19,8 @@ import {
     UserPlusIcon,
     UserGroupIcon as HeroUserGroupIcon,
     ArrowUturnLeftIcon,
-    TrashIcon
+    TrashIcon,
+    ShareIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory, Page } from '../types';
 import { supabase } from '../supabaseClient';
@@ -266,7 +267,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
             if (evts) {
                 const formattedEvents: CalendarEvent[] = evts
-                    .filter((e: any) => !e.is_private || e.creator_id === currentUser.id || sharedUserIds.includes(e.creator_id))
+                    .filter((e: any) => !e.is_private || e.creator_id === currentUser.id)
                     .map((e: any) => ({
                         id: e.id,
                         title: e.title,
@@ -299,6 +300,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     }));
                 setEvents(formattedEvents);
             }
+            await fetchShares();
         };
         fetchData();
     }, [currentUser]);
@@ -331,19 +333,32 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 end_time: combinedEndTime,
                 category: newEventData.category,
                 location: newEventData.location,
-                attendees: [currentUser.id],
+                attendees: selectedCalendarUserId === currentUser.id ? [currentUser.id] : [selectedCalendarUserId],
                 invited_ids: newEventData.isPrivate ? [] : finalAttendees.filter(id => id !== currentUser.id),
-                creator_id: currentUser.id,
+                creator_id: selectedCalendarUserId,
                 is_private: newEventData.isPrivate
             }).select();
 
             if (data && data[0]) {
                 const eventId = data[0].id;
 
+                // Notificar o dono do calendário se for outra pessoa
+                if (selectedCalendarUserId !== currentUser.id) {
+                    await supabase.from('notifications').insert({
+                        user_id: selectedCalendarUserId,
+                        type: 'event',
+                        title: 'Novo Compromisso Agendado',
+                        description: `${currentUser.name || currentUser.full_name || 'Alguém'} agendou um evento no seu calendário: ${newEventData.title}`,
+                        avatar_url: currentUser?.avatar_url || currentUser?.avatarUrl || '',
+                        link: 'calendar',
+                        read: false
+                    });
+                }
+
                 // Criar convites na tabela calendar_invites (apenas se não for privado)
                 if (!newEventData.isPrivate && finalAttendees.length > 0) {
                     const invites = finalAttendees
-                        .filter(id => id !== currentUser.id)
+                        .filter(id => id !== currentUser.id && id !== selectedCalendarUserId)
                         .map(userId => ({
                             event_id: eventId,
                             user_id: userId,
@@ -359,7 +374,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             console.error('Error creating invites:', inviteError);
                         } else {
                             // NOTIFICAR CONVIDADOS
-                            for (const userId of finalAttendees.filter(id => id !== currentUser.id)) {
+                            for (const userId of finalAttendees.filter(id => id !== currentUser.id && id !== selectedCalendarUserId)) {
                                 addNotification({
                                     user_id: userId,
                                     type: 'event',
@@ -531,6 +546,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 return !e.isPrivate || isCreator || isAttendee || isInvited;
             } else {
                 // For shared calendars: show events created by target, or target attending/invited
+                // Hide private events of the shared calendar
+                if (e.isPrivate) return false;
                 const isCreator = e.creatorId === selectedCalendarUserId;
                 const isAttendee = e.attendees?.some(att => att.id === selectedCalendarUserId);
                 const isInvited = e.invitedIds?.includes(selectedCalendarUserId) || e.invites?.some(inv => inv.user_id === selectedCalendarUserId && inv.status === 'accepted');
@@ -1172,6 +1189,32 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.subtitle')}</p>
                 </div>
                 <div className="flex items-center space-x-3">
+                    {sharedWithMe.length > 0 && (
+                        <div className="flex items-center space-x-2">
+                            <label className="text-xs font-black text-slate-500 dark:text-gray-400 uppercase tracking-wider hidden sm:inline">Ver Agenda:</label>
+                            <select
+                                value={selectedCalendarUserId}
+                                onChange={(e) => setSelectedCalendarUserId(e.target.value)}
+                                className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-gray-100 px-4 py-2.5 rounded-2xl text-xs font-bold focus:outline-none shadow-sm"
+                            >
+                                <option value={currentUser?.id}>Minha Agenda (Pessoal)</option>
+                                {sharedWithMe.map(share => (
+                                    <option key={share.id} value={share.id}>
+                                        Agenda de {share.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="flex items-center space-x-2 px-4 py-3 text-sm font-black text-slate-700 dark:text-gray-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all active:scale-95"
+                    >
+                        <ShareIcon className="w-4 h-4 text-slate-500" />
+                        <span className="hidden sm:inline">Compartilhar</span>
+                    </button>
+
                     <button onClick={() => setCreateModalOpen(true)} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
                         <PlusIcon className="w-5 h-5" /><span>{t('calendar.new_event')}</span>
                     </button>
@@ -1580,6 +1623,145 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     </div>
                 );
             })()}
+
+            {isShareModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                            type="button"
+                            onClick={() => setIsShareModalOpen(false)}
+                            className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                        >
+                            <XCircleIcon className="w-8 h-8" />
+                        </button>
+
+                        <h3 className="text-2xl font-black text-slate-800 dark:text-gray-100 mb-2">
+                            Compartilhar Calendário
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-gray-400 mb-6">
+                            Permita que outros colaboradores visualizem seus compromissos e agendem eventos na sua agenda.
+                        </p>
+
+                        <div className="space-y-6">
+                            {/* Compartilhar com novo colaborador */}
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-3">
+                                    Conceder Acesso
+                                </h4>
+                                <div className="flex gap-2">
+                                    <select
+                                        id="share-user-select"
+                                        className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-gray-100 px-4 py-3 rounded-xl text-sm focus:outline-none"
+                                        defaultValue=""
+                                        onChange={async (e) => {
+                                            const userId = e.target.value;
+                                            if (!userId) return;
+                                            try {
+                                                const { error } = await supabase
+                                                    .from('calendar_shares')
+                                                    .insert({
+                                                        owner_id: currentUser?.id,
+                                                        shared_with_id: userId
+                                                    });
+                                                if (error) {
+                                                    console.error('Erro ao compartilhar:', error);
+                                                } else {
+                                                    await fetchShares();
+                                                    e.target.value = ""; // reset select
+                                                }
+                                            } catch (err) {
+                                                console.error(err);
+                                            }
+                                        }}
+                                    >
+                                        <option value="" disabled>Selecione um colaborador...</option>
+                                        {employees
+                                            .filter(emp => emp.id !== currentUser?.id && !mySharedList.some(s => s.id === emp.id))
+                                            .map(emp => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.name} ({emp.email})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Colaboradores com acesso */}
+                            <div>
+                                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-3">
+                                    Colaboradores com Acesso ({mySharedList.length})
+                                </h4>
+                                {mySharedList.length === 0 ? (
+                                    <p className="text-xs text-slate-400 dark:text-gray-500 italic">
+                                        Ninguém tem acesso ao seu calendário no momento.
+                                    </p>
+                                ) : (
+                                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                                        {mySharedList.map(share => (
+                                            <div
+                                                key={share.id}
+                                                className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800/50"
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    {share.avatarUrl ? (
+                                                        <img
+                                                            src={share.avatarUrl}
+                                                            alt={share.name}
+                                                            className="w-8 h-8 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-gray-300">
+                                                            {share.name.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800 dark:text-gray-200">
+                                                            {share.name}
+                                                        </p>
+                                                        <p className="text-xs text-slate-400 dark:text-gray-500">
+                                                            {share.email}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const { error } = await supabase
+                                                                .from('calendar_shares')
+                                                                .delete()
+                                                                .eq('id', share.shareId);
+                                                            if (error) {
+                                                                console.error('Erro ao remover compartilhamento:', error);
+                                                            } else {
+                                                                await fetchShares();
+                                                            }
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                        }
+                                                    }}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                                                    title="Remover acesso"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end">
+                            <button
+                                onClick={() => setIsShareModalOpen(false)}
+                                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider transition-colors"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

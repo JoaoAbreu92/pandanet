@@ -94,6 +94,8 @@ const UserFormModal: React.FC<{
     const planEmailLimit = plan?.emailLimit || 1;
     const remainingLimit = Math.max(0, planEmailLimit - totalAllocatedOtherUsers);
 
+    const [permissionTab, setPermissionTab] = useState<'social' | 'rh' | 'ti' | 'rh_admin' | 'whatspanda'>('social');
+
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
@@ -278,277 +280,320 @@ const UserFormModal: React.FC<{
                     </div>
 
                     <div className="border-t pt-6">
-                        <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <h4 className="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
                             <ShieldCheckIcon className="w-5 h-5 text-brand-primary" />
                             Configurações de Acesso e Permissões
                         </h4>
 
-                        <div className="space-y-8">
-                            {/* Grupo: Social */}
-                            <section>
-                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <SparklesIcon className="w-3 h-3" /> Redes e Comunicação
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} label="Chat & Mensagens" name="viewMessages" checked={formData.permissions.viewMessages} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<EnvelopeIcon className="w-4 h-4" />} label="E-mail Corporativo" name="viewEmail" checked={formData.permissions.viewEmail} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Texto" name="canPostText" checked={formData.permissions.canPostText} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Imagem" name="canPostImage" checked={formData.permissions.canPostImage} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Vídeo" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                </div>
-                            </section>
+                        {/* Seletor de Abas de Permissões */}
+                        <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-3 mb-6">
+                            {[
+                                { id: 'social', label: 'Social', icon: SparklesIcon },
+                                { id: 'rh', label: 'RH', icon: BuildingOfficeIcon },
+                                { id: 'ti', label: 'Suporte & T.I.', icon: LifebuoyIcon },
+                                { id: 'rh_admin', label: 'RH Admin Sensível', icon: ShieldCheckIcon },
+                                { id: 'whatspanda', label: 'WhatsPanda & E-mail', icon: ChatBubbleLeftRightIcon }
+                            ].map(tab => {
+                                const Icon = tab.icon;
+                                const active = permissionTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setPermissionTab(tab.id as any)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                            active
+                                                ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm dark:bg-brand-primary/20 dark:text-emerald-400'
+                                                : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/50 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                                        }`}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
-                            {/* Grupo: Corporativo */}
-                            <section>
-                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <BuildingOfficeIcon className="w-3 h-3" /> Corporativo & RH
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Calendário" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agenda (Agendamentos e Eventos)" name="viewScheduling" checked={formData.permissions.viewScheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Formulários" name="viewForms" checked={formData.permissions.viewForms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Reconhecimentos" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Gestão de Projetos" name="viewProjects" checked={formData.permissions.viewProjects} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                        <div className="space-y-6">
+                            {/* Grupo: Social */}
+                            {permissionTab === 'social' && (
+                                <div className="space-y-6 animate-fade-in-up">
+                                    <section>
+                                        <h5 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <SparklesIcon className="w-3 h-3" /> Redes e Comunicação
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <PermissionToggle icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} label="Chat & Mensagens" name="viewMessages" checked={formData.permissions.viewMessages} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<EnvelopeIcon className="w-4 h-4" />} label="E-mail Corporativo" name="viewEmail" checked={formData.permissions.viewEmail} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Texto" name="canPostText" checked={formData.permissions.canPostText} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Imagem" name="canPostImage" checked={formData.permissions.canPostImage} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Vídeo" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        </div>
+                                    </section>
+
+                                    <section className="bg-emerald-50/30 dark:bg-emerald-950/10 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <h5 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <SparklesIcon className="w-3 h-3" /> Comunicação Avançada
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                                            <PermissionToggle 
+                                                icon={<SparklesIcon className="w-4 h-4" />} 
+                                                label="Poder Chamar Atenção (Nudge)" 
+                                                name="can_nudge" 
+                                                checked={formData.can_nudge} 
+                                                onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                            />
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase px-1">Cooldown Nudge (segundos)</label>
+                                                <input 
+                                                    type="number" 
+                                                    name="nudge_cooldown" 
+                                                    value={formData.nudge_cooldown} 
+                                                    onChange={handleChange} 
+                                                    min="0"
+                                                    className="w-full bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 dark:text-white transition-all outline-none" 
+                                                />
+                                            </div>
+                                        </div>
+                                    </section>
                                 </div>
-                            </section>
+                            )}
+
+                            {/* Grupo: Corporativo & RH */}
+                            {permissionTab === 'rh' && (
+                                <section className="animate-fade-in-up">
+                                    <h5 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <BuildingOfficeIcon className="w-3 h-3" /> Corporativo & RH
+                                    </h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Calendário" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agenda (Agendamentos e Eventos)" name="viewScheduling" checked={formData.permissions.viewScheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Formulários" name="viewForms" checked={formData.permissions.viewForms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Reconhecimentos" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Gestão de Projetos" name="viewProjects" checked={formData.permissions.viewProjects} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Grupo: Tecnologia */}
-                            <section>
-                                <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <LifebuoyIcon className="w-3 h-3" /> Suporte & T.I.
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle icon={<TicketIcon className="w-4 h-4" />} label="Meus Chamados" name="openTickets" checked={formData.permissions.openTickets} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Solicitar Equipamento" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Dashboard T.I. (Admin)" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                </div>
-                            </section>
+                            {permissionTab === 'ti' && (
+                                <section className="animate-fade-in-up">
+                                    <h5 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <LifebuoyIcon className="w-3 h-3" /> Suporte & T.I.
+                                    </h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <PermissionToggle icon={<TicketIcon className="w-4 h-4" />} label="Meus Chamados" name="openTickets" checked={formData.permissions.openTickets} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Solicitar Equipamento" name="openTiRequests" checked={formData.permissions.openTiRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<Cog6ToothIcon className="w-4 h-4" />} label="Dashboard T.I. (Admin)" name="viewTiDashboard" checked={formData.permissions.viewTiDashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Grupo: Gestão RH Crítica */}
-                            <section className="bg-red-50/50 p-4 rounded-2xl border border-red-100">
-                                <h5 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <ShieldCheckIcon className="w-3 h-3" /> Gestão Sensível (RH Admin)
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Ver Dados Confidenciais" name="viewEmployeeDetails" checked={formData.permissions.viewEmployeeDetails} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<PencilIcon className="w-4 h-4" />} label="Editar Funcionários" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<TrashIcon className="w-4 h-4" />} label="Excluir Funcionários" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aprovar/Rejeitar Férias" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Visualizar Banco de Horas" name="viewTimeBank" checked={formData.permissions.viewTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Gerenciar Banco de Horas" name="manageTimeBank" checked={formData.permissions.manageTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Gerenciar Benefícios de Funcionários" name="viewEmployeeBenefitsAdmin" checked={formData.permissions.viewEmployeeBenefitsAdmin} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Visualizar Desempenho e Metas" name="viewPerformance" checked={formData.permissions.viewPerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                    <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Gerenciar Desempenho e Metas" name="managePerformance" checked={formData.permissions.managePerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                </div>
-                            </section>
-                            
-                            <section className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50">
-                                <h5 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <SparklesIcon className="w-3 h-3" /> Comunicação Avançada
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                                    <PermissionToggle 
-                                        icon={<SparklesIcon className="w-4 h-4" />} 
-                                        label="Poder Chamar Atenção (Nudge)" 
-                                        name="can_nudge" 
-                                        checked={formData.can_nudge} 
-                                        onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
-                                    />
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase px-1">Cooldown Nudge (segundos)</label>
-                                        <input 
-                                            type="number" 
-                                            name="nudge_cooldown" 
-                                            value={formData.nudge_cooldown} 
-                                            onChange={handleChange} 
-                                            min="0"
-                                            className="w-full bg-white border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
-                                        />
+                            {permissionTab === 'rh_admin' && (
+                                <section className="bg-red-50/50 dark:bg-red-950/10 p-4 rounded-2xl border border-red-100 dark:border-red-900/30 animate-fade-in-up">
+                                    <h5 className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <ShieldCheckIcon className="w-3 h-3" /> Gestão Sensível (RH Admin)
+                                    </h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Ver Dados Confidenciais" name="viewEmployeeDetails" checked={formData.permissions.viewEmployeeDetails} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<PencilIcon className="w-4 h-4" />} label="Editar Funcionários" name="editEmployeeProfile" checked={formData.permissions.editEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<TrashIcon className="w-4 h-4" />} label="Excluir Funcionários" name="deleteEmployeeProfile" checked={formData.permissions.deleteEmployeeProfile} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Aprovar/Rejeitar Férias" name="manageVacationRequests" checked={formData.permissions.manageVacationRequests} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Visualizar Banco de Horas" name="viewTimeBank" checked={formData.permissions.viewTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Gerenciar Banco de Horas" name="manageTimeBank" checked={formData.permissions.manageTimeBank} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Gerenciar Benefícios de Funcionários" name="viewEmployeeBenefitsAdmin" checked={formData.permissions.viewEmployeeBenefitsAdmin} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Visualizar Desempenho e Metas" name="viewPerformance" checked={formData.permissions.viewPerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Gerenciar Desempenho e Metas" name="managePerformance" checked={formData.permissions.managePerformance} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                     </div>
-                                </div>
-                            </section>
+                                </section>
+                            )}
 
-                            {/* Grupo: WhatsPanda */}
-                            <section className={`p-4 rounded-2xl border transition-all ${formData.is_whatsapp_agent ? 'bg-emerald-50/50 border-emerald-200' : 'bg-gray-50/50 border-gray-100'}`}>
-                                <h5 className={`text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 ${formData.is_whatsapp_agent ? 'text-emerald-600' : 'text-gray-400'}`}>
-                                    <ChatBubbleLeftRightIcon className="w-3 h-3" /> WhatsPanda (Atendimento)
-                                </h5>
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div className="max-w-md">
-                                        <PermissionToggle 
-                                            icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} 
-                                            label="Agente WhatsPanda" 
-                                            name="is_whatsapp_agent" 
-                                            checked={formData.is_whatsapp_agent} 
-                                            onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
-                                        />
-                                    </div>
+                            {/* Grupo: WhatsPanda & E-mail */}
+                            {permissionTab === 'whatspanda' && (
+                                <div className="space-y-6 animate-fade-in-up">
+                                    <section className={`p-4 rounded-2xl border transition-all ${formData.is_whatsapp_agent ? 'bg-emerald-50/50 border-emerald-250 dark:bg-emerald-950/10 dark:border-emerald-900/30' : 'bg-gray-50/50 border-gray-100 dark:bg-gray-800/10 dark:border-gray-800'}`}>
+                                        <h5 className={`text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 ${formData.is_whatsapp_agent ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                                            <ChatBubbleLeftRightIcon className="w-3 h-3" /> WhatsPanda (Atendimento)
+                                        </h5>
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div className="max-w-md">
+                                                <PermissionToggle 
+                                                    icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />} 
+                                                    label="Agente WhatsPanda" 
+                                                    name="is_whatsapp_agent" 
+                                                    checked={formData.is_whatsapp_agent} 
+                                                    onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                                />
+                                            </div>
 
-                                    {formData.is_whatsapp_agent && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
-                                            {/* Permissões Gerais */}
-                                            <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Permissões do Agente</p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                    {[
-                                                        { key: 'can_view_contacts', label: 'Ver Contatos' },
-                                                        { key: 'can_edit_contacts', label: 'Editar Contatos' },
-                                                        { key: 'can_view_chats', label: 'Ver Chats' },
-                                                        { key: 'can_send_messages', label: 'Enviar Mensagens' },
-                                                        { key: 'can_send_media', label: 'Enviar Mídia' },
-                                                        { key: 'can_manage_settings', label: 'Gerenciar Configs' },
-                                                    ].map(perm => (
-                                                        <label key={perm.key} className="flex items-center space-x-2 text-[11px] text-gray-600 bg-gray-50 p-1.5 rounded-lg border border-transparent hover:border-emerald-100 cursor-pointer transition-colors">
+                                            {formData.is_whatsapp_agent && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
+                                                    {/* Permissões Gerais */}
+                                                    <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-emerald-100 dark:border-emerald-900/35 shadow-sm">
+                                                        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Permissões do Agente</p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                            {[
+                                                                { key: 'can_view_contacts', label: 'Ver Contatos' },
+                                                                { key: 'can_edit_contacts', label: 'Editar Contatos' },
+                                                                { key: 'can_view_chats', label: 'Ver Chats' },
+                                                                { key: 'can_send_messages', label: 'Enviar Mensagens' },
+                                                                { key: 'can_send_media', label: 'Enviar Mídia' },
+                                                                { key: 'can_manage_settings', label: 'Gerenciar Configs' },
+                                                            ].map(perm => (
+                                                                <label key={perm.key} className="flex items-center space-x-2 text-[11px] text-gray-655 bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded-lg border border-transparent hover:border-emerald-100 cursor-pointer transition-colors dark:text-gray-300">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={(formData.whatspanda_permissions as any)?.[perm.key]} 
+                                                                        onChange={(e) => setFormData(prev => ({
+                                                                            ...prev,
+                                                                            whatspanda_permissions: {
+                                                                                ...(prev.whatspanda_permissions as any),
+                                                                                [perm.key]: e.target.checked
+                                                                            }
+                                                                        }))}
+                                                                        className="rounded text-emerald-500 w-3.5 h-3.5"
+                                                                    />
+                                                                    <span className="font-medium">{perm.label}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Conexões (Canais Permitidos) */}
+                                                    <div className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-emerald-100 dark:border-emerald-900/35 shadow-sm flex flex-col gap-3">
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Canais Vinculados</p>
+                                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">Escolha quais números este agente pode acessar e responder.</p>
+                                                        </div>
+                                                        
+                                                        <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                                                            {channels.map(ch => (
+                                                                <label key={ch.id} className="flex items-center space-x-3 p-2 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-emerald-55 dark:hover:bg-emerald-950/20 cursor-pointer transition-colors">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={((formData.whatspanda_permissions as any)?.allowed_channels || []).includes(ch.id)}
+                                                                        onChange={(e) => {
+                                                                            const current = (formData.whatspanda_permissions as any)?.allowed_channels || [];
+                                                                            const updated = e.target.checked ? [...current, ch.id] : current.filter((id: string) => id !== ch.id);
+                                                                            setFormData(prev => ({
+                                                                                ...prev,
+                                                                                whatspanda_permissions: {
+                                                                                    ...(prev.whatspanda_permissions as any),
+                                                                                    allowed_channels: updated
+                                                                                }
+                                                                            }));
+                                                                        }}
+                                                                        className="rounded text-emerald-500 focus:ring-emerald-500" 
+                                                                    />
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{ch.instance_name || 'Instância sem nome'}</span>
+                                                                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{ch.phone_number || 'Sem número'}</span>
+                                                                    </div>
+                                                                </label>
+                                                            ))}
+                                                            {channels.length === 0 && (
+                                                                <span className="text-[11px] text-red-500 bg-red-50 dark:bg-red-950/20 p-2 rounded border border-red-100 dark:border-red-900/35">Nenhum WhatsApp conectado na empresa.</span>
+                                                            )}
+                                                        </div>
+
+                                                        <label className="flex items-start space-x-3 p-2 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-105 dark:border-blue-900/20 rounded-lg cursor-pointer mt-auto">
                                                             <input 
                                                                 type="checkbox" 
-                                                                checked={(formData.whatspanda_permissions as any)?.[perm.key]} 
+                                                                checked={(formData.whatspanda_permissions as any)?.can_connect_own_whatsapp || false}
                                                                 onChange={(e) => setFormData(prev => ({
-                                                                    ...prev,
+                                                                    ...prev, 
                                                                     whatspanda_permissions: {
-                                                                        ...(prev.whatspanda_permissions as any),
-                                                                        [perm.key]: e.target.checked
+                                                                        ...(prev.whatspanda_permissions as any), 
+                                                                        can_connect_own_whatsapp: e.target.checked
                                                                     }
                                                                 }))}
-                                                                className="rounded text-emerald-500 w-3.5 h-3.5"
-                                                            />
-                                                            <span className="font-medium">{perm.label}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* Conexões (Canais Permitidos) */}
-                                            <div className="p-3 bg-white rounded-xl border border-emerald-100 shadow-sm flex flex-col gap-3">
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Canais Vinculados</p>
-                                                    <p className="text-[10px] text-gray-400 leading-tight">Escolha quais números este agente pode acessar e responder.</p>
-                                                </div>
-                                                
-                                                <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                                                    {channels.map(ch => (
-                                                        <label key={ch.id} className="flex items-center space-x-3 p-2 border border-gray-100 rounded-lg hover:bg-emerald-50 cursor-pointer transition-colors">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={((formData.whatspanda_permissions as any)?.allowed_channels || []).includes(ch.id)}
-                                                                onChange={(e) => {
-                                                                    const current = (formData.whatspanda_permissions as any)?.allowed_channels || [];
-                                                                    const updated = e.target.checked ? [...current, ch.id] : current.filter((id: string) => id !== ch.id);
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        whatspanda_permissions: {
-                                                                            ...(prev.whatspanda_permissions as any),
-                                                                            allowed_channels: updated
-                                                                        }
-                                                                    }));
-                                                                }}
-                                                                className="rounded text-emerald-500 focus:ring-emerald-500" 
+                                                                className="rounded text-blue-500 mt-0.5" 
                                                             />
                                                             <div className="flex flex-col">
-                                                                <span className="text-xs font-bold text-gray-700">{ch.instance_name || 'Instância sem nome'}</span>
-                                                                <span className="text-[10px] text-gray-500">{ch.phone_number || 'Sem número'}</span>
+                                                                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-400">Conectar o Próprio WhatsApp</span>
+                                                                <span className="text-[10px] text-blue-600/70 dark:text-blue-500 leading-tight">O usuário poderá escanear o QR Code de seu celular pessoal ou corporativo no painel.</span>
                                                             </div>
                                                         </label>
-                                                    ))}
-                                                    {channels.length === 0 && (
-                                                        <span className="text-[11px] text-red-500 bg-red-50 p-2 rounded border border-red-100">Nenhum WhatsApp conectado na empresa.</span>
-                                                    )}
-                                                </div>
-
-                                                <label className="flex items-start space-x-3 p-2 bg-blue-50/50 border border-blue-100 rounded-lg cursor-pointer mt-auto">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={(formData.whatspanda_permissions as any)?.can_connect_own_whatsapp || false}
-                                                        onChange={(e) => setFormData(prev => ({
-                                                            ...prev, 
-                                                            whatspanda_permissions: {
-                                                                ...(prev.whatspanda_permissions as any), 
-                                                                can_connect_own_whatsapp: e.target.checked
-                                                            }
-                                                        }))}
-                                                        className="rounded text-blue-500 mt-0.5" 
-                                                    />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[11px] font-bold text-blue-800">Conectar o Próprio WhatsApp</span>
-                                                        <span className="text-[10px] text-blue-600/70 leading-tight">O usuário poderá escanear o QR Code de seu celular pessoal ou corporativo no painel.</span>
                                                     </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
+
+                                    {/* Grupo: PandaMail */}
+                                    <section className="bg-slate-50/50 dark:bg-gray-800/10 p-4 rounded-2xl border border-slate-200 dark:border-gray-800">
+                                        <h5 className="text-[10px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <EnvelopeIcon className="w-3 h-3" /> PandaMail (E-mail Corporativo)
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <PermissionToggle 
+                                                icon={<EnvelopeIcon className="w-4 h-4" />} 
+                                                label="Acesso ao Módulo PandaMail" 
+                                                name="viewEmail" 
+                                                checked={formData.permissions.viewEmail} 
+                                                onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} 
+                                            />
+                                            <PermissionToggle 
+                                                icon={<Cog6ToothIcon className="w-4 h-4" />} 
+                                                label="Pode Adicionar/Remover Contas" 
+                                                name="can_manage_accounts" 
+                                                checked={formData.email_permissions.can_manage_accounts} 
+                                                onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
+                                            />
+                                            <PermissionToggle 
+                                                icon={<ShieldCheckIcon className="w-4 h-4" />} 
+                                                label="Ver Todas as Contas da Empresa" 
+                                                name="can_view_all_accounts" 
+                                                checked={formData.email_permissions.can_view_all_accounts} 
+                                                onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
+                                            />
+                                            <div className="flex flex-col gap-1.5 p-3 bg-white dark:bg-gray-800 rounded-xl border border-slate-250 dark:border-gray-700">
+                                                <label className="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase px-1">
+                                                    Limite de Contas de E-mail (Max: {planEmailLimit})
                                                 </label>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="Ex: 2"
+                                                    min="0"
+                                                    value={formData.email_permissions.account_limit || 0} 
+                                                    onChange={(e) => {
+                                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                                        setFormData(p => ({ 
+                                                            ...p, 
+                                                            email_permissions: { 
+                                                                ...p.email_permissions, 
+                                                                account_limit: val 
+                                                            } 
+                                                        }));
+                                                    }} 
+                                                    className="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 dark:text-white outline-none transition-all" 
+                                                />
+                                                <p className="text-[9px] text-slate-400 dark:text-gray-500 italic px-1 leading-tight">
+                                                    Máximo de contas que este usuário pode cadastrar. (Disponível no plano: {remainingLimit} livre(s)).
+                                                </p>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-150 dark:border-gray-700 shadow-sm">
+                                                <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase px-1">Equipe / Setor</label>
+                                                <input type="text" placeholder="Ex: Comercial" value={formData.team} onChange={(e) => setFormData(p => ({ ...p, team: e.target.value }))} className="w-full bg-gray-50 dark:bg-gray-700 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 dark:text-white outline-none transition-all" />
+                                            </div>
+
+                                            <div className="sm:col-span-2 p-3 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-slate-200 dark:border-gray-700">
+                                                <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <p className="text-[10px] text-slate-400 dark:text-gray-500 italic">As contas disponíveis aparecerão aqui para seleção após serem cadastradas no PandaMail.</p>
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
+                                    </section>
                                 </div>
-                            </section>
-
-                            {/* Grupo: PandaMail */}
-                            <section className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
-                                <h5 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <EnvelopeIcon className="w-3 h-3" /> PandaMail (E-mail Corporativo)
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <PermissionToggle 
-                                        icon={<EnvelopeIcon className="w-4 h-4" />} 
-                                        label="Acesso ao Módulo PandaMail" 
-                                        name="viewEmail" 
-                                        checked={formData.permissions.viewEmail} 
-                                        onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} 
-                                    />
-                                    <PermissionToggle 
-                                        icon={<Cog6ToothIcon className="w-4 h-4" />} 
-                                        label="Pode Adicionar/Remover Contas" 
-                                        name="can_manage_accounts" 
-                                        checked={formData.email_permissions.can_manage_accounts} 
-                                        onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
-                                    />
-                                    <PermissionToggle 
-                                        icon={<ShieldCheckIcon className="w-4 h-4" />} 
-                                        label="Ver Todas as Contas da Empresa" 
-                                        name="can_view_all_accounts" 
-                                        checked={formData.email_permissions.can_view_all_accounts} 
-                                        onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
-                                    />
-                                    <div className="flex flex-col gap-1.5 p-3 bg-white/50 rounded-xl border border-slate-200">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase px-1">
-                                            Limite de Contas de E-mail (Max: {planEmailLimit})
-                                        </label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="Ex: 2"
-                                            min="0"
-                                            value={formData.email_permissions.account_limit || 0} 
-                                            onChange={(e) => {
-                                                const val = Math.max(0, parseInt(e.target.value) || 0);
-                                                setFormData(p => ({ 
-                                                    ...p, 
-                                                    email_permissions: { 
-                                                        ...p.email_permissions, 
-                                                        account_limit: val 
-                                                    } 
-                                                }));
-                                            }} 
-                                            className="w-full bg-white border-slate-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" 
-                                        />
-                                        <p className="text-[9px] text-slate-400 italic px-1 leading-tight">
-                                            Máximo de contas que este usuário pode cadastrar. (Disponível no plano: {remainingLimit} livre(s)).
-                                        </p>
-                                    </div>
-
-                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Equipe / Setor</label>
-                                        <input type="text" placeholder="Ex: Comercial" value={formData.team} onChange={(e) => setFormData(p => ({ ...p, team: e.target.value }))} className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all" />
-                                    </div>
-
-                                    <div className="sm:col-span-2 p-3 bg-white/50 rounded-xl border border-dashed border-slate-200">
-                                        <p className="text-[10px] text-gray-500 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <p className="text-[10px] text-slate-400 italic">As contas disponíveis aparecerão aqui para seleção após serem cadastradas no PandaMail.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
+                            )}
                         </div>
                     </div>
 

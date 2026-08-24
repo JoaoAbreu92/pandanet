@@ -341,4 +341,58 @@
   font-weight: 600 !important;
 }
 
+/* --- MODO ESCURO CONTRASTE & LEGIBILIDADE POLISH --- */
+@layer base {
+  .dark .text-slate-500,
+  .dark .text-gray-500,
+  .dark .text-slate-400,
+  .dark .text-gray-400 {
+    color: #94a3b8 !important; /* Brilho slate-400 */
+  }
+
+  .dark .text-slate-650,
+  .dark .text-slate-600,
+  .dark .text-gray-600 {
+    color: #cbd5e1 !important; /* Brilho slate-300 */
+  }
+
+  .dark .text-slate-700,
+  .dark .text-gray-700,
+  .dark .text-slate-800,
+  .dark .text-gray-800 {
+    color: #f1f5f9 !important; /* Quase branco */
+  }
+
+  .dark input,
+  .dark select,
+  .dark textarea {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #64748b !important;
+  }
+
+  .dark .bg-gray-50,
+  .dark .bg-slate-50 {
+    background-color: #0f172a !important;
+  }
+
+  .dark .border-gray-200,
+  .dark .border-slate-200 {
+    border-color: #1e293b !important;
+  }
+
+  /* Ajustes para Enquetes e Painéis de Admin */
+  .dark .company-poll,
+  .dark .poll-container,
+  .dark .admin-panel,
+  .dark .user-manager-tab {
+    color: #f8fafc !important;
+  }
+}
+
 

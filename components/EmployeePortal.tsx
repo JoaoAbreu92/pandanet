@@ -884,7 +884,6 @@ const EmployeePortal: React.FC = () => {
                                             })()}
                                         </div>
 
-                                        {/* Coluna 3: Gráfico de Competências / Notas */}
                                         {(() => {
                                             const competencia = evaluations.find(e => e.type === 'competencia');
                                             if (!competencia) return (
@@ -893,30 +892,65 @@ const EmployeePortal: React.FC = () => {
                                                 </div>
                                             );
 
-                                            const radarData = [
-                                                { name: 'Comunicação', nota: Number(competencia.score_communication || 0) },
-                                                { name: 'Qualidade', nota: Number(competencia.score_quality || 0) },
-                                                { name: 'Equipe', nota: Number(competencia.score_teamwork || 0) },
-                                                { name: 'Proatividade', nota: Number(competencia.score_proactivity || 0) }
-                                            ];
+                                            let radarData: { name: string, nota: number, displayNota: string }[] = [];
+                                            let maxScale = 5;
+                                            let validScoresSum = 0;
+                                            let validScoresCount = 0;
+
+                                            if (competencia.custom_scores && Object.keys(competencia.custom_scores).length > 0) {
+                                                Object.entries(competencia.custom_scores).forEach(([name, val]: [string, any]) => {
+                                                    if (val === 'N/A') {
+                                                        radarData.push({ name, nota: 0, displayNota: 'N/A' });
+                                                    } else {
+                                                        const numVal = Number(val) || 0;
+                                                        radarData.push({ name, nota: numVal, displayNota: numVal.toString() });
+                                                        validScoresSum += numVal;
+                                                        validScoresCount++;
+                                                        if (numVal > 5) {
+                                                            maxScale = 10;
+                                                        }
+                                                    }
+                                                });
+                                            } else {
+                                                const scores = [
+                                                    { name: 'Comunicação', nota: Number(competencia.score_communication || 0) },
+                                                    { name: 'Qualidade', nota: Number(competencia.score_quality || 0) },
+                                                    { name: 'Equipe', nota: Number(competencia.score_teamwork || 0) },
+                                                    { name: 'Proatividade', nota: Number(competencia.score_proactivity || 0) }
+                                                ];
+                                                scores.forEach(s => {
+                                                    radarData.push({ name: s.name, nota: s.nota, displayNota: s.nota.toString() });
+                                                    validScoresSum += s.nota;
+                                                    validScoresCount++;
+                                                });
+                                            }
+
+                                            const averageScore = validScoresCount > 0 ? (validScoresSum / validScoresCount).toFixed(1) : 'N/A';
 
                                             return (
                                                 <div className="bg-white dark:bg-slate-900 border border-gray-150 dark:border-white/5 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col justify-between">
                                                     <div>
-                                                        <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                            <StarIcon className="w-5 h-5 text-amber-500" />
-                                                            Competências ({competencia.title})
-                                                        </h4>
-                                                        <p className="text-[10px] text-gray-400 leading-tight">Nota de desempenho atribuída pelo gestor (escala de 1 a 5).</p>
+                                                        <div className="flex justify-between items-start">
+                                                            <h4 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                                <StarIcon className="w-5 h-5 text-amber-500" />
+                                                                Competências ({competencia.title})
+                                                            </h4>
+                                                            <div className="text-right">
+                                                                <span className="text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-xl">
+                                                                    Média: {averageScore} / {maxScale}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 leading-tight">Nota de desempenho atribuída pelo gestor (escala de 1 a {maxScale}).</p>
                                                     </div>
 
                                                     <div className="h-56 w-full flex items-center justify-center my-4">
                                                         <ResponsiveContainer width="100%" height="100%">
                                                             <BarChart data={radarData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
                                                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
-                                                                <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 9, fill: '#94A3B8' }} />
-                                                                <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#94A3B8' }} />
-                                                                <Tooltip />
+                                                                <XAxis type="number" domain={[0, maxScale]} tick={{ fontSize: 9, fill: '#94A3B8' }} />
+                                                                <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#94A3B8' }} width={80} />
+                                                                <Tooltip formatter={(value, name, props) => [props.payload.displayNota, "Nota"]} />
                                                                 <Bar dataKey="nota" fill="#F59E0B" radius={[0, 4, 4, 0]} />
                                                             </BarChart>
                                                         </ResponsiveContainer>

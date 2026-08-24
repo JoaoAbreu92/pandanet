@@ -39,6 +39,10 @@ const Carousel: React.FC = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
 
+    if (currentUser?.company?.custom_features?.banners === false) {
+        return null;
+    }
+
     const fetchBanners = async () => {
         if (!currentUser?.company_id) return;
         try {

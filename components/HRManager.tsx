@@ -77,9 +77,31 @@ const HRManager: React.FC = () => {
   const [evProact, setEvProact] = useState('5');
   const [evFeedbackText, setEvFeedbackText] = useState('');
   const [savingEv, setSavingEv] = useState(false);
+  const [competencies, setCompetencies] = useState<string[]>([]);
+  const [newCompetency, setNewCompetency] = useState('');
+  const [showCompetenciesModal, setShowCompetenciesModal] = useState(false);
+  const [customScores, setCustomScores] = useState<Record<string, string>>({});
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3000);
+  };
+
+  const fetchCompetencies = async () => {
+    if (!profile?.company_id) return;
+    const { data, error } = await supabase
+      .from('companies')
+      .select('competencies')
+      .eq('id', profile.company_id)
+      .single();
+    if (data && data.competencies) {
+      setCompetencies(data.competencies);
+      // Initialize scores
+      const initialScores: Record<string, string> = {};
+      data.competencies.forEach((c: string) => {
+        initialScores[c] = '10';
+      });
+      setCustomScores(initialScores);
+    }
   };
 
   useEffect(() => { if (profile?.company_id) { fetchAll(); } }, [profile?.company_id]);
@@ -93,7 +115,8 @@ const HRManager: React.FC = () => {
       fetchPayslips(),
       fetchTimeBank(),
       fetchEmployeeBenefits(),
-      fetchEvaluations()
+      fetchEvaluations(),
+      fetchCompetencies()
     ]);
     setLoading(false);
   };
@@ -206,9 +229,48 @@ const HRManager: React.FC = () => {
     else { showToast('Benefício excluído.'); fetchEmployeeBenefits(); }
   };
 
+  const addCompetency = async () => {
+    if (!newCompetency.trim()) return;
+    if (competencies.length >= 10) { showToast('Máximo de 10 competências atingido.', false); return; }
+    if (competencies.includes(newCompetency.trim())) { showToast('Esta competência já existe.', false); return; }
+    
+    const updated = [...competencies, newCompetency.trim()];
+    const { error } = await supabase
+      .from('companies')
+      .update({ competencies: updated })
+      .eq('id', profile!.company_id!);
+      
+    if (error) {
+      showToast('Erro ao salvar competência: ' + error.message, false);
+    } else {
+      setCompetencies(updated);
+      setNewCompetency('');
+      setCustomScores(prev => ({ ...prev, [newCompetency.trim()]: '10' }));
+      showToast('Competência adicionada!');
+    }
+  };
+
+  const removeCompetency = async (comp: string) => {
+    const updated = competencies.filter(c => c !== comp);
+    const { error } = await supabase
+      .from('companies')
+      .update({ competencies: updated })
+      .eq('id', profile!.company_id!);
+      
+    if (error) {
+      showToast('Erro ao remover competência: ' + error.message, false);
+    } else {
+      setCompetencies(updated);
+      showToast('Competência removida!');
+    }
+  };
+
   const saveEvaluation = async () => {
     if (!evEmployee || !evTitle) { showToast('Selecione o funcionário e insira o título.', false); return; }
     setSavingEv(true);
+    
+    const isCustom = competencies.length > 0;
+    
     const { error } = await supabase.from('hr_evaluations').insert({
       company_id: profile!.company_id!,
       employee_id: evEmployee,
@@ -216,10 +278,11 @@ const HRManager: React.FC = () => {
       type: evType,
       status: evStatus,
       progress: evType === 'meta' ? parseFloat(evProgress) : 0,
-      score_communication: evType === 'competencia' ? parseFloat(evComm) : null,
-      score_quality: evType === 'competencia' ? parseFloat(evQual) : null,
-      score_teamwork: evType === 'competencia' ? parseFloat(evTeam) : null,
-      score_proactivity: evType === 'competencia' ? parseFloat(evProact) : null,
+      score_communication: (evType === 'competencia' && !isCustom) ? parseFloat(evComm) : null,
+      score_quality: (evType === 'competencia' && !isCustom) ? parseFloat(evQual) : null,
+      score_teamwork: (evType === 'competencia' && !isCustom) ? parseFloat(evTeam) : null,
+      score_proactivity: (evType === 'competencia' && !isCustom) ? parseFloat(evProact) : null,
+      custom_scores: (evType === 'competencia' && isCustom) ? customScores : {},
       feedback_text: evFeedbackText || null,
       created_by: profile!.id
     });
@@ -228,6 +291,9 @@ const HRManager: React.FC = () => {
     else {
       showToast('Avaliação/Meta cadastrada!');
       setEvTitle(''); setEvProgress('0'); setEvFeedbackText('');
+      const resetScores: Record<string, string> = {};
+      competencies.forEach(c => { resetScores[c] = '10'; });
+      setCustomScores(resetScores);
       fetchEvaluations();
     }
   };
@@ -768,27 +834,60 @@ const HRManager: React.FC = () => {
               )}
 
               {evType === 'competencia' && (
-                <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-800">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-505 block mb-1">Comunicação (1-5)</label>
-                    <input type="number" min="1" max="5" step="0.5" value={evComm} onChange={e => setEvComm(e.target.value)}
-                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                <div className="md:col-span-2 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-400 dark:text-gray-550 uppercase tracking-wider block">Notas das Competências</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowCompetenciesModal(true)} 
+                      className="text-xs text-brand-primary hover:underline font-bold"
+                    >
+                      ⚙️ Configurar Competências ({competencies.length}/10)
+                    </button>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-550 block mb-1">Qualidade (1-5)</label>
-                    <input type="number" min="1" max="5" step="0.5" value={evQual} onChange={e => setEvQual(e.target.value)}
-                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-550 block mb-1">Equipe (1-5)</label>
-                    <input type="number" min="1" max="5" step="0.5" value={evTeam} onChange={e => setEvTeam(e.target.value)}
-                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-550 block mb-1">Proatividade (1-5)</label>
-                    <input type="number" min="1" max="5" step="0.5" value={evProact} onChange={e => setEvProact(e.target.value)}
-                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
-                  </div>
+                  
+                  {competencies.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-800">
+                      {competencies.map(comp => (
+                        <div key={comp} className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">{comp}</label>
+                          <select 
+                            value={customScores[comp] || '10'} 
+                            onChange={e => setCustomScores(prev => ({ ...prev, [comp]: e.target.value }))}
+                            className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                          >
+                            {Array.from({ length: 10 }, (_, i) => i + 1).map(val => (
+                              <option key={val} value={val.toString()}>{val}</option>
+                            ))}
+                            <option value="N/A">N/A (Não se aplica)</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border dark:border-slate-800">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-505 block mb-1">Comunicação (1-5)</label>
+                        <input type="number" min="1" max="5" step="0.5" value={evComm} onChange={e => setEvComm(e.target.value)}
+                          className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-550 block mb-1">Qualidade (1-5)</label>
+                        <input type="number" min="1" max="5" step="0.5" value={evQual} onChange={e => setEvQual(e.target.value)}
+                          className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-550 block mb-1">Equipe (1-5)</label>
+                        <input type="number" min="1" max="5" step="0.5" value={evTeam} onChange={e => setEvTeam(e.target.value)}
+                          className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-550 block mb-1">Proatividade (1-5)</label>
+                        <input type="number" min="1" max="5" step="0.5" value={evProact} onChange={e => setEvProact(e.target.value)}
+                          className="w-full border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs bg-white dark:bg-slate-800 text-gray-955 dark:text-white focus:outline-none" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -814,7 +913,13 @@ const HRManager: React.FC = () => {
                     <p className="text-xs text-gray-400 dark:text-gray-500">
                       Tipo: <span className="font-semibold uppercase text-[10px]">{ev.type}</span>
                       {ev.type === 'meta' && ` · Progresso: ${Number(ev.progress).toFixed(0)}%`}
-                      {ev.type === 'competencia' && ` · Notas: C:${ev.score_communication} Q:${ev.score_quality} E:${ev.score_teamwork} P:${ev.score_proactivity}`}
+                      {ev.type === 'competencia' && (
+                        ev.custom_scores && Object.keys(ev.custom_scores).length > 0 ? (
+                          ` · Notas: ` + Object.entries(ev.custom_scores).map(([k, v]) => `${k}:${v}`).join(', ')
+                        ) : (
+                          ` · Notas: C:${ev.score_communication} Q:${ev.score_quality} E:${ev.score_teamwork} P:${ev.score_proactivity}`
+                        )
+                      )}
                     </p>
                   </div>
                   <button onClick={() => deleteEvaluation(ev.id)}
@@ -823,6 +928,60 @@ const HRManager: React.FC = () => {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCompetenciesModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+            <button onClick={() => setShowCompetenciesModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white font-bold text-sm">X</button>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Competências da Empresa</h3>
+            
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newCompetency} 
+                  onChange={e => setNewCompetency(e.target.value)} 
+                  placeholder="Nova competência (ex: Liderança)"
+                  className="flex-1 border border-gray-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none"
+                />
+                <button 
+                  onClick={addCompetency}
+                  className="px-4 py-2 bg-brand-primary hover:bg-emerald-600 text-white rounded-xl text-sm font-bold transition-all"
+                >
+                  Adicionar
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400 dark:text-gray-550 italic leading-tight">Cadastre até 10 competências para avaliações de notas de 1 a 10 + N/A.</p>
+              
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {competencies.map(comp => (
+                  <div key={comp} className="flex justify-between items-center p-2.5 bg-gray-50 dark:bg-slate-800/40 rounded-xl border border-gray-150 dark:border-slate-800">
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{comp}</span>
+                    <button 
+                      onClick={() => removeCompetency(comp)} 
+                      className="text-xs font-bold text-red-500 hover:underline"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                ))}
+                {competencies.length === 0 && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-4">Nenhuma competência cadastrada. O sistema usará as competências padrão de 1 a 5.</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end mt-6">
+              <button 
+                onClick={() => setShowCompetenciesModal(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold uppercase transition-all"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>

@@ -35,7 +35,9 @@ const FormSubmissionsManager: React.FC = () => {
                 submittedAt: s.submitted_at,
                 startDate: s.start_date,
                 endDate: s.end_date,
-                reason: s.reason
+                reason: s.reason,
+                attachment_url: s.attachment_url,
+                attachment_name: s.attachment_name
             })));
         } catch (err) {
             console.error('Error fetching submissions:', err);
@@ -103,7 +105,17 @@ const FormSubmissionsManager: React.FC = () => {
                                             <span>{sub.requesterName}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">{sub.formType}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-850 dark:text-gray-200">{sub.formType}</span>
+                                            {sub.reason && <span className="text-xs text-gray-400 leading-tight mt-0.5">{sub.reason}</span>}
+                                            {sub.attachment_url && (
+                                                <a href={sub.attachment_url} target="_blank" rel="noreferrer" className="text-xs text-brand-primary font-bold hover:underline mt-1 flex items-center gap-1">
+                                                    📎 Atestado / Comprovante
+                                                </a>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4">
                                         {sub.startDate ? new Date(sub.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}
                                         {sub.endDate ? ` - ${new Date(sub.endDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : ''}

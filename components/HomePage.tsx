@@ -348,6 +348,16 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     const [latestMarketplaces, setLatestMarketplaces] = useState<any[]>([]);
     const [latestProjects, setLatestProjects] = useState<any[]>([]);
     
+    const projectsScrollRef = React.useRef<HTMLDivElement>(null);
+    const marketScrollRef = React.useRef<HTMLDivElement>(null);
+
+    const scrollContainer = (ref: React.RefObject<HTMLDivElement>, direction: 'left' | 'right') => {
+        if (ref.current) {
+            const scrollAmount = direction === 'left' ? -350 : 350;
+            ref.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        }
+    };
+    
     const [isEditingVideo, setIsEditingVideo] = useState(false);
     const [videoInputs, setVideoInputs] = useState<string[]>(['', '', '', '', '']);
 
@@ -399,7 +409,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 `)
                 .eq('company_id', companyId)
                 .order('created_at', { ascending: false })
-                .limit(3);
+                .limit(8);
 
             if (marketData && marketData.length > 0) {
                 setLatestMarketplaces(marketData.map((item: any) => ({
@@ -445,12 +455,12 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                     return isManager || hasAssignedTask;
                 });
 
-                setLatestProjects(userProjects.slice(0, 3));
+                setLatestProjects(userProjects.slice(0, 8));
             } else {
                 setLatestProjects([]);
             }
-        } catch (err) {
-            console.error('Error fetching highlights:', err);
+        } catch (error) {
+            console.error("Erro ao buscar destaques:", error);
         } finally {
             setLoading(false);
         }
@@ -459,6 +469,15 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     useEffect(() => {
         fetchHighlights();
     }, [companyId]);
+
+    useEffect(() => {
+        if (youtubeUrls.length > 2) {
+            const timer = setInterval(() => {
+                setActiveVideoIndex(prev => (prev + 1) % youtubeUrls.length);
+            }, 5000);
+            return () => clearInterval(timer);
+        }
+    }, [youtubeUrls]);
 
     const handleSaveVideo = async () => {
         if (!companyId) return;
@@ -503,207 +522,264 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     }
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 space-y-6 mt-8">
-            <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                🌟 Destaques da Empresa
-            </h4>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* 1. YouTube Video Player / Carousel (50% de largura no desktop) */}
-                <div className="space-y-3 lg:col-span-6 flex flex-col justify-between">
-                    <div className="flex justify-between items-center shrink-0">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                            <VideoCameraIcon className="w-3.5 h-3.5 text-brand-primary" />
-                            Vídeo em Destaque {youtubeUrls.length > 1 && `(${activeVideoIndex + 1}/${youtubeUrls.length})`}
-                        </span>
+        <div className="space-y-8 mt-8">
+            {/* Bloco 1: Vídeos em Destaque */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        📺 Vídeos em Destaque {youtubeUrls.length > 2 && `(${activeVideoIndex + 1}/${youtubeUrls.length})`}
+                    </h4>
+                    {canEditVideo && (
+                        <button
+                            onClick={() => setIsEditingVideo(true)}
+                            className="text-[11px] text-brand-primary font-bold hover:underline flex items-center gap-1 bg-brand-primary/10 px-3 py-1.5 rounded-full transition-all"
+                        >
+                            <Cog6ToothIcon className="w-3.5 h-3.5" />
+                            Configurar Vídeos
+                        </button>
+                    )}
+                </div>
+
+                {youtubeUrls.length === 0 ? (
+                    <div className="w-full h-40 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center p-4">
+                        <span className="text-2xl mb-1">📺</span>
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum vídeo configurado</span>
                         {canEditVideo && (
                             <button
                                 onClick={() => setIsEditingVideo(true)}
-                                className="text-[10px] text-brand-primary font-bold hover:underline flex items-center gap-0.5"
+                                className="mt-2 text-[10px] bg-brand-primary text-white px-3 py-1.5 rounded-full font-bold shadow-sm hover:bg-emerald-600 transition-all"
                             >
-                                <Cog6ToothIcon className="w-3 h-3" />
-                                Configurar
+                                Adicionar
                             </button>
                         )}
                     </div>
-                    
-                    <div className="flex-1 flex items-center justify-center">
-                        {embedUrl ? (
-                            <div className="relative group/carousel aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner bg-black">
+                ) : youtubeUrls.length === 1 ? (
+                    <div className="max-w-3xl mx-auto">
+                        <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-lg bg-black">
+                            <iframe
+                                src={getYouTubeEmbedUrl(youtubeUrls[0])}
+                                title="YouTube video player"
+                                frameBorder="0"
+                                className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
+                    </div>
+                ) : youtubeUrls.length === 2 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {youtubeUrls.map((url, idx) => (
+                            <div key={idx} className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-lg bg-black">
                                 <iframe
-                                    src={embedUrl}
-                                    title="YouTube video player"
+                                    src={getYouTubeEmbedUrl(url)}
+                                    title={`YouTube video player ${idx + 1}`}
                                     frameBorder="0"
                                     className="w-full h-full"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
                                 />
-                                
-                                {youtubeUrls.length > 1 && (
-                                    <>
-                                        {/* Seta Esquerda */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveVideoIndex(prev => (prev === 0 ? youtubeUrls.length - 1 : prev - 1));
-                                            }}
-                                            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
-                                            title="Vídeo Anterior"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                                            </svg>
-                                        </button>
-                                        
-                                        {/* Seta Direita */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveVideoIndex(prev => (prev === youtubeUrls.length - 1 ? 0 : prev + 1));
-                                            }}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
-                                            title="Próximo Vídeo"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                                            </svg>
-                                        </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    /* Carousel de 3 ou mais vídeos com transição automática de 5s */
+                    <div className="relative group/carousel aspect-video max-w-4xl mx-auto w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-xl bg-black">
+                        <iframe
+                            src={getYouTubeEmbedUrl(youtubeUrls[activeVideoIndex])}
+                            title="YouTube video player"
+                            frameBorder="0"
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        />
+                        
+                        {/* Seta Esquerda */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveVideoIndex(prev => (prev === 0 ? youtubeUrls.length - 1 : prev - 1));
+                            }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/70 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
+                            title="Vídeo Anterior"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        
+                        {/* Seta Direita */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveVideoIndex(prev => (prev === youtubeUrls.length - 1 ? 0 : prev + 1));
+                            }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/70 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
+                            title="Próximo Vídeo"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </button>
 
-                                        {/* Dots Indicadores */}
-                                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm z-10">
-                                            {youtubeUrls.map((_, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => setActiveVideoIndex(idx)}
-                                                    className={`w-2 h-2 rounded-full transition-all ${idx === activeVideoIndex ? 'bg-brand-primary w-4' : 'bg-white/60 hover:bg-white'}`}
-                                                    title={`Vídeo ${idx + 1}`}
-                                                />
-                                            ))}
+                        {/* Dots Indicadores */}
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 px-4 py-1.5 rounded-full backdrop-blur-sm z-10">
+                            {youtubeUrls.map((_, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setActiveVideoIndex(idx)}
+                                    className={`w-2.5 h-2.5 rounded-full transition-all ${idx === activeVideoIndex ? 'bg-brand-primary w-5' : 'bg-white/60 hover:bg-white'}`}
+                                    title={`Vídeo ${idx + 1}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Bloco 2: Últimos Projetos Ativos */}
+            {latestProjects.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 space-y-4">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            📂 Meus Projetos Ativos
+                        </h4>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => scrollContainer(projectsScrollRef, 'left')}
+                                className="p-1.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-850"
+                                title="Rolar para esquerda"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={() => scrollContainer(projectsScrollRef, 'right')}
+                                className="p-1.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-850"
+                                title="Rolar para direita"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        ref={projectsScrollRef}
+                        className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scroll-smooth snap-x snap-mandatory"
+                    >
+                        {latestProjects.map((project: any) => {
+                            const progress = project.task_count > 0 ? Math.round((project.completed_task_count / project.task_count) * 100) : 0;
+                            return (
+                                <div
+                                    key={project.id}
+                                    onClick={() => {
+                                        localStorage.setItem('pixel_selected_project', JSON.stringify(project));
+                                        onNavigate('projects');
+                                    }}
+                                    className="flex-shrink-0 w-80 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[110px] snap-start animate-in fade-in duration-300"
+                                    style={{ borderLeft: `4px solid ${project.color || '#10B981'}` }}
+                                >
+                                    <div>
+                                        <h5 className="text-xs font-bold text-slate-850 dark:text-slate-200 truncate">{project.name}</h5>
+                                        <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
+                                            Gerente: {project.manager?.full_name || 'Sem gerente'}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1.5 pt-1.5 shrink-0">
+                                        <div className="flex justify-between text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+                                            <span>Progresso</span>
+                                            <span>{progress}% ({project.completed_task_count}/{project.task_count})</span>
                                         </div>
-                                    </>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="aspect-video w-full rounded-2xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center p-4 min-h-[220px]">
-                                <span className="text-xl mb-1">📺</span>
-                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sem vídeo</span>
-                                {canEditVideo && (
-                                    <button
-                                        onClick={() => setIsEditingVideo(true)}
-                                        className="mt-2 text-[10px] bg-brand-primary text-white px-2.5 py-1 rounded-full font-bold shadow-sm"
-                                    >
-                                        Adicionar
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: project.color || '#10B981' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Bloco 3: Marketplace */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/20 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        🛍️ Destaques do Marketplace
+                    </h4>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => scrollContainer(marketScrollRef, 'left')}
+                            className="p-1.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-850"
+                            title="Rolar para esquerda"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => scrollContainer(marketScrollRef, 'right')}
+                            className="p-1.5 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-850"
+                            title="Rolar para direita"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
-                {/* 2. Latest Marketplace Announcements (25% de largura no desktop) */}
-                <div className="space-y-3 lg:col-span-3 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                        <BuildingStorefrontIcon className="w-3.5 h-3.5 text-brand-primary" />
-                        Últimos Anúncios
-                    </span>
-                    <div className="space-y-3 flex-1 flex flex-col justify-between">
-                        {latestMarketplaces.length > 0 ? (
-                            latestMarketplaces.map((item: any) => (
+                <div
+                    ref={marketScrollRef}
+                    className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 scroll-smooth snap-x snap-mandatory"
+                >
+                    {latestMarketplaces.length > 0 ? (
+                        <>
+                            {latestMarketplaces.map((item: any) => (
                                 <div
                                     key={item.id}
                                     onClick={() => onNavigate('marketplace')}
-                                    className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px] shrink-0"
+                                    className="flex-shrink-0 w-72 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[130px] snap-start animate-in fade-in duration-300"
                                 >
                                     <div className="flex gap-3">
                                         {item.imageUrl ? (
-                                            <img src={item.imageUrl} alt={item.title} className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                                            <img src={item.imageUrl} alt={item.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
                                         ) : (
-                                            <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg shrink-0">🛍️</div>
+                                            <div className="w-16 h-16 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg shrink-0">🛍️</div>
                                         )}
                                         <div className="min-w-0">
-                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{item.title}</h5>
+                                            <h5 className="text-xs font-bold text-slate-850 dark:text-slate-200 truncate">{item.title}</h5>
                                             <p className="text-[10px] text-slate-400 font-medium truncate">Por {item.seller}</p>
                                             <span className="inline-block mt-1 bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
                                                 {item.status}
                                             </span>
                                         </div>
                                     </div>
-                                    <div className="flex justify-between items-center mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/60 shrink-0">
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase">Preço</span>
+                                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 shrink-0">
+                                        <span className="text-[9px] text-slate-400 font-bold uppercase">Preço</span>
                                         <span className="text-xs font-black text-brand-primary">R$ {item.price.toFixed(2)}</span>
                                     </div>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[384px] w-full">
-                                <span className="text-2xl mb-2">🛍️</span>
-                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum anúncio</span>
+                            ))}
+                            
+                            {/* Card Gradiente Especial "Ver Todos" no Final */}
+                            <div
+                                onClick={() => onNavigate('marketplace')}
+                                className="flex-shrink-0 w-48 bg-gradient-to-br from-brand-primary to-emerald-600 text-white p-4 rounded-2xl shadow-md cursor-pointer transition-all hover:scale-[1.02] flex flex-col items-center justify-center text-center h-[130px] snap-start"
+                            >
+                                <span className="text-2xl mb-1">➔</span>
+                                <span className="text-xs font-bold uppercase tracking-wider">Ver Todos</span>
+                                <span className="text-[9px] text-white/85 mt-1 font-medium">Acessar Marketplace</span>
                             </div>
-                        )}
-                        {/* Preenchimento para manter simetria se tiver menos de 3 anúncios */}
-                        {latestMarketplaces.length > 0 && latestMarketplaces.length < 3 && (
-                            Array.from({ length: 3 - latestMarketplaces.length }).map((_, idx) => (
-                                <div key={idx} className="bg-slate-50/20 dark:bg-slate-800/5 p-4 rounded-2xl border border-dashed border-slate-150 dark:border-slate-800/30 flex items-center justify-center text-center h-[120px] shrink-0">
-                                    <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700 uppercase">Sem anúncio</span>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* 3. Latest Active Projects (25% de largura no desktop) */}
-                <div className="space-y-3 lg:col-span-3 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                        <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-brand-primary" />
-                        Últimos Projetos Ativos
-                    </span>
-                    <div className="space-y-3 flex-1 flex flex-col justify-between">
-                        {latestProjects.length > 0 ? (
-                            latestProjects.map((project: any) => {
-                                const progress = project.task_count > 0 ? Math.round((project.completed_task_count / project.task_count) * 100) : 0;
-                                return (
-                                    <div
-                                        key={project.id}
-                                        onClick={() => {
-                                            localStorage.setItem('pixel_selected_project', JSON.stringify(project));
-                                            onNavigate('projects');
-                                        }}
-                                        className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px] shrink-0"
-                                        style={{ borderLeft: `4px solid ${project.color || '#10B981'}` }}
-                                    >
-                                        <div>
-                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{project.name}</h5>
-                                            <p className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">
-                                                Gerente: {project.manager?.full_name || 'Sem gerente'}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1 pt-1.5 shrink-0">
-                                            <div className="flex justify-between text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">
-                                                <span>Progresso</span>
-                                                <span>{progress}% ({project.completed_task_count}/{project.task_count})</span>
-                                            </div>
-                                            <div className="w-full bg-slate-150 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                                                <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: project.color || '#10B981' }} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[384px] w-full">
-                                <span className="text-2xl mb-2">📂</span>
-                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum projeto</span>
-                            </div>
-                        )}
-                        {/* Preenchimento para manter simetria se tiver menos de 3 projetos */}
-                        {latestProjects.length > 0 && latestProjects.length < 3 && (
-                            Array.from({ length: 3 - latestProjects.length }).map((_, idx) => (
-                                <div key={idx} className="bg-slate-50/20 dark:bg-slate-800/5 p-4 rounded-2xl border border-dashed border-slate-150 dark:border-slate-800/30 flex items-center justify-center text-center h-[120px] shrink-0">
-                                    <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700 uppercase">Sem projeto</span>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                        </>
+                    ) : (
+                        <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-2xl border border-slate-150 dark:border-slate-850 flex flex-col items-center justify-center text-center w-full h-[130px]">
+                            <span className="text-2xl mb-1">🛍️</span>
+                            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum anúncio disponível no momento</span>
+                        </div>
+                    )}
                 </div>
             </div>
 

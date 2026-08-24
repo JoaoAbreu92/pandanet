@@ -249,9 +249,17 @@ const ChatbotSettings: React.FC = () => {
         setIsSavingFlow(true);
         setSaveSuccess(false);
 
-        const dirtyNodes = nodes.filter(n => dirtyNodeIds.has(n.id));
-        
         try {
+            // Se metadados do fluxo foram modificados
+            if (dirtyNodeIds.has('flow-meta') && selectedFlow) {
+                const { error: flowErr } = await supabase
+                    .from('whatsapp_chatbot_flows')
+                    .update({ name: selectedFlow.name, description: selectedFlow.description })
+                    .eq('id', selectedFlow.id);
+                if (flowErr) throw flowErr;
+            }
+
+            const dirtyNodes = nodes.filter(n => dirtyNodeIds.has(n.id) && n.id !== 'flow-meta');
             for (const node of dirtyNodes) {
                 const { error } = await supabase
                     .from('whatsapp_chatbot_nodes')
@@ -259,6 +267,18 @@ const ChatbotSettings: React.FC = () => {
                     .eq('id', node.id);
                 if (error) throw error;
             }
+
+            // Recarregar os fluxos do banco de dados para sincronizar a lista lateral
+            const companyId = currentUser?.company_id || profile?.company_id;
+            if (companyId) {
+                const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
+                if (flowsData) {
+                    setFlows(flowsData);
+                    const updatedSelected = flowsData.find(f => f.id === selectedFlow?.id);
+                    if (updatedSelected) setSelectedFlow(updatedSelected);
+                }
+            }
+
             setDirtyNodeIds(new Set());
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
@@ -356,7 +376,7 @@ const ChatbotSettings: React.FC = () => {
     };
 
     // ── Templates ─────────────────────────────────────────────────────────────
-    const loadTemplate = async (templateType: 'support_sales' | 'clinic') => {
+    const loadTemplate = async (templateType: 'support_sales' | 'clinic' | 'restaurant') => {
         if (!selectedFlow) return;
         if (!window.confirm('Atenção: Carregar este modelo irá apagar todas as etapas atuais deste fluxo de chatbot. Deseja continuar?')) return;
 
@@ -431,6 +451,38 @@ const ChatbotSettings: React.FC = () => {
                 await supabase.from('whatsapp_chatbot_nodes').insert({
                     flow_id: selectedFlow.id, type: 'greeting', sort_order: 0,
                     content: { text: 'Olá! Obrigado por entrar em contato com nossa clínica médica. Como podemos te ajudar hoje?' }
+                });
+            } else if (templateType === 'restaurant') {
+                const { data: menuLinkNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'message', sort_order: 2,
+                    content: { text: 'Aqui está o nosso cardápio digital completo: https://cardapio.exemplo.com.br/pedir. Faça o seu pedido por lá e ele já entrará em nossa cozinha!' }
+                }).select().single();
+
+                const { data: trackerNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'message', sort_order: 3,
+                    content: { text: 'Para acompanhar seu pedido, envie o número dele (ex: #1024) ou aguarde que o sistema enviará atualizações.' }
+                }).select().single();
+
+                const { data: supportNode } = await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'transfer_queue', sort_order: 4,
+                    content: { text: 'Vou te passar para um de nossos atendentes na recepção para te ajudar com seu pedido.', queue_id: q1 }
+                }).select().single();
+
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'menu', sort_order: 1,
+                    content: {
+                        text: 'Olá! Sou o PandaBot de Delivery 🐼. Escolha uma opção para iniciar seu atendimento:',
+                        options: [
+                            { label: '1. Ver Cardápio / Fazer Pedido 🍔', next_node: menuLinkNode?.id || '' },
+                            { label: '2. Acompanhar Pedido 📦', next_node: trackerNode?.id || '' },
+                            { label: '3. Falar com Atendente 👤', next_node: supportNode?.id || '' }
+                        ]
+                    }
+                });
+
+                await supabase.from('whatsapp_chatbot_nodes').insert({
+                    flow_id: selectedFlow.id, type: 'greeting', sort_order: 0,
+                    content: { text: 'Seja bem-vindo ao Panda Restaurante! 🐼🍔🍕' }
                 });
             }
 
@@ -823,6 +875,9 @@ const ChatbotSettings: React.FC = () => {
                                         <button onClick={() => loadTemplate('clinic')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all border border-purple-200/50">
                                             Clínica / Agenda
                                         </button>
+                                        <button onClick={() => loadTemplate('restaurant')} className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all border border-emerald-200/50">
+                                            Restaurante / Delivery 🍔
+                                        </button>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {/* Dirty state indicator */}
@@ -881,22 +936,53 @@ const ChatbotSettings: React.FC = () => {
                                 </div>
 
                                 {/* Active Flow Header in Editor */}
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-base font-bold text-gray-800 dark:text-white truncate max-w-[280px]">
-                                            {selectedFlow.name}
-                                        </h3>
-                                        {selectedFlow.is_active ? (
-                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-500 text-white px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md shadow-emerald-500/30">
-                                                <Zap className="w-2.5 h-2.5 fill-white" /> ATIVO
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400 px-2.5 py-1 rounded-full uppercase tracking-wide">
-                                                Inativo
-                                            </span>
-                                        )}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/5 shadow-xl">
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="text"
+                                                value={selectedFlow.name}
+                                                onChange={(e) => {
+                                                    const updated = { ...selectedFlow, name: e.target.value };
+                                                    setSelectedFlow(updated);
+                                                    setFlows(flows.map(f => f.id === selectedFlow.id ? updated : f));
+                                                    setDirtyNodeIds(prev => new Set([...prev, 'flow-meta']));
+                                                }}
+                                                placeholder="Nome do fluxo..."
+                                                className="bg-transparent border-b border-dashed border-gray-300 dark:border-white/10 hover:border-gray-500 focus:border-emerald-500 outline-none text-base font-bold text-gray-800 dark:text-white px-1 py-0.5 w-full md:w-64"
+                                            />
+                                            {selectedFlow.is_active ? (
+                                                <button
+                                                    onClick={() => handleToggleActive(selectedFlow)}
+                                                    className="inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-full uppercase tracking-wide shadow-md shadow-emerald-500/30 transition-all"
+                                                    title="Clique para desativar este fluxo"
+                                                >
+                                                    <Zap className="w-2.5 h-2.5 fill-white" /> ATIVO
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleToggleActive(selectedFlow)}
+                                                    className="inline-flex items-center gap-1 text-[9px] font-bold bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-500 dark:text-gray-400 px-2.5 py-1 rounded-full uppercase tracking-wide transition-all"
+                                                    title="Clique para ativar este fluxo"
+                                                >
+                                                    Inativo (Ativar)
+                                                </button>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={selectedFlow.description || ''}
+                                            placeholder="Descrição do fluxo (opcional)..."
+                                            onChange={(e) => {
+                                                const updated = { ...selectedFlow, description: e.target.value };
+                                                setSelectedFlow(updated);
+                                                setFlows(flows.map(f => f.id === selectedFlow.id ? updated : f));
+                                                setDirtyNodeIds(prev => new Set([...prev, 'flow-meta']));
+                                            }}
+                                            className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-emerald-500 outline-none text-xs text-gray-500 dark:text-gray-400 px-1 py-0.5 w-full"
+                                        />
                                     </div>
-                                    <span className="text-[10px] text-gray-400 font-medium">{nodes.length} etapa{nodes.length !== 1 ? 's' : ''}</span>
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-xl shrink-0">{nodes.length} etapa{nodes.length !== 1 ? 's' : ''}</span>
                                 </div>
 
                                 {/* Nodes List with Drag-and-Drop + SVG Connectors */}

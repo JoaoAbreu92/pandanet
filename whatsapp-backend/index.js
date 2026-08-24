@@ -1461,53 +1461,68 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const spTime = new Date(utc + (3600000 * spOffset));
     
-    const daysMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const currentDay = daysMap[spTime.getDay()];
+    const currentDayStr = spTime.getDay().toString(); // "0" a "6"
     const currentHourStr = spTime.toTimeString().slice(0, 5); // "HH:MM"
 
-    // 1. Se tiver setor (queueId), verificar expediente personalizado do setor primeiro
-    if (queueId) {
-        const { data: queue } = await supabase
-            .from('whatsapp_queues')
-            .select('custom_hours, business_hours, away_message')
-            .eq('id', queueId)
-            .maybeSingle();
-
-        if (queue && queue.custom_hours && queue.business_hours) {
-            const dayConfig = queue.business_hours[currentDay];
-            if (dayConfig) {
-                if (dayConfig.closed) {
-                    return { inHours: false, awayMessage: queue.away_message || 'Estamos fora do horário de expediente deste setor.' };
-                }
-                const { start, end } = dayConfig;
-                if (currentHourStr < start || currentHourStr > end) {
-                    return { inHours: false, awayMessage: queue.away_message || 'Estamos fora do horário de expediente deste setor.' };
-                }
-            }
-            return { inHours: true, awayMessage: null };
-        }
-    }
-
-    // 2. Caso contrário, verificar expediente geral da conexão/canal
+    // 1. Buscar configurações da conexão do WhatsApp
     const { data: settings } = await supabase
         .from('whatsapp_settings')
-        .select('business_hours_start, business_hours_end, away_message')
+        .select('business_hours, business_hours_start, business_hours_end, away_message')
         .eq('id', connectionId)
         .maybeSingle();
 
-    if (settings) {
-        const start = settings.business_hours_start ? settings.business_hours_start.slice(0, 5) : null;
-        const end = settings.business_hours_end ? settings.business_hours_end.slice(0, 5) : null;
-        const awayMessage = settings.away_message || 'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
+    if (!settings) {
+        return { inHours: true, awayMessage: null };
+    }
 
-        if (start && end) {
-            if (currentHourStr < start || currentHourStr > end) {
+    const awayMessage = settings.away_message || 'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
+
+    // 2. Se houver configuração business_hours JSONB
+    if (settings.business_hours) {
+        const bh = settings.business_hours;
+        let dayConfig = null;
+
+        // Se passamos queueId, tentar achar expediente da fila
+        if (queueId && bh.queues && bh.queues[queueId]) {
+            dayConfig = bh.queues[queueId][currentDayStr];
+            if (dayConfig) {
+                // Se dayConfig existe e é um array de intervalos
+                const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
+                if (inRange) {
+                    return { inHours: true, awayMessage: null };
+                } else {
+                    return { inHours: false, awayMessage: 'Estamos fora do horário de expediente deste setor.' };
+                }
+            } else {
+                // Se dayConfig for nulo/vazio, significa que o setor está fechado neste dia (ou não cadastrou)
+                // Se foi configurado a fila no JSONB mas não há expediente para esse dia, assume FECHADO para essa fila
+                return { inHours: false, awayMessage: 'Estamos fora do horário de expediente deste setor.' };
+            }
+        }
+
+        // Se não achou na fila ou não passou queueId, verificar no Geral (general)
+        if (bh.general && bh.general[currentDayStr]) {
+            dayConfig = bh.general[currentDayStr];
+            const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
+            if (inRange) {
+                return { inHours: true, awayMessage: null };
+            } else {
                 return { inHours: false, awayMessage };
             }
-            const isWeekend = spTime.getDay() === 0 || spTime.getDay() === 6;
-            if (isWeekend) {
-                return { inHours: false, awayMessage };
-            }
+        }
+    }
+
+    // 3. Fallback: Lógica Legada (business_hours_start / business_hours_end)
+    const start = settings.business_hours_start ? settings.business_hours_start.slice(0, 5) : null;
+    const end = settings.business_hours_end ? settings.business_hours_end.slice(0, 5) : null;
+
+    if (start && end) {
+        if (currentHourStr < start || currentHourStr > end) {
+            return { inHours: false, awayMessage };
+        }
+        const isWeekend = spTime.getDay() === 0 || spTime.getDay() === 6;
+        if (isWeekend) {
+            return { inHours: false, awayMessage };
         }
     }
 
@@ -1906,7 +1921,68 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                         }
                     } else {
                         // Só executa o chatbot se estiver dentro do horário de expediente
-                        runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                        // Triagem Inteligente via IA se não houver fila nem atendente atribuídos
+                        const currentConv = conv || { id: conversationId, contact_phone: fromPhone, queue_id: null, assigned_to: null };
+                        let hasTransferred = false;
+
+                        if (!currentConv.queue_id && !currentConv.assigned_to) {
+                            try {
+                                const { data: settings } = await supabase
+                                    .from('whatsapp_settings')
+                                    .select('gemini_api_key, business_hours')
+                                    .eq('id', connectionId)
+                                    .maybeSingle();
+
+                                if (settings && settings.gemini_api_key) {
+                                    const { data: queues } = await supabase
+                                        .from('whatsapp_queues')
+                                        .select('id, name')
+                                        .eq('company_id', companyId);
+
+                                    if (queues && queues.length > 0) {
+                                        const suggestedQueueId = await analyzeMessageForTransfer(text, queues, settings.gemini_api_key, settings.business_hours);
+                                        if (suggestedQueueId) {
+                                            console.log(`[IA TRIAGEM] Sugeriu transferir para fila: ${suggestedQueueId}`);
+                                            addDebugLog('IA_TRIAGEM_OK', `Transferência automática via IA para fila ${suggestedQueueId} sugerida com sucesso.`);
+                                            await supabase
+                                                .from('whatsapp_conversations')
+                                                .update({ queue_id: suggestedQueueId, chatbot_node_id: null })
+                                                .eq('id', conversationId);
+                                            
+                                            // Enviar mensagem informando sobre a transferência
+                                            const destQueue = queues.find(q => q.id === suggestedQueueId);
+                                            const notifyText = `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
+                                            
+                                            const instanceName = `conn_${connectionId}`;
+                                            await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                                                method: 'POST',
+                                                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    number: fromPhone,
+                                                    text: notifyText
+                                                })
+                                            }).catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+
+                                            await supabase.from('whatsapp_messages').insert({
+                                                company_id: companyId,
+                                                conversation_id: conversationId,
+                                                message_text: notifyText,
+                                                is_from_customer: false,
+                                                sent_by: null
+                                            });
+
+                                            hasTransferred = true;
+                                        }
+                                    }
+                                }
+                            } catch (triagemErr) {
+                                console.error('[IA TRIAGEM] Erro no processamento:', triagemErr.message);
+                            }
+                        }
+
+                        if (!hasTransferred) {
+                            runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
+                        }
                     }
                 } catch (expErr) {
                     console.error('[EXPEDIENTE] Erro na validação de horário:', expErr.message);

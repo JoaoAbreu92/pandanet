@@ -192,7 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         account_limit: isMasterAdmin ? 100 : (planEmailLimit || 1)
                     },
                     plan_email_limit: isMasterAdmin ? 100 : planEmailLimit,
-                    plan_whatsapp_limit: isMasterAdmin ? 100 : planWhatsappLimit
+                    plan_whatsapp_limit: isMasterAdmin ? 100 : planWhatsappLimit,
+                    company: data.company
                 };
                 setProfile(employee);
             }

@@ -107,7 +107,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         birthDate: data.birth_date,
                         company_id: data.company_id,
                         permissions: data.permissions || {},
-                        following: data.following || []
+                        following: data.following || [],
+                        status_text: data.status_text
                     };
                     // Manually append department_id as it might not be in Employee type definition yet
                     (freshUser as any).department_id = data.department_id;
@@ -145,7 +146,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             isAdmin: data.is_admin,
                             company_id: data.company_id,
                             following: data.following || [],
-                            permissions: data.permissions || {}
+                            permissions: data.permissions || {},
+                            status_text: data.status_text
                         };
                         (mapped as any).department_id = data.department_id;
                         setTargetUser(mapped);
@@ -332,6 +334,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 ai_api_key: tempUserData.ai_api_key,
                 ai_provider: tempUserData.ai_provider,
                 ai_behavior: tempUserData.ai_behavior,
+                status_text: (tempUserData as any).status_text,
                 updated_at: new Date().toISOString()
             };
 
@@ -390,7 +393,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     coverUrl: freshProfile.cover_url,
                     ai_api_key: freshProfile.ai_api_key,
                     ai_provider: freshProfile.ai_provider,
-                    ai_behavior: freshProfile.ai_behavior
+                    ai_behavior: freshProfile.ai_behavior,
+                    status_text: freshProfile.status_text
                 };
                 
                 setTempUserData(reloadedUser);
@@ -648,6 +652,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 <div>
                     <h3 className="text-2xl font-black leading-tight">{userData.name}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{userData.role} • {userData.team}</p>
+                    {(userData as any).status_text && (
+                        <p className="text-xs text-brand-primary dark:text-brand-primary font-bold italic mt-1.5">
+                            Status: "{(userData as any).status_text}"
+                        </p>
+                    )}
                 </div>
                 {/* Equipped Badges Row */}
                 <div className="flex gap-3 flex-wrap select-none mt-2 md:mt-0">
@@ -799,6 +808,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                     <div>
                                         <label className="text-sm font-medium text-brand-subtle-text">Escritório</label>
                                         <input name="officeLocation" value={tempUserData.officeLocation || ''} onChange={handleInputChange} placeholder="Ex: São Paulo ou Remoto" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <label className="text-sm font-medium text-brand-subtle-text">Frase de Status (Aparece no Chat Rápido)</label>
+                                        <input 
+                                            name="status_text" 
+                                            value={(tempUserData as any).status_text || ''} 
+                                            onChange={handleInputChange} 
+                                            placeholder="Ex: Focado em reuniões ou Disponível para café ☕"
+                                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" 
+                                            maxLength={50}
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-brand-subtle-text">Data de Nascimento</label>

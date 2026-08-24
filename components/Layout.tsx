@@ -7,6 +7,7 @@ import DebugPanel from './DebugPanel';
 import SystemUpdateNotification from './SystemUpdateNotification';
 import EmailNotifier from './EmailNotifier';
 import { useNotifications } from './NotificationContext';
+import { OnlineUsersSidebar } from './OnlineUsersSidebar';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -35,6 +36,9 @@ interface LayoutProps {
 
     // Search
     onSearch?: (term: string) => void;
+
+    // Chat
+    onStartDirectChat?: (userId: string) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -55,7 +59,8 @@ const Layout: React.FC<LayoutProps> = ({
     theme,
     toggleTheme,
     isShaking,
-    onSearch
+    onSearch,
+    onStartDirectChat
 }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
@@ -106,61 +111,71 @@ const Layout: React.FC<LayoutProps> = ({
                 />
             )}
             <div className="flex flex-1 w-full overflow-hidden relative">
-            {/* Mobile Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
+                {/* Mobile Overlay */}
+                {isSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
 
-            <Sidebar
-                isOpen={isSidebarOpen}
-                onNavigate={(page) => {
-                    onNavigate(page);
-                    if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
-                }}
-                currentPage={currentPage}
-                currentUser={currentUser}
-                companyName={companySettings.companyName}
-                companyLogo={companySettings.logoUrl}
-                isImpersonating={isImpersonating}
-                isMasterAdmin={isMasterAdmin}
-                customFeatures={currentCompany.custom_features}
-            />
-                <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
-                <Header
-                    onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
-                        onToggleDebug={() => setDebugOpen(!isDebugOpen)}
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    onNavigate={(page) => {
+                        onNavigate(page);
+                        if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
+                    }}
+                    currentPage={currentPage}
                     currentUser={currentUser}
-                    onLogout={onLogout}
-                    onNavigate={onNavigate}
+                    companyName={companySettings.companyName}
+                    companyLogo={companySettings.logoUrl}
                     isImpersonating={isImpersonating}
-                    impersonatedCompanyName={impersonatedCompanyName}
-                    onEndImpersonation={onEndImpersonation}
-                    onToggleNotifications={() => setNotificationsOpen(!isNotificationsOpen)}
-                    unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
-                    theme={theme}
-                    toggleTheme={toggleTheme}
-                    onSearch={onSearch}
+                    isMasterAdmin={isMasterAdmin}
+                    customFeatures={currentCompany.custom_features}
                 />
-                <NotificationsPanel
-                    isOpen={isNotificationsOpen}
-                    onClose={() => setNotificationsOpen(false)}
-                    notifications={notifications}
-                    onMarkAsRead={onMarkAsRead}
-                    onClearAll={onClearAllNotifications}
-                    onNavigate={onNavigate}
-                />
-                <main className="flex-1 overflow-hidden p-0 relative">
+
+                <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
+                    <Header
+                        onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+                        onToggleDebug={() => setDebugOpen(!isDebugOpen)}
+                        currentUser={currentUser}
+                        onLogout={onLogout}
+                        onNavigate={onNavigate}
+                        isImpersonating={isImpersonating}
+                        impersonatedCompanyName={impersonatedCompanyName}
+                        onEndImpersonation={onEndImpersonation}
+                        onToggleNotifications={() => setNotificationsOpen(!isNotificationsOpen)}
+                        unreadNotificationsCount={notifications.filter(n => !n.isRead).length}
+                        theme={theme}
+                        toggleTheme={toggleTheme}
+                        onSearch={onSearch}
+                    />
+                    <NotificationsPanel
+                        isOpen={isNotificationsOpen}
+                        onClose={() => setNotificationsOpen(false)}
+                        notifications={notifications}
+                        onMarkAsRead={onMarkAsRead}
+                        onClearAll={onClearAllNotifications}
+                        onNavigate={onNavigate}
+                    />
+                    <main className="flex-1 overflow-hidden p-0 relative">
                         <div className={`h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
-                        {children}
-                    </div>
+                            {children}
+                        </div>
                     </main>
+                </div>
+
+                {currentPage !== 'messages' && onStartDirectChat && (
+                    <div className="hidden md:block h-full">
+                        <OnlineUsersSidebar
+                            currentUser={currentUser}
+                            onStartChat={onStartDirectChat}
+                        />
+                    </div>
+                )}
             </div>
         </div>
-    </div>
-);
+    );
 };
 
 export default Layout;
