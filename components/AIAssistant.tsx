@@ -84,7 +84,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`Gemini API error: ${response.status}`);
+                    const errData = await response.json().catch(() => ({}));
+                    console.error("Gemini Error Details:", errData);
+                    throw new Error(`Gemini API error: ${response.status} - ${errData?.error?.message || 'Erro desconhecido'}`);
                 }
                 const data = await response.json();
                 aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, não consegui processar sua mensagem.";
