@@ -32,7 +32,8 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
         fetchSystemLogo();
     }, []);
 
-    <div className={`flex flex-col items-center justify-center ${className}`}>
+    return (
+        <div className={`flex flex-col items-center justify-center ${className}`}>
             <img
                 src={(companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo)}
                 alt="Logo"
@@ -44,6 +45,7 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
                 </span>
             )}
         </div>
+    );
 };
 
 export default Logo;

@@ -72,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (!permission && !isAdmin) return null;
 
         const isActive = React.Children.toArray(children).some(child =>
-            React.isValidElement(child) && child.props.page === currentPage
+            React.isValidElement(child) && (child.props as any).page === currentPage
         );
 
         return (
