@@ -37,10 +37,10 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
             <img
                 src={(companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo)}
                 alt="Logo"
-                className="h-12 w-auto object-contain transition-all duration-300"
+                className="h-16 w-auto object-contain transition-all duration-300"
             />
             {showText && (
-                <span className="text-[10px] text-gray-400 font-medium tracking-wider -mt-1">
+                <span className="text-[10px] text-gray-400 font-medium tracking-wider mt-1">
                     v{SYSTEM_VERSION}
                 </span>
             )}
