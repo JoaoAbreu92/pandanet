@@ -57,6 +57,7 @@ import WhatsPanda from './components/WhatsPanda.tsx';
 import EmailPage from './components/EmailPage';
 import CRMTasks from './components/CRMTasks';
 import AIAssistant from './components/AIAssistant';
+import PWAReloadPrompt from './components/PWAReloadPrompt';
 import { CRMCustomer } from './types';
 
 
@@ -920,6 +921,7 @@ const AppContent: React.FC = () => {
     );
 };
 
+
 const App: React.FC = () => {
     return (
         <LanguageProvider>
@@ -928,6 +930,7 @@ const App: React.FC = () => {
                     <NotificationProvider>
                         <ToastProvider>
                             <AppContent />
+                            <PWAReloadPrompt />
                         </ToastProvider>
                     </NotificationProvider>
                 </PresenceProvider>
