@@ -1,12 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheckIcon, UserGroupIcon, LockClosedIcon } from './icons';
 import type { SecurityAlert } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
-interface InfoSecPageProps {
-    alerts?: SecurityAlert[];
-}
+const InfoSecPage: React.FC = () => {
+    const { currentUser } = useAuth();
+    const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
 
-const InfoSecPage: React.FC<InfoSecPageProps> = ({ alerts = [] }) => {
+    useEffect(() => {
+        if (!currentUser?.company_id) return;
+
+        const fetchAlerts = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('security_alerts')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id)
+                    .order('date', { ascending: false });
+
+                if (error) throw error;
+                if (data) {
+                    setAlerts(data.map((a: any) => ({
+                        id: a.id,
+                        title: a.title,
+                        description: a.description,
+                        level: (a.level as any) || 'info', // cast to enum
+                        date: a.date?.split('T')[0] || a.created_at?.split('T')[0]
+                    })));
+                }
+            } catch (err) {
+                console.error("Error fetching security alerts:", err);
+            }
+        };
+
+        fetchAlerts();
+    }, [currentUser?.company_id]);
+
     return (
         <div className="p-6 max-w-5xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">

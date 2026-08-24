@@ -1,46 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import type { OnboardingCategory } from '../types';
-// FIX: Using local icon for consistency
+import type { OnboardingCategory, OnboardingStep } from '../types';
 import { CheckCircleIcon } from './icons';
-
-const initialOnboardingData: OnboardingCategory[] = [
-    {
-        title: 'Sua Primeira Semana',
-        steps: [
-            { id: 1, title: 'Configure suas ferramentas', description: 'Acesse seu e-mail, Slack e outras ferramentas essenciais.', completed: true, link: {text: 'Guia de Ferramentas', url: '#'} },
-            { id: 2, title: 'Conheça seu time', description: 'Participe da reunião de boas-vindas e agende cafés virtuais.', completed: true },
-            { id: 3, title: 'Entenda nossos valores', description: 'Leia sobre nossa cultura e os valores que nos guiam.', completed: false, link: {text: 'Nosso Código de Cultura', url: '#'} },
-            { id: 4, title: 'Complete os treinamentos iniciais', description: 'Acesse a plataforma de treinamento e conclua os módulos de integração.', completed: false },
-        ]
-    },
-    {
-        title: 'Seu Primeiro Mês',
-        steps: [
-            { id: 5, title: 'Alinhe suas metas com seu gestor', description: 'Converse sobre suas responsabilidades e expectativas para o primeiro trimestre.', completed: false },
-            { id: 6, title: 'Explore a Base de Conhecimento', description: 'Navegue pelos documentos da sua área e entenda nossos processos.', completed: false, link: {text: 'Acessar Documentos', url: '#'} },
-            { id: 7, title: 'Participe de um projeto', description: 'Comece a colaborar ativamente em um dos projetos da sua equipe.', completed: false },
-        ]
-    }
-];
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 const OnboardingPage: React.FC = () => {
-    const [onboardingData, setOnboardingData] = useState(initialOnboardingData);
+    const { currentUser } = useAuth();
+    const [onboardingData, setOnboardingData] = useState<OnboardingCategory[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const toggleStep = (stepId: number) => {
+    const fetchData = async () => {
+        if (!currentUser?.company_id) return;
+        setLoading(true);
+        try {
+            // Fetch all steps
+            const { data: stepsData, error: stepsError } = await supabase
+                .from('onboarding_steps')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('order', { ascending: true });
+
+            if (stepsError) throw stepsError;
+
+            // Fetch user progress
+            const { data: progressData, error: progressError } = await supabase
+                .from('user_onboarding')
+                .select('step_id, completed')
+                .eq('user_id', currentUser.id);
+
+            if (progressError) throw progressError;
+
+            // Create a map of completed steps
+            const completedStepIds = new Set(
+                progressData?.filter(p => p.completed).map(p => p.step_id) || []
+            );
+
+            // Group steps by category
+            const groupedData: { [key: string]: OnboardingStep[] } = {};
+            stepsData?.forEach((step: any) => {
+                const category = step.category || 'Geral';
+                if (!groupedData[category]) {
+                    groupedData[category] = [];
+                }
+                groupedData[category].push({
+                    id: step.id,
+                    title: step.title,
+                    description: step.description,
+                    completed: completedStepIds.has(step.id),
+                    link: step.link_text ? { text: step.link_text, url: step.link_url } : undefined
+                });
+            });
+
+            // Convert to array format
+            const categories: OnboardingCategory[] = Object.keys(groupedData).map(title => ({
+                title,
+                steps: groupedData[title]
+            }));
+
+            setOnboardingData(categories);
+        } catch (error) {
+            console.error('Error fetching onboarding data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [currentUser?.company_id]);
+
+    const toggleStep = async (stepId: number | string) => {
+        if (!currentUser) return;
+
+        // Find current status
+        let isCurrentlyCompleted = false;
+        onboardingData.forEach(cat => {
+            const step = cat.steps.find(s => s.id === stepId);
+            if (step) isCurrentlyCompleted = step.completed;
+        });
+
+        const newStatus = !isCurrentlyCompleted;
+
+        // Optimistic update
         setOnboardingData(prevData =>
             prevData.map(category => ({
                 ...category,
                 steps: category.steps.map(step =>
-                    step.id === stepId ? { ...step, completed: !step.completed } : step
+                    step.id === stepId ? { ...step, completed: newStatus } : step
                 )
             }))
         );
+
+        try {
+            // Upsert progress
+            const { error } = await supabase
+                .from('user_onboarding')
+                .upsert(
+                    {
+                        user_id: currentUser.id,
+                        step_id: stepId,
+                        completed: newStatus,
+                        completed_at: newStatus ? new Date().toISOString() : null,
+                        company_id: currentUser.company_id
+                    },
+                    { onConflict: 'user_id, step_id' }
+                );
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating step:', error);
+            // Revert on error
+            setOnboardingData(prevData =>
+                prevData.map(category => ({
+                    ...category,
+                    steps: category.steps.map(step =>
+                        step.id === stepId ? { ...step, completed: isCurrentlyCompleted } : step
+                    )
+                }))
+            );
+            alert('Erro ao atualizar progresso. Tente novamente.');
+        }
     };
-    
+
     const totalSteps = onboardingData.reduce((acc, cat) => acc + cat.steps.length, 0);
     const completedSteps = onboardingData.reduce((acc, cat) => acc + cat.steps.filter(s => s.completed).length, 0);
     const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando guia de integração...</div>;
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
@@ -48,11 +135,11 @@ const OnboardingPage: React.FC = () => {
                 <h1 className="text-3xl font-bold">Bem-vindo(a) à Equipe!</h1>
                 <p className="mt-2 text-emerald-100 text-lg">Estamos muito felizes em ter você conosco. Este guia irá ajudá-lo(a) em seus primeiros passos.</p>
             </div>
-            
-             <Card title="Progresso da Integração">
+
+            <Card title="Progresso da Integração">
                 <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div 
-                        className="bg-green-500 h-4 rounded-full transition-all duration-500" 
+                    <div
+                        className="bg-green-500 h-4 rounded-full transition-all duration-500"
                         style={{ width: `${progressPercentage}%` }}
                     ></div>
                 </div>
@@ -65,7 +152,7 @@ const OnboardingPage: React.FC = () => {
                         {category.steps.map(step => (
                             <div key={step.id} className={`p-4 rounded-lg flex items-start space-x-4 transition-colors ${step.completed ? 'bg-emerald-50' : 'bg-gray-50'}`}>
                                 <div className="flex-shrink-0">
-                                    <button onClick={() => toggleStep(step.id)} className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-300">
+                                    <button onClick={() => toggleStep(step.id)} className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-gray-300 hover:border-brand-primary transition-colors">
                                         {step.completed && <CheckCircleIcon className="w-6 h-6 text-brand-primary" />}
                                     </button>
                                 </div>

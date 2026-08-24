@@ -6,7 +6,7 @@ import { XMarkIcon } from './icons';
 interface RecognitionModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => void;
+    onSubmit: (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'> & { toUserId: string }) => void;
     employees: Employee[];
     currentUserId: string;
 }
@@ -26,6 +26,7 @@ const RecognitionModal: React.FC<RecognitionModalProps> = ({ isOpen, onClose, on
         onSubmit({
             to: selectedUser.name,
             toAvatar: selectedUser.avatarUrl,
+            toUserId: selectedUser.id,
             message,
             value
         });

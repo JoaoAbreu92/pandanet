@@ -69,4 +69,5 @@ export {
   AdjustmentsHorizontalIcon,
   ArchiveBoxIcon,
   CloudIcon,
+  PlusCircleIcon,
 } from '@heroicons/react/24/outline';

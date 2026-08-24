@@ -1,17 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserGroupIcon, PlusIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from './icons';
-import type { Event, Employee } from '../types';
+import type { Event } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
-interface EventsPageProps {
-    events: Event[];
-    onJoinEvent: (eventId: number) => void;
-    onDeclineEvent: (eventId: number, reason: string) => void;
-    currentUser: Employee;
-}
-
-const EventsPage: React.FC<EventsPageProps> = ({ events, onJoinEvent, onDeclineEvent, currentUser }) => {
-    const [declineModalOpen, setDeclineModalOpen] = useState<number | null>(null);
+const EventsPage: React.FC = () => {
+    const { currentUser } = useAuth();
+    const [events, setEvents] = useState<Event[]>([]);
+    const [declineModalOpen, setDeclineModalOpen] = useState<string | null>(null);
     const [declineReason, setDeclineReason] = useState('');
+    const [loading, setLoading] = useState(true);
+
+    const fetchEvents = async () => {
+        if (!currentUser?.company_id) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('events')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('date', { ascending: true }); // Future events first? ascending works.
+
+            if (error) throw error;
+
+            if (data) {
+                const formattedEvents: Event[] = data.map((e: any) => ({
+                    id: e.id,
+                    title: e.title,
+                    description: e.description,
+                    date: e.date?.split('T')[0] || e.created_at?.split('T')[0],
+                    time: e.start_time || '00:00', // start_time mapped to time
+                    location: e.location || '',
+                    imageUrl: e.imageUrl, // Assuming imageUrl column exists or mapped from media? Schema said generic. let's assume not.
+                    // Schema check result didn't show imageUrl. 
+                    // I should probably allow random or generic image if null.
+                    category: (e.category as any) || 'Outro',
+                    imageType: 'url',
+                    invitees: e.invitees || [],
+                    attendees: e.attendees || [],
+                    declined: e.declined || []
+                }));
+                setEvents(formattedEvents);
+            }
+        } catch (err) {
+            console.error('Error fetching events:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchEvents();
+
+        // Subscription for realtime updates?
+        const subscription = supabase
+            .channel('public:events')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `company_id=eq.${currentUser?.company_id}` }, () => {
+                fetchEvents();
+            })
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        }
+    }, [currentUser?.company_id]);
+
+    const handleJoinEvent = async (eventId: string) => {
+        if (!currentUser) return;
+        const event = events.find(e => e.id === eventId);
+        if (!event) return;
+
+        // Optimistic update
+        const updatedAttendees = [...(event.attendees || []), currentUser.id];
+
+        // Remove from declined if present?
+        const updatedDeclined = (event.declined || []).filter(d => d.userId !== currentUser.id);
+
+        try {
+            // In DB attendees is array of strings (uuid)
+            const { error } = await supabase
+                .from('events')
+                .update({
+                    attendees: updatedAttendees,
+                    declined: updatedDeclined
+                })
+                .eq('id', eventId);
+
+            if (error) throw error;
+            // State updates via realtime or manual refresh (realtime set above)
+        } catch (err) {
+            console.error("Error joining event:", err);
+            alert("Erro ao confirmar presença.");
+        }
+    };
+
+    const onDeclineEvent = async (eventId: string, reason: string) => {
+        if (!currentUser) return;
+        const event = events.find(e => e.id === eventId);
+        if (!event) return;
+
+        const updatedDeclined = [...(event.declined || []), { userId: currentUser.id, reason }];
+        const updatedAttendees = (event.attendees || []).filter(id => id !== currentUser.id);
+
+        try {
+            const { error } = await supabase
+                .from('events')
+                .update({
+                    attendees: updatedAttendees,
+                    declined: updatedDeclined
+                })
+                .eq('id', eventId);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error declining event:", err);
+            alert("Erro ao recusar evento.");
+        }
+    };
 
     const handleDeclineSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -23,10 +128,14 @@ const EventsPage: React.FC<EventsPageProps> = ({ events, onJoinEvent, onDeclineE
     };
 
     const sortedEvents = [...events].filter(event => {
-        const isInvited = (event.invitees || []).includes(currentUser.id);
-        const isAttending = event.attendees.includes(currentUser.id);
-        return event.category === 'Social' || isInvited || isAttending || event.category === 'Corporativo' || event.category === 'Treinamento';
+        const isInvited = (event.invitees || []).includes(currentUser?.id || '');
+        const isAttending = (event.attendees || []).includes(currentUser?.id || '');
+        const isSocialOrPublic = ['Social', 'Corporativo', 'Treinamento', 'Evento da Empresa'].includes(event.category) || !event.invitees || event.invitees.length === 0;
+
+        return isSocialOrPublic || isInvited || isAttending;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando eventos...</div>;
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -46,7 +155,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ events, onJoinEvent, onDeclineE
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {sortedEvents.map(event => {
-                        const isAttending = event.attendees.includes(currentUser.id);
+                        const isAttending = (event.attendees || []).includes(currentUser?.id || '');
                         return (
                             <div key={event.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group">
                                 <div className="h-48 overflow-hidden relative">
@@ -78,19 +187,30 @@ const EventsPage: React.FC<EventsPageProps> = ({ events, onJoinEvent, onDeclineE
                                         </div>
                                         <div className="flex items-center text-sm text-gray-600">
                                             <UserGroupIcon className="w-4 h-4 mr-2 text-gray-400" />
-                                            {event.attendees.length} confirmados
+                                            {(event.attendees || []).length} confirmados
                                         </div>
                                     </div>
 
-                                    <button
-                                        onClick={() => onJoinEvent(event.id)}
-                                        className={`w-full py-2.5 px-4 rounded-lg font-medium transition-all ${isAttending
-                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                            : 'bg-brand-primary text-white hover:bg-emerald-600 shadow-md hover:shadow-lg'
-                                            }`}
-                                    >
-                                        {isAttending ? 'Confirmado ✓' : 'Confirmar Presença'}
-                                    </button>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => handleJoinEvent(event.id)}
+                                            disabled={isAttending}
+                                            className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${isAttending
+                                                ? 'bg-green-100 text-green-700 cursor-default'
+                                                : 'bg-brand-primary text-white hover:bg-emerald-600 shadow-md hover:shadow-lg'
+                                                }`}
+                                        >
+                                            {isAttending ? 'Confirmado ✓' : 'Confirmar'}
+                                        </button>
+                                        {!isAttending && (
+                                            <button
+                                                onClick={() => setDeclineModalOpen(event.id)}
+                                                className="px-4 py-2.5 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                                            >
+                                                Recusar
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

@@ -12,7 +12,30 @@ interface TicketDetailProps {
 }
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTicket, currentUser }) => {
-    
+    const [newComment, setNewComment] = React.useState('');
+
+    const handleCommentSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        const comment = {
+            id: Date.now(),
+            author: currentUser.name,
+            authorAvatarUrl: currentUser.avatarUrl,
+            text: newComment,
+            timestamp: new Date().toLocaleString('pt-BR')
+        };
+
+        const updatedTicket = {
+            ...ticket,
+            comments: [...ticket.comments, comment],
+            hasNotification: true // Mark as having update
+        };
+
+        onUpdateTicket(updatedTicket);
+        setNewComment('');
+    };
+
     const handleRatingSubmit = (rating: number) => {
         onUpdateTicket({ ...ticket, rating });
     };
@@ -26,7 +49,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
             default: return 'bg-gray-100 text-gray-800';
         }
     };
-    
+
     const getPriorityColor = (priority: Ticket['priority']) => {
         switch (priority) {
             case 'Baixa': return 'bg-gray-100 text-gray-800';
@@ -36,7 +59,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
             default: return 'bg-gray-100 text-gray-800';
         }
     };
-    
+
     const isRequester = ticket.requester === currentUser.name;
 
     return (
@@ -44,7 +67,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
             <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="text-xl font-bold text-brand-text pr-8">Chamado #{ticket.id}: {ticket.title}</h3>
-                     <button onClick={onClose} className="text-sm font-medium text-brand-primary hover:underline">Voltar</button>
+                    <button onClick={onClose} className="text-sm font-medium text-brand-primary hover:underline">Voltar</button>
                 </div>
 
                 <div className="space-y-6">
@@ -65,7 +88,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                             <p className="text-gray-500">Solicitante</p>
                             <p className="text-brand-text">{ticket.requester}</p>
                         </div>
-                         <div className="md:col-span-2">
+                        <div className="md:col-span-2">
                             <p className="text-gray-500">Atribuído a</p>
                             <p className="text-brand-text font-semibold">{ticket.assignedTo || 'Ninguém'}</p>
                         </div>
@@ -91,13 +114,13 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                             )}
                         </div>
                     )}
-                    
+
                     <div>
                         <h4 className="font-semibold text-brand-text mb-4">Comentários ({ticket.comments.length})</h4>
                         <div className="space-y-4">
-                            {ticket.comments.map(comment => (
-                                <div key={comment.id} className="flex items-start space-x-3">
-                                    <img src={comment.authorAvatarUrl} alt={comment.author} className="w-8 h-8 rounded-full"/>
+                            {ticket.comments.map((comment, index) => (
+                                <div key={index} className="flex items-start space-x-3">
+                                    <img src={comment.authorAvatarUrl || 'https://via.placeholder.com/40'} alt={comment.author} className="w-8 h-8 rounded-full object-cover" />
                                     <div>
                                         <div className="bg-gray-100 p-3 rounded-lg rounded-tl-none">
                                             <p className="font-semibold text-sm text-brand-text">{comment.author}</p>
@@ -111,15 +134,17 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                     </div>
 
                     <div>
-                         <form className="mt-6 flex items-center space-x-3">
-                            <img src={currentUser.avatarUrl} alt="Sua foto" className="w-8 h-8 rounded-full" />
+                        <form onSubmit={handleCommentSubmit} className="mt-6 flex items-center space-x-3">
+                            <img src={currentUser.avatarUrl} alt="Sua foto" className="w-8 h-8 rounded-full object-cover" />
                             <div className="relative flex-1">
                                 <input
                                     type="text"
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
                                     placeholder="Adicionar um comentário..."
-                                    className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text"
                                 />
-                                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600">
+                                <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:opacity-50">
                                     <PaperAirplaneIcon className="w-4 h-4" />
                                 </button>
                             </div>

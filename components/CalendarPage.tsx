@@ -1,14 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XCircleIcon, UsersIcon, CalendarIcon, GiftIcon } from './icons';
-// FIX: Correcting the import path for types.
 import type { CalendarEvent, Employee, CalendarEventCategory } from '../types';
-
-interface CalendarPageProps {
-    allEmployees: Employee[];
-    userEvents?: CalendarEvent[];
-    onEventCreate?: (event: CalendarEvent) => void;
-}
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 const mockHolidays = [
     { title: 'Dia do Trabalho', date: '2024-05-01' },
@@ -19,11 +14,12 @@ const mockHolidays = [
     { title: 'Natal', date: '2024-12-25' },
 ];
 
-
-const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = [], onEventCreate }) => {
+const CalendarPage: React.FC = () => {
+    const { currentUser } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'week'>('month');
-    // Removed local events state in favor of props
+    const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -34,27 +30,142 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = 
         endTime: '10:00',
         category: 'Reunião' as CalendarEventCategory,
         location: '',
-        attendees: [] as Employee[],
+        attendees: [] as string[], // IDs
         notes: ''
     });
 
+    useEffect(() => {
+        if (!currentUser?.company_id) return;
+
+        const fetchData = async () => {
+            // Fetch Employees
+            const { data: emps } = await supabase.from('profiles').select('*').eq('company_id', currentUser.company_id);
+            if (emps) {
+                setEmployees(emps.map((e: any) => ({
+                    id: e.id,
+                    name: e.full_name,
+                    email: e.email,
+                    role: e.role,
+                    team: e.department,
+                    avatarUrl: e.avatar_url,
+                    permissions: {} as any, // minimal
+                    joinDate: e.created_at,
+                    birthDate: '', // Not in profiles usually
+                    following: []
+                })));
+            }
+
+            // Fetch Events
+            const { data: evts, error } = await supabase
+                .from('events')
+                .select('*')
+                .eq('company_id', currentUser.company_id);
+
+            if (evts) {
+                const formattedEvents: CalendarEvent[] = evts.map((e: any) => ({
+                    id: e.id,
+                    title: e.title,
+                    date: e.date?.split('T')[0] || e.created_at?.split('T')[0], // Fallback
+                    startTime: e.start_time || '00:00',
+                    endTime: e.end_time || '00:00',
+                    category: (e.category as CalendarEventCategory) || 'Reunião',
+                    location: e.location || '',
+                    attendees: [], // We will map this if needed, complicated to map right away without employees loaded
+                    notes: e.description || ''
+                }));
+                // Note: Real attendees mapping requires loaded employees. 
+                // We'll update state. Ideally we fetch attendees IDs.
+                // Assuming e.attendees is array of strings.
+
+                const eventsWithAttendees = formattedEvents.map((fe, index) => {
+                    const raw = evts[index];
+                    const attendeeIds = raw.attendees || [];
+                    // We can't map here because 'employees' state might not be set yet if run in parallel.
+                    // But we are in same function.
+                    // Actually let's just store IDs in formattedEvents and map in render or useMemo.
+                    // types.ts defines attendees: Employee[]. strict.
+                    // So we need to map here.
+                    // We have 'emps' from previous await.
+                    return {
+                        ...fe,
+                        attendees: (emps || []).filter((emp: any) => attendeeIds.includes(emp.id)).map((emp: any) => ({
+                            id: emp.id,
+                            name: emp.full_name,
+                            avatarUrl: emp.avatar_url
+                        } as Employee))
+                    };
+                });
+                setEvents(eventsWithAttendees);
+            }
+        };
+
+        fetchData();
+    }, [currentUser?.company_id]);
+
+    const handleCreateEvent = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentUser?.company_id) return;
+
+        try {
+            const { data, error } = await supabase.from('events').insert({
+                company_id: currentUser.company_id,
+                title: newEventData.title,
+                description: newEventData.notes,
+                date: newEventData.date, // timestamp? Supabase expects ISO string
+                start_time: newEventData.startTime,
+                end_time: newEventData.endTime,
+                category: newEventData.category,
+                location: newEventData.location,
+                attendees: newEventData.attendees, // Array of IDs
+                creator_id: currentUser.id
+            }).select();
+
+            if (error) throw error;
+
+            if (data) {
+                // Refresh or append
+                // Simple refresh for now
+                // Or manual append
+                const newEvt: CalendarEvent = {
+                    id: data[0].id,
+                    title: data[0].title,
+                    date: data[0].date?.split('T')[0],
+                    startTime: data[0].start_time,
+                    endTime: data[0].end_time,
+                    category: data[0].category as any,
+                    location: data[0].location,
+                    attendees: employees.filter(emp => newEventData.attendees.includes(emp.id)),
+                    notes: data[0].description
+                };
+                setEvents([...events, newEvt]);
+                setCreateModalOpen(false);
+                setNewEventData({ title: '', date: new Date().toISOString().split('T')[0], startTime: '09:00', endTime: '10:00', category: 'Reunião', location: '', attendees: [], notes: '' });
+            }
+        } catch (error) {
+            console.error('Error creating event:', error);
+            alert('Erro ao criar evento');
+        }
+    };
+
+
     const allCalendarEvents = useMemo(() => {
-        const birthdayEvents: CalendarEvent[] = allEmployees.map(emp => ({
-            id: -emp.id, // Negative ID to avoid collision
+        // ... (birthday and holiday logic same as before)
+        const birthdayEvents: CalendarEvent[] = employees.map((emp: any) => ({
+            id: `bday-${emp.id}`, // String ID
             title: `Aniversário de ${emp.name.split(' ')[0]}`,
-            date: `${currentDate.getFullYear()}-${emp.birthDate.substring(5)}`,
+            date: emp.birthDate ? `${currentDate.getFullYear()}-${emp.birthDate.substring(5)}` : '',
             startTime: '00:00',
             endTime: '23:59',
             category: 'Aniversário',
             location: '',
             attendees: [],
             notes: `Deseje um feliz aniversário para ${emp.name}!`
-        }));
+        })).filter(e => e.date); // Filter valid dates
 
         const holidayEvents: CalendarEvent[] = mockHolidays.map((h, i) => ({
-            id: -1000 - i,
+            id: `holiday-${i}`,
             title: h.title,
-            date: h.date.replace('2024', currentDate.getFullYear().toString()), // Adjust year
+            date: h.date.replace('2024', currentDate.getFullYear().toString()),
             startTime: '00:00',
             endTime: '23:59',
             category: 'Feriado',
@@ -63,8 +174,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = 
             notes: 'Feriado Nacional'
         }));
 
-        return [...userEvents, ...birthdayEvents, ...holidayEvents];
-    }, [userEvents, allEmployees, currentDate]);
+        return [...events, ...birthdayEvents, ...holidayEvents];
+    }, [events, employees, currentDate]);
 
 
     const { grid: calendarGrid, title: calendarTitle } = useMemo(() => {
@@ -115,19 +226,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = 
     }
 
     const handleAttendeesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedIds = [...e.target.selectedOptions].map(option => Number(option.value));
-        const selectedEmployees = allEmployees.filter(emp => selectedIds.includes(emp.id));
-        setNewEventData(prev => ({ ...prev, attendees: selectedEmployees }));
-    };
-
-    const handleCreateEvent = (e: React.FormEvent) => {
-        e.preventDefault();
-        const newEvent: CalendarEvent = { id: Date.now(), ...newEventData };
-        if (onEventCreate) {
-            onEventCreate(newEvent);
-        }
-        setCreateModalOpen(false);
-        setNewEventData({ title: '', date: new Date().toISOString().split('T')[0], startTime: '09:00', endTime: '10:00', category: 'Reunião', location: '', attendees: [], notes: '' });
+        const selectedIds = [...e.target.selectedOptions].map(option => option.value);
+        setNewEventData(prev => ({ ...prev, attendees: selectedIds }));
     };
 
     const getCategoryColor = (category: CalendarEventCategory) => {
@@ -157,9 +257,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = 
                     <div className="flex items-center space-x-3"><CalendarIcon className="w-5 h-5" /><span>{new Date(event.date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}, {event.startTime} - {event.endTime}</span></div>
                     {event.location && <p><strong>Local:</strong> {event.location}</p>}
                     {event.notes && <p><strong>Observações:</strong> {event.notes}</p>}
-                    {event.attendees.length > 0 && <div>
+                    {event.attendees && event.attendees.length > 0 && <div>
                         <h4 className="font-semibold text-brand-text mb-2">Participantes ({event.attendees.length})</h4>
-                        <div className="flex flex-wrap gap-2">{event.attendees.map(a => <span key={a.id} className="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded-full text-sm"><img src={a.avatarUrl} className="w-5 h-5 rounded-full" alt={a.name} /><span>{a.name}</span></span>)}</div>
+                        <div className="flex flex-wrap gap-2">{event.attendees.map(a => <span key={a.id} className="flex items-center space-x-2 bg-gray-100 px-2 py-1 rounded-full text-sm"><img src={a.avatarUrl || 'https://via.placeholder.com/32'} className="w-5 h-5 rounded-full" alt={a.name} /><span>{a.name}</span></span>)}</div>
                     </div>}
                 </div>
             </div>
@@ -248,7 +348,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ allEmployees, userEvents = 
                                 <div><label className="block text-sm font-medium text-brand-subtle-text">Fim</label><input type="time" name="endTime" value={newEventData.endTime} onChange={handleInputChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                             </div>
                             <div><label className="block text-sm font-medium text-brand-subtle-text">Local</label><input type="text" name="location" value={newEventData.location} onChange={handleInputChange} placeholder="Ex: Sala de Reunião 1 ou Virtual" className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                            <div><label className="block text-sm font-medium text-brand-subtle-text">Participantes</label><select multiple name="attendees" onChange={handleAttendeesChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text h-24">{allEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+                            <div><label className="block text-sm font-medium text-brand-subtle-text">Participantes</label><select multiple name="attendees" onChange={handleAttendeesChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text h-24">{employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
                             <div><label className="block text-sm font-medium text-brand-subtle-text">Observações</label><textarea name="notes" value={newEventData.notes} onChange={handleInputChange} rows={3} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"></textarea></div>
                             <div className="flex justify-end space-x-3 pt-2"><button type="button" onClick={() => setCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">Salvar Evento</button></div>
                         </form>

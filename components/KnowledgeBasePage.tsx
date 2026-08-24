@@ -1,23 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QuestionMarkCircleIcon, MagnifyingGlassIcon, ChevronDownIcon } from './icons';
 import type { KBArticle } from '../types';
-
-interface KnowledgeBasePageProps {
-    articles: KBArticle[];
-}
-
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
-const KnowledgeBasePage: React.FC<KnowledgeBasePageProps> = ({ articles }) => {
+const KnowledgeBasePage: React.FC = () => {
     const { t } = useLanguage();
+    const { currentUser } = useAuth();
+    const [articles, setArticles] = useState<KBArticle[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [expandedIds, setExpandedIds] = useState<number[]>([]);
+    const [expandedIds, setExpandedIds] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const toggleExpand = (id: number) => {
-        setExpandedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    const toggleExpand = async (id: string) => {
+        const isExpanding = !expandedIds.includes(id);
+        setExpandedIds(prev => isExpanding ? [...prev, id] : prev.filter(i => i !== id));
+
+        // Increment view count if expanding
+        if (isExpanding) {
+            const { error } = await supabase.rpc('increment_kb_views', { article_id: id });
+            // If RPC doesn't exist, ignore for now.
+        }
     };
 
+    const fetchArticles = async () => {
+        if (!currentUser?.company_id) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('kb_articles')
+                .select('*')
+                .eq('company_id', currentUser.company_id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (data) {
+                const formattedArticles: KBArticle[] = data.map((a: any) => ({
+                    id: a.id,
+                    title: a.title,
+                    category: a.category,
+                    content: a.content,
+                    views: a.views || 0,
+                    mediaUrl: a.media_url,
+                    mediaType: a.media_type
+                }));
+                setArticles(formattedArticles);
+            }
+        } catch (error) {
+            console.error('Error fetching KB articles:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchArticles();
+    }, [currentUser?.company_id]);
+
     const filtered = articles.filter(a => a.title.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando base de conhecimento...</div>;
 
     return (
         <div className="p-6 max-w-5xl mx-auto">

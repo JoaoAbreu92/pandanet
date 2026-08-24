@@ -157,8 +157,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyE
                 } else {
                     const other = participants.find(p => p.user_id !== currentUser.id) || participants[0]; // Fallback to self if chat with self?
                     // If fetching profile failed, use placeholders
-                    participantName = other?.profiles?.full_name || 'Usuário Desconhecido';
-                    avatar = other?.profiles?.avatar_url || 'https://via.placeholder.com/150';
+                    const profileData = Array.isArray(other?.profiles) ? (other.profiles as any)[0] : other?.profiles;
+                    participantName = profileData?.full_name || 'Usuário Desconhecido';
+                    avatar = profileData?.avatar_url || 'https://via.placeholder.com/150';
                 }
 
                 return {

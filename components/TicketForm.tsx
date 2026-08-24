@@ -70,7 +70,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
                         <option>Urgente</option>
                     </select>
                 </div>
-                 <div>
+                <div>
                     <label htmlFor="assignedTo" className="block text-sm font-medium text-brand-text">Atribuir a (Opcional)</label>
                     <select
                         id="assignedTo"
@@ -80,7 +80,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
                     >
                         <option value="">Ninguém</option>
                         {assignableUsers.map(user => (
-                            <option key={user.id} value={user.name}>{user.name} - ({user.team})</option>
+                            <option key={user.id} value={user.id}>{user.name} - ({user.team})</option>
                         ))}
                     </select>
                 </div>

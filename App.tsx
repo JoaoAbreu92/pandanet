@@ -332,16 +332,16 @@ const AppContent: React.FC = () => {
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
-            case 'feed': return <FeedPage posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} onAddRecognition={handleAddRecognition} />;
-            case 'messages': return canAccess('viewMessages') ? <Messages conversations={companyData.conversations} setConversations={handleUpdateConversations} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
-            case 'tickets': return canAccess('openTickets') ? <TicketPage tickets={companyData.tickets} setTickets={handleUpdateTickets} currentUser={currentUser} allEmployees={companyData.employees} /> : null;
-            case 'calendar': return canAccess('viewCalendar') ? <CalendarPage allEmployees={companyData.employees} userEvents={calendarEvents} onEventCreate={handleAddEvent} /> : null;
+            case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} events={companyData.events} recognitions={companyData.recognitions} onAddRecognition={handleAddRecognition} />;
+            case 'messages': return canAccess('viewMessages') ? <Messages /> : null;
+            case 'tickets': return canAccess('openTickets') ? <TicketPage /> : null;
+            case 'calendar': return canAccess('viewCalendar') ? <CalendarPage /> : null;
             case 'directory': return canAccess('viewDirectory') ? <DirectoryPage employees={companyData.employees} /> : null;
-            case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter documents={companyData.documents} setDocuments={(d) => setCompanyData({ ...companyData, documents: d })} currentUser={currentUser} /> : null;
-            case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage recognitions={companyData.recognitions} employees={companyData.employees} currentUser={currentUser} onAddRecognition={handleAddRecognition} /> : null;
-            case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage items={companyData.marketplaceItems} setItems={(i) => setCompanyData({ ...companyData, marketplaceItems: i })} currentUser={currentUser} /> : null;
+            case 'documentos': return canAccess('viewDocuments') ? <ResourceCenter /> : null;
+            case 'recognition': return canAccess('viewRecognition') ? <RecognitionPage /> : null;
+            case 'marketplace': return canAccess('useMarketplace') ? <MarketplacePage /> : null;
             case 'forms': return canAccess('viewForms') ? <FormsPage submissions={companyData.formSubmissions} setSubmissions={(s) => setCompanyData({ ...companyData, formSubmissions: s })} currentUser={currentUser} /> : null;
-            case 'benefits': return canAccess('viewBenefits') ? <BeneficiosPage benefits={companyData.benefits} setBenefits={(b) => setCompanyData({ ...companyData, benefits: b })} currentUser={currentUser} /> : null;
+            case 'benefits': return canAccess('viewBenefits') ? <BeneficiosPage /> : null;
             case 'bem-estar': return canAccess('viewWellbeing') ? <BemEstarPage items={companyData.wellnessItems} /> : null;
             case 'onboarding': return canAccess('viewOnboarding') ? <OnboardingPage /> : null;
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
@@ -349,13 +349,13 @@ const AppContent: React.FC = () => {
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Acesso negado. Esta área é restrita.</p>;
             case 'admin': return currentUser.role === 'Super Admin' ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado. Apenas o Master TI tem acesso a esta área.</p>;
-            case 'training': return canAccess('viewTraining') ? <TrainingPage trainings={companyData.trainings} /> : null;
-            case 'surveys': return canAccess('viewSurveys') ? <SurveysPage polls={companyData.polls} /> : null;
-            case 'policies': return canAccess('viewPolicies') ? <PoliciesPage policies={companyData.documents} /> : null;
-            case 'knowledge-base': return canAccess('viewKnowledgeBase') ? <KnowledgeBasePage articles={companyData.kbArticles} /> : null;
-            case 'service-status': return canAccess('viewServiceStatus') ? <StatusPage services={companyData.services} /> : null;
-            case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage alerts={companyData.securityAlerts} /> : null;
-            case 'events': return <EventsPage events={companyData.events} onJoinEvent={handleJoinEvent} onDeclineEvent={handleDeclineEvent} currentUser={currentUser} />;
+            case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
+            case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
+            case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;
+            case 'knowledge-base': return canAccess('viewKnowledgeBase') ? <KnowledgeBasePage /> : null;
+            case 'service-status': return canAccess('viewServiceStatus') ? <StatusPage /> : null;
+            case 'infosec': return canAccess('viewInfoSec') ? <InfoSecPage /> : null;
+            case 'events': return <EventsPage />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
             default: return <HomePage onNavigate={handleNavigate} companyData={companyData} />;
         }

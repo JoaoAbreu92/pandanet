@@ -1,15 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { RocketLaunchIcon, PlayCircleIcon } from './icons';
 import type { TrainingModule } from '../types';
-
-interface TrainingPageProps {
-    trainings: TrainingModule[];
-}
-
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
-const TrainingPage: React.FC<TrainingPageProps> = ({ trainings }) => {
+const TrainingPage: React.FC = () => {
     const { t } = useLanguage();
+    const { currentUser } = useAuth();
+    const [trainings, setTrainings] = useState<TrainingModule[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser?.company_id) return;
+
+        const fetchTrainings = async () => {
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('training_modules')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                if (error) throw error;
+                if (data) {
+                    setTrainings(data.map((t: any) => ({
+                        id: t.id,
+                        title: t.title,
+                        duration: t.duration || '0 min',
+                        thumbnail: t.thumbnail || 'https://via.placeholder.com/300x200?text=Training',
+                        videoUrl: t.video_url,
+                        category: t.category
+                    })));
+                }
+            } catch (err) {
+                console.error("Error fetching trainings:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTrainings();
+    }, [currentUser?.company_id]);
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando treinamentos...</div>;
 
     return (
         <div className="p-6 max-w-7xl mx-auto">

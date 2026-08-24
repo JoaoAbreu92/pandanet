@@ -1,22 +1,141 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { SearchIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
-// FIX: Correcting the import path for types.
-import type { MarketplaceItem, Employee } from '../types';
+import { SearchIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusCircleIcon } from './icons';
+import type { MarketplaceItem } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
-interface MarketplacePageProps {
-    items: MarketplaceItem[];
-    setItems: (items: MarketplaceItem[]) => void;
-    currentUser: Employee;
+const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; currentUser: any }> = ({ onClose, onAddItem, currentUser }) => {
+    const [title, setTitle] = useState('');
+    const [price, setPrice] = useState('');
+    const [category, setCategory] = useState('Eletrônicos');
+    const [condition, setCondition] = useState('Bom');
+    const [description, setDescription] = useState('');
+    const [image, setImage] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title || !price || !description || !currentUser) return;
+
+        setUploading(true);
+        try {
+            let imageUrls: string[] = [];
+
+            if (image) {
+                const fileExt = image.name.split('.').pop();
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `${currentUser.id}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('marketplace-media')
+                    .upload(filePath, image);
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage
+                    .from('marketplace-media')
+                    .getPublicUrl(filePath);
+
+                if (data) imageUrls.push(data.publicUrl);
+            }
+
+            const { error } = await supabase
+                .from('marketplace_items')
+                .insert([{
+                    title,
+                    price: parseFloat(price),
+                    category,
+                    condition,
+                    description,
+                    company_id: currentUser.company_id,
+                    listed_by: currentUser.id,
+                    status: 'Disponível',
+                    image_urls: imageUrls
+                }]);
+
+            if (error) throw error;
+
+            onAddItem();
+            onClose();
+            alert('Item anunciado com sucesso!');
+        } catch (error) {
+            console.error('Error adding item:', error);
+            alert('Erro ao anunciar item. Tente novamente.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <XCircleIcon className="w-6 h-6" />
+                </button>
+                <h3 className="text-xl font-bold text-brand-text mb-4">Anunciar Novo Item</h3>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text">Título do Anúncio</label>
+                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-text">Preço (R$)</label>
+                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-text">Condição</label>
+                            <select value={condition} onChange={e => setCondition(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                                <option>Novo</option>
+                                <option>Quase Novo</option>
+                                <option>Bom</option>
+                                <option>Usado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text">Categoria</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
+                            <option>Eletrônicos</option>
+                            <option>Móveis</option>
+                            <option>Livros</option>
+                            <option>Roupas</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text">Descrição</label>
+                        <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" required></textarea>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-brand-text">Foto do Item</label>
+                        <input type="file" accept="image/*" onChange={e => setImage(e.target.files ? e.target.files[0] : null)} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <button type="button" onClick={onClose} className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancelar</button>
+                        <button type="submit" disabled={uploading} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
+                            {uploading ? 'Publicando...' : 'Publicar Anúncio'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
 }
 
-
-const ItemDetailModal: React.FC<{ 
-    item: MarketplaceItem; 
-    onClose: () => void; 
-    onReserve: (itemId: number) => void;
-    currentUser: Employee;
-}> = ({ item, onClose, onReserve, currentUser }) => {
+const ItemDetailModal: React.FC<{
+    item: MarketplaceItem;
+    onClose: () => void;
+    onReserve: (itemId: number | string) => void;
+    currentUserId: string;
+}> = ({ item, onClose, onReserve, currentUserId }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     const nextImage = () => setCurrentImageIndex(prev => (prev + 1) % item.imageUrls.length);
@@ -33,8 +152,13 @@ const ItemDetailModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                <div className="w-full md:w-1/2 relative">
-                    <img src={item.imageUrls[currentImageIndex]} alt={item.title} className="w-full h-64 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none" />
+                <div className="w-full md:w-1/2 relative bg-gray-100 flex items-center justify-center">
+                    {item.imageUrls.length > 0 ? (
+                        <img src={item.imageUrls[currentImageIndex]} alt={item.title} className="w-full h-64 md:h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none" />
+                    ) : (
+                        <div className="text-gray-400">Sem imagem</div>
+                    )}
+
                     {item.imageUrls.length > 1 && (
                         <>
                             <button onClick={prevImage} className="absolute top-1/2 left-2 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full hover:bg-black/60"><ChevronLeftIcon className="w-6 h-6" /></button>
@@ -56,14 +180,15 @@ const ItemDetailModal: React.FC<{
                     <p className="text-3xl font-bold text-brand-primary mb-4">R$ {item.price.toFixed(2)}</p>
                     <div className="text-brand-subtle-text space-y-2 text-sm mb-6 flex-grow">
                         <p className="whitespace-pre-wrap">{item.description}</p>
+                        <p className="text-xs text-gray-400 mt-4">Anunciado por: {item.seller} em {item.listedAt}</p>
                     </div>
                     <div className="mt-auto pt-4 border-t">
                         {item.status === 'Disponível' ? (
-                             <button onClick={() => onReserve(item.id)} className="w-full py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Tenho Interesse!</button>
+                            <button onClick={() => onReserve(item.id)} className="w-full py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors">Tenho Interesse!</button>
                         ) : (
-                             <button className="w-full py-3 bg-gray-300 text-gray-600 font-semibold rounded-lg cursor-not-allowed" disabled>
-                                {item.status === 'Reservado' ? `Reservado por ${item.reservedBy}` : 'Item Indisponível'}
-                             </button>
+                            <button className="w-full py-3 bg-gray-300 text-gray-600 font-semibold rounded-lg cursor-not-allowed" disabled>
+                                {item.status === 'Reservado' ? `Reservado por ${item.reservedBy || 'alguém'}` : 'Item Indisponível'}
+                            </button>
                         )}
                     </div>
                 </div>
@@ -72,11 +197,58 @@ const ItemDetailModal: React.FC<{
     );
 };
 
-
-const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, currentUser }) => {
+const MarketplacePage: React.FC = () => {
+    const { currentUser } = useAuth();
+    const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Todos');
     const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
+    const [isSellModalOpen, setSellModalOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    const fetchItems = async () => {
+        if (!currentUser?.company_id) return;
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('marketplace_items')
+                .select(`
+                    *,
+                    reserver:reserved_by(full_name),
+                    seller:listed_by(full_name)
+                `)
+                .eq('company_id', currentUser.company_id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (data) {
+                const formattedItems: MarketplaceItem[] = data.map((item: any) => ({
+                    id: item.id, // Keep as string (UUID)
+                    title: item.title,
+                    price: item.price,
+                    imageUrls: item.image_urls || [], // Default to empty array if null
+                    category: item.category,
+                    condition: item.condition,
+                    description: item.description,
+                    status: item.status,
+                    reservedBy: item.reserver?.full_name,
+                    seller: item.seller?.full_name || 'Desconhecido',
+                    listedBy: item.listed_by,
+                    listedAt: new Date(item.created_at).toLocaleDateString('pt-BR')
+                }));
+                setItems(formattedItems);
+            }
+        } catch (error) {
+            console.error('Error fetching marketplace items:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchItems();
+    }, [currentUser?.company_id]);
 
     const categories = ['Todos', ...new Set(items.map(item => item.category))];
 
@@ -88,13 +260,31 @@ const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, curr
         });
     }, [items, searchTerm, selectedCategory]);
 
-    const handleReserveItem = (itemId: number) => {
-        setItems(items.map(item =>
-            item.id === itemId
-                ? { ...item, status: 'Reservado', reservedBy: currentUser.name }
-                : item
-        ));
-        setSelectedItem(null);
+    const handleReserveItem = async (itemId: number | string) => {
+        if (!currentUser) return;
+        try {
+            const { error } = await supabase
+                .from('marketplace_items')
+                .update({
+                    status: 'Reservado',
+                    reserved_by: currentUser.id
+                })
+                .eq('id', itemId);
+
+            if (error) throw error;
+
+            // Optimistic update
+            setItems(items.map(item =>
+                item.id === itemId
+                    ? { ...item, status: 'Reservado', reservedBy: currentUser.name }
+                    : item
+            ));
+            setSelectedItem(null);
+            alert('Item reservado com sucesso! Entre em contato com o vendedor para combinar o pagamento e a retirada.');
+        } catch (error) {
+            console.error('Error reserving item:', error);
+            alert('Erro ao reservar item.');
+        }
     };
 
     const getStatusBorder = (status: MarketplaceItem['status']) => {
@@ -103,11 +293,22 @@ const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, curr
         return 'border-transparent';
     };
 
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando marketplace...</div>;
+
     return (
         <div className="space-y-6">
-            <div className="text-center md:text-left">
-                <h1 className="text-3xl font-bold text-brand-text">Marketplace da Empresa</h1>
-                <p className="text-brand-subtle-text mt-1">Encontre equipamentos usados com um ótimo custo-benefício!</p>
+            <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
+                <div>
+                    <h1 className="text-3xl font-bold text-brand-text">Marketplace da Empresa</h1>
+                    <p className="text-brand-subtle-text mt-1">Encontre equipamentos usados com um ótimo custo-benefício!</p>
+                </div>
+                <button
+                    onClick={() => setSellModalOpen(true)}
+                    className="mt-4 md:mt-0 flex items-center space-x-2 px-6 py-2 bg-brand-primary text-white rounded-full hover:bg-emerald-600 transition-colors shadow-lg"
+                >
+                    <PlusCircleIcon className="w-5 h-5" />
+                    <span>Anunciar um Item</span>
+                </button>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">
@@ -115,7 +316,7 @@ const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, curr
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input type="text" placeholder="Buscar por item..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-full bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" />
                 </div>
-                 <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full md:w-48 px-4 py-2 border rounded-full bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary">
+                <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full md:w-48 px-4 py-2 border rounded-full bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary">
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
             </div>
@@ -124,7 +325,12 @@ const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, curr
                 {filteredItems.map(item => (
                     <div key={item.id} onClick={() => setSelectedItem(item)} className={`rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 cursor-pointer bg-white flex flex-col overflow-hidden border-2 ${getStatusBorder(item.status)}`}>
                         <div className="relative">
-                            <img src={item.imageUrls[0]} alt={item.title} className="h-48 w-full object-cover" />
+                            {item.imageUrls.length > 0 ? (
+                                <img src={item.imageUrls[0]} alt={item.title} className="h-48 w-full object-cover" />
+                            ) : (
+                                <div className="h-48 w-full bg-gray-200 flex items-center justify-center text-gray-400">Sem Imagem</div>
+                            )}
+
                             {item.status !== 'Disponível' && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                     <span className="text-white font-bold text-lg px-4 py-2 bg-black/60 rounded-md">{item.status}</span>
@@ -144,7 +350,9 @@ const MarketplacePage: React.FC<MarketplacePageProps> = ({ items, setItems, curr
             </div>
             {filteredItems.length === 0 && <p className="text-center text-gray-500 py-12">Nenhum item encontrado. Tente ajustar sua busca.</p>}
 
-            {selectedItem && <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onReserve={handleReserveItem} currentUser={currentUser} />}
+            {selectedItem && currentUser && <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onReserve={handleReserveItem} currentUserId={currentUser.id} />}
+
+            {isSellModalOpen && <SellItemModal onClose={() => setSellModalOpen(false)} onAddItem={fetchItems} currentUser={currentUser} />}
         </div>
     );
 };

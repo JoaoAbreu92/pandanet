@@ -1,14 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from './LanguageContext';
 import { ArrowPathIcon, CheckCircleIcon, XCircleIcon } from './icons';
 import type { ServiceStatusItem } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
-interface StatusPageProps {
-    services: ServiceStatusItem[];
-}
-
-const StatusPage: React.FC<StatusPageProps> = ({ services }) => {
+const StatusPage: React.FC = () => {
     const { t } = useLanguage();
+    const { currentUser } = useAuth();
+    const [services, setServices] = useState<ServiceStatusItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser?.company_id) return;
+
+        const fetchServices = async () => {
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('services')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                if (error) throw error;
+                if (data) {
+                    setServices(data.map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        status: (s.status as any) || 'operational',
+                        uptime: s.uptime || '100%',
+                        imageUrl: s.image_url
+                    })));
+                }
+            } catch (err) {
+                console.error("Error fetching services:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchServices();
+    }, [currentUser?.company_id]);
+
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando status dos serviços...</div>;
 
     return (
         <div className="p-6 max-w-4xl mx-auto">
@@ -23,8 +57,8 @@ const StatusPage: React.FC<StatusPageProps> = ({ services }) => {
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-bold hidden sm:inline-block">{t('status.all_operational')}</span>
                 </div>
                 <div className="divide-y divide-gray-100">
-                    {services.map((service, idx) => (
-                        <div key={idx} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    {services.length === 0 ? <p className="p-4 text-center text-gray-500">Nenhum serviço monitorado.</p> : services.map((service) => (
+                        <div key={service.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                             <div className="flex items-center">
                                 {service.imageUrl ? (
                                     <img src={service.imageUrl} alt={service.name} className="w-10 h-10 rounded-full mr-3 object-cover border border-gray-200" />
