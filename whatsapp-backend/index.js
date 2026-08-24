@@ -977,10 +977,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             } : isAudio ? {
                 number: phoneNumber,
-                audioMessage: {
-                    audio: base64Data,
-                    ptt: true
-                },
+                audio: base64Data.startsWith('data:') ? base64Data : `data:${mediaType || 'audio/ogg'};base64,${base64Data}`,
                 options: {
                     encoding: true
                 }

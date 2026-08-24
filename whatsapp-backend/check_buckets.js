@@ -18,8 +18,8 @@ async function execSQL(sql) {
 }
 
 async function run() {
-  const res = await execSQL("SELECT id, name, public FROM storage.buckets");
-  console.log('Buckets:', res.body);
+  const res = await execSQL("SELECT policyname, cmd, qual FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage'");
+  console.log('Policies:', res.body);
 }
 
 run().catch(console.error);

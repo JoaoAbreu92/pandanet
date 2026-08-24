@@ -76,37 +76,42 @@ supabase.storage.from = (bucket: string) => {
 export function getCleanImageUrl(url: string | null | undefined): string {
     if (!url) return '';
     if (url.startsWith('blob:')) return url;
-    if (url.includes('/storage/v1/object/public/')) {
-        if (typeof window !== 'undefined') {
+    
+    let processedUrl = url;
+    
+    // Se contiver host interno do supabase
+    if (processedUrl.includes('supabase-kong:8000')) {
+        processedUrl = processedUrl.replace('http://supabase-kong:8000', 'https://pandanet.grupopixel.com.br').replace('supabase-kong:8000', 'pandanet.grupopixel.com.br');
+    }
+
+    if (processedUrl.includes('/storage/v1/object/public/')) {
+        const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+        let isDevServer = false;
+
+        if (typeof window !== 'undefined' && !isCapacitor) {
             const hostname = window.location.hostname;
             const port = window.location.port;
-            
-            // Se estivermos rodando no Vite Dev Server (porta 3000, 5173, etc.) ou se for localhost,
-            // não reescrevemos o host original do banco de dados (que aponta para a porta 8000 da VPS),
-            // pois o Vite Dev Server local não tem proxy para a rota /storage.
-            const isDevServer = port === '3000' || port === '5173' || port === '3001' ||
-                                hostname === 'localhost' || 
-                                hostname === '127.0.0.1' || 
-                                hostname.startsWith('192.168.') || 
-                                hostname.startsWith('10.') || 
-                                hostname.startsWith('172.');
-            
-            if (isDevServer) {
-                return url;
-            }
+            isDevServer = port === '3000' || port === '5173' || port === '3001' ||
+                          hostname === 'localhost' || 
+                          hostname === '127.0.0.1' || 
+                          hostname.startsWith('192.168.') || 
+                          hostname.startsWith('10.') || 
+                          hostname.startsWith('172.');
         }
 
-        if (url.startsWith('https://')) return url;
-        const idx = url.indexOf('/storage/v1/object/public/');
+        // Em desenvolvimento local no PC (fora do Capacitor), mantém IP da VPS para acesso direto
+        if (isDevServer) {
+            return processedUrl;
+        }
+
+        // Em produção ou no aplicativo APK (Capacitor), sempre força HTTPS para o domínio oficial
+        const idx = processedUrl.indexOf('/storage/v1/object/public/');
         if (idx !== -1) {
-            const path = url.substring(idx);
-            if (typeof window !== 'undefined') {
-                return `${window.location.origin}${path}`;
-            }
-            return path;
+            const path = processedUrl.substring(idx);
+            return `https://pandanet.grupopixel.com.br${path}`;
         }
     }
-    return url;
+    return processedUrl;
 }
 
 /**

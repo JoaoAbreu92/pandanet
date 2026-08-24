@@ -881,33 +881,48 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     let processedUrl = url;
 
     // 1. Resolve host base para Supabase interno
-    const supabaseBaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     if (processedUrl.includes('supabase-kong:8000')) {
-      processedUrl = processedUrl.replace('http://supabase-kong:8000', supabaseBaseUrl).replace('supabase-kong:8000', supabaseBaseUrl);
+      processedUrl = processedUrl.replace('http://supabase-kong:8000', 'https://pandanet.grupopixel.com.br').replace('supabase-kong:8000', 'pandanet.grupopixel.com.br');
     }
+
     // 2. Se for path relativo
     if (processedUrl.startsWith('/storage/v1/')) {
-      processedUrl = `${supabaseBaseUrl}${processedUrl}`;
+      const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+      let isDevServer = false;
+
+      if (typeof window !== 'undefined' && !isCapacitor) {
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+        isDevServer = port === '3000' || port === '5173' || port === '3001' ||
+                      hostname === 'localhost' || 
+                      hostname === '127.0.0.1';
+      }
+
+      if (isDevServer) {
+        processedUrl = `http://77.37.43.60:8000${processedUrl}`;
+      } else {
+        processedUrl = `https://pandanet.grupopixel.com.br${processedUrl}`;
+      }
     }
 
     // 3. FIX MASTER PARA VPS / MIXED CONTENT
-    // Se o backend/DB salvou ou env de rede for HTTP (ex: http://77.37.43.60:8000), 
-    // mas o painel estiver rodando em HTTPS (https://pandanet...), o browser vai bloquear.
-    // Tenta contornar isso forçando https se for seguro ou via proxy do mesmo host!
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      // Se a url original estiver apontando para um IP via HTTP puro 
-      // e o sistema roda atrás de um proxy SSL, forçamos o path pelo mesmo host SSL
-      if (processedUrl.startsWith('http://')) {
-        // Em vez de falhar por Mixed Content pegando do IP direto,
-        // redireciona a requisição de storage para o host atual, assumindo que NGINX roteia.
-        // Extrai só a rota do storage (ex: /storage/v1/object/public/...)
-        const storagePathMatch = processedUrl.match(/(\/storage\/v1\/.+)/);
-        if (storagePathMatch) {
-          processedUrl = `${window.location.origin}${storagePathMatch[1]}`;
-        } else {
-          // Fallback: força https cegamente
-          processedUrl = processedUrl.replace('http://', 'https://');
-        }
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+    let isDevServer = false;
+
+    if (typeof window !== 'undefined' && !isCapacitor) {
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      isDevServer = port === '3000' || port === '5173' || port === '3001' ||
+                    hostname === 'localhost' || 
+                    hostname === '127.0.0.1';
+    }
+
+    if (!isDevServer && processedUrl.startsWith('http://')) {
+      const storagePathMatch = processedUrl.match(/(\/storage\/v1\/.+)/);
+      if (storagePathMatch) {
+        processedUrl = `https://pandanet.grupopixel.com.br${storagePathMatch[1]}`;
+      } else {
+        processedUrl = processedUrl.replace('http://', 'https://');
       }
     }
 
@@ -1651,6 +1666,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (!rawUrl) return;
     const url = fixMediaUrl(rawUrl);
     if (!url) return;
+
+    // Se estiver rodando dentro do APK (Capacitor), abre a URL no navegador padrão do Android
+    // para que o download seja gerenciado de forma nativa pelo sistema operacional.
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
+    if (isCapacitor) {
+      window.open(url, '_system');
+      return;
+    }
 
     try {
       const response = await fetch(url);
