@@ -152,7 +152,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
             // NEW: Fetch WhatsApp Status
             try {
-                const res = await fetch('http://localhost:3000/sessions/status/all');
+                const res = await fetch('/api/sessions/status/all');
                 if (res.ok) {
                     const statusData = await res.json();
                     setWhatsappStatus(statusData);
