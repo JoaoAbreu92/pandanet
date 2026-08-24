@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # O Supabase já roda em sua própria stack (network: supabase_network)
+
+  whatsapp-backend:
+    container_name: whatsapp_backend_prod
+    build: 
+      context: ./whatsapp-backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SUPABASE_URL=http://kong:8000 # Comunicação interna com Supabase
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - COMPANY_ID=${COMPANY_ID}
+      - PORT=3000
+    networks:
+      - pandanet_network
+      - supabase_network # Conecta à rede do Supabase
+
+  pandanet-frontend:
+    container_name: pandanet_frontend_prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - whatsapp-backend
+    networks:
+      - pandanet_network
+
+networks:
+  pandanet_network:
+    driver: bridge
+  supabase_network:
+    external: true
+    name: supabase_default # Nome padrão da rede do Supabase Docker

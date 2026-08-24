@@ -1,20 +1,15 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
-# Create app directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
-# Install production dependencies
+# Instalar dependências de produção
 RUN npm ci --only=production
 
-# Bundle app source
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 3000
+# Variáveis de ambiente devem ser passadas no run/compose
+ENV NODE_ENV=production
 
-# Command to run the app
-CMD [ "node", "index.js" ]
+CMD ["node", "index.js"]
