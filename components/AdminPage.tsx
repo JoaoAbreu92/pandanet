@@ -16,6 +16,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Department } from '../types';
 import BadgesManager from './BadgesManager';
+import ReservationsManager from './ReservationsManager';
 
 interface AdminPageProps {
     company: Company;
@@ -149,6 +150,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'jobs', label: 'Gestão de Vagas', category: 'Recursos Humanos (RH)', featureId: 'jobs' },
         { id: 'hr', label: 'Gestão RH', category: 'Recursos Humanos (RH)' },
         { id: 'forms', label: 'Formulários', category: 'Recursos Humanos (RH)' },
+        { id: 'reservas_admin', label: 'Reservas', category: 'Recursos Humanos (RH)' },
 
         { id: 'ti-requests', label: 'Chamados T.I.', category: 'Tecnologia & TI' },
         { id: 'status', label: 'Status TI', category: 'Tecnologia & TI' },
@@ -389,6 +391,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.url}</p></div>}
                 />;
+            case 'reservas_admin':
+                return <ReservationsManager />;
             default:
                 return null;
         }

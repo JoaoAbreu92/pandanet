@@ -6,6 +6,7 @@ import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import BadgeDetailModal from './BadgeDetailModal';
+import { UserAvatar } from './UserAvatar';
 
 const PRESET_AVATARS = [
     'https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?auto=format&fit=crop&w=150&q=80', // Panda
@@ -52,6 +53,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [isFollowLoading, setIsFollowLoading] = useState(false);
     const [selectedBadgeForComments, setSelectedBadgeForComments] = useState<UserBadge | null>(null);
     const { refreshProfile } = useAuth();
+    const [allCompanyBadges, setAllCompanyBadges] = useState<CompanyBadge[]>([]);
+    const [showGalleryModal, setShowGalleryModal] = useState(false);
 
     // Password change state
     const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
@@ -116,7 +119,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         health_insurance: data.health_insurance || '',
                         blood_type: data.blood_type || '',
                         marital_status: data.marital_status || '',
-                        education_level: data.education_level || ''
+                        education_level: data.education_level || '',
+                        xp: data.xp || 0,
+                        level: data.level || 1
                     };
                     // Manually append department_id as it might not be in Employee type definition yet
                     (freshUser as any).department_id = data.department_id;
@@ -163,7 +168,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             health_insurance: data.health_insurance || '',
                             blood_type: data.blood_type || '',
                             marital_status: data.marital_status || '',
-                            education_level: data.education_level || ''
+                            education_level: data.education_level || '',
+                            xp: data.xp || 0,
+                            level: data.level || 1
                         };
                         (mapped as any).department_id = data.department_id;
                         setTargetUser(mapped);
@@ -185,9 +192,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 .from('posts')
                 .select(`
                     id, content, created_at, media_url, media_type, mentions, author_id,
-                    profiles: author_id(full_name, avatar_url),
+                    profiles: author_id(full_name, avatar_url, level),
                     post_reactions(id, emoji, user_id),
-                    comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
+                    comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url, level))
                 `)
                 .or(`author_id.eq.${targetId},mentions.cs.{${targetId}}`)
                 .order('created_at', { ascending: false });
@@ -199,6 +206,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 authorId: item.author_id,
                 authorName: item.profiles?.full_name || 'Usuário Excluído',
                 authorAvatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'Usuario Excluido')}&background=random`,
+                authorLevel: item.profiles?.level || 1,
                 content: item.content,
                 mediaUrl: item.media_url,
                 mediaType: item.media_type as 'image' | 'video',
@@ -213,6 +221,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     authorId: c.author_id,
                     authorName: c.profiles?.full_name || 'Usuário Excluído',
                     authorAvatar: c.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.profiles?.full_name || 'Usuario Excluido')}&background=random`,
+                    authorLevel: c.profiles?.level || 1,
                     text: c.content,
                     timestamp: c.created_at
                 })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -263,6 +272,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
         };
         fetchProfileBadges();
     }, [effectiveUser.id]);
+
+    useEffect(() => {
+        const fetchCompanyBadges = async () => {
+            if (!effectiveUser.company_id) return;
+            const { data } = await supabase
+                .from('company_badges')
+                .select('*')
+                .eq('company_id', effectiveUser.company_id)
+                .order('created_at', { ascending: false });
+            if (data) {
+                setAllCompanyBadges(data);
+            }
+        };
+        fetchCompanyBadges();
+    }, [effectiveUser.company_id]);
 
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
@@ -427,7 +451,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     blood_type: freshProfile.blood_type || '',
                     marital_status: freshProfile.marital_status || '',
                     education_level: freshProfile.education_level || '',
-                    status: freshProfile.status
+                    status: freshProfile.status,
+                    xp: freshProfile.xp || 0,
+                    level: freshProfile.level || 1
                 };
                 
                 setTempUserData(reloadedUser);
@@ -461,7 +487,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
         setIsEditing(false);
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         console.log(`[Profile] Input change: ${name} = ${value}`);
         setTempUserData(prev => ({
@@ -658,7 +684,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 </div>
                 <div className="absolute -bottom-12 left-6">
                     <div className="relative group">
-                        <img src={userData.avatarUrl} alt="User Avatar" className="w-24 h-24 rounded-full border-4 border-white object-cover" />
+                        <UserAvatar src={userData.avatarUrl} name={userData.name} level={userData.level} size="xl" className="border-4 border-white rounded-full bg-white shadow-md" />
                         {isEditing && (
                             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
@@ -685,6 +711,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                 <div>
                     <h3 className="text-2xl font-black leading-tight">{userData.name}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{userData.role} • {userData.team}</p>
+                    
+                    {/* XP and Level Bar */}
+                    <div className="mt-3 max-w-xs select-none">
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
+                            <span>Nível {userData.level || 1}</span>
+                            <span>{userData.xp || 0} / {((userData.level || 1) * 100)} XP</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden border dark:border-slate-700">
+                            <div 
+                                className="bg-gradient-to-r from-emerald-400 to-brand-primary h-full transition-all duration-500" 
+                                style={{ width: `${Math.min(100, ((userData.xp || 0) / ((userData.level || 1) * 100)) * 100)}%` }}
+                            ></div>
+                        </div>
+                    </div>
                     {(userData as any).status_text && (
                         <p className="text-xs text-brand-primary dark:text-brand-primary font-bold italic mt-1.5">
                             Status: "{(userData as any).status_text}"
@@ -692,7 +732,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     )}
                 </div>
                 {/* Equipped Badges Row */}
-                <div className="flex gap-3 flex-wrap select-none mt-2 md:mt-0">
+                <div className="flex items-center gap-3 flex-wrap select-none mt-2 md:mt-0">
                     {profileBadges.filter(ub => ub.is_equipped).slice(0, 3).map(ub => {
                         const badge = ub.company_badges;
                         if (!badge) return null;
@@ -712,6 +752,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             </div>
                         );
                     })}
+                    {isOwnProfile && (
+                        <button
+                            onClick={() => setShowGalleryModal(true)}
+                            className="text-xs bg-brand-primary text-white font-bold px-3 py-1.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-sm ml-2"
+                        >
+                            Editar Selos
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -1254,6 +1302,126 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                     userBadge={selectedBadgeForComments}
                     onClose={() => setSelectedBadgeForComments(null)}
                 />
+            )}
+
+            {/* MODAL DA GALERIA DE SELOS */}
+            {showGalleryModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-3xl border border-slate-100 dark:border-slate-850 shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 text-slate-800 dark:text-white">
+                        <div className="flex justify-between items-center p-6 border-b dark:border-slate-800">
+                            <div>
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    🏆 Minha Galeria de Selos
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    Equipe até 3 selos conquistados para exibir em seu perfil
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowGalleryModal(false)}
+                                className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center font-bold text-slate-500 transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
+                                <span className="text-xs text-emerald-800 dark:text-emerald-400 font-bold">
+                                    Painel de Destaques
+                                </span>
+                                <span className="text-xs bg-brand-primary text-white font-bold px-2.5 py-1 rounded-full">
+                                    {profileBadges.filter(ub => ub.is_equipped).length} / 3 Equipados
+                                </span>
+                            </div>
+                            
+                            {allCompanyBadges.length === 0 ? (
+                                <p className="text-sm text-slate-500 text-center py-6">
+                                    Nenhum selo cadastrado pela empresa até o momento.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-4">
+                                    {allCompanyBadges.map(badge => {
+                                        const earned = profileBadges.find(ub => ub.badge_id === badge.id);
+                                        const isEquipped = earned?.is_equipped || false;
+                                        
+                                        return (
+                                            <button
+                                                key={badge.id}
+                                                onClick={async () => {
+                                                    if (!earned) return; // Locked badge
+                                                    
+                                                    const newEquippedState = !isEquipped;
+                                                    const equippedBadges = profileBadges.filter(ub => ub.is_equipped);
+                                                    if (newEquippedState && equippedBadges.length >= 3) {
+                                                        alert("Você só pode equipar no máximo 3 selos em destaque!");
+                                                        return;
+                                                    }
+                                                    
+                                                    const { error } = await supabase
+                                                        .from('user_badges')
+                                                        .update({ is_equipped: newEquippedState })
+                                                        .eq('id', earned.id);
+                                                    
+                                                    if (!error) {
+                                                        // Refresh profile badges
+                                                        const { data } = await supabase
+                                                            .from('user_badges')
+                                                            .select(`
+                                                                id, company_id, user_id, badge_id, awarded_by, reason, is_equipped, created_at,
+                                                                company_badges ( id, name, description, icon, color )
+                                                            `)
+                                                            .eq('user_id', effectiveUser.id);
+                                                        if (data) setProfileBadges(data as any[]);
+                                                    }
+                                                }}
+                                                className={`relative flex flex-col items-center p-3.5 rounded-2xl border transition-all duration-300 outline-none ${
+                                                    earned 
+                                                        ? isEquipped 
+                                                            ? 'border-brand-primary bg-emerald-50/10 dark:bg-emerald-500/5 shadow-md scale-105' 
+                                                            : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-900 hover:scale-[1.02] hover:border-slate-300 dark:hover:border-slate-700'
+                                                        : 'border-slate-50 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/30 opacity-60 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-3 select-none overflow-hidden ${
+                                                    earned 
+                                                        ? badge.color 
+                                                        : 'bg-slate-200 dark:bg-slate-800 text-slate-455 dark:text-slate-650 grayscale'
+                                                }`}>
+                                                    {badge.icon.startsWith('http') ? (
+                                                        <img src={badge.icon} className={`w-full h-full object-cover rounded-2xl ${earned ? '' : 'grayscale'}`} alt="" />
+                                                    ) : (
+                                                        badge.icon
+                                                    )}
+                                                </div>
+                                                
+                                                <span className="text-[10px] font-bold text-center truncate w-full">
+                                                    {badge.name}
+                                                </span>
+                                                
+                                                {earned ? (
+                                                    isEquipped ? (
+                                                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white dark:border-slate-950">
+                                                            ✓
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase mt-1 tracking-wider">
+                                                            Conquistado
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase mt-1 tracking-wider flex items-center gap-0.5">
+                                                        🔒 Bloqueado
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

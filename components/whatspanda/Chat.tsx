@@ -375,12 +375,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setAccessibleChannelIds(null); // admins see all
       return;
     }
-    supabase
-      .from('whatsapp_channel_users')
-      .select('channel_id, can_send_messages, can_send_media, force_signature')
-      .eq('user_id', userId)
-      .eq('company_id', companyId)
-      .then(({ data }) => {
+    const loadChannelAccess = async () => {
+      try {
+        const { data } = await supabase
+          .from('whatsapp_channel_users')
+          .select('channel_id, can_send_messages, can_send_media, force_signature')
+          .eq('user_id', userId)
+          .eq('company_id', companyId);
+        
         const profileAllowed = permissions?.allowed_connections || [];
         if (data && data.length > 0) {
           setChannelAccess(data);
@@ -397,12 +399,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           setChannelAccess([]);
           setAccessibleChannelIds(null); // No connection restrictions, show all
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('Erro ao buscar whatsapp_channel_users:', err);
         setChannelAccess([]);
         setAccessibleChannelIds(null);
-      });
+      }
+    };
+    loadChannelAccess();
   }, [activeProfile?.id, profile?.id, isAdmin, permissions?.allowed_connections]);
 
   useEffect(() => {

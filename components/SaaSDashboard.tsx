@@ -1057,7 +1057,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
                 
-                <SelectLevelToggle label="Agendamentos" id="scheduling" icon={CalendarDaysIcon} />
+                <SelectLevelToggle label="Comercial" id="scheduling" icon={CalendarDaysIcon} />
+                <Toggle label="Agenda (Visitas/Reuniões/Treinamentos)" id="new_agenda" icon={CalendarDaysIcon} />
+                <Toggle label="Reservas (Salas/Veículos)" id="reservations" icon={BuildingOfficeIcon} />
                 <SelectLevelToggle label="Gestão de Projetos" id="projects" icon={ClipboardDocumentCheckIcon} />
                 
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />

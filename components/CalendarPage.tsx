@@ -141,13 +141,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         date: new Date().toISOString().split('T')[0],
         startTime: '09:00',
         endTime: '10:00',
-        category: 'Reunião' as CalendarEventCategory,
+        category: 'Social' as any,
         location: '',
         attendees: [] as string[],
         departmentId: '',
         notes: '',
         isPrivate: false
     });
+
+    const [filterText, setFilterText] = useState('');
+    const [filterUserId, setFilterUserId] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterDeptId, setFilterDeptId] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
 
     const fetchShares = async () => {
         if (!currentUser?.id) return;
@@ -384,7 +390,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         type: 'event',
                         title: 'Novo Compromisso Agendado',
                         description: `${currentUser.name || currentUser.full_name || 'Alguém'} agendou um evento no seu calendário: ${newEventData.title}`,
-                        avatar_url: currentUser?.avatar_url || currentUser?.avatarUrl || '',
+                        avatar_url: currentUser?.avatarUrl || '',
                         link: 'calendar',
                         read: false
                     });
@@ -635,8 +641,47 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             }
         });
 
-        return [...filteredEvents, ...birthdayEvents, ...holidayEvents, ...taskEvents];
-    }, [events, employees, currentDate, personalTasks, selectedCalendarUserId, currentUser]);
+        const filteredBySearch = filteredEvents.filter(e => {
+            if (filterText) {
+                const term = filterText.toLowerCase();
+                const matchTitle = e.title?.toLowerCase().includes(term);
+                const matchNotes = e.notes?.toLowerCase().includes(term);
+                if (!matchTitle && !matchNotes) return false;
+            }
+            if (filterUserId) {
+                const isCreator = e.creatorId === filterUserId;
+                const isAttendee = e.attendees?.some(att => att.id === filterUserId);
+                const isInvited = e.invitedIds?.includes(filterUserId) || e.invites?.some(inv => inv.user_id === filterUserId && inv.status === 'accepted');
+                if (!isCreator && !isAttendee && !isInvited) return false;
+            }
+            if (filterCategory) {
+                const cat = e.category?.toLowerCase() || '';
+                if (filterCategory === 'Reserva') {
+                    if (!cat.includes('reserva') && !cat.includes('aluguel')) return false;
+                } else if (filterCategory === 'Visita') {
+                    if (!cat.includes('visita')) return false;
+                } else if (filterCategory === 'Reunião') {
+                    if (!cat.includes('reunião') && !cat.includes('reuniao')) return false;
+                } else if (filterCategory === 'Treinamento') {
+                    if (!cat.includes('treinamento')) return false;
+                } else {
+                    if (!cat.includes(filterCategory.toLowerCase())) return false;
+                }
+            }
+            if (filterDeptId) {
+                const creator = employees.find(emp => emp.id === e.creatorId);
+                const creatorDeptMatch = creator && (creator as any).department_id === filterDeptId;
+                const attendeeDeptMatch = e.attendees?.some(att => {
+                    const emp = employees.find(x => x.id === att.id);
+                    return emp && (emp as any).department_id === filterDeptId;
+                });
+                if (!creatorDeptMatch && !attendeeDeptMatch) return false;
+            }
+            return true;
+        });
+
+        return [...filteredBySearch, ...birthdayEvents, ...holidayEvents, ...taskEvents];
+    }, [events, employees, currentDate, personalTasks, selectedCalendarUserId, currentUser, filterText, filterUserId, filterCategory, filterDeptId]);
 
     const handleMonthClick = (monthIndex: number) => {
         setCurrentDate(new Date(currentDate.getFullYear(), monthIndex, 1));
@@ -1267,14 +1312,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         );
     };
 
-    const getCategoryColor = (category: CalendarEventCategory) => {
-        switch (category) {
-            case 'Reunião': return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
-            case 'Evento da Empresa': return 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
-            case 'Feriado': return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800';
-            case 'Aniversário': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800';
-            default: return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-slate-700/30 dark:text-gray-300 dark:border-slate-800';
+    const getCategoryColor = (category: string) => {
+        const cat = category ? category.toLowerCase() : '';
+        if (cat.includes('visita') || cat.includes('reunião') || cat.includes('reuniao')) {
+            return 'bg-yellow-50 text-yellow-750 border-yellow-250 dark:bg-yellow-950/20 dark:text-yellow-300 dark:border-yellow-900/30';
         }
+        if (cat.includes('treinamento') || cat.includes('projeto') || cat.includes('evento da empresa')) {
+            return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+        }
+        if (cat.includes('reserva') || cat.includes('aluguel')) {
+            return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-300 dark:border-green-850';
+        }
+        if (cat.includes('social') || cat.includes('outro') || cat.includes('corporativo')) {
+            return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-300 dark:border-orange-850';
+        }
+        if (cat.includes('aniversário') || cat.includes('aniversario')) {
+            return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-850';
+        }
+        if (cat.includes('feriado')) {
+            return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800';
+        }
+        return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-slate-700/30 dark:text-gray-300 dark:border-slate-800';
     };
 
     return (
@@ -1311,26 +1369,87 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <span className="hidden sm:inline">Compartilhar</span>
                     </button>
 
-                    <button onClick={() => {
-                        setEditingEventId(null);
-                        setNewEventData({
-                            title: '',
-                            date: new Date().toISOString().split('T')[0],
-                            startTime: '09:00',
-                            endTime: '10:00',
-                            category: 'Reunião',
-                            location: '',
-                            attendees: [],
-                            departmentId: '',
-                            notes: '',
-                            isPrivate: false
-                        });
-                        setCreateModalOpen(true);
-                    }} className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95">
-                        <PlusIcon className="w-5 h-5" /><span>{t('calendar.new_event')}</span>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center space-x-2 px-4 py-3 text-sm font-black border rounded-2xl shadow-sm transition-all active:scale-95 ${showFilters ? 'bg-brand-primary text-white border-brand-primary' : 'text-slate-700 dark:text-gray-200 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-705'}`}
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                        <span>Filtros</span>
                     </button>
+
+                    <div className="flex flex-col gap-1.5 w-full sm:w-auto">
+                        <button onClick={() => {
+                            setEditingEventId(null);
+                            setNewEventData({
+                                title: '',
+                                date: new Date().toISOString().split('T')[0],
+                                startTime: '09:00',
+                                endTime: '10:00',
+                                category: 'Social',
+                                location: '',
+                                attendees: [],
+                                departmentId: '',
+                                notes: '',
+                                isPrivate: false
+                            });
+                            setCreateModalOpen(true);
+                        }} className="flex items-center justify-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95 w-full">
+                            <PlusIcon className="w-5 h-5" /><span>Agendar novo evento</span>
+                        </button>
+                        <div className="flex gap-1 justify-end">
+                            <button onClick={() => onNavigate?.('agenda', { tab: 'visits' })} className="px-2.5 py-1 text-[10px] font-bold text-yellow-800 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-colors">
+                                Agendar visita
+                            </button>
+                            <button onClick={() => onNavigate?.('agenda', { tab: 'trainings' })} className="px-2.5 py-1 text-[10px] font-bold text-blue-750 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors">
+                                Agendar treinamento
+                            </button>
+                            <button onClick={() => onNavigate?.('agenda', { tab: 'meetings' })} className="px-2.5 py-1 text-[10px] font-bold text-yellow-800 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-colors">
+                                Agendar reunião
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* Painel de Filtros expansível */}
+            {showFilters && (
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Tópico / Busca</label>
+                        <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Buscar título ou observações..." className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl p-3 text-xs text-slate-850 dark:text-white font-semibold focus:ring-2 focus:ring-brand-primary" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Colaborador</label>
+                        <select value={filterUserId} onChange={e => setFilterUserId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl p-3 text-xs text-slate-850 dark:text-white font-semibold focus:ring-2 focus:ring-brand-primary">
+                            <option value="">Todos os usuários</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Reservas / Tipos</label>
+                        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl p-3 text-xs text-slate-850 dark:text-white font-semibold focus:ring-2 focus:ring-brand-primary">
+                            <option value="">Todos os tipos</option>
+                            <option value="Reunião">Reuniões</option>
+                            <option value="Visita">Visitas</option>
+                            <option value="Treinamento">Treinamentos</option>
+                            <option value="Reserva">Reservas (Salas/Veículos)</option>
+                            <option value="Social">Social</option>
+                            <option value="Outro">Outros</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Setor / Departamento</label>
+                        <select value={filterDeptId} onChange={e => setFilterDeptId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl p-3 text-xs text-slate-850 dark:text-white font-semibold focus:ring-2 focus:ring-brand-primary">
+                            <option value="">Todos os setores</option>
+                            {departments.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            )}
 
             <Card title="" className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
                 <header className="bg-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 gap-4">
@@ -1381,8 +1500,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Categoria</label>
                                     <select name="category" value={newEventData.category} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold appearance-none">
-                                        <option>Reunião</option>
-                                        <option>Evento da Empresa</option>
+                                        <option>Social</option>
+                                        <option>Outro</option>
                                     </select>
                                 </div>
                             </div>

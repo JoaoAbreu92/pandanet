@@ -55,6 +55,8 @@ import ProjectsPage from './components/ProjectsPage';
 import FloatingChatHeads from './components/FloatingChatHeads';
 import SchedulingPage from './components/SchedulingPage';
 import SchedulingBookPage from './components/SchedulingBookPage';
+import AgendaPage from './components/AgendaPage';
+import ReservationsPage from './components/ReservationsPage';
 
 
 
@@ -867,7 +869,9 @@ const AppContent: React.FC = () => {
             'viewInfoSec': 'infosec',
             'viewKPIDashboard': 'kpis',
             'viewProjects': 'projects',
-            'viewScheduling': 'scheduling'
+            'viewScheduling': 'scheduling',
+            'viewAgenda': 'new_agenda',
+            'viewReservations': 'reservations'
         };
 
         const featureId = featureMap[permission];
@@ -943,6 +947,22 @@ const AppContent: React.FC = () => {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
                 return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="events" />;
+            }
+            case 'agenda': {
+                if (!canAccess('viewAgenda')) return null;
+                const agendaFeat = currentCompany?.custom_features?.new_agenda as any;
+                if (agendaFeat === false || agendaFeat === 'disabled') {
+                    return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agenda está desativado para a sua empresa.</div>;
+                }
+                return <AgendaPage initialTab={pageContext?.tab} />;
+            }
+            case 'reservas': {
+                if (!canAccess('viewReservations')) return null;
+                const reservationsFeat = currentCompany?.custom_features?.reservations as any;
+                if (reservationsFeat === false || reservationsFeat === 'disabled') {
+                    return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de reservas está desativado para a sua empresa.</div>;
+                }
+                return <ReservationsPage initialTab={pageContext?.tab} />;
             }
             case 'scheduling-book': return <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={false} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;

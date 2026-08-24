@@ -51,7 +51,9 @@ export type Page =
   | 'whatspanda'
   | 'scheduling'
   | 'scheduling-events'
-  | 'scheduling-book';
+  | 'scheduling-book'
+  | 'agenda'
+  | 'reservas';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -225,6 +227,8 @@ export interface EmployeePermissions {
 
   // Agenda Permission
   viewScheduling: boolean;
+  viewAgenda: boolean;
+  viewReservations: boolean;
 
   // Novas Permissões de RH
   viewTimeBank: boolean;
@@ -296,6 +300,7 @@ export interface Employee {
   marital_status?: string;
   education_level?: string;
   status?: 'pending' | 'active' | 'rejected';
+  status_text?: string;
 
   // Panda IA Assistant
   ai_api_key?: string | null;
@@ -308,6 +313,8 @@ export interface Employee {
   is_whatsapp_agent?: boolean;
   is_manager?: boolean;
   quick_links?: string[];
+  xp?: number;
+  level?: number;
 }
 
 export interface AIMessage {
@@ -539,6 +546,7 @@ export interface PostComment {
   authorId: string;
   authorName: string;
   authorAvatar: string;
+  authorLevel?: number;
   text: string;
   timestamp: string;
 }
@@ -553,6 +561,7 @@ export interface Post {
   authorId: string;
   authorName: string;
   authorAvatar: string;
+  authorLevel?: number;
   content: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video';
@@ -858,6 +867,7 @@ export interface CompanyBadge {
   icon: string;
   color: string;
   created_at?: string;
+  xp?: number;
 }
 
 export interface UserBadge {
@@ -905,6 +915,7 @@ export interface SchedulingEventType {
   has_lunch_break: boolean;
   lunch_start_time?: string;
   lunch_end_time?: string;
+  photos?: string[];
   created_at?: string;
   profiles?: {
     full_name?: string;

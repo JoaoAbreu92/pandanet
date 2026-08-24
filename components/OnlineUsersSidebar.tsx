@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { usePresence } from './PresenceContext';
+import { UserAvatar } from './UserAvatar';
 import {
     ChatBubbleLeftRightIcon,
     NoSymbolIcon,
@@ -48,7 +49,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('id, full_name, email, role, avatar_url, status_text')
+                    .select('id, full_name, email, role, avatar_url, status_text, level')
                     .eq('company_id', currentUser.company_id);
                 
                 if (data && !error) {
@@ -148,17 +149,12 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                                         <div className="flex items-center space-x-3 min-w-0 flex-1">
                                             {/* Avatar with Status indicator */}
                                             <div className="relative shrink-0">
-                                                {user.avatar_url ? (
-                                                    <img
-                                                        src={user.avatar_url}
-                                                        alt={user.full_name}
-                                                        className="w-9 h-9 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-gray-300">
-                                                        {user.full_name ? user.full_name.substring(0, 2).toUpperCase() : 'CO'}
-                                                    </div>
-                                                )}
+                                                <UserAvatar
+                                                    src={user.avatar_url}
+                                                    name={user.full_name}
+                                                    level={user.level}
+                                                    size="sm"
+                                                />
                                                 <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#0f172a] ${
                                                     isOnline ? 'bg-emerald-500' : 'bg-gray-400'
                                                 }`} />
@@ -253,17 +249,12 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                                         setSelectedUser(user);
                                     }}
                                 >
-                                    {user.avatar_url ? (
-                                        <img
-                                            src={user.avatar_url}
-                                            alt={user.full_name}
-                                            className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-                                        />
-                                    ) : (
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-gray-300">
-                                            {user.full_name ? user.full_name.substring(0, 2).toUpperCase() : 'CO'}
-                                        </div>
-                                    )}
+                                    <UserAvatar
+                                        src={user.avatar_url}
+                                        name={user.full_name}
+                                        level={user.level}
+                                        size="xs"
+                                    />
                                     <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white dark:border-[#0f172a] ${
                                         isOnline ? 'bg-emerald-500' : 'bg-gray-400'
                                     }`} />

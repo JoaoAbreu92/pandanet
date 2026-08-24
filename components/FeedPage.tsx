@@ -10,6 +10,7 @@ import { useLanguage } from './LanguageContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon, ShieldCheckIcon as ShieldCheck } from './icons';
 import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page, CompanyBadge, UserBadge } from '../types';
 import BadgeDetailModal from './BadgeDetailModal';
+import { UserAvatar } from './UserAvatar';
 
 export const PostCard: React.FC<{
     post: Post;
@@ -95,13 +96,25 @@ export const PostCard: React.FC<{
         }
     }
 
+    const isLevelUp = post.content.startsWith('[LEVEL_UP]');
+    let levelUpData: any = null;
+    if (isLevelUp) {
+        try {
+            levelUpData = JSON.parse(post.content.replace('[LEVEL_UP]', ''));
+        } catch (e) {
+            console.error('Failed to parse level up json', e);
+        }
+    }
+
     return (
         <Card 
             title="" 
             className={`pb-2 overflow-visible transition-all duration-500 ${
                 badgeData 
                     ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/40 via-white to-rose-50/40 shadow-xl shadow-amber-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-amber-400/40 rounded-3xl' 
-                    : ''
+                    : levelUpData
+                        ? 'border-2 border-purple-500/40 bg-gradient-to-br from-indigo-50/30 via-white to-purple-50/30 shadow-xl shadow-purple-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-purple-500/30 rounded-3xl'
+                        : ''
             }`}
         >
             {badgeData ? (
@@ -152,10 +165,56 @@ export const PostCard: React.FC<{
                         </div>
 
                         <div className="flex items-center gap-2 pt-1 text-slate-550 dark:text-slate-400">
-                            <img src={badgeData.recipient_avatar} className="w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-700" alt="" />
+                            <UserAvatar src={badgeData.recipient_avatar} name={badgeData.recipient_name} level={1} size="xs" className="w-5 h-5 shrink-0" />
                             <span className="text-[10px] font-bold">
                                 Premiação concedida por {badgeData.awarded_by_name}
                             </span>
+                        </div>
+                    </div>
+                </div>
+            ) : levelUpData ? (
+                <div className="py-6 px-5 flex flex-col md:flex-row items-center gap-6 relative select-none">
+                    {/* Glowing background rays */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
+                    
+                    {/* Delete button for level up post */}
+                    {isAuthor && (
+                        <button 
+                            onClick={() => onDelete(post.id)} 
+                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10" 
+                            title={t('feed.delete_post')}
+                        >
+                            <TrashIcon className="w-5 h-5" />
+                        </button>
+                    )}
+
+                    {/* Left Side: Avatar with Special Level Ring */}
+                    <div className="flex-shrink-0 relative">
+                        <UserAvatar 
+                            src={levelUpData.recipient_avatar} 
+                            name={levelUpData.recipient_name} 
+                            level={levelUpData.new_level} 
+                            size="xl" 
+                            className="shadow-2xl scale-110" 
+                        />
+                    </div>
+                    
+                    {/* Right Side: Information */}
+                    <div className="flex-1 min-w-0 text-left space-y-3">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 uppercase tracking-widest">
+                            ⚔️ Evolução de Nível (RPG)
+                        </span>
+                        
+                        <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+                            {levelUpData.recipient_name} subiu para o Nível {levelUpData.new_level}! 🚀
+                        </h3>
+                        
+                        <p className="text-sm text-slate-650 dark:text-slate-300 font-medium">
+                            {levelUpData.message}
+                        </p>
+                        
+                        <div className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 bg-purple-50 dark:bg-purple-950/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900/30">
+                            <span>✨ Incentive o seu colega reagindo e comentando abaixo!</span>
                         </div>
                     </div>
                 </div>
@@ -163,7 +222,7 @@ export const PostCard: React.FC<{
                 <>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
-                            <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                            <UserAvatar src={post.authorAvatar} name={post.authorName} level={post.authorLevel} size="sm" className="mr-3 shrink-0" />
                             <div>
                                 <h4 className="font-bold text-brand-text dark:text-gray-100">{post.authorName}</h4>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(post.timestamp).toLocaleString()}</p>
@@ -277,7 +336,7 @@ export const PostCard: React.FC<{
                 <div className="mt-4 space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                     {post.comments.map(comment => (
                         <div key={comment.id} className="flex space-x-3">
-                            <img src={comment.authorAvatar} alt={comment.authorName} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                            <UserAvatar src={comment.authorAvatar} name={comment.authorName} level={comment.authorLevel} size="xs" className="shrink-0" />
                             <div className="bg-gray-50 dark:bg-slate-700/50 rounded-2xl px-4 py-2 flex-1">
                                 <h5 className="font-bold text-xs text-brand-text dark:text-gray-100">{comment.authorName}</h5>
                                 <p className="text-sm text-brand-text dark:text-gray-200">{comment.text}</p>
@@ -290,7 +349,7 @@ export const PostCard: React.FC<{
 
             {!isGhostMode && (
                 <form onSubmit={handleCommentSubmit} className="mt-4 flex space-x-3 items-center">
-                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                    <UserAvatar src={currentUser.avatarUrl} name={currentUser.name} level={currentUser.level} size="xs" className="shrink-0" />
                     <div className="flex-1 relative">
                         <input
                             ref={commentInputRef}
@@ -340,8 +399,8 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                         <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">{t('feed.online_now')}</p>
                         {onlineUsers.map(user => (
                             <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                                <div className="relative">
-                                    <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
+                                <div className="relative shrink-0">
+                                    <UserAvatar src={user.avatarUrl} name={user.name} level={user.level} size="sm" />
                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-slate-800 rounded-full"></span>
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -360,7 +419,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
                     ) : (
                         displaySuggestions.map(user => (
                             <div key={user.id} onClick={() => onNavigate('profile-page', user.id)} className="flex items-center space-x-3 p-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
+                                <UserAvatar src={user.avatarUrl} name={user.name} level={user.level} size="sm" className="shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-brand-text dark:text-gray-100 truncate transition-colors">{user.name}</p>
                                     <p className="text-xs text-brand-subtle-text dark:text-gray-400 truncate">{user.role}</p>
@@ -461,9 +520,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 .from('posts')
                 .select(`
                     id, content, created_at, media_url, media_type, mentions, author_id,
-                    profiles: author_id(full_name, avatar_url),
+                    profiles: author_id(full_name, avatar_url, level),
                     post_reactions(id, emoji, user_id),
-                    comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url))
+                    comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url, level))
                 `)
                 .eq('company_id', profile.company_id)
                 .gte('created_at', ninetyDaysAgo.toISOString())
@@ -476,6 +535,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 authorId: item.author_id,
                 authorName: item.profiles?.full_name || 'Usuário Excluído',
                 authorAvatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'Usuario Excluido')}&background=random`,
+                authorLevel: item.profiles?.level || 1,
                 content: item.content,
                 mediaUrl: item.media_url,
                 mediaType: item.media_type as 'image',
@@ -490,6 +550,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     authorId: c.author_id,
                     authorName: c.profiles?.full_name || 'Usuário Excluído',
                     authorAvatar: c.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.profiles?.full_name || 'Usuario Excluido')}&background=random`,
+                    authorLevel: c.profiles?.level || 1,
                     text: c.content,
                     timestamp: c.created_at
                 })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -885,7 +946,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                 <div className="h-24 bg-brand-primary"></div>
                             )}
                             <div className="absolute left-1/2 -translate-x-1/2 -bottom-10">
-                                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md object-cover" />
+                                <UserAvatar src={currentUser.avatarUrl} name={currentUser.name} level={currentUser.level} size="lg" className="border-4 border-white shadow-md rounded-full bg-white" />
                             </div>
                         </div>
                         <div className="px-6 pt-2">
@@ -970,7 +1031,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                         ) : (
                             <div className="premium-card p-4 mb-6">
                                 <div className="flex space-x-4 mb-4">
-                                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover" />
+                                    <UserAvatar src={currentUser.avatarUrl} name={currentUser.name} level={currentUser.level} size="md" className="shrink-0" />
                                     <div className="flex-1 relative">
                                         <textarea
                                             ref={postTextareaRef}
@@ -985,7 +1046,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                     .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
                                                     .map(user => (
                                                         <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
-                                                            <img src={user.avatarUrl || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full object-cover" alt="" />
+                                                            <UserAvatar src={user.avatarUrl} name={user.name} level={user.level} size="xs" className="shrink-0" />
                                                             <div><p className="text-sm font-bold text-brand-text dark:text-gray-100">{user.name}</p><p className="text-xs text-brand-subtle-text dark:text-gray-400">{user.role}</p></div>
                                                         </div>
                                                     ))}

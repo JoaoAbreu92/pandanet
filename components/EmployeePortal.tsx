@@ -81,6 +81,7 @@ interface Evaluation {
     score_proactivity: number | null;
     feedback_text: string | null;
     created_at: string;
+    custom_scores?: Record<string, any> | null;
 }
 
 const statusConfig = {

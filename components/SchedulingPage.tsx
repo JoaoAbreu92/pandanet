@@ -56,6 +56,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
 
     // Event Type Form
     const [editingEvent, setEditingEvent] = useState<Partial<SchedulingEventType> | null>(null);
+    const [uploadingPhotos, setUploadingPhotos] = useState(false);
     const [eventForm, setEventForm] = useState({
         name: '',
         slug: '',
@@ -85,7 +86,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
         show_capacity_to_guest: true,
         has_lunch_break: false,
         lunch_start_time: '12:00',
-        lunch_end_time: '13:00'
+        lunch_end_time: '13:00',
+        photos: [] as string[]
     });
 
     // Template Form
@@ -580,7 +582,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                 show_capacity_to_guest: eventForm.show_capacity_to_guest,
                 has_lunch_break: eventForm.has_lunch_break,
                 lunch_start_time: eventForm.lunch_start_time,
-                lunch_end_time: eventForm.lunch_end_time
+                lunch_end_time: eventForm.lunch_end_time,
+                photos: eventForm.photos || []
             };
 
             let error;
@@ -613,7 +616,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                 show_capacity_to_guest: true,
                 has_lunch_break: false,
                 lunch_start_time: '12:00',
-                lunch_end_time: '13:00'
+                lunch_end_time: '13:00',
+                photos: []
             });
         } catch (err: any) {
             alert('Erro ao salvar tipo de evento: ' + err.message);
@@ -653,7 +657,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             show_capacity_to_guest: event.show_capacity_to_guest ?? true,
             has_lunch_break: event.has_lunch_break ?? false,
             lunch_start_time: event.lunch_start_time ?? '12:00',
-            lunch_end_time: event.lunch_end_time ?? '13:00'
+            lunch_end_time: event.lunch_end_time ?? '13:00',
+            photos: event.photos || []
         });
         setShowEventModal(true);
     };
@@ -668,6 +673,49 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
         } catch (err: any) {
             alert('Erro ao excluir: ' + err.message);
         }
+    };
+
+    const handlePhotosUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        
+        const currentPhotos = eventForm.photos || [];
+        if (currentPhotos.length + files.length > 7) {
+            alert('Você pode enviar no máximo 7 fotos.');
+            return;
+        }
+
+        setUploadingPhotos(true);
+        try {
+            const uploadedUrls = [...currentPhotos];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `scheduling_photo_${currentUser.company_id}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('feed-media')
+                    .upload(filePath, file);
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+                uploadedUrls.push(data.publicUrl);
+            }
+            setEventForm(prev => ({ ...prev, photos: uploadedUrls }));
+        } catch (err: any) {
+            alert('Erro ao fazer upload das fotos: ' + err.message);
+        } finally {
+            setUploadingPhotos(false);
+        }
+    };
+
+    const handleRemovePhoto = (indexToRemove: number) => {
+        setEventForm(prev => ({
+            ...prev,
+            photos: (prev.photos || []).filter((_, idx) => idx !== indexToRemove)
+        }));
     };
 
     // Actions for Templates
@@ -941,7 +989,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                         show_capacity_to_guest: true,
                                         has_lunch_break: false,
                                         lunch_start_time: '12:00',
-                                        lunch_end_time: '13:00'
+                                        lunch_end_time: '13:00',
+                                        photos: []
                                     });
                                     setShowEventModal(true);
                                 }}
@@ -1047,75 +1096,16 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                 </div>
                             ) : (
                                 eventTypes.map(event => (
-                                    <div 
+                                    <SchedulingEventCard
                                         key={event.id}
-                                        className={`bg-white dark:bg-slate-900 border ${event.is_active ? 'border-slate-100 dark:border-slate-800' : 'border-slate-200 opacity-60'} rounded-2xl shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between relative group`}
-                                    >
-                                        <div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold px-2 py-1 rounded-md">
-                                                    {event.duration} {event.duration_unit === 'days' ? (event.duration === 1 ? 'dia' : 'dias') : event.duration_unit === 'hours' ? (event.duration === 1 ? 'hora' : 'horas') : 'min'}
-                                                </span>
-                                                <span className={`text-xs px-2 py-1 rounded-md font-bold ${event.is_paid ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
-                                                    {event.is_paid ? `R$ ${event.price.toFixed(2)}` : 'Grátis'}
-                                                </span>
-                                            </div>
-
-                                            <h3 className="font-extrabold text-lg text-slate-900 dark:text-white mt-3 truncate">{event.name}</h3>
-                                            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1.5 line-clamp-2 h-8">
-                                                {event.description || 'Sem descrição.'}
-                                            </p>
-                                            
-                                            <div className="mt-4 bg-slate-50 dark:bg-slate-950 rounded-xl p-3 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 space-y-1">
-                                                <div className="font-semibold text-slate-700 dark:text-slate-300">Requisitos obrigatórios:</div>
-                                                <div className="flex flex-wrap gap-1.5 mt-1">
-                                                    <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Nome e E-mail</span>
-                                                    {event.requirements?.phone && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Telefone</span>}
-                                                    {event.requirements?.cnpj && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CNPJ</span>}
-                                                    {event.requirements?.company_name && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Empresa</span>}
-                                                    {event.requirements?.cpf && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CPF</span>}
-                                                </div>
-                                            </div>
-
-                                            {event.has_capacity_limit && (
-                                                <div className="mt-3 text-xs font-bold text-slate-700 dark:text-slate-300 bg-brand-primary/5 border border-brand-primary/10 rounded-xl p-2.5 flex items-center justify-between">
-                                                    <span>Vagas preenchidas:</span>
-                                                    <span className="text-brand-primary font-extrabold">{bookings.filter(b => b.event_type_id === event.id && b.status !== 'rejected' && b.status !== 'cancelled').length} / {event.capacity_limit}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
-                                            <button
-                                                onClick={() => copyToClipboard(getBookingLink(event), event.id)}
-                                                className="flex-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-200/50 dark:border-slate-800"
-                                            >
-                                                {copiedId === event.id ? (
-                                                    <>
-                                                        <CheckIcon className="w-4 h-4 text-green-500" />
-                                                        Copiado!
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <LinkIcon className="w-4 h-4" />
-                                                        Copiar Link
-                                                    </>
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => handleEditEvent(event)}
-                                                className="px-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold py-2 rounded-xl text-xs border border-slate-200/50 dark:border-slate-800"
-                                            >
-                                                Editar
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteEvent(event.id)}
-                                                className="px-3 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:hover:bg-red-950/40 font-bold py-2 rounded-xl text-xs"
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
+                                        event={event}
+                                        copiedId={copiedId}
+                                        copyToClipboard={copyToClipboard}
+                                        getBookingLink={getBookingLink}
+                                        handleEditEvent={handleEditEvent}
+                                        handleDeleteEvent={handleDeleteEvent}
+                                        bookings={bookings}
+                                    />
                                 ))
                             )}
                         </div>
@@ -1736,6 +1726,43 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                                 </div>
                             </div>
 
+                            {/* Fotos (máximo 7) */}
+                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block">Fotos do Espaço / Sala (Máximo 7)</label>
+                                        <p className="text-[10px] text-slate-500">Adicione até 7 fotos reais do espaço ou sala comercial.</p>
+                                    </div>
+                                    <label className="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold px-3.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all border border-brand-primary/20">
+                                        {uploadingPhotos ? 'Enviando...' : 'Adicionar Fotos'}
+                                        <input 
+                                            type="file" 
+                                            multiple 
+                                            accept="image/*"
+                                            onChange={handlePhotosUpload}
+                                            disabled={uploadingPhotos}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                </div>
+                                {(eventForm.photos || []).length > 0 && (
+                                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                                        {(eventForm.photos || []).map((url, idx) => (
+                                            <div key={idx} className="relative aspect-square bg-slate-100 dark:bg-slate-850 rounded-xl overflow-hidden border group">
+                                                <img src={url} alt="" className="w-full h-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemovePhoto(idx)}
+                                                    className="absolute inset-0 bg-black/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold"
+                                                >
+                                                    Remover
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 pt-6">
                                 <button 
                                     type="button" 
@@ -1934,6 +1961,141 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const SchedulingEventCard: React.FC<{
+    event: SchedulingEventType;
+    copiedId: string | null;
+    copyToClipboard: (text: string, eventId: string) => void;
+    getBookingLink: (event: SchedulingEventType) => string;
+    handleEditEvent: (event: SchedulingEventType) => void;
+    handleDeleteEvent: (id: string) => void;
+    bookings: SchedulingBooking[];
+}> = ({ event, copiedId, copyToClipboard, getBookingLink, handleEditEvent, handleDeleteEvent, bookings }) => {
+    const [photoIndex, setPhotoIndex] = useState(0);
+    const photos = event.photos || [];
+
+    const handleNextPhoto = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setPhotoIndex((prev) => (prev + 1) % photos.length);
+    };
+
+    const handlePrevPhoto = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    };
+
+    return (
+        <div 
+            className={`bg-white dark:bg-slate-900 border ${event.is_active ? 'border-slate-100 dark:border-slate-800' : 'border-slate-200 opacity-60'} rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative group overflow-hidden`}
+        >
+            <div>
+                {/* Photo Carousel/Banner */}
+                {photos.length > 0 ? (
+                    <div className="relative h-40 w-full bg-slate-150 dark:bg-slate-800 overflow-hidden">
+                        <img 
+                            src={photos[photoIndex]} 
+                            alt={`${event.name}`} 
+                            className="w-full h-full object-cover transition-all duration-300"
+                        />
+                        {photos.length > 1 && (
+                            <>
+                                <button 
+                                    type="button"
+                                    onClick={handlePrevPhoto}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/45 hover:bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs transition-colors"
+                                >
+                                    ‹
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={handleNextPhoto}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/45 hover:bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs transition-colors"
+                                >
+                                    ›
+                                </button>
+                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                                    {photos.map((_, idx) => (
+                                        <span 
+                                            key={idx}
+                                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === photoIndex ? 'bg-white w-3' : 'bg-white/50'}`}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <div className="h-3 w-full bg-brand-primary" />
+                )}
+
+                <div className="p-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold px-2 py-1 rounded-md">
+                            {event.duration} {event.duration_unit === 'days' ? (event.duration === 1 ? 'dia' : 'dias') : event.duration_unit === 'hours' ? (event.duration === 1 ? 'hora' : 'horas') : 'min'}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded-md font-bold ${event.is_paid ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                            {event.is_paid ? `R$ ${event.price.toFixed(2)}` : 'Grátis'}
+                        </span>
+                    </div>
+
+                    <h3 className="font-extrabold text-lg text-slate-900 dark:text-white mt-3 truncate">{event.name}</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs mt-1.5 line-clamp-2 h-8">
+                        {event.description || 'Sem descrição.'}
+                    </p>
+                    
+                    <div className="mt-4 bg-slate-50 dark:bg-slate-950 rounded-xl p-3 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 space-y-1">
+                        <div className="font-semibold text-slate-700 dark:text-slate-300">Requisitos obrigatórios:</div>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                            <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Nome e E-mail</span>
+                            {event.requirements?.phone && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Telefone</span>}
+                            {event.requirements?.company_name && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Empresa</span>}
+                            {event.requirements?.cnpj && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CNPJ</span>}
+                            {event.requirements?.cpf && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">CPF</span>}
+                        </div>
+                    </div>
+
+                    {event.has_capacity_limit && (
+                        <div className="mt-3 text-xs font-bold text-slate-700 dark:text-slate-300 bg-brand-primary/5 border border-brand-primary/10 rounded-xl p-2.5 flex items-center justify-between">
+                            <span>Vagas preenchidas:</span>
+                            <span className="text-brand-primary font-extrabold">{bookings.filter(b => b.event_type_id === event.id && b.status !== 'rejected' && b.status !== 'cancelled').length} / {event.capacity_limit}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="p-5 pt-0 mt-2 flex gap-2">
+                <button
+                    onClick={() => copyToClipboard(getBookingLink(event), event.id)}
+                    className="flex-1 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-200/50 dark:border-slate-800"
+                >
+                    {copiedId === event.id ? (
+                        <>
+                            <CheckIcon className="w-4 h-4 text-green-500" />
+                            Copiado!
+                        </>
+                    ) : (
+                        <>
+                            <LinkIcon className="w-4 h-4" />
+                            Copiar Link
+                        </>
+                    )}
+                </button>
+                <button
+                    onClick={() => handleEditEvent(event)}
+                    className="px-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold py-2 rounded-xl text-xs border border-slate-200/50 dark:border-slate-800"
+                >
+                    Editar
+                </button>
+                <button
+                    onClick={() => handleDeleteEvent(event.id)}
+                    className="px-3 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:hover:bg-red-950/40 font-bold py-2 rounded-xl text-xs"
+                >
+                    <TrashIcon className="w-4 h-4" />
+                </button>
+            </div>
         </div>
     );
 };

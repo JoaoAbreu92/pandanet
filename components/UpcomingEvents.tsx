@@ -4,7 +4,11 @@ import { CalendarIcon } from './icons';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
-const UpcomingEvents: React.FC = () => {
+interface UpcomingEventsProps {
+  onNavigate?: (page: string, context?: any) => void;
+}
+
+const UpcomingEvents: React.FC<UpcomingEventsProps> = ({ onNavigate }) => {
   const { currentUser } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +21,7 @@ const UpcomingEvents: React.FC = () => {
         .from('events')
         .select('*')
         .eq('company_id', currentUser.company_id)
-        .gte('date', new Date().toISOString())
+        .gte('date', new Date().toISOString().split('T')[0]) // Use apenas a data YYYY-MM-DD
         .order('date', { ascending: true })
         .limit(3);
 
@@ -49,7 +53,7 @@ const UpcomingEvents: React.FC = () => {
   }, [currentUser?.company_id]);
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T12:00:00'); // Evita timezone shift
     const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     const month = months[date.getMonth()];
     const day = date.getDate().toString().padStart(2, '0');
@@ -59,7 +63,17 @@ const UpcomingEvents: React.FC = () => {
   if (loading) return <Card title="Próximos Eventos"><div className="animate-pulse space-y-4">{[1, 2].map(i => <div key={i} className="h-16 bg-gray-100 rounded-md"></div>)}</div></Card>;
 
   return (
-    <Card title="Próximos Eventos" headerAction={<button className="text-sm font-medium text-brand-primary hover:underline">Ver todos</button>}>
+    <Card 
+      title="Próximos Eventos" 
+      headerAction={
+        <button 
+          onClick={() => onNavigate?.('events')} 
+          className="text-sm font-medium text-brand-primary hover:underline"
+        >
+          Ver todos
+        </button>
+      }
+    >
       <div className="space-y-4">
         {events.length === 0 ? (
           <p className="text-sm text-brand-subtle-text text-center py-4">Nenhum evento próximo.</p>
@@ -67,8 +81,12 @@ const UpcomingEvents: React.FC = () => {
           events.map(event => {
             const { day, month } = formatDate(event.date);
             return (
-              <div key={event.id} className="flex items-center space-x-4">
-                <div className="flex-shrink-0 text-center bg-emerald-50 p-3 rounded-lg min-w-[60px]">
+              <div 
+                key={event.id} 
+                onClick={() => onNavigate?.('events', { eventId: event.id })}
+                className="flex items-center space-x-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 p-2 rounded-2xl transition-all active:scale-[0.99]"
+              >
+                <div className="flex-shrink-0 text-center bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl min-w-[60px] border dark:border-emerald-900/20">
                   <p className="text-xs font-bold text-brand-primary uppercase">{month}</p>
                   <p className="text-xl font-bold text-brand-primary leading-tight">{day}</p>
                 </div>
@@ -81,6 +99,7 @@ const UpcomingEvents: React.FC = () => {
                         href={event.meeting_url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-blue-500 hover:text-blue-600 flex-shrink-0"
                         title="Participar da Reunião"
                       >

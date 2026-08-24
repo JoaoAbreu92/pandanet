@@ -28,6 +28,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
     const [hostProfile, setHostProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
     // Flow states
     const [step, setStep] = useState<'datetime' | 'form' | 'payment' | 'success'>('datetime');
@@ -377,6 +378,43 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                             </h3>
                         </div>
                     </div>
+
+                    {/* Event Photos Carousel */}
+                    {eventType.photos && eventType.photos.length > 0 && (
+                        <div className="relative h-44 w-full rounded-2xl overflow-hidden border border-slate-205 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 shadow-inner group">
+                            <img 
+                                src={eventType.photos[activePhotoIndex]} 
+                                alt={eventType.name}
+                                className="w-full h-full object-cover transition-all duration-300"
+                            />
+                            {eventType.photos.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePhotoIndex(prev => (prev - 1 + eventType.photos!.length) % eventType.photos!.length)}
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/45 hover:bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                                    >
+                                        ‹
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePhotoIndex(prev => (prev + 1) % eventType.photos!.length)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/45 hover:bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                                    >
+                                        ›
+                                    </button>
+                                    <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1">
+                                        {eventType.photos.map((_, idx) => (
+                                            <span 
+                                                key={idx}
+                                                className={`w-1 h-1 rounded-full transition-all ${idx === activePhotoIndex ? 'bg-white w-2' : 'bg-white/50'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {/* Event Type Meta */}
                     <div className="space-y-2">

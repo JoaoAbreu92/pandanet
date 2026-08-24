@@ -4,6 +4,7 @@ import type { Company, Employee, CompanyBadge, UserBadge } from '../types';
 import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
 import Card from './Card';
+import { UserAvatar } from './UserAvatar';
 
 interface BadgesManagerProps {
     company: Company;
@@ -22,6 +23,7 @@ interface AwardHistoryItem {
         name: string;
         icon: string;
         color: string;
+        xp: number;
     };
 }
 
@@ -42,7 +44,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const { profile } = useAuth();
     const { addNotification } = useNotifications();
 
-    const [activeTab, setActiveTab] = useState<'create' | 'award' | 'history'>('create');
+    const [activeTab, setActiveTab] = useState<'create' | 'award' | 'history' | 'gamification'>('create');
     const [companyBadges, setCompanyBadges] = useState<CompanyBadge[]>([]);
     const [history, setHistory] = useState<AwardHistoryItem[]>([]);
     
@@ -51,6 +53,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [newDescription, setNewDescription] = useState('');
     const [newIcon, setNewIcon] = useState('🏆');
     const [newColor, setNewColor] = useState(PRESET_GRADIENTS[0].class);
+    const [newXP, setNewXP] = useState<number>(15);
     const [isUploadingIcon, setIsUploadingIcon] = useState(false);
     
     // Award Badge Form State
@@ -60,17 +63,73 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchEmployeeQuery, setSearchEmployeeQuery] = useState('');
 
+    // Gamification config states
+    const [level2XP, setLevel2XP] = useState(100);
+    const [level3XP, setLevel3XP] = useState(300);
+    const [level4XP, setLevel4XP] = useState(600);
+    const [level5XP, setLevel5XP] = useState(1000);
+
+    const [userProfiles, setUserProfiles] = useState<any[]>([]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Carregar configurações de metas de XP do localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('pixel_gamification_thresholds');
+        if (saved) {
+            try {
+                const [l2, l3, l4, l5] = JSON.parse(saved);
+                setLevel2XP(l2 || 100);
+                setLevel3XP(l3 || 300);
+                setLevel4XP(l4 || 600);
+                setLevel5XP(l5 || 1000);
+            } catch (e) {}
+        }
+    }, []);
+
+    const saveThresholds = (l2: number, l3: number, l4: number, l5: number) => {
+        localStorage.setItem('pixel_gamification_thresholds', JSON.stringify([l2, l3, l4, l5]));
+    };
+
+    const getThresholds = () => {
+        return [level2XP, level3XP, level4XP, level5XP];
+    };
+
+    const getLevelForXP = (xp: number, thresholds: number[]) => {
+        let lvl = 1;
+        for (let i = 0; i < thresholds.length; i++) {
+            if (xp >= thresholds[i]) {
+                lvl = i + 2;
+            } else {
+                break;
+            }
+        }
+        return Math.min(lvl, 5);
+    };
 
     const fetchCompanyBadges = async () => {
         if (!company?.id) return;
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('company_badges')
             .select('*')
             .eq('company_id', company.id)
             .order('created_at', { ascending: false });
 
-        if (data) setCompanyBadges(data);
+        if (data) {
+            if (data.length === 0) {
+                // Pre-popula selos padrão caso não existam selos criados
+                const defaultBadges = [
+                    { company_id: company.id, name: 'Foco no Cliente', description: 'Atendimento excepcional e foco total nas necessidades do cliente.', icon: '🎯', color: PRESET_GRADIENTS[0].class, xp: 15 },
+                    { company_id: company.id, name: 'Inovação', description: 'Criação de novas soluções, automações ou ideias inovadoras.', icon: '💡', color: PRESET_GRADIENTS[2].class, xp: 20 },
+                    { company_id: company.id, name: 'Trabalho em Equipe', description: 'Demonstração de forte colaboração, empatia e ajuda mútua.', icon: '🤝', color: PRESET_GRADIENTS[3].class, xp: 15 },
+                    { company_id: company.id, name: 'Qualidade Excepcional', description: 'Entregas técnicas impecáveis e atenção apurada aos detalhes.', icon: '🏆', color: PRESET_GRADIENTS[1].class, xp: 10 },
+                ];
+                const { data: inserted } = await supabase.from('company_badges').insert(defaultBadges).select();
+                if (inserted) setCompanyBadges(inserted);
+            } else {
+                setCompanyBadges(data);
+            }
+        }
     };
 
     const fetchAwardHistory = async () => {
@@ -88,7 +147,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     id,
                     name,
                     icon,
-                    color
+                    color,
+                    xp
                 )
             `)
             .eq('company_id', company.id)
@@ -97,9 +157,22 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         if (data) setHistory(data as any[]);
     };
 
+    const fetchUserProfiles = async () => {
+        if (!company?.id) return;
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url, role, team, xp, level')
+            .eq('company_id', company.id)
+            .order('xp', { ascending: false });
+        if (data) {
+            setUserProfiles(data);
+        }
+    };
+
     useEffect(() => {
         fetchCompanyBadges();
         fetchAwardHistory();
+        fetchUserProfiles();
     }, [company?.id]);
 
     const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +225,8 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     name: newName,
                     description: newDescription,
                     icon: newIcon,
-                    color: newColor
+                    color: newColor,
+                    xp: newXP
                 });
 
             if (error) throw error;
@@ -161,6 +235,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
             setNewName('');
             setNewDescription('');
             setNewIcon('🏆');
+            setNewXP(15);
             fetchCompanyBadges();
         } catch (error: any) {
             console.error('Error creating badge:', error);
@@ -205,7 +280,22 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                 return;
             }
 
-            // 1. Insert user badge
+            // 1. Obter XP e Level atuais do banco
+            const { data: recipientProfile } = await supabase
+                .from('profiles')
+                .select('xp, level')
+                .eq('id', targetUserId)
+                .single();
+
+            const currentXP = recipientProfile?.xp || 0;
+            const currentLevel = recipientProfile?.level || 1;
+            const badgeXP = badge.xp || 10;
+            const newXPValue = currentXP + badgeXP;
+            
+            const thresholds = getThresholds();
+            const newLevelValue = getLevelForXP(newXPValue, thresholds);
+
+            // 2. Conceder o selo
             const { error: insertError } = await supabase
                 .from('user_badges')
                 .insert({
@@ -219,7 +309,13 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
             if (insertError) throw insertError;
 
-            // 2. Insert public post inside feed
+            // 3. Atualizar XP e Nível do usuário no banco
+            await supabase
+                .from('profiles')
+                .update({ xp: newXPValue, level: newLevelValue })
+                .eq('id', targetUserId);
+
+            // 4. Inserir post de conquista de selo no feed
             const awardPayload = {
                 type: 'badge_award',
                 recipient_id: recipient.id,
@@ -233,7 +329,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                 awarded_by_name: profile?.name || 'Administrador'
             };
 
-            const { error: postError } = await supabase
+            await supabase
                 .from('posts')
                 .insert({
                     author_id: profile?.id || targetUserId,
@@ -244,25 +340,46 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     mentions: [recipient.id]
                 });
 
-            if (postError) console.error('Erro ao postar premiação no feed:', postError);
+            // 5. Se subiu de nível, gerar o post de parabéns por level up
+            if (newLevelValue > currentLevel) {
+                const levelUpPayload = {
+                    recipient_id: recipient.id,
+                    recipient_name: recipient.name,
+                    recipient_avatar: recipient.avatarUrl,
+                    new_level: newLevelValue,
+                    message: `Subiu para o Nível ${newLevelValue} no RPG PandaNet! Parabéns pela jornada de evolução! 🛡️⚔️`
+                };
 
-            // 3. Send system notification
+                await supabase
+                    .from('posts')
+                    .insert({
+                        author_id: profile?.id || targetUserId,
+                        company_id: company.id,
+                        content: `[LEVEL_UP]${JSON.stringify(levelUpPayload)}`,
+                        media_url: null,
+                        media_type: null,
+                        mentions: [recipient.id]
+                    });
+            }
+
+            // 6. Enviar notificação de sistema
             await addNotification({
                 user_id: recipient.id,
                 company_id: company.id,
                 type: 'system',
                 title: 'Você recebeu um Selo! 🏆',
-                description: `${profile?.name || 'Um administrador'} concedeu o selo "${badge.name}" a você.`,
+                description: `${profile?.name || 'Um administrador'} concedeu o selo "${badge.name}" a você (+${badgeXP} XP).`,
                 avatarUrl: recipient.avatarUrl,
                 link: '/'
             });
 
-            alert(`Selo "${badge.name}" concedido com sucesso para ${recipient.name}!`);
+            alert(`Selo "${badge.name}" concedido com sucesso para ${recipient.name}! (+${badgeXP} XP)`);
             setTargetUserId('');
             setSelectedBadgeId('');
             setAwardReason('');
             setSearchEmployeeQuery('');
             fetchAwardHistory();
+            fetchUserProfiles();
         } catch (error: any) {
             console.error('Error awarding badge:', error);
             alert('Erro ao conceder selo: ' + error.message);
@@ -275,6 +392,29 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
         if (!confirm('Deseja realmente revogar esta concessão de selo?')) return;
 
         try {
+            // Buscando o selo e o usuário para diminuir XP correspondente
+            const { data: userBadge } = await supabase
+                .from('user_badges')
+                .select('user_id, badge_id')
+                .eq('id', userBadgeId)
+                .single();
+
+            if (userBadge) {
+                const targetUser = userBadge.user_id;
+                const badge = companyBadges.find(b => b.id === userBadge.badge_id);
+                const badgeXP = badge?.xp || 10;
+
+                const { data: p } = await supabase.from('profiles').select('xp, level').eq('id', targetUser).single();
+                if (p) {
+                    const currentXP = p.xp || 0;
+                    const newXP = Math.max(0, currentXP - badgeXP);
+                    const thresholds = getThresholds();
+                    const newLvl = getLevelForXP(newXP, thresholds);
+                    
+                    await supabase.from('profiles').update({ xp: newXP, level: newLvl }).eq('id', targetUser);
+                }
+            }
+
             const { error } = await supabase
                 .from('user_badges')
                 .delete()
@@ -284,6 +424,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
             alert('Concessão revogada com sucesso.');
             fetchAwardHistory();
+            fetchUserProfiles();
         } catch (error: any) {
             console.error('Error revoking badge:', error);
             alert('Erro ao revogar selo: ' + error.message);
@@ -305,29 +446,35 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 gap-4">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Gerenciador de Gamificação</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Crie selos de qualidade e premie colaboradores de destaque</p>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Gerenciador de Gamificação (RPG)</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Crie selos de qualidade, configure metas de XP e premie colaboradores de destaque</p>
                 </div>
-                <div className="flex space-x-2 bg-gray-100 dark:bg-slate-700/50 p-1.5 rounded-xl">
+                <div className="flex flex-wrap bg-gray-100 dark:bg-slate-700/50 p-1.5 rounded-xl gap-1 shrink-0">
                     <button
                         onClick={() => setActiveTab('create')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'create' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'create' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Criar Selos
                     </button>
                     <button
                         onClick={() => setActiveTab('award')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'award' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'award' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Conceder Selo
                     </button>
                     <button
                         onClick={() => setActiveTab('history')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Histórico
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('gamification')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'gamification' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
+                    >
+                        ⚙️ RPG & Metas
                     </button>
                 </div>
             </div>
@@ -351,7 +498,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-bold text-sm text-slate-800 dark:text-white truncate">{newName || 'Nome do Selo'}</h4>
-                                        <p className="text-xs text-slate-400 truncate">Clique no ícone para carregar imagem</p>
+                                        <p className="text-xs text-brand-primary font-bold">+{newXP} XP para o colaborador</p>
                                     </div>
                                 </div>
 
@@ -375,6 +522,20 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                         placeholder="Ex: Concedido a quem demonstrar atenção excepcional..."
                                         rows={3}
                                         className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Pontos de XP ao Conquistar *</label>
+                                    <input
+                                        type="number"
+                                        value={newXP}
+                                        onChange={e => setNewXP(Number(e.target.value))}
+                                        placeholder="Ex: 15"
+                                        min="1"
+                                        max="500"
+                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                        required
                                     />
                                 </div>
 
@@ -474,6 +635,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-bold text-slate-800 dark:text-white text-base truncate">{badge.name}</h4>
+                                                    <p className="text-xs text-brand-primary font-bold">+{badge.xp || 10} XP</p>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-3 leading-relaxed">
                                                         {badge.description || 'Sem descrição.'}
                                                     </p>
@@ -546,7 +708,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Selecionar Selo *</label>
+                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Selecionar Selo *</label>
                                 {companyBadges.length === 0 ? (
                                     <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-100 dark:border-amber-500/20">
                                         Nenhum selo criado ainda. Vá até a aba "Criar Selos" antes de prosseguir!
@@ -565,7 +727,7 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{badge.name}</p>
-                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{badge.description || 'Sem descrição.'}</p>
+                                                    <p className="text-[10px] text-brand-primary font-bold">+{badge.xp || 10} XP</p>
                                                 </div>
                                             </button>
                                         ))}
@@ -667,6 +829,150 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                         </div>
                     )}
                 </Card>
+            )}
+
+            {activeTab === 'gamification' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* XP Goals Config Box */}
+                    <div className="lg:col-span-1">
+                        <Card title="Metas de XP por Nível" className="bg-white dark:bg-slate-800 shadow-sm">
+                            <div className="space-y-4 mt-2">
+                                <div className="bg-emerald-50 dark:bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-semibold">
+                                    A XP acumulada é cumulativa. Configure a pontuação necessária que o usuário precisa atingir para ser promovido a cada nível de RPG.
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 2 (Bronze)</label>
+                                    <input
+                                        type="number"
+                                        value={level2XP}
+                                        onChange={e => {
+                                            const v = Number(e.target.value);
+                                            setLevel2XP(v);
+                                            saveThresholds(v, level3XP, level4XP, level5XP);
+                                        }}
+                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 3 (Prata)</label>
+                                    <input
+                                        type="number"
+                                        value={level3XP}
+                                        onChange={e => {
+                                            const v = Number(e.target.value);
+                                            setLevel3XP(v);
+                                            saveThresholds(level2XP, v, level4XP, level5XP);
+                                        }}
+                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 4 (Ouro)</label>
+                                    <input
+                                        type="number"
+                                        value={level4XP}
+                                        onChange={e => {
+                                            const v = Number(e.target.value);
+                                            setLevel4XP(v);
+                                            saveThresholds(level2XP, level3XP, v, level5XP);
+                                        }}
+                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-650 dark:text-slate-400 uppercase mb-1">Nível 5 (Lendário)</label>
+                                    <input
+                                        type="number"
+                                        value={level5XP}
+                                        onChange={e => {
+                                            const v = Number(e.target.value);
+                                            setLevel5XP(v);
+                                            saveThresholds(level2XP, level3XP, level4XP, v);
+                                        }}
+                                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-750 text-slate-800 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+
+                                <div className="text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-500/10 p-3 rounded-xl border border-orange-100 dark:border-orange-500/20 font-bold leading-normal">
+                                    🛡️ Nota do RPG: Nível 5 é o limite padrão predefinido e exibe o anel lendário neon pulsante ao redor do avatar!
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Users list with progress bars */}
+                    <div className="lg:col-span-2">
+                        <Card title="Classificação e Progresso de XP dos Colaboradores" className="bg-white dark:bg-slate-800 shadow-sm">
+                            <div className="space-y-4 mt-2">
+                                {userProfiles.map((user, idx) => {
+                                    const xp = user.xp || 0;
+                                    const level = user.level || 1;
+                                    
+                                    // Determinar limites de XP para a barra de progresso
+                                    const thresholds = getThresholds();
+                                    const prevThreshold = level === 1 ? 0 : thresholds[level - 2];
+                                    const nextThreshold = level >= 5 ? thresholds[3] : thresholds[level - 1];
+                                    
+                                    const progressVal = level >= 5 
+                                        ? 100 
+                                        : ((xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100;
+                                    
+                                    return (
+                                        <div key={user.id} className="flex items-center space-x-4 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/60 bg-slate-50/40 dark:bg-slate-900/30 hover:bg-slate-100/30 transition-colors">
+                                            <span className="font-extrabold text-slate-400 text-sm w-5 text-center shrink-0">
+                                                {idx + 1}
+                                            </span>
+                                            
+                                            <div className="shrink-0">
+                                                <UserAvatar src={user.avatar_url} name={user.full_name} level={level} size="sm" />
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="font-bold text-sm text-slate-800 dark:text-white truncate">
+                                                        {user.full_name}
+                                                    </span>
+                                                    <span className="text-xs font-black text-brand-primary uppercase">
+                                                        Nível {level}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* XP Progress Bar */}
+                                                <div className="relative w-full bg-slate-200 dark:bg-slate-750 h-2.5 rounded-full overflow-hidden border dark:border-slate-700">
+                                                    <div 
+                                                        className={`h-full transition-all duration-500 bg-gradient-to-r ${
+                                                            level >= 5 
+                                                                ? 'from-pink-500 via-purple-500 to-cyan-400 animate-pulse' 
+                                                                : 'from-emerald-400 to-brand-primary'
+                                                        }`}
+                                                        style={{ width: `${Math.max(3, Math.min(100, progressVal))}%` }}
+                                                    ></div>
+                                                </div>
+
+                                                <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold mt-1">
+                                                    <span>{xp} XP Acumulado</span>
+                                                    <span>
+                                                        {level >= 5 ? 'Nível Máximo Atingido! 🎉' : `${nextThreshold} XP para subir`}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {userProfiles.length === 0 && (
+                                    <div className="text-center py-6 text-slate-500 italic">
+                                        Nenhum perfil carregado.
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+                </div>
             )}
         </div>
     );

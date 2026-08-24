@@ -131,16 +131,26 @@ export const MiniCalendar: React.FC<MiniCalendarProps> = ({ onNavigate, currentU
   };
 
   const getDotColor = (category: string) => {
-    switch (category) {
-      case 'Reunião':
-        return 'bg-blue-500';
-      case 'Evento da Empresa':
-        return 'bg-purple-500';
-      case 'Feriado':
-        return 'bg-rose-500';
-      default:
-        return 'bg-slate-400';
+    const cat = category ? category.toLowerCase() : '';
+    if (cat.includes('visita') || cat.includes('reunião') || cat.includes('reuniao')) {
+      return 'bg-yellow-500';
     }
+    if (cat.includes('treinamento') || cat.includes('projeto')) {
+      return 'bg-blue-500';
+    }
+    if (cat.includes('reserva') || cat.includes('aluguel')) {
+      return 'bg-green-500';
+    }
+    if (cat.includes('social') || cat.includes('outro') || cat.includes('corporativo')) {
+      return 'bg-orange-500';
+    }
+    if (cat.includes('aniversário') || cat.includes('aniversario')) {
+      return 'bg-amber-500';
+    }
+    if (cat.includes('feriado')) {
+      return 'bg-rose-500';
+    }
+    return 'bg-slate-400';
   };
 
   return (

@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
                             viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                            ai_assistant: true, viewScheduling: true,
+                            ai_assistant: true, viewScheduling: true, viewAgenda: true, viewReservations: true,
                             viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
                         },
                         following: [],
@@ -116,6 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         education_level: '',
                         status: 'active',
                         quick_links: data?.quick_links || [],
+                        xp: data?.xp || 0,
+                        level: data?.level || 1,
                         ai_api_key: data?.ai_api_key || null,
                         ai_provider: data?.ai_provider || null,
                         ai_behavior: data?.ai_behavior || null,
@@ -149,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                     viewVacationRequests: true, manageVacationRequests: true,
                     viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                    viewScheduling: true,
+                    viewScheduling: true, viewAgenda: true, viewReservations: true,
                     viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
                 };
 
@@ -188,6 +190,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     quick_links: data.quick_links || [],
                     company_id: data.company_id,
                     status: data.status,
+                    xp: data.xp || 0,
+                    level: data.level || 1,
                     ai_api_key: data.ai_api_key || null,
                     ai_provider: data.ai_provider || null,
                     ai_behavior: data.ai_behavior || null,
