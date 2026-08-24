@@ -27,6 +27,8 @@ const evoKey = process.env.EVOLUTION_API_KEY || 'EvolutionPandaSecret123';
 // For internal docker network:
 const backendWebhookBaseUrl = process.env.BACKEND_WEBHOOK_URL || 'http://pandanet_backend:3000';
 
+app.set('trust proxy', 1);
+
 // --- Security Middlewares ---
 app.use(helmet());
 app.use(hpp());
@@ -43,7 +45,11 @@ const apiLimiter = rateLimit({
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' })); // Evolution API webhooks can be large
 
-const supabaseUrl = process.env.SUPABASE_URL;
+// Fix URL for Docker internal network if localhost is provided
+let supabaseUrl = process.env.SUPABASE_URL || '';
+if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
+  supabaseUrl = supabaseUrl.replace('localhost', 'supabase-kong').replace('127.0.0.1', 'supabase-kong');
+}
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey ? supabaseKey.trim() : '');
 
