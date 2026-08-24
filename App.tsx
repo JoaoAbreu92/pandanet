@@ -49,6 +49,7 @@ import AIAssistant from './components/AIAssistant';
 import AICorrector from './components/AICorrector';
 import PWAReloadPrompt from './components/PWAReloadPrompt';
 import SupportInbox from './components/SupportInbox';
+import PersonalNotesPage from './components/PersonalNotesPage';
 
 
 const AppContent: React.FC = () => {
@@ -209,7 +210,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -666,6 +667,7 @@ const AppContent: React.FC = () => {
             case 'whatspanda': return canAccess('viewWhatsPanda') ? <WhatsPanda initialSearch={globalSearchTerm} /> : null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
+            case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;
             default: return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;
         }
     };

@@ -3,6 +3,7 @@ import React from 'react';
 // Basic types
 export type Page =
   | 'home'
+  | 'personal-notes'
   | 'messages'
   | 'email'
   | 'tickets'
