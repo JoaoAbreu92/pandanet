@@ -1304,7 +1304,128 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             addDebugLog('SYNC_GROUPS_EXCEPTION', `Exceção em sincronizar grupos: ${groupSyncErr.message}`);
         }
 
-        console.log(`[SYNC] Histórico para ${activeChats.length} chats ignorado por configuração (apenas novas mensagens geram atendimentos).`);
+        // 5. Importar histórico de atendimentos (Top 50 chats/conversas)
+        try {
+            console.log(`[SYNC] Importando histórico de atendimentos (últimos 50 contatos)...`);
+            
+            // Filtrar chats pessoais do activeChats
+            const personalChats = activeChats.filter(chat => {
+                const jid = chat.remoteJid || chat.jid || chat.id || '';
+                return jid && !jid.includes('@g.us') && !jid.includes('@broadcast') && !jid.includes('@newsletter');
+            });
+
+            // Se tivermos chats ativos no histórico da Evolution, usamos eles
+            if (personalChats.length > 0) {
+                const top50 = personalChats.slice(0, 50);
+                addDebugLog('SYNC_HISTORY_CHATS', `Importando ${top50.length} chats ativos do histórico.`);
+                
+                for (const chat of top50) {
+                    const jid = chat.remoteJid || chat.jid || chat.id || '';
+                    const phone = jid.split('@')[0];
+                    const cleanPhone = phone.replace(/\D/g, '');
+                    
+                    if (channelPhone && (cleanPhone === channelPhone || cleanPhone.endsWith(channelPhone) || channelPhone.endsWith(cleanPhone))) {
+                        continue;
+                    }
+
+                    // Verificar se já existe a conversa
+                    const { data: convExists } = await supabase
+                        .from('whatsapp_conversations')
+                        .select('id')
+                        .eq('company_id', companyId)
+                        .eq('contact_phone', phone)
+                        .maybeSingle();
+
+                    if (!convExists) {
+                        const name = chat.pushName || chat.pushname || chat.name || chat.verifiedName || formatPhoneDisplay(phone);
+                        let lastMessageText = "";
+                        let lastMessageTime = new Date().toISOString();
+                        let isFromMe = false;
+
+                        if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+                            const lastMsg = chat.messages[chat.messages.length - 1];
+                            lastMessageText = lastMsg.message?.conversation || lastMsg.message?.extendedTextMessage?.text || lastMsg.conversation || "";
+                            isFromMe = !!lastMsg.key?.fromMe;
+                            if (lastMsg.messageTimestamp) {
+                                lastMessageTime = new Date(lastMsg.messageTimestamp * 1000).toISOString();
+                            }
+                        }
+
+                        // Inserir conversa como fechada por padrão, exceto se houver mensagens não lidas
+                        const hasUnread = (chat.unreadCount || 0) > 0;
+                        const status = hasUnread ? 'aberto' : 'fechado';
+
+                        const { data: newConv, error: insertErr } = await supabase
+                            .from('whatsapp_conversations')
+                            .insert({
+                                company_id: companyId,
+                                connection_id: connectionId,
+                                contact_phone: phone,
+                                contact_name: name,
+                                is_group: false,
+                                status: status,
+                                unread_count: chat.unreadCount || 0,
+                                last_message: lastMessageText || "Histórico importado",
+                                last_message_at: lastMessageTime
+                            })
+                            .select('id')
+                            .maybeSingle();
+
+                        if (insertErr) {
+                            console.error(`[SYNC] Erro ao importar chat histórico para ${phone}:`, insertErr.message);
+                        } else if (newConv && lastMessageText) {
+                            // Inserir última mensagem para dar contexto
+                            await supabase.from('whatsapp_messages').insert({
+                                company_id: companyId,
+                                conversation_id: newConv.id,
+                                message_text: lastMessageText,
+                                is_from_customer: !isFromMe,
+                                sent_by: null,
+                                created_at: lastMessageTime
+                            });
+                        }
+                    }
+                }
+            } else {
+                // Fallback: se não tiver chats ativos na Evolution, usa os contatos da agenda findContacts
+                const personalContacts = contactsToUpsert.filter(c => !c.is_group);
+                const top50 = personalContacts.slice(0, 50);
+                addDebugLog('SYNC_HISTORY_FALLBACK', `Importando ${top50.length} contatos da agenda como fallback de histórico.`);
+
+                for (const c of top50) {
+                    const phone = c.phone;
+                    const { data: convExists } = await supabase
+                        .from('whatsapp_conversations')
+                        .select('id')
+                        .eq('company_id', companyId)
+                        .eq('contact_phone', phone)
+                        .maybeSingle();
+
+                    if (!convExists) {
+                        const { error: insertErr } = await supabase
+                            .from('whatsapp_conversations')
+                            .insert({
+                                company_id: companyId,
+                                connection_id: connectionId,
+                                contact_phone: phone,
+                                contact_name: c.name,
+                                is_group: false,
+                                status: 'fechado',
+                                unread_count: 0,
+                                last_message: "Histórico importado",
+                                last_message_at: new Date().toISOString()
+                            });
+
+                        if (insertErr) {
+                            console.error(`[SYNC] Erro ao importar contato fallback para ${phone}:`, insertErr.message);
+                        }
+                    }
+                }
+            }
+        } catch (histErr) {
+            console.error(`[SYNC] Erro no histórico de atendimentos:`, histErr.message);
+            addDebugLog('SYNC_HISTORY_ERR', `Erro ao importar histórico: ${histErr.message}`);
+        }
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
         console.error(`[SYNC] Erro fatal:`, err.message);
