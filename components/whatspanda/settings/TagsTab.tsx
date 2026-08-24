@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { WhatsAppTag } from '../../../types';
 import { Plus, Edit2, Trash2, X, Check, Tag } from 'lucide-react';
+import { useAuth } from '../../AuthContext';
 
 const TagsTab: React.FC = () => {
+    const { user, profile } = useAuth();
     const [tags, setTags] = useState<WhatsAppTag[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,10 +20,14 @@ const TagsTab: React.FC = () => {
     }, []);
 
     const fetchTags = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
         setLoading(true);
         const { data, error } = await supabase
             .from('whatsapp_tags')
             .select('*')
+            .eq('company_id', companyId)
             .order('created_at', { ascending: true });
         
         if (error) console.error('Error fetching tags:', error);
@@ -45,10 +51,16 @@ const TagsTab: React.FC = () => {
     const handleSave = async () => {
         if (!name.trim()) return;
 
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) {
+            alert('Não foi possível identificar a empresa. Tente fazer login novamente.');
+            return;
+        }
+
         const tagData = {
             name,
             color,
-            company_id: '15d38706-59a6-43b8-9366-2371904d90ce', // TODO: Get from context/auth
+            company_id: companyId,
             is_active: true
         };
 
@@ -68,7 +80,7 @@ const TagsTab: React.FC = () => {
 
         if (error) {
             console.error('Error saving tag:', error);
-            alert('Erro ao salvar tag.');
+            alert(`Erro ao salvar tag: ${error.message}`);
         } else {
             fetchTags();
             setIsModalOpen(false);

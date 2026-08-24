@@ -162,8 +162,81 @@ app.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, 
 
 
 // ============================================
-// WEBHOOKS DA EVOLUTION API
+// WEBHOOKS DA EVOLUTION API E SYNC
 // ============================================
+
+async function syncEvolutionData(instanceName, companyId, connectionId) {
+    try {
+        console.log(`[SYNC] Iniciando sincronização de histórico para a instância ${instanceName}...`);
+        
+        // 1. Buscar chats da Evolution API
+        const chatRes = await fetch(`${evoUrl}/chat/findChats/${instanceName}`, {
+            headers: { 'apikey': evoKey }
+        });
+        
+        if (!chatRes.ok) {
+            console.error(`[SYNC] Erro ao buscar chats: ${chatRes.statusText}`);
+            return;
+        }
+        
+        const chats = await chatRes.json();
+        if (!Array.isArray(chats)) return;
+
+        console.log(`[SYNC] ${chats.length} chats encontrados. Sincronizando no Supabase...`);
+
+        // 2. Buscar contatos para mapear nomes (Opcional, mas ajuda muito)
+        const contactRes = await fetch(`${evoUrl}/chat/findContacts/${instanceName}`, {
+            headers: { 'apikey': evoKey }
+        }).catch(() => null);
+        
+        let contactsMap = {};
+        if (contactRes && contactRes.ok) {
+            const contacts = await contactRes.json();
+            if (Array.isArray(contacts)) {
+                contacts.forEach(c => {
+                    if (c.id || c.remoteJid) {
+                         contactsMap[c.id || c.remoteJid] = c.name || c.pushName || c.notify;
+                    }
+                });
+            }
+        }
+
+        // 3. Inserir ou atualizar na tabela whatsapp_conversations
+        for (const chat of chats) {
+            const remoteJid = chat.id || chat.remoteJid;
+            if (!remoteJid || remoteJid.includes('@g.us')) continue; // Ignorar grupos por enquanto
+            
+            const fromPhone = remoteJid.split('@')[0];
+            const contactName = chat.name || contactsMap[remoteJid] || fromPhone;
+            const unreadCount = chat.unreadCount || 0;
+            // A Evo API geralmente retorna timestamp em segundos
+            const timestamp = chat.conversationTimestamp ? new Date(chat.conversationTimestamp * 1000).toISOString() : new Date().toISOString();
+
+            // Verifica se já existe
+            const { data: existingConv } = await supabase
+                .from('whatsapp_conversations')
+                .select('id')
+                .eq('company_id', companyId)
+                .eq('contact_phone', fromPhone)
+                .single();
+
+            if (!existingConv) {
+                await supabase.from('whatsapp_conversations').insert({
+                    company_id: companyId,
+                    contact_phone: fromPhone,
+                    contact_name: contactName,
+                    status: 'aberto',
+                    unread_count: unreadCount,
+                    connection_id: connectionId,
+                    last_message_at: timestamp
+                });
+            }
+        }
+        console.log(`[SYNC] Sincronização da instância ${instanceName} concluída!`);
+    } catch (err) {
+        console.error(`[SYNC] Erro durante a sincronização:`, err.message);
+    }
+}
 
 app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
     // Responde 200 rápido para a Evolution não travar
@@ -191,6 +264,9 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         
         if (state === 'open' || state === 'connected') {
             await supabase.from('whatsapp_settings').update({ is_connected: true, qr_code: null }).eq('id', connectionId);
+            
+            // Disparar sincronização em background
+            syncEvolutionData(instance, companyId, connectionId);
         } else if (state === 'close' || state === 'disconnected' || state === 'refused') {
             await supabase.from('whatsapp_settings').update({ is_connected: false }).eq('id', connectionId);
             // Em auth_failure, a evo exclui a sessão? Se sim, avisar.

@@ -189,7 +189,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                 );
                             }
 
-                            if (message.file?.type === 'sticker') {
+                            // If there's an image/GIF/sticker file attached, don't render text
+                            if (message.file && (message.file.type === 'sticker' || message.file.type?.startsWith('image/') || isImageUrl(message.file.url || ''))) {
                                 return null;
                             }
 
@@ -804,14 +805,17 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     console.log("[Realtime] Mensagem própria, não notificar");
                 }
 
-                console.log("[Realtime] Atualizando conversas...");
                 fetchConversations();
                 
                 if (selectedConvRef.current === newMsg.conversation_id) {
                     console.log("[Realtime] Atualizando mensagens da conversa ativa");
+                    // Only update the messages list, avoiding full conversation re-fetch
+                    // which causes flickering/scroll jump
                     fetchMessages(selectedConvRef.current);
                 } else {
-                    console.log("[Realtime] Mensagem de outra conversa, não atualizar");
+                    // Only update conversation list preview for non-active conversations
+                    fetchConversations();
+                    console.log("[Realtime] Mensagem de outra conversa, atualizado lista");
                 }
             })
             .subscribe((status, err) => {
@@ -922,16 +926,15 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
     // Auto-scroll inteligente: apenas no carregamento inicial ou ao enviar mensagem
     useEffect(() => {
-        // Scroll apenas se:
-        // 1. É o carregamento inicial da conversa
-        // 2. O número de mensagens aumentou E a última mensagem é minha
-        const shouldScroll = isInitialLoad.current || 
-            (messages.length > lastMessageCount.current && 
-             messages[messages.length - 1]?.sender === 'me');
+        const lastMsg = messages[messages.length - 1];
+        const isFromMe = lastMsg?.sender === 'me';
+        const shouldScroll = isInitialLoad.current || isFromMe;
         
-        if (shouldScroll) {
+        if (shouldScroll && messages.length > 0) {
             // Scroll instantâneo sem animação
-            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: isInitialLoad.current ? 'auto' : 'smooth' });
+            }, 50);
             isInitialLoad.current = false;
         }
         

@@ -271,6 +271,39 @@ const UsersTab: React.FC = () => {
                                 </select>
                              </div>
 
+                            {/* Allowed Queues */}
+                            <div>
+                                <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Filas de Atendimento (Setores)</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-100 dark:border-white/5 rounded-[2rem] p-6 bg-gray-50/50 dark:bg-white/5 mb-8">
+                                    {queues.length === 0 ? (
+                                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest col-span-full py-4 text-center opacity-50 italic">Nenhuma fila configurada.</p>
+                                    ) : (
+                                        queues.map((queue) => (
+                                            <div key={queue.id} className="flex items-center group/item hover:translate-x-1 transition-transform">
+                                                <input
+                                                    id={`queue-${queue.id}`}
+                                                    type="checkbox"
+                                                    checked={permissions.assigned_queues?.includes(queue.id) || false}
+                                                    onChange={(e) => {
+                                                        const current = permissions.assigned_queues || [];
+                                                        if (e.target.checked) {
+                                                            setPermissions({ ...permissions, assigned_queues: [...current, queue.id] });
+                                                        } else {
+                                                            setPermissions({ ...permissions, assigned_queues: current.filter(id => id !== queue.id) });
+                                                        }
+                                                    }}
+                                                    className="h-5 w-5 rounded-lg border-gray-300/50 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 bg-white dark:bg-white/5 transition-all cursor-pointer"
+                                                />
+                                                <label htmlFor={`queue-${queue.id}`} className="ml-4 text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer group-hover/item:text-emerald-500 transition-colors flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: queue.color }}></div>
+                                                    {queue.name}
+                                                </label>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Allowed Channels */}
                             <div>
                                 <h4 className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Canais Permitidos</h4>

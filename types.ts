@@ -240,6 +240,7 @@ export interface WhatsAppPermissions {
   can_see_all_departments: boolean; // New: Can see conversations from all departments
   can_manage_tags: boolean; // New: Can manage tags
   allowed_connections?: string[]; // IDs of Allowed connections
+  assigned_queues?: string[]; // IDs of assigned queues
 }
 
 export interface Employee {
@@ -674,6 +675,8 @@ export interface WhatsAppConversation {
   assigned_to?: string; // profile_id
   department_id?: string;
   connection_id?: string; // connection ID for Multi-channel
+  kanban_column_id?: string | null;
+  queue_id?: string | null;
   last_message_at: string;
   unread_count: number;
 }

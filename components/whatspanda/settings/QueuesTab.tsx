@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { WhatsAppQueue } from '../../../types';
 import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { useAuth } from '../../AuthContext';
 
 const QueuesTab: React.FC = () => {
+    const { user, profile } = useAuth();
     const [queues, setQueues] = useState<WhatsAppQueue[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,10 +21,14 @@ const QueuesTab: React.FC = () => {
     }, []);
 
     const fetchQueues = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+
         setLoading(true);
         const { data, error } = await supabase
             .from('whatsapp_queues')
             .select('*')
+            .eq('company_id', companyId)
             .order('created_at', { ascending: true });
         
         if (error) console.error('Error fetching queues:', error);
@@ -48,11 +54,17 @@ const QueuesTab: React.FC = () => {
     const handleSave = async () => {
         if (!name.trim()) return;
 
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) {
+            alert('Não foi possível identificar a empresa. Tente fazer login novamente.');
+            return;
+        }
+
         const queueData = {
             name,
             description,
             color,
-            company_id: '15d38706-59a6-43b8-9366-2371904d90ce', // TODO: Get from context/auth
+            company_id: companyId,
             is_active: true
         };
 
@@ -72,7 +84,7 @@ const QueuesTab: React.FC = () => {
 
         if (error) {
             console.error('Error saving queue:', error);
-            alert('Erro ao salvar fila.');
+            alert(`Erro ao salvar fila: ${error.message}`);
         } else {
             fetchQueues();
             setIsModalOpen(false);

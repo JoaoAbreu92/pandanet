@@ -18,7 +18,7 @@ interface Agent {
   department_id?: string;
 }
 
-interface Department {
+interface Queue {
   id: string;
   name: string;
 }
@@ -35,13 +35,13 @@ const TransferModal: React.FC<TransferModalProps> = ({
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [queues, setQueues] = useState<Queue[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAgents();
-    fetchDepartments();
+    fetchQueues();
   }, []);
 
   const fetchAgents = async () => {
@@ -56,15 +56,16 @@ const TransferModal: React.FC<TransferModalProps> = ({
     if (error) console.error('Error fetching agents:', error);
   };
 
-  const fetchDepartments = async () => {
+  const fetchQueues = async () => {
     const { data, error } = await supabase
-      .from('departments')
+      .from('whatsapp_queues')
       .select('id, name')
       .eq('company_id', profile?.company_id)
+      .eq('is_active', true)
       .order('name');
 
-    if (data) setDepartments(data);
-    if (error) console.error('Error fetching departments:', error);
+    if (data) setQueues(data);
+    if (error) console.error('Error fetching queues:', error);
   };
 
   const handleTransfer = async () => {
@@ -86,10 +87,10 @@ const TransferModal: React.FC<TransferModalProps> = ({
 
       if (transferType === 'user' && selectedUserId) {
         updateData.assigned_to = selectedUserId;
-        updateData.department_id = null; // Clear department when assigning to user
+        updateData.queue_id = null; // Clear queue when assigning to user
       } else if (transferType === 'department' && selectedDepartmentId) {
-        updateData.department_id = selectedDepartmentId;
-        updateData.assigned_to = null; // Clear user when assigning to department
+        updateData.queue_id = selectedDepartmentId;
+        updateData.assigned_to = null; // Clear user when assigning to queue
       } else {
         setError('Selecione um usuário ou setor para transferir');
         setLoading(false);
@@ -225,21 +226,20 @@ const TransferModal: React.FC<TransferModalProps> = ({
           {transferType === 'department' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Selecione o Setor
+                Selecione o Setor / Fila
               </label>
               <select
                 value={selectedDepartmentId}
                 onChange={(e) => setSelectedDepartmentId(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
-                <option value="">Escolha um setor...</option>
-                {departments.map((dept) => (
+                <option value="">Escolha uma fila...</option>
+                {queues.map((queue) => (
                   <option 
-                    key={dept.id} 
-                    value={dept.id}
-                    disabled={dept.id === currentDepartmentId}
+                    key={queue.id} 
+                    value={queue.id}
                   >
-                    {dept.name} {dept.id === currentDepartmentId ? '(Atual)' : ''}
+                    {queue.name}
                   </option>
                 ))}
               </select>

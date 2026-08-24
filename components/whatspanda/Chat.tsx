@@ -20,12 +20,15 @@ import {
   Info,
   UserPlus,
   Instagram,
-  Smartphone
+  Smartphone,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
 import TransferModal from './TransferModal';
 import ContactSidebar from './ContactSidebar';
+import KanbanBoard from './KanbanBoard';
 
 interface ChatProps {
   onConversationSelect?: (isActive: boolean) => void;
@@ -51,6 +54,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // const [user] = useState({ id: 'current-user-id' }); // Mock removed
@@ -124,7 +128,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
     const companyId = profile?.company_id || user?.user_metadata?.company_id;
     if (!companyId) return;
 
-    const { data } = await supabase
+    let query = supabase
       .from('whatsapp_conversations')
       .select(`
         *,
@@ -132,8 +136,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
         department:departments(id, name),
         channel:whatsapp_settings!connection_id(channel_type, connection_name)
       `)
-      .eq('company_id', companyId)
-      .order('last_message_at', { ascending: false });
+      .eq('company_id', companyId);
+
+    // Filter by queues if not Admin and cannot see all departments
+    if (!isAdmin && profile?.id && !permissions.can_see_all_departments) {
+      const assignedQueues = permissions.assigned_queues || [];
+      if (assignedQueues.length > 0) {
+        query = query.or(`queue_id.in.(${assignedQueues.join(',')}),queue_id.is.null,assigned_to.eq.${profile.id}`);
+      } else {
+        query = query.or(`queue_id.is.null,assigned_to.eq.${profile.id}`);
+      }
+    }
+
+    const { data } = await query.order('last_message_at', { ascending: false });
     
     if (data) setConversations(data as WhatsAppConversationWithDetails[]);
     setLoading(false);
@@ -199,7 +214,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
             <h2 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-white tracking-tight uppercase text-sm opacity-80">
               Atendimentos
             </h2>
-            <div className={`w-3 h-3 rounded-full ring-4 shadow-lg ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-500/20 animate-pulse' : 'bg-red-500 ring-red-500/20'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-500 transition-colors"
+                title={viewMode === 'list' ? 'Mudar para Kanban' : 'Mudar para Lista'}
+              >
+                {viewMode === 'list' ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
+              </button>
+              <div className={`w-3 h-3 rounded-full ring-4 shadow-lg ${settings?.is_connected ? 'bg-emerald-500 ring-emerald-500/20 animate-pulse' : 'bg-red-500 ring-red-500/20'}`} title={settings?.is_connected ? 'Conectado' : 'Desconectado'}></div>
+            </div>
           </div>
           
           {/* Tabs */}
@@ -318,6 +342,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
         </div>
       </div>
 
+      {viewMode === 'kanban' ? (
+        <KanbanBoard 
+          companyId={profile?.company_id || user?.user_metadata?.company_id || ''}
+          conversations={conversations}
+          onOpenChat={(conv) => {
+            setSelectedConversation(conv);
+            setViewMode('list');
+          }}
+        />
+      ) : (
+      <>
       {/* Main Chat Area */}
       <div className={`${selectedConversation ? 'flex' : 'hidden md:flex'} flex-1 flex flex-col bg-[#F3F6F8] dark:bg-[#020617] relative transition-colors duration-500`} style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', opacity: 1 }}>
         <div className="absolute inset-0 bg-white/70 dark:bg-[#020617]/90 pointer-events-none" /> {/* Overlay to soften the background */}
@@ -504,6 +539,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect }) => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Transfer Modal */}
