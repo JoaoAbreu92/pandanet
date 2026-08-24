@@ -19,7 +19,7 @@ const CompanySelectPage: React.FC<CompanySelectPageProps> = ({ onCompanySelect }
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="flex flex-col items-center justify-center min-h-[125vh] p-4">
             <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
                 <div className="text-center">
                     <Logo showText={true} className="mx-auto mb-4 w-48" />

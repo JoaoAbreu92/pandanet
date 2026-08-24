@@ -84,7 +84,7 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-[125vh] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
             <div className="absolute top-4 right-4 group">
                 {/* Language Selector */}
                 <div className="relative inline-block text-left">
