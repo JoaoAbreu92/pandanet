@@ -18,7 +18,8 @@ import {
     XMarkIcon,
     UserPlusIcon,
     UserGroupIcon as HeroUserGroupIcon,
-    ArrowUturnLeftIcon
+    ArrowUturnLeftIcon,
+    TrashIcon
 } from './icons';
 import type { CalendarEvent, Employee, CalendarEventCategory, Page } from '../types';
 import { supabase } from '../supabaseClient';
@@ -114,6 +115,13 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [declineReason, setDeclineReason] = useState('');
     const [selectedDayOptionsDate, setSelectedDayOptionsDate] = useState<Date | null>(null);
     const [isDayOptionsOpen, setDayOptionsOpen] = useState(false);
+    
+    // Sharing states
+    const [sharedWithMe, setSharedWithMe] = useState<any[]>([]);
+    const [mySharedList, setMySharedList] = useState<any[]>([]);
+    const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string>(currentUser?.id || '');
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
     const [newEventData, setNewEventData] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
@@ -127,11 +135,60 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         isPrivate: false
     });
 
+    const fetchShares = async () => {
+        if (!currentUser?.id) return;
+        try {
+            const { data: sharesWithMeData } = await supabase
+                .from('calendar_shares')
+                .select('*')
+                .eq('shared_with_id', currentUser.id);
+
+            const { data: mySharesData } = await supabase
+                .from('calendar_shares')
+                .select('*')
+                .eq('owner_id', currentUser.id);
+
+            const { data: emps } = await supabase.from('profiles').select('*').eq('company_id', currentUser.company_id);
+            const empsMap = emps || [];
+
+            if (sharesWithMeData) {
+                const mappedSharedWithMe = sharesWithMeData.map((share: any) => {
+                    const profile = empsMap.find((emp: any) => emp.id === share.owner_id);
+                    return {
+                        id: share.owner_id,
+                        shareId: share.id,
+                        name: profile?.full_name || 'Usuário',
+                        email: profile?.email || '',
+                        avatarUrl: profile?.avatar_url || ''
+                    };
+                });
+                setSharedWithMe(mappedSharedWithMe);
+            }
+
+            if (mySharesData) {
+                const mappedMySharedList = mySharesData.map((share: any) => {
+                    const profile = empsMap.find((emp: any) => emp.id === share.shared_with_id);
+                    return {
+                        id: share.shared_with_id,
+                        shareId: share.id,
+                        name: profile?.full_name || 'Usuário',
+                        email: profile?.email || '',
+                        avatarUrl: profile?.avatar_url || ''
+                    };
+                });
+                setMySharedList(mappedMySharedList);
+            }
+        } catch (err) {
+            console.error('Erro ao buscar compartilhamentos:', err);
+        }
+    };
+
     useEffect(() => {
         if (!currentUser?.company_id) return;
 
         const fetchData = async () => {
             const { data: emps } = await supabase.from('profiles').select('*').eq('company_id', currentUser.company_id);
+            const empsMap = emps || [];
             if (emps) {
                 setEmployees(emps.map((e: any) => ({
                     id: e.id,
@@ -161,18 +218,59 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 console.warn('Could not load personal tasks:', err);
             }
 
+            // Fetch shares to correctly filter private events
+            const { data: sharesWithMeData } = await supabase
+                .from('calendar_shares')
+                .select('*')
+                .eq('shared_with_id', currentUser.id);
+
+            const { data: mySharesData } = await supabase
+                .from('calendar_shares')
+                .select('*')
+                .eq('owner_id', currentUser.id);
+
+            const sharedUserIds: string[] = [];
+            if (sharesWithMeData) {
+                const mappedSharedWithMe = sharesWithMeData.map((share: any) => {
+                    const profile = empsMap.find((emp: any) => emp.id === share.owner_id);
+                    sharedUserIds.push(share.owner_id);
+                    return {
+                        id: share.owner_id,
+                        shareId: share.id,
+                        name: profile?.full_name || 'Usuário',
+                        email: profile?.email || '',
+                        avatarUrl: profile?.avatar_url || ''
+                    };
+                });
+                setSharedWithMe(mappedSharedWithMe);
+            }
+
+            if (mySharesData) {
+                const mappedMySharedList = mySharesData.map((share: any) => {
+                    const profile = empsMap.find((emp: any) => emp.id === share.shared_with_id);
+                    return {
+                        id: share.shared_with_id,
+                        shareId: share.id,
+                        name: profile?.full_name || 'Usuário',
+                        email: profile?.email || '',
+                        avatarUrl: profile?.avatar_url || ''
+                    };
+                });
+                setMySharedList(mappedMySharedList);
+            }
+
             const { data: evts } = await supabase
                 .from('events')
                 .select('*, calendar_invites(*)')
                 .or(`company_id.eq.${currentUser.company_id},and(is_private.eq.true,creator_id.eq.${currentUser.id})`);
 
             if (evts) {
-                const empsMap = emps || [];
                 const formattedEvents: CalendarEvent[] = evts
-                    .filter((e: any) => !e.is_private || e.creator_id === currentUser.id)
+                    .filter((e: any) => !e.is_private || e.creator_id === currentUser.id || sharedUserIds.includes(e.creator_id))
                     .map((e: any) => ({
                         id: e.id,
                         title: e.title,
+                        creatorId: e.creator_id,
                         date: e.date ? e.date.split('T')[0] : (e.created_at ? e.created_at.split('T')[0] : ''),
                         startTime: e.start_time ? new Date(e.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
                         endTime: e.end_time ? new Date(e.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '00:00',
@@ -343,40 +441,15 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         }));
 
         const taskEvents: CalendarEvent[] = [];
-        personalTasks.forEach(t => {
-            if (!t.date) {
-                const targetDate = t.limit_date || t.date;
-                if (targetDate) {
-                    taskEvents.push({
-                        id: `task-${t.id}`,
-                        title: `Tarefa: ${t.title}`,
-                        date: targetDate,
-                        startTime: '00:00',
-                        endTime: '23:59',
-                        category: 'Tarefa' as any,
-                        location: '',
-                        attendees: [],
-                        notes: '',
-                        isPrivate: true,
-                        isSystem: false,
-                        isTask: true,
-                        taskCompleted: t.completed,
-                        taskCompletedAt: t.completed_at,
-                        isTaskStart: true,
-                        isTaskEnd: true,
-                        isTaskMiddle: false,
-                        taskStartDate: t.date,
-                        taskLimitDate: t.limit_date
-                    } as any);
-                }
-            } else {
-                if (t.limit_date && t.limit_date >= t.date) {
-                    const dates = getDatesInRange(t.date, t.limit_date);
-                    dates.forEach(d => {
+        if (selectedCalendarUserId === currentUser?.id) {
+            personalTasks.forEach(t => {
+                if (!t.date) {
+                    const targetDate = t.limit_date || t.date;
+                    if (targetDate) {
                         taskEvents.push({
-                            id: `task-${t.id}-${d}`,
+                            id: `task-${t.id}`,
                             title: `Tarefa: ${t.title}`,
-                            date: d,
+                            date: targetDate,
                             startTime: '00:00',
                             endTime: '23:59',
                             category: 'Tarefa' as any,
@@ -388,41 +461,85 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             isTask: true,
                             taskCompleted: t.completed,
                             taskCompletedAt: t.completed_at,
-                            isTaskStart: d === t.date,
-                            isTaskEnd: d === t.limit_date,
-                            isTaskMiddle: d !== t.date && d !== t.limit_date,
+                            isTaskStart: true,
+                            isTaskEnd: true,
+                            isTaskMiddle: false,
                             taskStartDate: t.date,
                             taskLimitDate: t.limit_date
                         } as any);
-                    });
+                    }
                 } else {
-                    taskEvents.push({
-                        id: `task-${t.id}`,
-                        title: `Tarefa: ${t.title}`,
-                        date: t.date,
-                        startTime: '00:00',
-                        endTime: '23:59',
-                        category: 'Tarefa' as any,
-                        location: '',
-                        attendees: [],
-                        notes: '',
-                        isPrivate: true,
-                        isSystem: false,
-                        isTask: true,
-                        taskCompleted: t.completed,
-                        taskCompletedAt: t.completed_at,
-                        isTaskStart: true,
-                        isTaskEnd: true,
-                        isTaskMiddle: false,
-                        taskStartDate: t.date,
-                        taskLimitDate: t.limit_date
-                    } as any);
+                    if (t.limit_date && t.limit_date >= t.date) {
+                        const dates = getDatesInRange(t.date, t.limit_date);
+                        dates.forEach(d => {
+                            taskEvents.push({
+                                id: `task-${t.id}-${d}`,
+                                title: `Tarefa: ${t.title}`,
+                                date: d,
+                                startTime: '00:00',
+                                endTime: '23:59',
+                                category: 'Tarefa' as any,
+                                location: '',
+                                attendees: [],
+                                notes: '',
+                                isPrivate: true,
+                                isSystem: false,
+                                isTask: true,
+                                taskCompleted: t.completed,
+                                taskCompletedAt: t.completed_at,
+                                isTaskStart: d === t.date,
+                                isTaskEnd: d === t.limit_date,
+                                isTaskMiddle: d !== t.date && d !== t.limit_date,
+                                taskStartDate: t.date,
+                                taskLimitDate: t.limit_date
+                            } as any);
+                        });
+                    } else {
+                        taskEvents.push({
+                            id: `task-${t.id}`,
+                            title: `Tarefa: ${t.title}`,
+                            date: t.date,
+                            startTime: '00:00',
+                            endTime: '23:59',
+                            category: 'Tarefa' as any,
+                            location: '',
+                            attendees: [],
+                            notes: '',
+                            isPrivate: true,
+                            isSystem: false,
+                            isTask: true,
+                            taskCompleted: t.completed,
+                            taskCompletedAt: t.completed_at,
+                            isTaskStart: true,
+                            isTaskEnd: true,
+                            isTaskMiddle: false,
+                            taskStartDate: t.date,
+                            taskLimitDate: t.limit_date
+                        } as any);
+                    }
                 }
+            });
+        }
+
+        // Filter events for target user
+        const filteredEvents = events.filter(e => {
+            if (selectedCalendarUserId === currentUser?.id) {
+                // For current user: show their events, invites accepted, or public company events
+                const isCreator = e.creatorId === currentUser.id;
+                const isAttendee = e.attendees?.some(att => att.id === currentUser.id);
+                const isInvited = e.invitedIds?.includes(currentUser.id) || e.invites?.some(inv => inv.user_id === currentUser.id && inv.status === 'accepted');
+                return !e.isPrivate || isCreator || isAttendee || isInvited;
+            } else {
+                // For shared calendars: show events created by target, or target attending/invited
+                const isCreator = e.creatorId === selectedCalendarUserId;
+                const isAttendee = e.attendees?.some(att => att.id === selectedCalendarUserId);
+                const isInvited = e.invitedIds?.includes(selectedCalendarUserId) || e.invites?.some(inv => inv.user_id === selectedCalendarUserId && inv.status === 'accepted');
+                return isCreator || isAttendee || isInvited;
             }
         });
 
-        return [...events, ...birthdayEvents, ...holidayEvents, ...taskEvents];
-    }, [events, employees, currentDate, personalTasks]);
+        return [...filteredEvents, ...birthdayEvents, ...holidayEvents, ...taskEvents];
+    }, [events, employees, currentDate, personalTasks, selectedCalendarUserId, currentUser]);
 
     const handleMonthClick = (monthIndex: number) => {
         setCurrentDate(new Date(currentDate.getFullYear(), monthIndex, 1));
@@ -675,6 +792,184 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         );
     };
 
+    const WeekView = () => {
+        const handlePrevWeek = () => {
+            const d = new Date(currentDate);
+            d.setDate(d.getDate() - 7);
+            setCurrentDate(d);
+        };
+
+        const handleNextWeek = () => {
+            const d = new Date(currentDate);
+            d.setDate(d.getDate() + 7);
+            setCurrentDate(d);
+        };
+
+        // Find Monday of the current week based on currentDate
+        const startOfWeek = new Date(currentDate);
+        const dayOfWeek = startOfWeek.getDay(); // 0 is Sunday, 1 is Monday, etc.
+        const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        startOfWeek.setDate(diff);
+
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+        const weekDays = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(startOfWeek);
+            d.setDate(startOfWeek.getDate() + i);
+            return d;
+        });
+
+        const formatDateISO = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
+        const dayNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+        const formatWeekRange = () => {
+            const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+            const startStr = startOfWeek.toLocaleDateString('pt-BR', options);
+            const endStr = endOfWeek.toLocaleDateString('pt-BR', options);
+            return `${startStr} - ${endStr}`;
+        };
+
+        const theme = MONTH_THEMES[currentDate.getMonth()] || MONTH_THEMES[0];
+
+        return (
+            <div className="animate-scale-in transition-all duration-500 bg-white dark:bg-slate-900 rounded-b-xl">
+                <div className={`p-4 ${theme.bg} border-b ${theme.border} dark:border-slate-800 flex items-center justify-between`}>
+                    <div className="flex items-center space-x-6">
+                        <button
+                            onClick={() => setView('month')}
+                            className="p-2 hover:bg-white/50 dark:hover:bg-slate-800/50 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all border border-transparent hover:border-white/50 dark:hover:border-slate-700"
+                            title="Voltar para Visão Mensal"
+                        >
+                            <ArrowUturnLeftIcon className="w-5 h-5" />
+                        </button>
+
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={handlePrevWeek}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
+                            >
+                                <ChevronLeftIcon className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center min-w-[200px]">
+                                <h3 className={`text-2xl font-black ${theme.text} dark:text-gray-100`}>
+                                    {formatWeekRange()}
+                                </h3>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 italic mt-0.5">{theme.phrase}</p>
+                            </div>
+
+                            <button
+                                onClick={handleNextWeek}
+                                className={`p-2 rounded-xl transition-all ${theme.border} border bg-white/30 dark:bg-slate-800/50 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 shadow-sm text-gray-500 dark:text-gray-300`}
+                            >
+                                <ChevronRightIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+                        {weekDays.map((dayDate, idx) => {
+                            const dateStr = formatDateISO(dayDate);
+                            const isToday = new Date().toDateString() === dayDate.toDateString();
+                            
+                            const dayEvents = allCalendarEvents.filter(e => e.date === dateStr);
+
+                            return (
+                                <div 
+                                    key={idx} 
+                                    className={`flex flex-col min-h-[350px] bg-slate-50 dark:bg-slate-800/20 rounded-2xl p-4 border transition-all hover:shadow-md ${
+                                        isToday ? 'border-brand-primary ring-1 ring-brand-primary/20 bg-emerald-50/10' : 'border-slate-100 dark:border-slate-800/60'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
+                                        <div>
+                                            <h4 className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-wider">
+                                                {dayNames[idx]}
+                                            </h4>
+                                            <span className={`text-lg font-black block mt-0.5 ${isToday ? 'text-brand-primary' : 'text-slate-700 dark:text-gray-200'}`}>
+                                                {dayDate.getDate()}
+                                            </span>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                setNewEventData(prev => ({
+                                                    ...prev,
+                                                    date: dateStr
+                                                }));
+                                                setCreateModalOpen(true);
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-brand-primary hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all"
+                                            title="Adicionar evento"
+                                        >
+                                            <PlusIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-grow space-y-1.5 overflow-y-auto max-h-[280px] pr-0.5 custom-scrollbar">
+                                        {dayEvents.map(e => {
+                                            const isTask = (e as any).isTask;
+                                            const taskCompleted = (e as any).taskCompleted;
+                                            
+                                            let taskClasses = '';
+                                            if (isTask) {
+                                                taskClasses = taskCompleted 
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30' 
+                                                    : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30';
+                                            }
+
+                                            return (
+                                                <button
+                                                    key={e.id}
+                                                    onClick={() => {
+                                                        if (isTask) {
+                                                            const taskId = e.id.replace('task-', '').split('-')[0];
+                                                            onNavigate?.('personal-tasks' as Page, { taskId });
+                                                        } else {
+                                                            setSelectedEvent(e);
+                                                            setDetailModalOpen(true);
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left p-2 rounded-xl border text-[10px] font-bold transition-all hover:scale-[1.02] flex flex-col gap-1 ${
+                                                        isTask ? taskClasses : getCategoryColor(e.category)
+                                                    } shadow-sm`}
+                                                >
+                                                    <div className="truncate leading-tight">
+                                                        {isTask ? (taskCompleted ? '🟢 ' : '⚪ ') : ''}
+                                                        {e.category === 'Aniversário' && <GiftIcon className="w-3 h-3 inline mr-1" />}
+                                                        {e.title}
+                                                    </div>
+                                                    {!isTask && e.startTime !== '00:00' && (
+                                                        <div className="text-[9px] opacity-75 font-semibold">
+                                                            {e.startTime} - {e.endTime}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                        {dayEvents.length === 0 && (
+                                            <div className="h-full flex items-center justify-center py-6">
+                                                <p className="text-[9px] text-slate-300 dark:text-slate-600 font-bold uppercase tracking-wider text-center">Vazio</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const DayView = () => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -900,16 +1195,15 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                     <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
                         <button onClick={() => setView('year')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'year' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.year_view')}</button>
                         <button onClick={() => setView('month')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'month' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.month_view')}</button>
-                        {view === 'day' && (
-                            <button onClick={() => setView('day')} className="px-4 py-2 text-xs font-black rounded-xl bg-white text-slate-900 shadow-lg transition-all">Dia</button>
-                        )}
+                        <button onClick={() => setView('week')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'week' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>Semana</button>
+                        <button onClick={() => setView('day')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'day' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>Dia</button>
                     </div>
                 </header>
 
                 {view === 'year' && <YearView />}
                 {view === 'month' && <MonthView />}
+                {view === 'week' && <WeekView />}
                 {view === 'day' && <DayView />}
-                {view === 'week' && <div className="p-20 text-center text-gray-400">Em desenvolvimento</div>}
             </Card>
 
             {isCreateModalOpen && (
