@@ -81,6 +81,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [savedImapUser, setSavedImapUser] = useState('');
     const [showEmailPass, setShowEmailPass] = useState(false);
     const [loadingBody, setLoadingBody] = useState(false);
+    const [folders, setFolders] = useState<any[]>([]);
     
     // --- State: Search & Filters ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +130,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             // Poll every 2 minutes
             if (pollingRef.current) clearInterval(pollingRef.current);
             pollingRef.current = setInterval(() => fetchEmails(true), 120000);
+            fetchFolders(); // Load folders once
         }
     }, [savedImapUser]); // Only fires when settings are loaded from DB, not when user types
 
@@ -240,6 +242,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         });
     };
 
+    const fetchFolders = async () => {
+        if (!settings.imap_host) return;
+        const { data, error } = await callEmailServer('folders', { config: settings, action: 'list' });
+        if (data && !error) {
+            setFolders(data);
+        }
+    };
+
     const deleteEmail = async (email: EmailMessage) => {
         if (!confirm('Tem certeza que deseja mover este e-mail para a lixeira?')) return;
 
@@ -250,18 +260,24 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setView('inbox');
         }
 
-        // Call Server - Try standard trash folder names
-        const trashFolder = 'Trash'; // Common default. Other candidates: 'Deleted', 'Bin', 'Lixeira'
+        // Detect Trash Folder
+        // 1. Look for specialUse: \Trash
+        // 2. Look for common names
+        const trashFolderObj = folders.find((f: any) => f.specialUse === '\\Trash') ||
+            folders.find((f: any) => ['Trash', 'Bin', 'Lixeira', 'Deleted', 'Itens Excluídos'].includes(f.path));
+
+        const trashPath = trashFolderObj ? trashFolderObj.path : 'Trash';
 
         const { error } = await callEmailServer('move', {
             config: settings,
             uids: [email.uid],
-            path: trashFolder
+            path: trashPath
         });
 
         if (error) {
             console.error('Error deleting email:', error);
-            alert('Erro ao mover para lixeira. O e-mail reaparecerá na próxima sincronização se a pasta Trash não existir.');
+            alert(`Erro ao mover para lixeira (${trashPath}). O e-mail reaparecerá se a pasta não existir.`);
+            fetchFolders(); // Retry fetching folders in case they changed
         }
     };
 
