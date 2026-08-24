@@ -129,13 +129,13 @@ const TicketPage: React.FC = () => {
                     const filePath = `ticket-media/${currentUser.id}/${fileName}`;
 
                     const { error: uploadError, data } = await supabase.storage
-                        .from('intranet-content') // Assuming a generic content bucket
+                        .from('ticket-media')
                         .upload(filePath, file);
 
                     if (uploadError) throw uploadError;
 
                     const { data: { publicUrl } } = supabase.storage
-                        .from('intranet-content')
+                        .from('ticket-media')
                         .getPublicUrl(filePath);
 
                     mediaUrls.push(publicUrl);
