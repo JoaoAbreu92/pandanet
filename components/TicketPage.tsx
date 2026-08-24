@@ -202,7 +202,14 @@ const TicketPage: React.FC = () => {
         }
     };
 
-    const userTickets = tickets; // Show all for now. Filter if needed: tickets.filter(t => t.requester === currentUser.name || t.assignedTo === currentUser.name);
+    const isTechOrAdmin = currentUser?.role?.toLowerCase() === 'admin' ||
+        currentUser?.role?.toLowerCase() === 'super admin' ||
+        currentUser?.team?.toUpperCase() === 'TI' ||
+        (currentUser as any).is_company_admin;
+
+    const userTickets = isTechOrAdmin
+        ? tickets
+        : tickets.filter(t => (t as any).requester_id === currentUser?.id || t.assignedToId === currentUser?.id);
 
     if (loading) return <div className="p-8 text-center text-gray-500">Carregando chamados...</div>;
 
