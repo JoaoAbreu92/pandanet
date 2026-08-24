@@ -15,11 +15,11 @@ cd ..
 
 # 3. Roda Node em background
 # - Logs em email-server.log
-# Carrega variáveis de ambiente ignorando comentários e linhas vazias
+# Carrega variáveis de ambiente ignorando comentários e linhas vazias de forma robusta
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  export $(grep -v '^[[:space:]]*#' .env | grep '=' | xargs)
 elif [ -f .env.production ]; then
-  export $(grep -v '^#' .env.production | xargs)
+  export $(grep -v '^[[:space:]]*#' .env.production | grep '=' | xargs)
 fi
 
 # 3. Roda Node em background
