@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key, ShieldCheck, Zap } from 'lucide-react';
+import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key, ShieldCheck, Zap, Users, UserPlus, UserMinus, PenLine } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
@@ -31,6 +31,69 @@ const Channels: React.FC = () => {
     // Debug State
     const [showDebug, setShowDebug] = useState(false);
     const [debugLogs, setDebugLogs] = useState<{ time: string, msg: string, type: 'info' | 'error' | 'success' }[]>([]);
+
+    // Channel Users State
+    const [expandedChannelUsers, setExpandedChannelUsers] = useState<string | null>(null);
+    const [channelUsers, setChannelUsers] = useState<Record<string, any[]>>({});
+    const [companyUsers, setCompanyUsers] = useState<any[]>([]);
+    const [channelUsersLoading, setChannelUsersLoading] = useState(false);
+
+    const fetchCompanyUsers = async () => {
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, avatar_url')
+            .eq('company_id', companyId)
+            .order('full_name');
+        if (data) setCompanyUsers(data);
+    };
+
+    const fetchChannelUsers = async (channelId: string) => {
+        setChannelUsersLoading(true);
+        const { data } = await supabase
+            .from('whatsapp_channel_users')
+            .select('*, user:profiles(id, full_name, email, avatar_url)')
+            .eq('channel_id', channelId);
+        if (data) {
+            setChannelUsers(prev => ({ ...prev, [channelId]: data }));
+        }
+        setChannelUsersLoading(false);
+    };
+
+    const toggleChannelUser = async (channelId: string, userId: string, currentlyAdded: boolean) => {
+        if (isGhostMode) return;
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        if (!companyId) return;
+        if (currentlyAdded) {
+            await supabase.from('whatsapp_channel_users')
+                .delete()
+                .eq('channel_id', channelId)
+                .eq('user_id', userId);
+        } else {
+            await supabase.from('whatsapp_channel_users')
+                .insert({ channel_id: channelId, user_id: userId, company_id: companyId, created_by: currentUser?.id || profile?.id });
+        }
+        fetchChannelUsers(channelId);
+    };
+
+    const updateChannelUserPerm = async (channelId: string, userId: string, field: string, value: boolean) => {
+        if (isGhostMode) return;
+        await supabase.from('whatsapp_channel_users')
+            .update({ [field]: value })
+            .eq('channel_id', channelId)
+            .eq('user_id', userId);
+        fetchChannelUsers(channelId);
+    };
+
+    const handleToggleChannelUsersPanel = async (channelId: string) => {
+        if (expandedChannelUsers === channelId) {
+            setExpandedChannelUsers(null);
+            return;
+        }
+        setExpandedChannelUsers(channelId);
+        await Promise.all([fetchCompanyUsers(), fetchChannelUsers(channelId)]);
+    };
 
     const addDebugLog = (msg: string, type: 'info' | 'error' | 'success' = 'info') => {
         setDebugLogs(prev => [{ time: new Date().toLocaleTimeString(), msg, type }, ...prev].slice(0, 20));
@@ -464,6 +527,73 @@ const Channels: React.FC = () => {
                                             <button onClick={() => handleDelete(channel.id)} className="p-2.5 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all duration-300">
                                                 <Trash2 className="w-4.5 h-4.5" />
                                             </button>
+                                        )}
+                                    </div>
+
+                                    {/* Usuários com Acesso ao Canal */}
+                                    <div className="mt-4 pt-4 border-t border-gray-50 dark:border-white/5">
+                                        <button
+                                            onClick={() => handleToggleChannelUsersPanel(channel.id)}
+                                            className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors py-1"
+                                        >
+                                            <span className="flex items-center gap-2"><Users className="w-3.5 h-3.5" /> Usuários com Acesso</span>
+                                            <span className={`transition-transform duration-300 ${expandedChannelUsers === channel.id ? 'rotate-180' : ''}`}>▾</span>
+                                        </button>
+
+                                        {expandedChannelUsers === channel.id && (
+                                            <div className="mt-3 animate-in slide-in-from-top-2 duration-300 space-y-2">
+                                                {channelUsersLoading ? (
+                                                    <div className="text-center py-4"><RefreshCw className="w-4 h-4 animate-spin text-emerald-500 mx-auto opacity-50" /></div>
+                                                ) : (
+                                                    companyUsers.map(u => {
+                                                        const access = (channelUsers[channel.id] || []).find(cu => cu.user_id === u.id);
+                                                        const hasAccess = !!access;
+                                                        return (
+                                                            <div key={u.id} className={`p-3 rounded-xl border transition-all duration-200 ${hasAccess ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-gray-50 dark:bg-white/5 border-transparent'}`}>
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                                                                            {u.full_name?.charAt(0) || '?'}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-[11px] font-bold text-gray-800 dark:text-white leading-tight">{u.full_name}</p>
+                                                                            <p className="text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">{u.email}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => toggleChannelUser(channel.id, u.id, hasAccess)}
+                                                                        className={`p-1.5 rounded-lg transition-all duration-200 ${hasAccess ? 'bg-emerald-500 text-white hover:bg-red-500' : 'bg-gray-200 dark:bg-white/10 text-gray-500 hover:bg-emerald-500 hover:text-white'}`}
+                                                                        title={hasAccess ? 'Remover acesso' : 'Dar acesso'}
+                                                                    >
+                                                                        {hasAccess ? <UserMinus className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
+                                                                    </button>
+                                                                </div>
+                                                                {hasAccess && (
+                                                                    <div className="mt-2 flex gap-2 flex-wrap">
+                                                                        {[
+                                                                            { key: 'can_send_messages', label: 'Enviar msgs' },
+                                                                            { key: 'can_send_media', label: 'Enviar mídia' },
+                                                                            { key: 'force_signature', label: 'Assinatura forçada' },
+                                                                        ].map(perm => (
+                                                                            <button
+                                                                                key={perm.key}
+                                                                                onClick={() => updateChannelUserPerm(channel.id, u.id, perm.key, !(access as any)[perm.key])}
+                                                                                className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border transition-all ${
+                                                                                    (access as any)[perm.key]
+                                                                                        ? 'bg-emerald-500 text-white border-emerald-500'
+                                                                                        : 'bg-transparent text-gray-400 border-gray-300 dark:border-white/10 hover:border-emerald-400'
+                                                                                }`}
+                                                                            >
+                                                                                {perm.label}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

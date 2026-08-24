@@ -294,6 +294,32 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [agents, setAgents] = useState<any[]>([]);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Canal access: list of {channel_id, can_send_messages, can_send_media, force_signature}
+  const [channelAccess, setChannelAccess] = useState<any[]>([]);
+  const [accessibleChannelIds, setAccessibleChannelIds] = useState<string[] | null>(null); // null = all
+
+  // Load channel access for non-admins
+  useEffect(() => {
+    const userId = activeProfile?.id || profile?.id;
+    const companyId = activeProfile?.company_id || profile?.company_id;
+    if (!userId || !companyId) return;
+    if (isAdmin) {
+      setAccessibleChannelIds(null); // admins see all
+      return;
+    }
+    supabase
+      .from('whatsapp_channel_users')
+      .select('channel_id, can_send_messages, can_send_media, force_signature')
+      .eq('user_id', userId)
+      .eq('company_id', companyId)
+      .then(({ data }) => {
+        if (data) {
+          setChannelAccess(data);
+          setAccessibleChannelIds(data.map((d: any) => d.channel_id));
+        }
+      });
+  }, [activeProfile?.id, profile?.id, isAdmin]);
+
   useEffect(() => {
     if (onConversationSelect) {
       onConversationSelect(!!selectedConversation);
@@ -559,9 +585,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       `)
       .eq('company_id', companyId);
 
-    // Se tiver filtrado conexões, aplica. Caso contrário mostra de todos os canais visíveis
+    // Se tiver filtrado conexões, aplica. Caso contrário mostra dos canais acessíveis
     if (filterConnection.length > 0) {
       query = query.in('connection_id', filterConnection);
+    } else if (!isAdmin && accessibleChannelIds !== null) {
+      // Usuário não-admin: só vê conversas dos canais que tem acesso
+      if (accessibleChannelIds.length === 0) {
+        // Sem acesso a nenhum canal: retorna vazio
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
+      query = query.in('connection_id', accessibleChannelIds);
     }
 
     query = query.eq('status', activeTab);
@@ -889,9 +924,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     let messageWithSignature = messageText;
 
-    // Adiciona assinatura se ativada, exceto em stickers
-    if (messageText && useSignature && signatureText.trim() !== '' && !isSticker) {
-      messageWithSignature = `${messageText}\n\n${signatureText}`;
+    // Assinatura: verifica force_signature no canal da conversa, ou se o usuário ativou manualmente
+    const channelPerms = channelAccess.find((ca: any) => ca.channel_id === selectedConversation.connection_id);
+    const forceSig = channelPerms?.force_signature === true;
+    const senderName = activeProfile?.full_name || profile?.full_name || '';
+    const autoSignature = forceSig && senderName ? `*${senderName}*` : null;
+    const effectiveSignature = autoSignature || (useSignature && signatureText.trim() ? signatureText.trim() : null);
+
+    if (messageText && effectiveSignature && !isSticker) {
+      messageWithSignature = `${messageText}\n\n${effectiveSignature}`;
     }
 
     try {

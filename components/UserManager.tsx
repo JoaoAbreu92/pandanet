@@ -296,7 +296,6 @@ const UserFormModal: React.FC<{
                                                 { key: 'can_send_messages', label: 'Enviar Mensagens' },
                                                 { key: 'can_send_media', label: 'Enviar Mídia' },
                                                 { key: 'can_manage_settings', label: 'Gerenciar Configs' },
-                                                { key: 'can_view_groups', label: 'Ver Grupos' },
                                             ].map(perm => (
                                                 <label key={perm.key} className="flex items-center space-x-2 text-[10px] text-gray-600">
                                                     <input 

@@ -6,8 +6,7 @@ import {
   QrCode,
   Settings as SettingsIcon,
   LayoutGrid,
-  Lock,
-  UsersRound
+  Lock
 } from 'lucide-react';
 import Chat from './whatspanda/Chat';
 import Contacts from './whatspanda/Contacts';
@@ -18,7 +17,7 @@ import Settings from './whatspanda/Settings';
 import { useAuth } from './AuthContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
+type View = 'privados' | 'contacts' | 'new-ticket' | 'channels' | 'settings';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -43,7 +42,6 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     can_send_messages: true,
     can_send_media: true,
     can_manage_settings: false,
-    can_view_groups: true,  // Ativado por padrão para todos
     ...(profile?.whatspanda_permissions || {})
   };
 
@@ -57,16 +55,14 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     permissions.can_send_messages = true;
     permissions.can_send_media = true;
     permissions.can_manage_settings = true;
-    permissions.can_view_groups = true;
   }
 
   const menuItems = React.useMemo(() => [
     ...(permissions.can_view_chats ? [{ id: 'privados', label: 'Privados', icon: Lock, view: 'privados' }] : []),
-    ...(permissions.can_view_groups ? [{ id: 'grupos', label: 'Grupos', icon: UsersRound, view: 'grupos' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
-  ], [permissions.can_view_chats, permissions.can_view_groups, permissions.can_view_contacts, permissions.can_manage_settings]);
+  ], [permissions.can_view_chats, permissions.can_view_contacts, permissions.can_manage_settings]);
 
   // Set default view if current is invalid
   React.useEffect(() => {
@@ -99,7 +95,6 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
 
     switch (currentView) {
       case 'privados': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" initialConversationId={selectedConversationId} /> : null;
-      case 'grupos': return permissions.can_view_groups ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" initialConversationId={selectedConversationId} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
       case 'new-ticket': return permissions.can_view_chats ? (
         <NewTicket 
