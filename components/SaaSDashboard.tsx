@@ -511,49 +511,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const handleApproveUser = async (user: Employee) => {
         setIsValidating(user.id);
         try {
-            let finalCompanyId = user.company_id;
+            const { data: rpcData, error: rpcError } = await supabase.rpc('approve_user_and_create_company', {
+                p_user_id: user.id,
+                p_plan_id: localPlans[0]?.id || null
+            });
 
-            // Se o usuário não tem empresa vinculada, tentamos criar uma baseada no domínio dele
-            if (!finalCompanyId && user.email) {
-                const domain = user.email.split('@')[1];
+            if (rpcError) throw rpcError;
+            if (rpcData && !rpcData.success) throw new Error(rpcData.error || 'Erro ao aprovar');
 
-                // Verificar se empresa já existe com esse domínio
-                const { data: existingComp } = await supabase
-                    .from('companies')
-                    .select('id')
-                    .ilike('domain', domain)
-                    .single();
-
-                if (existingComp) {
-                    finalCompanyId = existingComp.id;
-                } else {
-                    // Criar nova empresa básica
-                    const { data: newComp, error: createError } = await supabase
-                        .from('companies')
-                        .insert([{
-                            name: domain.split('.')[0].toUpperCase(),
-                            domain: domain,
-                            status: 'active',
-                            plan_id: localPlans[0]?.id || null
-                        }])
-                        .select()
-                        .single();
-
-                    if (createError) throw createError;
-                    finalCompanyId = newComp.id;
-                }
-            }
-
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    status: 'active',
-                    company_id: finalCompanyId,
-                    is_company_admin: true // Primeiro usuário do domínio costuma ser admin
-                })
-                .eq('id', user.id);
-
-            if (error) throw error;
             showToast('Usuário aprovado com sucesso!', 'success');
             fetchData();
         } catch (error: any) {

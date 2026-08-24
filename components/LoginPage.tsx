@@ -56,7 +56,7 @@ const LoginPage: React.FC = () => {
                     .from('companies')
                     .select('id')
                     .ilike('domain', domain.trim())
-                    .single();
+                    .maybeSingle();
 
                 // Profile is usually created by a database trigger on auth.users insert.
                 // We will try to update it here with the company_id and status pending
