@@ -433,8 +433,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 logoUrl = systemLogo?.value || '/logo.png';
             }
 
-            // 2. Adicionar Logo ao PDF
+            // 2. Adicionar Logo ao PDF (Resiliente)
             if (logoUrl) {
+                console.log('[UserManager] Carregando logo:', logoUrl);
                 try {
                     const { data: base64Logo, width, height } = await getBase64ImageFromURL(logoUrl);
                     const maxWidth = 35;
@@ -442,7 +443,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     const finalHeight = maxWidth * aspectRatio;
                     doc.addImage(base64Logo, 'PNG', 14, 10, maxWidth, finalHeight, undefined, 'FAST');
                 } catch (e) {
-                    console.warn('Erro ao carregar logo para o PDF:', e);
+                    console.error('[UserManager] Erro ao carregar logo, continuando sem ela:', e);
                 }
             }
 
@@ -460,35 +461,43 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             const now = new Date();
             doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`, 14, 45);
 
-            // 4. Buscar mensagens (Enviadas e Recebidas em conversas do usuário)
-            // Primeiro pegamos os IDs de conversa onde o usuário participa
-            const { data: participations } = await supabase
-                .from('conversation_participants')
-                .select('conversation_id')
-                .eq('user_id', userId);
+            let messages: any[] = [];
+            try {
+                console.log('[UserManager] Buscando conversas participadas...');
+                const { data: participations } = await supabase
+                    .from('conversation_participants')
+                    .select('conversation_id')
+                    .eq('user_id', userId);
 
-            const conversationIds = participations?.map(p => p.conversation_id) || [];
+                const conversationIds = participations?.map(p => p.conversation_id) || [];
+                console.log(`[UserManager] Encontradas ${conversationIds.length} conversas.`);
 
-            let query = supabase
-                .from('messages')
-                .select(`
-                    id, 
-                    text, 
-                    created_at, 
-                    sender_id,
-                    profiles:sender_id(full_name)
-                `)
-                .order('created_at', { ascending: true });
+                let query = supabase
+                    .from('messages')
+                    .select(`
+                        id, 
+                        text, 
+                        created_at, 
+                        sender_id,
+                        profiles:sender_id(full_name)
+                    `)
+                    .order('created_at', { ascending: true });
 
-            if (conversationIds.length > 0) {
-                query = query.or(`sender_id.eq.${userId},conversation_id.in.(${conversationIds.map(id => `'${id}'`).join(',')})`);
-            } else {
-                query = query.eq('sender_id', userId);
+                if (conversationIds.length > 0) {
+                    // Proteção contra query muito longa/complexa
+                    const limitedIds = conversationIds.slice(0, 50);
+                    query = query.or(`sender_id.eq.${userId},conversation_id.in.(${limitedIds.map(id => `'${id}'`).join(',')})`);
+                } else {
+                    query = query.eq('sender_id', userId);
+                }
+
+                const { data, error: msgError } = await query;
+                if (msgError) throw msgError;
+                messages = data || [];
+                console.log(`[UserManager] ${messages.length} mensagens recuperadas.`);
+            } catch (err) {
+                console.error('[UserManager] Erve ao buscar mensagens, gerando PDF vazio:', err);
             }
-
-            const { data: messages, error } = await query;
-
-            if (error) throw error;
 
             const tableData = messages?.map(m => [
                 new Date(m.created_at).toLocaleString('pt-BR'),
