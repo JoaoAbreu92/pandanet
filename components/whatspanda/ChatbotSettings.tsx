@@ -41,6 +41,7 @@ const ChatbotSettings: React.FC = () => {
     const [geminiKey, setGeminiKey] = useState('');
     const [chatbotMode, setChatbotMode] = useState<'disabled' | 'flow' | 'gemini'>('disabled');
     const [chatbotMaxRetries, setChatbotMaxRetries] = useState<number>(2);
+    const [chatbotInvalidOptionMsg, setChatbotInvalidOptionMsg] = useState<string>('Opção inválida. Por favor, escolha uma das opções do menu:');
     const activeProfile = currentUser || profile;
     const [signature, setSignature] = useState('');
     const [useSignature, setUseSignature] = useState(false);
@@ -241,7 +242,7 @@ const ChatbotSettings: React.FC = () => {
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
         const { data: queuesData } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         const { data: teamData } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
-        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode, chatbot_max_retries').eq('company_id', companyId).limit(1).single();
+        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode, chatbot_max_retries, chatbot_invalid_option_msg').eq('company_id', companyId).limit(1).single();
 
         if (flowsData) setFlows(flowsData);
         if (queuesData) setQueues(queuesData);
@@ -250,6 +251,7 @@ const ChatbotSettings: React.FC = () => {
             setGeminiKey(settingsData.gemini_api_key || '');
             setChatbotMode((settingsData.chatbot_mode as any) || 'disabled');
             setChatbotMaxRetries(settingsData.chatbot_max_retries !== undefined ? settingsData.chatbot_max_retries : 2);
+            setChatbotInvalidOptionMsg(settingsData.chatbot_invalid_option_msg || 'Opção inválida. Por favor, escolha uma das opções do menu:');
         }
     };
 
@@ -448,7 +450,8 @@ const ChatbotSettings: React.FC = () => {
             .from('whatsapp_settings')
             .update({ 
                 gemini_api_key: geminiKey,
-                chatbot_max_retries: chatbotMaxRetries
+                chatbot_max_retries: chatbotMaxRetries,
+                chatbot_invalid_option_msg: chatbotInvalidOptionMsg
             })
             .eq('company_id', companyId);
         setLoading(false);
@@ -1034,6 +1037,25 @@ const ChatbotSettings: React.FC = () => {
                         </div>
                         <span className="text-[9px] text-gray-450 dark:text-gray-400 font-bold opacity-70">
                             Quantas vezes o menu reaparecerá se o cliente digitar uma opção errada antes de desativar o bot.
+                        </span>
+                    </div>
+
+                    {/* Input Mensagem de Opção Inválida */}
+                    <div className="flex flex-col space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                            Mensagem para Opção Inválida / Não Encontrada
+                        </label>
+                        <div className="flex items-center gap-3 bg-slate-100/50 dark:bg-black/20 p-2.5 rounded-2xl border border-transparent dark:border-white/5">
+                            <textarea 
+                                rows={2}
+                                value={chatbotInvalidOptionMsg}
+                                onChange={(e) => setChatbotInvalidOptionMsg(e.target.value)}
+                                className="bg-transparent border-none outline-none text-sm px-3 py-2 flex-1 dark:text-white min-w-0 resize-none"
+                                placeholder="Digite a mensagem enviada quando o cliente escolhe uma opção inexistente..."
+                            />
+                        </div>
+                        <span className="text-[9px] text-gray-450 dark:text-gray-400 font-bold opacity-70">
+                            Mensagem enviada de volta quando o robô de fluxo não entende o texto digitado pelo cliente.
                         </span>
                     </div>
                 </div>

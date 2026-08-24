@@ -647,6 +647,29 @@ const Scheduler: React.FC = () => {
                       </p>
                     )}
                   </div>
+
+                  {/* Histórico / Detalhes de Disparos da Campanha */}
+                  <div className="mt-4 p-4 bg-slate-50/50 dark:bg-black/10 rounded-2xl border border-gray-100 dark:border-white/5 space-y-2">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Mensagem Programada / Enviada (Template 1)</span>
+                      <p className="text-xs text-gray-650 dark:text-gray-300 line-clamp-2 mt-1 whitespace-pre-line leading-relaxed">
+                        {camp.template_1 || "Sem mensagem de texto programada."}
+                      </p>
+                    </div>
+                    {camp.image_url && (
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-150/50 dark:border-white/5">
+                        <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Mídia / Anexo:</span>
+                        <a 
+                          href={camp.image_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-all"
+                        >
+                          {camp.media_type === 'video' ? '🎥 Ver Vídeo Programado' : '🖼️ Ver Imagem Programada'}
+                        </a>
+                      </div>
+                    )}
+                  </div>
                   {/* Ações da Campanha */}
                   <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
                     <button
@@ -1133,7 +1156,21 @@ const Scheduler: React.FC = () => {
 
             {(() => {
               const currentCamp = campaigns.find(c => c.id === selectedCampaignDetails.id);
-              if (!currentCamp || currentCamp.status !== 'running') return null;
+              if (!currentCamp) return null;
+
+              if (currentCamp.status === 'completed') {
+                return (
+                  <div className="mx-4 sm:mx-6 mt-4 p-3 sm:p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-3xl flex items-center gap-3 text-left animate-in fade-in duration-300">
+                    <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center font-bold shrink-0">✓</div>
+                    <div>
+                      <span className="text-xs font-black text-emerald-800 dark:text-emerald-300 block">Campanha Concluída com Sucesso!</span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Todos os alvos foram processados de forma inteligente.</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (currentCamp.status !== 'running') return null;
 
               return (
                 <div className="mx-4 sm:mx-6 mt-4 p-3 sm:p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-3xl flex items-center justify-between text-left">

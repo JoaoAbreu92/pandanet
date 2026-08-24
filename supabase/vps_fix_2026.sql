@@ -1027,6 +1027,7 @@ ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retri
 ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.whatsapp_scheduled_targets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_invalid_option_msg TEXT DEFAULT 'Opção inválida. Por favor, escolha uma das opções do menu:';
 
 -- 21. WHATSAPP CAMPAIGNS RLS POLICIES FOR FRONTEND ACCESS
 ALTER TABLE public.whatsapp_scheduled_campaigns ENABLE ROW LEVEL SECURITY;

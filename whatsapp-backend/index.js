@@ -178,6 +178,7 @@ async function runAutoMigration() {
                 ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_max_retries INTEGER DEFAULT 2;
                 ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS chatbot_retries INTEGER DEFAULT 0;
                 ALTER TABLE public.whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_bot BOOLEAN DEFAULT FALSE;
+                ALTER TABLE public.whatsapp_settings ADD COLUMN IF NOT EXISTS chatbot_invalid_option_msg TEXT DEFAULT 'Opção inválida. Por favor, escolha uma das opções do menu:';
             `
         }).catch(e => console.error('[MIGRATION] Erro ao adicionar novas colunas de chatbot:', e));
 
@@ -1587,19 +1588,25 @@ async function runChatbot(incomingText, conversation, companyId, connectionId) {
                     await executeNode(currentNode, conversation, companyId, connectionId, nodes);
                 }
             } else {
-                // Resposta inválida: busca limite de tentativas (chatbot_max_retries) da whatsapp_settings
+                // Resposta inválida: busca limite de tentativas (chatbot_max_retries) e mensagem customizada da whatsapp_settings
                 let maxRetries = 2;
+                let invalidOptionMsg = "Opção inválida. Por favor, escolha uma das opções do menu:";
                 try {
                     const { data: settings } = await supabase
                         .from('whatsapp_settings')
-                        .select('chatbot_max_retries')
+                        .select('chatbot_max_retries, chatbot_invalid_option_msg')
                         .eq('id', connectionId)
                         .maybeSingle();
-                    if (settings && settings.chatbot_max_retries !== undefined) {
-                        maxRetries = settings.chatbot_max_retries;
+                    if (settings) {
+                        if (settings.chatbot_max_retries !== undefined) {
+                            maxRetries = settings.chatbot_max_retries;
+                        }
+                        if (settings.chatbot_invalid_option_msg) {
+                            invalidOptionMsg = settings.chatbot_invalid_option_msg;
+                        }
                     }
                 } catch (e) {
-                    console.error('[CHATBOT] Erro ao ler chatbot_max_retries:', e.message);
+                    console.error('[CHATBOT] Erro ao ler configurações do chatbot:', e.message);
                 }
 
                 // Incrementa a tentativa
@@ -1619,7 +1626,7 @@ async function runChatbot(incomingText, conversation, companyId, connectionId) {
                         .update({ chatbot_retries: currentRetries })
                         .eq('id', conversation.id);
                     
-                    await sendBotMessage("Opção inválida. Por favor, escolha uma das opções do menu:", conversation, companyId, connectionId);
+                    await sendBotMessage(invalidOptionMsg, conversation, companyId, connectionId);
                     await executeNode(currentNode, conversation, companyId, connectionId, nodes);
                 }
             }

@@ -583,6 +583,36 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation?.id]);
 
+  // Forçar reconexão do realtime e recarregar dados do chat quando a aba é focada ou volta a ficar visível
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[WP-DEBUG] App focado ou visível. Forçando conexão do Supabase Realtime...');
+        try {
+          supabase.realtime.connect();
+        } catch (e) {
+          console.error('[WP-DEBUG] Erro ao conectar realtime:', e);
+        }
+        
+        // Recarrega conversas e mensagens ativamente
+        if (typeof fetchConversationsRef.current === 'function') {
+          fetchConversationsRef.current();
+        }
+        if (selectedConversation?.id) {
+          console.log('[WP-DEBUG] Recarregando mensagens da conversa ativa por garantia:', selectedConversation.id);
+          fetchMessages(selectedConversation.id);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [selectedConversation?.id]);
+
   const [isUserReading, setIsUserReading] = useState(false);
 
   useEffect(() => {
