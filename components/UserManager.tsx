@@ -106,7 +106,7 @@ const UserFormModal: React.FC<{
         sector_manager_id: user?.sector_manager_id || '',
         isAdmin: user?.isAdmin || false,
         is_manager: user?.is_manager || false,
-        avatarUrl: user?.avatarUrl || `https://i.pravatar.cc/150?u=${user?.email || Date.now()}`,
+        avatarUrl: user?.avatarUrl || '',
         birthDate: user?.birthDate || '1990-01-01',
         joinDate: user?.joinDate || new Date().toISOString().split('T')[0],
         department_id: user?.department_id || '',
@@ -629,7 +629,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_is_admin: !!userData.isAdmin,
                     p_is_company_admin: !!userData.isAdmin,
                     p_permissions: userData.permissions,
-                    p_avatar_url: userData.avatarUrl || null,
+                    p_avatar_url: (userData.avatarUrl && !userData.avatarUrl.includes('ui-avatars.com')) ? userData.avatarUrl : null,
                     p_rg: userData.rg || null,
                     p_cpf: userData.cpf || null,
                     p_emergency_contact_name: userData.emergency_contact_name || null,
@@ -686,7 +686,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_is_admin: !!userData.isAdmin,
                         p_is_company_admin: !!userData.isAdmin,
                         p_permissions: userData.permissions,
-                        p_avatar_url: userData.avatarUrl || null,
+                        p_avatar_url: (userData.avatarUrl && !userData.avatarUrl.includes('ui-avatars.com')) ? userData.avatarUrl : null,
                         p_department_id: (userData as any).department_id || null,
                         p_rg: (userData as any).rg || null,
                         p_cpf: (userData as any).cpf || null,
@@ -1008,7 +1008,11 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                                     <tr key={user.id} className="bg-white hover:bg-amber-50/50">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center space-x-3">
-                                                <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                                                <img 
+                                                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E2E8F0&color=475569`} 
+                                                    alt={user.name} 
+                                                    className="w-8 h-8 rounded-full object-cover" 
+                                                />
                                                 <div>
                                                     <p className="font-medium text-gray-900">{user.name}</p>
                                                     <p className="text-xs text-gray-400">{user.email}</p>
@@ -1062,7 +1066,11 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                                 <tr key={user.id} className="bg-white hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                                         <div className="flex items-center space-x-3">
-                                            <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full" />
+                                            <img 
+                                                src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E2E8F0&color=475569`} 
+                                                alt={user.name} 
+                                                className="w-8 h-8 rounded-full object-cover" 
+                                            />
                                             <div>
                                                 <p>{user.name}</p>
                                                 <p className="text-xs text-gray-400">{user.email}</p>

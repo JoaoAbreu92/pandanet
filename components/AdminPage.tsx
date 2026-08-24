@@ -47,7 +47,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     email: p.email || '',
                     role: p.role,
                     team: p.team,
-                    avatarUrl: p.avatar_url || `https://i.pravatar.cc/150?u=${p.email}`,
+                    avatarUrl: p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.full_name || 'User')}&background=E2E8F0&color=475569`,
                     joinDate: p.join_date,
                     birthDate: p.birth_date,
                     isAdmin: p.is_admin,
