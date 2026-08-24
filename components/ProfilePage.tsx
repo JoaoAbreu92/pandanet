@@ -13,7 +13,7 @@ const PRESET_AVATARS = [
     'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=150&q=80', // Cachorro
     'https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=150&q=80', // Raposa
     'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=150&q=80', // Leão
-    'https://images.unsplash.com/photo-1507666480-f344d6741b16?auto=format&fit=crop&w=150&q=80', // Esquilo
+    'https://images.unsplash.com/photo-1501820488136-72669a482d0e?auto=format&fit=crop&w=150&q=80', // Esquilo (Link Corrigido)
     'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?auto=format&fit=crop&w=150&q=80', // Coelho
     'https://images.unsplash.com/photo-1517783999520-f068d7431a60?auto=format&fit=crop&w=150&q=80', // Pinguim
     'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?auto=format&fit=crop&w=150&q=80', // Coala
@@ -26,7 +26,7 @@ const PRESET_BANNERS = [
     'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&h=300&q=80',
     'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&h=300&q=80',
     'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&h=300&q=80',
-    'https://images.unsplash.com/photo-1618005198143-e5283b519a7f?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&h=300&q=80', // Paisagem de Montanhas (Link Corrigido)
     'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&h=300&q=80',
     'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&h=300&q=80'
 ];

@@ -345,13 +345,14 @@ interface CompanyHighlightsWidgetProps {
 }
 
 const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNavigate, currentUser }) => {
-    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [youtubeUrls, setYoutubeUrls] = useState<string[]>([]);
+    const [activeVideoIndex, setActiveVideoIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [latestMarketplace, setLatestMarketplace] = useState<any>(null);
-    const [latestProject, setLatestProject] = useState<any>(null);
+    const [latestMarketplaces, setLatestMarketplaces] = useState<any[]>([]);
+    const [latestProjects, setLatestProjects] = useState<any[]>([]);
     
     const [isEditingVideo, setIsEditingVideo] = useState(false);
-    const [videoInputUrl, setVideoInputUrl] = useState('');
+    const [videoInputs, setVideoInputs] = useState<string[]>(['', '', '', '', '']);
 
     const companyId = currentUser?.company_id;
     const canEditVideo = currentUser?.isAdmin || currentUser?.role === 'Super Admin' || currentUser?.isCompanyAdmin;
@@ -360,7 +361,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
         if (!companyId) return;
         setLoading(true);
         try {
-            // 1. YouTube Video
+            // 1. YouTube Video settings
             const { data: videoSetting } = await supabase
                 .from('system_settings')
                 .select('value')
@@ -368,11 +369,31 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 .maybeSingle();
             
             if (videoSetting?.value) {
-                setYoutubeUrl(videoSetting.value);
-                setVideoInputUrl(videoSetting.value);
+                const val = videoSetting.value.trim();
+                let urls: string[] = [];
+                if (val.startsWith('[') && val.endsWith(']')) {
+                    try {
+                        urls = JSON.parse(val);
+                    } catch {
+                        urls = val.split(',').map((u: string) => u.trim());
+                    }
+                } else {
+                    urls = val.split(',').map((u: string) => u.trim());
+                }
+                urls = urls.filter(u => u.length > 0).slice(0, 5);
+                setYoutubeUrls(urls);
+                
+                const inputs = ['', '', '', '', ''];
+                urls.forEach((url, idx) => {
+                    if (idx < 5) inputs[idx] = url;
+                });
+                setVideoInputs(inputs);
+            } else {
+                setYoutubeUrls([]);
+                setVideoInputs(['', '', '', '', '']);
             }
 
-            // 2. Latest Marketplace Item
+            // 2. Latest 3 Marketplace Items
             const { data: marketData } = await supabase
                 .from('marketplace_items')
                 .select(`
@@ -381,21 +402,22 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 `)
                 .eq('company_id', companyId)
                 .order('created_at', { ascending: false })
-                .limit(1);
+                .limit(3);
 
             if (marketData && marketData.length > 0) {
-                const item = marketData[0];
-                setLatestMarketplace({
+                setLatestMarketplaces(marketData.map((item: any) => ({
                     id: item.id,
                     title: item.title,
                     price: item.price,
                     imageUrl: item.image_urls?.[0] || '',
                     seller: item.seller?.full_name || 'Usuário',
                     status: item.status
-                });
+                })));
+            } else {
+                setLatestMarketplaces([]);
             }
 
-            // 3. Latest Active Project
+            // 3. Latest 3 Active Projects
             const { data: projData } = await supabase
                 .from('projects')
                 .select('*, manager:profiles(full_name, avatar_url)')
@@ -426,9 +448,9 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                     return isManager || hasAssignedTask;
                 });
 
-                if (userProjects.length > 0) {
-                    setLatestProject(userProjects[0]);
-                }
+                setLatestProjects(userProjects.slice(0, 3));
+            } else {
+                setLatestProjects([]);
             }
         } catch (err) {
             console.error('Error fetching highlights:', err);
@@ -444,12 +466,16 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     const handleSaveVideo = async () => {
         if (!companyId) return;
         try {
+            const urlsToSave = videoInputs.map(u => u.trim()).filter(u => u.length > 0);
+            const valueToSave = urlsToSave.join(',');
+            
             const { error } = await supabase
                 .from('system_settings')
-                .upsert({ key: `company_video_${companyId}`, value: videoInputUrl }, { onConflict: 'key' });
+                .upsert({ key: `company_video_${companyId}`, value: valueToSave }, { onConflict: 'key' });
             
             if (error) throw error;
-            setYoutubeUrl(videoInputUrl);
+            setYoutubeUrls(urlsToSave);
+            setActiveVideoIndex(0);
             setIsEditingVideo(false);
         } catch (err: any) {
             alert('Erro ao salvar vídeo: ' + err.message);
@@ -472,7 +498,8 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
         return `https://www.youtube.com/embed/${videoId}`;
     };
 
-    const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
+    const currentVideoUrl = youtubeUrls[activeVideoIndex] || '';
+    const embedUrl = getYouTubeEmbedUrl(currentVideoUrl);
 
     if (loading) {
         return <div className="text-center text-slate-450 py-4 text-xs font-semibold">Carregando destaques...</div>;
@@ -484,13 +511,13 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 🌟 Destaques da Empresa
             </h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* 1. YouTube Video */}
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* 1. YouTube Video Player / Carousel (50% de largura no desktop) */}
+                <div className="space-y-3 lg:col-span-6 flex flex-col justify-between">
+                    <div className="flex justify-between items-center shrink-0">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                             <VideoCameraIcon className="w-3.5 h-3.5 text-brand-primary" />
-                            Vídeo em Destaque
+                            Vídeo em Destaque {youtubeUrls.length > 1 && `(${activeVideoIndex + 1}/${youtubeUrls.length})`}
                         </span>
                         {canEditVideo && (
                             <button
@@ -502,135 +529,218 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                             </button>
                         )}
                     </div>
-                    {embedUrl ? (
-                        <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
-                            <iframe
-                                src={embedUrl}
-                                title="YouTube video player"
-                                frameBorder="0"
-                                className="w-full h-full"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                            />
-                        </div>
-                    ) : (
-                        <div className="aspect-video w-full rounded-2xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center p-4">
-                            <span className="text-xl mb-1">📺</span>
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sem vídeo</span>
-                            {canEditVideo && (
-                                <button
-                                    onClick={() => setIsEditingVideo(true)}
-                                    className="mt-2 text-[10px] bg-brand-primary text-white px-2.5 py-1 rounded-full font-bold shadow-sm"
-                                >
-                                    Adicionar
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
+                    
+                    <div className="flex-1 flex items-center justify-center">
+                        {embedUrl ? (
+                            <div className="relative group/carousel aspect-video w-full rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner bg-black">
+                                <iframe
+                                    src={embedUrl}
+                                    title="YouTube video player"
+                                    frameBorder="0"
+                                    className="w-full h-full"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                                
+                                {youtubeUrls.length > 1 && (
+                                    <>
+                                        {/* Seta Esquerda */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveVideoIndex(prev => (prev === 0 ? youtubeUrls.length - 1 : prev - 1));
+                                            }}
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
+                                            title="Vídeo Anterior"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                                            </svg>
+                                        </button>
+                                        
+                                        {/* Seta Direita */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveVideoIndex(prev => (prev === youtubeUrls.length - 1 ? 0 : prev + 1));
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/90 text-white flex items-center justify-center transition-all opacity-0 group-hover/carousel:opacity-100 shadow-md backdrop-blur-sm"
+                                            title="Próximo Vídeo"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                            </svg>
+                                        </button>
 
-                {/* 2. Latest Marketplace Announcement */}
-                <div className="space-y-3">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <BuildingStorefrontIcon className="w-3.5 h-3.5 text-brand-primary" />
-                        Último Anúncio
-                    </span>
-                    {latestMarketplace ? (
-                        <div
-                            onClick={() => onNavigate('marketplace')}
-                            className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px]"
-                        >
-                            <div className="flex gap-3">
-                                {latestMarketplace.imageUrl ? (
-                                    <img src={latestMarketplace.imageUrl} alt={latestMarketplace.title} className="w-14 h-14 rounded-xl object-cover shrink-0" />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg shrink-0">🛍️</div>
+                                        {/* Dots Indicadores */}
+                                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm z-10">
+                                            {youtubeUrls.map((_, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => setActiveVideoIndex(idx)}
+                                                    className={`w-2 h-2 rounded-full transition-all ${idx === activeVideoIndex ? 'bg-brand-primary w-4' : 'bg-white/60 hover:bg-white'}`}
+                                                    title={`Vídeo ${idx + 1}`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </>
                                 )}
-                                <div className="min-w-0">
-                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{latestMarketplace.title}</h5>
-                                    <p className="text-[10px] text-slate-400 font-medium">Por {latestMarketplace.seller}</p>
-                                    <span className="inline-block mt-1 bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
-                                        {latestMarketplace.status}
-                                    </span>
-                                </div>
                             </div>
-                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-105 dark:border-slate-800">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase">Preço</span>
-                                <span className="text-xs font-black text-brand-primary">R$ {latestMarketplace.price.toFixed(2)}</span>
+                        ) : (
+                            <div className="aspect-video w-full rounded-2xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center p-4 min-h-[220px]">
+                                <span className="text-xl mb-1">📺</span>
+                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sem vídeo</span>
+                                {canEditVideo && (
+                                    <button
+                                        onClick={() => setIsEditingVideo(true)}
+                                        className="mt-2 text-[10px] bg-brand-primary text-white px-2.5 py-1 rounded-full font-bold shadow-sm"
+                                    >
+                                        Adicionar
+                                    </button>
+                                )}
                             </div>
-                        </div>
-                    ) : (
-                        <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[120px]">
-                            <span className="text-xl mb-1">🛍️</span>
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum anúncio</span>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
-                {/* 3. Latest Active Project */}
-                <div className="space-y-3">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-brand-primary" />
-                        Último Projeto Ativo
+                {/* 2. Latest Marketplace Announcements (25% de largura no desktop) */}
+                <div className="space-y-3 lg:col-span-3 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                        <BuildingStorefrontIcon className="w-3.5 h-3.5 text-brand-primary" />
+                        Últimos Anúncios
                     </span>
-                    {(() => {
-                        if (!latestProject) {
-                            return (
-                                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[120px]">
-                                    <span className="text-xl mb-1">📂</span>
-                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum projeto</span>
-                                </div>
-                            );
-                        }
-                        const progress = latestProject.task_count > 0 ? Math.round((latestProject.completed_task_count / latestProject.task_count) * 100) : 0;
-                        return (
-                            <div
-                                onClick={() => {
-                                    localStorage.setItem('pixel_selected_project', JSON.stringify(latestProject));
-                                    onNavigate('projects');
-                                }}
-                                className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px]"
-                                style={{ borderLeft: `4px solid ${latestProject.color || '#10B981'}` }}
-                            >
-                                <div>
-                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{latestProject.name}</h5>
-                                    <p className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">
-                                        Gerente: {latestProject.manager?.full_name || 'Sem gerente'}
-                                    </p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <div className="flex justify-between text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">
-                                        <span>Progresso</span>
-                                        <span>{progress}% ({latestProject.completed_task_count}/{latestProject.task_count})</span>
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                        {latestMarketplaces.length > 0 ? (
+                            latestMarketplaces.map((item: any) => (
+                                <div
+                                    key={item.id}
+                                    onClick={() => onNavigate('marketplace')}
+                                    className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px] shrink-0"
+                                >
+                                    <div className="flex gap-3">
+                                        {item.imageUrl ? (
+                                            <img src={item.imageUrl} alt={item.title} className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                                        ) : (
+                                            <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-lg shrink-0">🛍️</div>
+                                        )}
+                                        <div className="min-w-0">
+                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{item.title}</h5>
+                                            <p className="text-[10px] text-slate-400 font-medium truncate">Por {item.seller}</p>
+                                            <span className="inline-block mt-1 bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                                {item.status}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="w-full bg-slate-150 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: latestProject.color || '#10B981' }} />
+                                    <div className="flex justify-between items-center mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-800/60 shrink-0">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase">Preço</span>
+                                        <span className="text-xs font-black text-brand-primary">R$ {item.price.toFixed(2)}</span>
                                     </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[384px] w-full">
+                                <span className="text-2xl mb-2">🛍️</span>
+                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum anúncio</span>
                             </div>
-                        );
-                    })()}
+                        )}
+                        {/* Preenchimento para manter simetria se tiver menos de 3 anúncios */}
+                        {latestMarketplaces.length > 0 && latestMarketplaces.length < 3 && (
+                            Array.from({ length: 3 - latestMarketplaces.length }).map((_, idx) => (
+                                <div key={idx} className="bg-slate-50/20 dark:bg-slate-800/5 p-4 rounded-2xl border border-dashed border-slate-150 dark:border-slate-800/30 flex items-center justify-center text-center h-[120px] shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700 uppercase">Sem anúncio</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* 3. Latest Active Projects (25% de largura no desktop) */}
+                <div className="space-y-3 lg:col-span-3 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                        <ClipboardDocumentCheckIcon className="w-3.5 h-3.5 text-brand-primary" />
+                        Últimos Projetos Ativos
+                    </span>
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                        {latestProjects.length > 0 ? (
+                            latestProjects.map((project: any) => {
+                                const progress = project.task_count > 0 ? Math.round((project.completed_task_count / project.task_count) * 100) : 0;
+                                return (
+                                    <div
+                                        key={project.id}
+                                        onClick={() => {
+                                            localStorage.setItem('pixel_selected_project', JSON.stringify(project));
+                                            onNavigate('projects');
+                                        }}
+                                        className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 shadow-sm cursor-pointer transition-all flex flex-col justify-between h-[120px] shrink-0"
+                                        style={{ borderLeft: `4px solid ${project.color || '#10B981'}` }}
+                                    >
+                                        <div>
+                                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{project.name}</h5>
+                                            <p className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">
+                                                Gerente: {project.manager?.full_name || 'Sem gerente'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1 pt-1.5 shrink-0">
+                                            <div className="flex justify-between text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+                                                <span>Progresso</span>
+                                                <span>{progress}% ({project.completed_task_count}/{project.task_count})</span>
+                                            </div>
+                                            <div className="w-full bg-slate-150 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: project.color || '#10B981' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 flex flex-col items-center justify-center text-center h-[384px] w-full">
+                                <span className="text-2xl mb-2">📂</span>
+                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">Nenhum projeto</span>
+                            </div>
+                        )}
+                        {/* Preenchimento para manter simetria se tiver menos de 3 projetos */}
+                        {latestProjects.length > 0 && latestProjects.length < 3 && (
+                            Array.from({ length: 3 - latestProjects.length }).map((_, idx) => (
+                                <div key={idx} className="bg-slate-50/20 dark:bg-slate-800/5 p-4 rounded-2xl border border-dashed border-slate-150 dark:border-slate-800/30 flex items-center justify-center text-center h-[120px] shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700 uppercase">Sem projeto</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Modal para Editar Vídeo */}
+            {/* Modal para Configurar Vídeos em Destaque (Suporta até 5 vídeos) */}
             {isEditingVideo && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider">Configurar Vídeo em Destaque</h3>
+                            <h3 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider">Configurar Vídeos em Destaque</h3>
                             <button onClick={() => setIsEditingVideo(false)} className="text-slate-450 hover:text-slate-650 text-lg font-bold">&times;</button>
                         </div>
-                        <p className="text-xs text-slate-450 dark:text-slate-500">Cole a URL do YouTube correspondente ao vídeo institucional ou de treinamento.</p>
-                        <div>
-                            <input
-                                type="text"
-                                value={videoInputUrl}
-                                onChange={(e) => setVideoInputUrl(e.target.value)}
-                                placeholder="https://www.youtube.com/watch?v=..."
-                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                            />
+                        <p className="text-xs text-slate-450 dark:text-slate-500">Cole até 5 URLs do YouTube. Caso adicione mais de um vídeo, eles serão exibidos em estilo carrossel.</p>
+                        
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                            {videoInputs.map((val, idx) => (
+                                <div key={idx} className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                        Vídeo {idx + 1} {idx === 0 ? '(Principal)' : '(Opcional)'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={val}
+                                        onChange={(e) => {
+                                            const updated = [...videoInputs];
+                                            updated[idx] = e.target.value;
+                                            setVideoInputs(updated);
+                                        }}
+                                        placeholder="https://www.youtube.com/watch?v=..."
+                                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                    />
+                                </div>
+                            ))}
                         </div>
+
                         <div className="flex gap-3 pt-2">
                             <button
                                 onClick={() => setIsEditingVideo(false)}
