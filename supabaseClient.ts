@@ -32,6 +32,7 @@ export function getCleanImageUrl(url: string | null | undefined): string {
     if (!url) return '';
     if (url.startsWith('blob:')) return url;
     if (url.includes('/storage/v1/object/public/')) {
+        if (url.startsWith('https://')) return url;
         const idx = url.indexOf('/storage/v1/object/public/');
         if (idx !== -1) {
             const path = url.substring(idx);

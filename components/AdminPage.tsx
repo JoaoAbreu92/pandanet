@@ -142,16 +142,16 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'departments', label: 'Departamentos', category: 'DP (Departamento Pessoal)' },
         { id: 'teams', label: 'Equipes', category: 'DP (Departamento Pessoal)' },
         { id: 'training', label: 'Treinamentos', category: 'DP (Departamento Pessoal)' },
-        { id: 'hr', label: 'Gestão RH', category: 'DP (Departamento Pessoal)' },
         { id: 'forms', label: 'Formulários', category: 'DP (Departamento Pessoal)' },
         { id: 'policies', label: 'Políticas', category: 'DP (Departamento Pessoal)', featureId: 'policies' },
         { id: 'onboarding', label: 'Onboarding (Integração)', category: 'DP (Departamento Pessoal)' },
         { id: 'documentos', label: 'Biblioteca Corporativa', category: 'DP (Departamento Pessoal)' },
         { id: 'benefits', label: 'Benefícios', category: 'DP (Departamento Pessoal)' },
 
-        // Gestão de RH
-        { id: 'jobs', label: 'Gestão de Vagas', category: 'Gestão de RH', featureId: 'jobs' },
-        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Gestão de RH' },
+        // RH
+        { id: 'hr', label: 'Gestão RH', category: 'RH' },
+        { id: 'jobs', label: 'Gestão de Vagas', category: 'RH', featureId: 'jobs' },
+        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'RH' },
 
         // Administrativo
         { id: 'badges', label: 'Selos, Elos & Gamificação', category: 'Administrativo' },
@@ -179,12 +179,12 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'settings', label: 'Geral', category: 'Configurações' },
     ];
 
-    const categories = ['DP (Departamento Pessoal)', 'Gestão de RH', 'Administrativo', 'Social', 'Tecnologia & TI', 'Comercial', 'Configurações'].filter(cat => {
+    const categories = ['DP (Departamento Pessoal)', 'RH', 'Administrativo', 'Social', 'Tecnologia & TI', 'Comercial', 'Configurações'].filter(cat => {
         if (profile?.role === 'Super Admin') return true;
         const permissions = profile?.permissions || {};
         const catMap: Record<string, string> = {
             'DP (Departamento Pessoal)': 'admin_view_dp',
-            'Gestão de RH': 'admin_view_gestao_rh',
+            'RH': 'admin_view_gestao_rh',
             'Administrativo': 'admin_view_administrativo',
             'Social': 'admin_view_social',
             'Tecnologia & TI': 'admin_view_ti',
@@ -205,7 +205,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             const permissions = profile?.permissions || {};
             const catMap: Record<string, string> = {
                 'DP (Departamento Pessoal)': 'admin_view_dp',
-                'Gestão de RH': 'admin_view_gestao_rh',
+                'RH': 'admin_view_gestao_rh',
                 'Administrativo': 'admin_view_administrativo',
                 'Social': 'admin_view_social',
                 'Tecnologia & TI': 'admin_view_ti',
