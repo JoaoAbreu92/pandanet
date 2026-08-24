@@ -748,11 +748,11 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" customFeatures={currentCompany?.custom_features} /> : null;
-            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" customFeatures={currentCompany?.custom_features} /> : null;
-            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" customFeatures={currentCompany?.custom_features} /> : null;
-            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" customFeatures={currentCompany?.custom_features} /> : null;
-            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" customFeatures={currentCompany?.custom_features} /> : null;
+            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
+            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
+            case 'projects-list': return canAccess('viewProjects') ? <ProjectsPage defaultTab="list" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
+            case 'projects-calendar': return canAccess('viewProjects') ? <ProjectsPage defaultTab="calendar" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
+            case 'projects-metrics': return canAccess('viewProjects') ? <ProjectsPage defaultTab="timesheet" customFeatures={currentCompany?.custom_features} onNavigate={handleNavigate} /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;

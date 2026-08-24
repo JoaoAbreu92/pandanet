@@ -126,9 +126,10 @@ const getRelativeTime = (dateString: string) => {
 interface ProjectsPageProps {
     defaultTab?: 'kanban' | 'planning' | 'list' | 'calendar' | 'timesheet';
     customFeatures?: Record<string, any>;
+    onNavigate?: (page: string, context?: any) => void;
 }
 
-const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures }) => {
+const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures, onNavigate }) => {
     const { currentUser } = useAuth();
     const { showToast } = useToast();
 
@@ -154,6 +155,25 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                 localStorage.removeItem('pixel_selected_project');
             }
             window.dispatchEvent(new Event('pixel_selected_project_changed'));
+        }
+    };
+
+    const handleTabClick = (tab: 'kanban' | 'planning' | 'list' | 'calendar' | 'timesheet') => {
+        setActiveTab(tab);
+        if (onNavigate) {
+            let route = 'projects';
+            if (tab === 'planning') route = 'projects-planning';
+            else if (tab === 'list') route = 'projects-list';
+            else if (tab === 'calendar') route = 'projects-calendar';
+            else if (tab === 'timesheet') route = 'projects-metrics';
+            onNavigate(route);
+        }
+    };
+
+    const handleBackToProjects = () => {
+        setSelectedProject(null);
+        if (onNavigate) {
+            onNavigate('projects');
         }
     };
     const [stages, setStages] = useState<ProjectStage[]>([]);
@@ -1456,7 +1476,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                         {selectedProject ? (
                             <>
                                 <button
-                                    onClick={() => setSelectedProject(null)}
+                                    onClick={handleBackToProjects}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
                                 >
                                     <ArrowLeftIcon className="w-6 h-6 text-slate-500" />
@@ -1605,7 +1625,63 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                 /* VIEW 2: VISÃO INTERNA DO PROJETO SELECIONADO */
                 <Card className="p-0 overflow-hidden border-0 shadow-2xl rounded-3xl">
                     {/* Barra de Abas e Filtros */}
-                    <div className="bg-slate-900 text-white p-4 flex flex-col lg:flex-row lg:items-center justify-end border-b border-white/10 gap-4">
+                    <div className="bg-slate-900 text-white p-4 flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 gap-4">
+
+                        {/* Abas responsivas */}
+                        <div className="overflow-x-auto no-scrollbar w-full lg:w-auto">
+                            <div className="flex items-center gap-2 min-w-max">
+                                <button
+                                    onClick={() => handleTabClick('kanban')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                                        activeTab === 'kanban'
+                                            ? 'bg-brand-primary text-white shadow-lg shadow-emerald-900/40'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Painel
+                                </button>
+                                <button
+                                    onClick={() => handleTabClick('planning')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                                        activeTab === 'planning'
+                                            ? 'bg-brand-primary text-white shadow-lg shadow-emerald-900/40'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Planejamento
+                                </button>
+                                <button
+                                    onClick={() => handleTabClick('list')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                                        activeTab === 'list'
+                                            ? 'bg-brand-primary text-white shadow-lg shadow-emerald-900/40'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Lista
+                                </button>
+                                <button
+                                    onClick={() => handleTabClick('calendar')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                                        activeTab === 'calendar'
+                                            ? 'bg-brand-primary text-white shadow-lg shadow-emerald-900/40'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Calendário
+                                </button>
+                                <button
+                                    onClick={() => handleTabClick('timesheet')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                                        activeTab === 'timesheet'
+                                            ? 'bg-brand-primary text-white shadow-lg shadow-emerald-900/40'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    }`}
+                                >
+                                    Métricas
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Filtros */}
                         <div className="flex flex-wrap items-center gap-3">
@@ -2367,8 +2443,8 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
 
                                                     {selectedCollabId ? (
                                                         collabChartData.length > 0 ? (
-                                                            <div className="h-64 mt-4 w-full">
-                                                                <ResponsiveContainer width="100%" height="100%">
+                                                            <div className="h-64 mt-4 w-full min-w-0">
+                                                                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                                                     <BarChart data={collabChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                                                                         <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94A3B8' }} />

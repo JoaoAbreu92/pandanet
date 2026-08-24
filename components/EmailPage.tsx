@@ -412,9 +412,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             if (data.length > 0) {
                 // Prioridade para a conta da notificação, depois localStorage, depois primeira conta
                 const lastAccountId = localStorage.getItem(`panda_active_email_account_${currentUser.id}`);
-                const targetAccountId = (pageContext?.accountId && data.find(a => a.id === pageContext.accountId))
+                let targetAccountId = (pageContext?.accountId && data.find(a => a.id === pageContext.accountId))
                     ? pageContext.accountId
                     : (lastAccountId && data.find(a => a.id === lastAccountId) ? lastAccountId : data[0].id);
+
+                if (targetAccountId === 'undefined' || targetAccountId === 'null') {
+                    targetAccountId = data[0]?.id || null;
+                }
 
                 setActiveAccountId(targetAccountId);
                 setExpandedAccounts(new Set([targetAccountId]));
@@ -805,7 +809,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const fetchTags = async () => {
-        if (!activeAccountId) return;
+        if (!activeAccountId || activeAccountId === 'undefined' || activeAccountId === 'null') return;
         const { data } = await supabase.from('email_tags').select('*').eq('account_id', activeAccountId);
         if (data) {
             // Map 'name' from DB to 'label' for UI compatibility
@@ -1048,11 +1052,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             if (!isSearchingGlobal && currentFolder === 'INBOX') setUnseenCount(unseen);
 
             // Fetch local metadata (tags, notes) from Supabase
-            const { data: metadataList } = await supabase
-                .from('email_metadata')
-                .select('*')
-                .eq('account_id', activeAccountId)
-                .in('message_id', emailList.map((e: any) => e.messageId || e.uid));
+            let metadataList: any[] = [];
+            if (activeAccountId && activeAccountId !== 'undefined' && activeAccountId !== 'null') {
+                const { data } = await supabase
+                    .from('email_metadata')
+                    .select('*')
+                    .eq('account_id', activeAccountId)
+                    .in('message_id', emailList.map((e: any) => e.messageId || e.uid));
+                if (data) metadataList = data;
+            }
 
             // Merge metadata and override Seen status from local state
             const mergedEmails = emailList.map((email: any) => {
