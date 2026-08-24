@@ -72,46 +72,57 @@ const AppContent: React.FC = () => {
                 table: 'messages'
             }, async (payload) => {
                 const newMsg = payload.new;
-                // Verificamos se é um "nudge" (chamar atenção)
                 if (newMsg.file_type === 'nudge') {
-                    console.log('[PandaNet] Nudge detectado:', newMsg);
-
-                    // RLS Check: If we received this from Supabase Realtime, we ARE a participant.
-                    // The 'messages' table policy strictly enforces 'conversation_id IN get_safe_conversation_ids()'.
-                    // Therefore, we can skip the manual DB check which was causing 403 errors.
-
-                    const isSender = newMsg.sender_id === currentUser.id;
-                    console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
-
-                    // Play sound for everyone for immediate feedback
-                    playNotificationSound('nudge');
-
-                    // Always shake! (MSN Style)
-                    console.log('[PandaNet] Executing Nudge Shake!');
-
-                    // Force navigation only for receiver
-                    if (!isSender) {
-                        setCurrentPage('messages');
-                        setPageContext({ conversationId: newMsg.conversation_id });
-                    }
-
-                    // Tremer a tela
-                    setIsShaking(true);
-                    setTimeout(() => {
-                        console.log('[PandaNet] Parando tremor.');
-                        setIsShaking(false);
-                    }, 5000);
+                    console.log('[PandaNet] DB Nudge detectado:', newMsg);
+                    handleNudge(newMsg.sender_id, newMsg.conversation_id);
                 }
+            })
+            .on('broadcast', { event: 'nudge' }, (payload) => {
+                console.log('[PandaNet] Broadcast Nudge detectado:', payload);
+                const { sender_id, conversation_id } = payload.payload; // Broadcast payload wrapper
+                handleNudge(sender_id, conversation_id);
             })
             .subscribe((status) => {
                 console.log('[PandaNet] Realtime Connection Status:', status);
                 if (status === 'SUBSCRIBED') {
-                    console.log('[PandaNet] Listening for nudges...');
+                    console.log('[PandaNet] Listening for nudges (DB + Broadcast)...');
+                    // Self-test cleanup/ensure connection
                 }
                 if (status === 'CHANNEL_ERROR') {
                     console.error('[PandaNet] Realtime Error. Check API Key or Network.');
                 }
             });
+
+        const handleNudge = (senderId: string, conversationId: string) => {
+            const isSender = senderId === currentUser.id;
+            console.log(`[PandaNet] Processing Nudge. Is Sender? ${isSender}`);
+
+            // Play sound
+            playNotificationSound('nudge');
+
+            // Force navigation only for receiver
+            if (!isSender) {
+                // If we serve the navigation, we should check if we are already there to avoid reload/flicker?
+                // setCurrentPage forces update.
+                console.log("Navigating Receiver to conversation:", conversationId);
+                setCurrentPage('messages');
+                setPageContext({ conversationId: conversationId });
+                // We also need to force Messages component to re-read the ID if it's already mounted?
+                // setCurrentPage causes re-render of Layout > renderPage > Messages.
+                // If currentPage was already 'messages', might need to force context update.
+                // React state update handles this.
+            }
+
+            // TREMER A TELA (SHAKE)
+            // Reset to false then true to restart animation if already shaking?
+            setIsShaking(false);
+            setTimeout(() => setIsShaking(true), 50);
+
+            // Stop shaking after 5s
+            setTimeout(() => {
+                setIsShaking(false);
+            }, 5000);
+        };
 
         // DEV: Allow manual triggering via console
         (window as any).triggerDetectionShake = () => {

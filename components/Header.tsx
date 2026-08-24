@@ -41,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
     };
 
     return (
-        <header className="bg-white border-b flex-shrink-0 relative z-20 dark:bg-gray-800 dark:border-gray-700 premium-card">
+        <header className="bg-white border-b flex-shrink-0 relative z-[60] dark:bg-gray-800 dark:border-gray-700 premium-card">
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -124,7 +124,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             </button>
                             {/* Dropdown de Sons */}
                             {isSoundMenuOpen && (
-                                <div className="absolute right-0 top-full pt-4 w-48 z-50 animate-fade-in-down">
+                                <div className="absolute right-0 top-full pt-4 w-48 z-[100] animate-fade-in-down">
                                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
                                         <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
                                             Escolher Toque
@@ -162,7 +162,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             </div>
                         </button>
                         {isDropdownOpen && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-50 dark:bg-gray-800 dark:border dark:border-gray-700">
+                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-[100] dark:bg-gray-800 dark:border dark:border-gray-700">
 
                                 <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
                                     <p className="text-xs text-gray-500 mb-2 dark:text-gray-400">{t('language.select')}</p>

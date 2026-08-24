@@ -180,6 +180,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             }
 
             fetchMessages(selectedConversationId);
+
+            // BROADCAST NUDGE (Faster than DB)
+            const channel = supabase.channel('global-nudges');
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Enviando nudge broadcast...');
+                    channel.send({
+                        type: 'broadcast',
+                        event: 'nudge',
+                        payload: {
+                            sender_id: currentUser?.id,
+                            conversation_id: selectedConversationId
+                        }
+                    });
+                    // Do NOT remove channel here, as it is shared with App.tsx listener!
+                }
+            });
+
         } catch (err) {
             console.error('Erro ao enviar nudge:', err);
         }
