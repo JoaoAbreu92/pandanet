@@ -20,11 +20,39 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
     const [isUploading, setIsUploading] = useState(false);
     const [targetUser, setTargetUser] = useState<Employee | null>(null);
     const [tempUserData, setTempUserData] = useState<Employee>(currentUser);
-    const [activeTab, setActiveTab] = useState<'info' | 'activity'>(userId && userId !== currentUser.id ? 'activity' : 'info');
+    const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'security'>(userId && userId !== currentUser.id ? 'activity' : 'info');
     const [loading, setLoading] = useState(false);
     const [userPosts, setUserPosts] = useState<Post[]>([]);
     const [isFollowLoading, setIsFollowLoading] = useState(false);
     const { refreshProfile } = useAuth();
+
+    // Password change state
+    const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    const handlePasswordChange = async () => {
+        setPasswordMessage(null);
+        if (passwordData.newPassword.length < 6) {
+            setPasswordMessage({ type: 'error', text: 'A senha deve ter pelo menos 6 caracteres.' });
+            return;
+        }
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordMessage({ type: 'error', text: 'As senhas não coincidem.' });
+            return;
+        }
+        setPasswordLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ password: passwordData.newPassword });
+            if (error) throw error;
+            setPasswordMessage({ type: 'success', text: 'Senha alterada com sucesso!' });
+            setPasswordData({ newPassword: '', confirmPassword: '' });
+        } catch (err: any) {
+            setPasswordMessage({ type: 'error', text: err.message || 'Erro ao alterar senha.' });
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
 
     const isOwnProfile = !userId || userId === currentUser.id;
 
@@ -560,6 +588,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         >
                             {isOwnProfile ? 'Minha Atividade' : 'Atividade'}
                         </button>
+                        {isOwnProfile && (
+                            <button
+                                onClick={() => setActiveTab('security')}
+                                className={`${activeTab === 'security' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                            >
+                                Segurança
+                            </button>
+                        )}
                     </nav>
                 </div>
 
@@ -690,6 +726,46 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                 </div>
                             </div>
                         )}
+                    </Card>
+                ) : activeTab === 'security' ? (
+                    <Card title="Alterar Senha">
+                        <div className="space-y-4 max-w-md">
+                            <div>
+                                <label className="text-sm font-medium text-brand-subtle-text">Nova Senha</label>
+                                <input
+                                    type="password"
+                                    value={passwordData.newPassword}
+                                    onChange={e => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                    placeholder="Mínimo 6 caracteres"
+                                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-brand-subtle-text">Confirmar Nova Senha</label>
+                                <input
+                                    type="password"
+                                    value={passwordData.confirmPassword}
+                                    onChange={e => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                    placeholder="Repita a nova senha"
+                                    className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                />
+                            </div>
+                            {passwordMessage && (
+                                <div className={`p-3 rounded-md text-sm font-medium ${passwordMessage.type === 'success'
+                                        ? 'bg-green-50 text-green-700 border border-green-200'
+                                        : 'bg-red-50 text-red-700 border border-red-200'
+                                    }`}>
+                                    {passwordMessage.text}
+                                </div>
+                            )}
+                            <button
+                                onClick={handlePasswordChange}
+                                disabled={passwordLoading}
+                                className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                            >
+                                {passwordLoading ? 'Salvando...' : 'Alterar Senha'}
+                            </button>
+                        </div>
                     </Card>
                 ) : (
                     <div className="space-y-6">
