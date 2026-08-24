@@ -290,6 +290,19 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
 
             if (error) throw error;
 
+            // Notificar o solicitante sobre a mudança de status
+            const currentSub = submissions.find(s => s.id === id);
+            if (currentSub && currentSub.requesterId !== currentUser.id) {
+                await addNotification({
+                    type: 'system',
+                    title: 'Atualização na sua solicitação de TI',
+                    description: `O status da sua solicitação "${currentSub.itemName}" foi alterado para: ${newStatus}`,
+                    user_id: currentSub.requesterId,
+                    avatarUrl: currentUser.avatarUrl,
+                    link: '/ti-requests'
+                });
+            }
+
             // Broadcast the update
             const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
             channel.send({
@@ -370,13 +383,13 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                             <p className="text-center text-brand-subtle-text py-8">Carregando solicitações...</p>
                         ) : (
                             <table className="w-full text-sm text-left text-gray-500">
-                                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                         <tr>
-                                            {isTIUser && <th scope="col" className="px-6 py-3">Solicitante</th>}
                                             <th scope="col" className="px-6 py-3">Item</th>
-                                            <th scope="col" className="px-6 py-3">Usuário</th>
+                                            <th scope="col" className="px-6 py-3">Solicitante</th>
+                                            <th scope="col" className="px-6 py-3">Responsável</th>
                                             <th scope="col" className="px-6 py-3">Tipo</th>
-                                            <th scope="col" className="px-6 py-3">Data de Envio</th>
+                                            <th scope="col" className="px-6 py-3 whitespace-nowrap">Data de Envio</th>
                                             <th scope="col" className="px-6 py-3">Status</th>
                                             {isTIUser && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
                                         </tr>
@@ -384,17 +397,17 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                     <tbody>
                                         {filteredSubmissions.map(sub => (
                                             <tr key={sub.id} className="bg-white border-b hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedRequest(sub)}>
-                                                {isTIUser && (
-                                                    <td className="px-6 py-4 font-medium text-gray-900">
-                                                        <div className="flex items-center space-x-2">
-                                                            {sub.comments && sub.comments.length > 0 && (
-                                                                <span className="w-2 h-2 bg-brand-primary rounded-full" title="Possui mensagens"></span>
-                                                            )}
-                                                            <span>{sub.requesterName}</span>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
+                                                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                                                    <div className="flex items-center space-x-2">
+                                                        {sub.comments && sub.comments.length > 0 && (
+                                                            <span className="w-2 h-2 bg-brand-primary rounded-full" title="Possui mensagens"></span>
+                                                        )}
+                                                        <span>{sub.itemName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 font-medium text-gray-900">
+                                                    <span>{sub.requesterName}</span>
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center space-x-2">
                                                         {sub.assignedUserAvatarUrl ? (
@@ -406,7 +419,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">{sub.requestType}</td>
-                                                <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
                                             <td className="px-6 py-4">
                                                     {isTIUser && activeTab === 'active' ? (
                                                         <select
@@ -555,6 +568,19 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             .update({ comments: updatedComments })
                                             .eq('id', selectedRequest.id);
                                         if (error) throw error;
+
+                                        // Notificar o outro usuário
+                                        const targetUserIdForComment = currentUser.id === selectedRequest.requesterId ? selectedRequest.assignedUserId : selectedRequest.requesterId;
+                                        if (targetUserIdForComment) {
+                                            await addNotification({
+                                                type: 'message',
+                                                title: 'Nova mensagem na solicitação de TI',
+                                                description: `${currentUser.name}: ${newComment.substring(0, 30)}${newComment.length > 30 ? '...' : ''}`,
+                                                user_id: targetUserIdForComment,
+                                                avatarUrl: currentUser.avatarUrl,
+                                                link: '/ti-requests'
+                                            });
+                                        }
 
                                         // Broadcast the update
                                         const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
