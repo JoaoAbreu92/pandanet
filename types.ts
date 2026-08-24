@@ -307,6 +307,7 @@ export interface Employee {
   nudge_cooldown?: number; // In seconds
   is_whatsapp_agent?: boolean;
   is_manager?: boolean;
+  quick_links?: string[];
 }
 
 export interface AIMessage {

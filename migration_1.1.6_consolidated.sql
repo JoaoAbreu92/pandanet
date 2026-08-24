@@ -157,44 +157,6 @@ $$;
 
 
 -- B. Função public.create_user_admin (Cria usuários a partir do painel de administração)
-CREATE OR REPLACE FUNCTION public.create_user_admin(
-    p_email TEXT,
-    p_password TEXT DEFAULT 'PandaNet123!',
-    p_full_name TEXT DEFAULT 'Novo Usuário',
-    p_role TEXT DEFAULT 'Colaborador',
-    p_team TEXT DEFAULT 'Geral',
-    p_company_id UUID DEFAULT NULL,
-    p_is_admin BOOLEAN DEFAULT FALSE,
-    p_is_company_admin BOOLEAN DEFAULT FALSE,
-    p_permissions JSONB DEFAULT '{}'::jsonb,
-    p_avatar_url TEXT DEFAULT NULL,
-    p_department_id UUID DEFAULT NULL,
-    p_rg TEXT DEFAULT NULL,
-    p_cpf TEXT DEFAULT NULL,
-    p_can_nudge BOOLEAN DEFAULT TRUE,
-    p_nudge_cooldown INTEGER DEFAULT 30,
-    p_is_whatsapp_agent BOOLEAN DEFAULT FALSE,
-    p_whatspanda_permissions JSONB DEFAULT '{}'::jsonb,
-    p_email_permissions JSONB DEFAULT '{}'::jsonb,
-    p_join_date DATE DEFAULT NULL,
-    p_reports_to UUID DEFAULT NULL,
-    p_sector_manager_id UUID DEFAULT NULL,
-    p_is_manager BOOLEAN DEFAULT FALSE
-)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth, extensions
-AS $$
-DECLARE
-    v_new_id UUID;
-    v_caller_company_id UUID;
-    v_caller_is_super BOOLEAN;
-    v_caller_is_admin BOOLEAN;
-    v_encrypted_pw TEXT;
-END;
-$$;
-
 -- Nota: Corpo completo da função create_user_admin com criptografia adequada e ON CONFLICT do profiles
 CREATE OR REPLACE FUNCTION public.create_user_admin(
     p_email TEXT,

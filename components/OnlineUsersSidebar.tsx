@@ -15,15 +15,23 @@ import type { Employee } from '../types';
 interface OnlineUsersSidebarProps {
     currentUser: Employee;
     onStartChat: (userId: string) => void;
+    onNavigate: (page: string, context?: any) => void;
+    isOpen?: boolean;
+    setIsOpen?: (open: boolean) => void;
 }
 
 export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
     currentUser,
-    onStartChat
+    onStartChat,
+    onNavigate,
+    isOpen: controlledIsOpen,
+    setIsOpen: controlledSetIsOpen
 }) => {
     const { onlineUsers } = usePresence();
     const [users, setUsers] = useState<any[]>([]);
-    const [isOpen, setIsOpen] = useState(true); // Controla visualização no desktop
+    const [localIsOpen, setLocalIsOpen] = useState(true); // Controla visualização no desktop
+    const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : localIsOpen;
+    const setIsOpen = controlledSetIsOpen !== undefined ? controlledSetIsOpen : setLocalIsOpen;
     const [selectedUser, setSelectedUser] = useState<any | null>(null);
     const [mutedUsers, setMutedUsers] = useState<Set<string>>(() => {
         if (typeof window !== 'undefined') {
@@ -99,7 +107,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="absolute top-1/2 -left-3.5 transform -translate-y-1/2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/10 rounded-full p-1 shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 text-gray-500 hover:text-gray-700 dark:hover:text-white transition-all z-20"
+                className="absolute top-1/2 -left-3.5 transform -translate-y-1/2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/10 rounded-full p-1 shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 text-gray-500 hover:text-gray-700 dark:hover:text-white transition-all z-20 md:hidden"
                 title={isOpen ? 'Recolher Barra' : 'Expandir Barra'}
             >
                 {isOpen ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
@@ -193,6 +201,16 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                                             >
                                                 <ChatBubbleLeftRightIcon className="w-4 h-4" />
                                                 <span>Conversar</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    onNavigate('profile-page', user.id);
+                                                    setSelectedUser(null);
+                                                }}
+                                                className="w-full flex items-center space-x-2 p-2 rounded-xl text-xs font-bold text-slate-700 dark:text-gray-200 hover:bg-brand-primary hover:text-white transition-all"
+                                            >
+                                                <UserCircleIcon className="w-4 h-4" />
+                                                <span>Abrir Feed</span>
                                             </button>
                                             <button
                                                 onClick={() => {

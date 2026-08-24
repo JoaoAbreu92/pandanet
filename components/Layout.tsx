@@ -63,6 +63,7 @@ const Layout: React.FC<LayoutProps> = ({
     onStartDirectChat
 }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isRightSidebarOpen, setRightSidebarOpen] = useState(false);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
     const [isDebugOpen, setDebugOpen] = useState(false);
 
@@ -189,11 +190,38 @@ const Layout: React.FC<LayoutProps> = ({
                     </main>
                 </div>
 
+                {/* Área invisível na extrema direita para acionar hover no desktop */}
                 {currentPage !== 'messages' && onStartDirectChat && (
-                    <div className="hidden md:block h-full">
+                    <div
+                        className="hidden md:block fixed right-0 top-0 bottom-0 w-3 z-40 bg-transparent"
+                        onMouseEnter={() => {
+                            if (window.innerWidth >= 768) {
+                                setRightSidebarOpen(true);
+                            }
+                        }}
+                    />
+                )}
+
+                {currentPage !== 'messages' && onStartDirectChat && (
+                    <div 
+                        className="hidden md:block h-full z-45"
+                        onMouseEnter={() => {
+                            if (window.innerWidth >= 768) {
+                                setRightSidebarOpen(true);
+                            }
+                        }}
+                        onMouseLeave={() => {
+                            if (window.innerWidth >= 768) {
+                                setRightSidebarOpen(false);
+                            }
+                        }}
+                    >
                         <OnlineUsersSidebar
                             currentUser={currentUser}
                             onStartChat={onStartDirectChat}
+                            onNavigate={onNavigate}
+                            isOpen={isRightSidebarOpen}
+                            setIsOpen={setRightSidebarOpen}
                         />
                     </div>
                 )}

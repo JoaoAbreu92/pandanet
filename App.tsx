@@ -536,7 +536,24 @@ const AppContent: React.FC = () => {
     const [chatHeads, setChatHeads] = useState<ActiveChatHead[]>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('pixel_chat_heads');
-            return saved ? JSON.parse(saved) : [];
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) {
+                        const unique: ActiveChatHead[] = [];
+                        const seen = new Set<string>();
+                        parsed.forEach(item => {
+                            if (item && item.conversationId && !seen.has(item.conversationId)) {
+                                seen.add(item.conversationId);
+                                unique.push(item);
+                            }
+                        });
+                        return unique;
+                    }
+                } catch (e) {
+                    console.error('[App] Erro ao analisar chatHeads do localStorage:', e);
+                }
+            }
         }
         return [];
     });
@@ -544,6 +561,7 @@ const AppContent: React.FC = () => {
  
     const handleMinimizeConversation = useCallback((conversationId: string, participantName: string, participantAvatarUrl: string, participantId?: string) => {
         setChatHeads(prev => {
+            const cleanPrev = prev.filter(ch => ch.conversationId !== conversationId);
             if (prev.some(ch => ch.conversationId === conversationId)) {
                 setExpandedChatHeadIds(ids => {
                     if (ids.includes(conversationId)) return ids;
@@ -561,7 +579,7 @@ const AppContent: React.FC = () => {
                 const updated = [...prev.slice(1), { conversationId, participantName, participantAvatarUrl, participantId }];
                 localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
                 setExpandedChatHeadIds(ids => {
-                    const filtered = ids.filter(id => id !== oldest.conversationId);
+                    const filtered = ids.filter(id => id !== oldest.conversationId && id !== conversationId);
                     return [...filtered, conversationId];
                 });
                 return updated;
@@ -569,11 +587,49 @@ const AppContent: React.FC = () => {
  
             const updated = [...prev, { conversationId, participantName, participantAvatarUrl, participantId }];
             localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
-            setExpandedChatHeadIds(ids => [...ids, conversationId]);
+            setExpandedChatHeadIds(ids => {
+                if (ids.includes(conversationId)) return ids;
+                return [...ids, conversationId];
+            });
             return updated;
         });
         handleNavigate('home');
     }, [handleNavigate]);
+
+    const handleOpenFloatingChat = useCallback((conversationId: string, participantName: string, participantAvatarUrl: string, participantId?: string) => {
+        setChatHeads(prev => {
+            if (prev.some(ch => ch.conversationId === conversationId)) {
+                setExpandedChatHeadIds(ids => {
+                    if (ids.includes(conversationId)) return ids;
+                    return [...ids, conversationId];
+                });
+                return prev;
+            }
+
+            if (prev.length >= 4) {
+                const oldest = prev[0];
+                const confirmClose = window.confirm(`Você já possui o limite máximo de 4 conversas simultâneas. Deseja fechar a conversa com "${oldest.participantName}" para abrir esta nova?`);
+                if (!confirmClose) {
+                    return prev;
+                }
+                const updated = [...prev.slice(1), { conversationId, participantName, participantAvatarUrl, participantId }];
+                localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+                setExpandedChatHeadIds(ids => {
+                    const filtered = ids.filter(id => id !== oldest.conversationId && id !== conversationId);
+                    return [...filtered, conversationId];
+                });
+                return updated;
+            }
+
+            const updated = [...prev, { conversationId, participantName, participantAvatarUrl, participantId }];
+            localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
+            setExpandedChatHeadIds(ids => {
+                if (ids.includes(conversationId)) return ids;
+                return [...ids, conversationId];
+            });
+            return updated;
+        });
+    }, []);
  
     const handleCloseChatHead = useCallback((conversationId: string) => {
         setChatHeads(prev => {
@@ -641,8 +697,8 @@ const AppContent: React.FC = () => {
                                 .eq('id', convs.id);
                         }
 
-                        // Redireciona diretamente para a tela de mensagens
-                        handleNavigate('messages', { conversationId: convs.id });
+                        // Abre a conversa diretamente no popup flutuante
+                        handleOpenFloatingChat(convs.id, targetName, targetAvatarUrl, targetUserId);
                         return;
                     }
                 }
@@ -671,13 +727,13 @@ const AppContent: React.FC = () => {
 
             if (partInsertError) throw partInsertError;
 
-            // Redireciona diretamente para a tela de mensagens
-            handleNavigate('messages', { conversationId: newConv.id });
+            // Abre a conversa diretamente no popup flutuante
+            handleOpenFloatingChat(newConv.id, targetName, targetAvatarUrl, targetUserId);
 
         } catch (error: any) {
             console.error('Erro ao iniciar conversa direta:', error);
         }
-    }, [currentUser, handleNavigate]);
+    }, [currentUser, handleOpenFloatingChat]);
 
     const handleUpdateUser = (updatedUser: Employee) => {
         if (companyData) {

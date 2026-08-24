@@ -135,9 +135,15 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
                                             const oldestHead = chatHeads.find(h => h.conversationId === oldestId);
                                             const confirmOpen = window.confirm(`Você já possui o limite máximo de 4 conversas abertas. Deseja fechar o chat de "${oldestHead?.participantName || 'Colega'}" para abrir este?`);
                                             if (!confirmOpen) return;
-                                            setExpandedChatHeadIds(prev => [...prev.filter(id => id !== oldestId), ch.conversationId]);
+                                            setExpandedChatHeadIds(prev => {
+                                                const filtered = prev.filter(id => id !== oldestId && id !== ch.conversationId);
+                                                return [...filtered, ch.conversationId];
+                                            });
                                         } else {
-                                            setExpandedChatHeadIds(prev => [...prev, ch.conversationId]);
+                                            setExpandedChatHeadIds(prev => {
+                                                if (prev.includes(ch.conversationId)) return prev;
+                                                return [...prev, ch.conversationId];
+                                            });
                                         }
                                         
                                         // Clear unread count when expanding
