@@ -27,6 +27,15 @@ const Channels: React.FC = () => {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
+    // Debug State
+    const [showDebug, setShowDebug] = useState(false);
+    const [debugLogs, setDebugLogs] = useState<{ time: string, msg: string, type: 'info' | 'error' | 'success' }[]>([]);
+
+    const addDebugLog = (msg: string, type: 'info' | 'error' | 'success' = 'info') => {
+        setDebugLogs(prev => [{ time: new Date().toLocaleTimeString(), msg, type }, ...prev].slice(0, 20));
+        console.log(`[WP-DEBUG] ${msg}`);
+    };
+
     // Limpar o estado da tela sempre que o usuário trocar de empresa no painel SaaS
     useEffect(() => {
         setView('list');
@@ -45,6 +54,7 @@ const Channels: React.FC = () => {
         let pollingInterval: NodeJS.Timeout;
 
         if (view === 'qr' && currentId && !isConnected) {
+            addDebugLog(`Iniciando polling para conexão: ${currentId}`, 'info');
             pollingInterval = setInterval(async () => {
                 const { data, error } = await supabase
                     .from('whatsapp_settings')
@@ -52,11 +62,15 @@ const Channels: React.FC = () => {
                     .eq('id', currentId)
                     .single();
 
-                if (!error && data) {
+                if (error) {
+                    addDebugLog(`Erro no polling: ${error.message}`, 'error');
+                } else if (data) {
                     if (data.qr_code && data.qr_code !== qrCode) {
+                        addDebugLog('QR Code recebido via polling!', 'success');
                         setQrCode(data.qr_code);
                     }
                     if (data.is_connected) {
+                        addDebugLog('Conexão detectada via polling!', 'success');
                         setIsConnected(true);
                         setTimeout(() => setView('list'), 2000);
                     }
@@ -64,6 +78,7 @@ const Channels: React.FC = () => {
             }, 3000);
         }
 
+        addDebugLog(`Inscrevendo no Realtime: whatsapp_settings_qr_${companyId}`, 'info');
         const subscription = supabase
             .channel(`whatsapp_settings_qr_${companyId}`)
             .on('postgres_changes', {
@@ -72,19 +87,24 @@ const Channels: React.FC = () => {
                 table: 'whatsapp_settings',
                 filter: `company_id=eq.${companyId}`
             }, (payload) => {
+                addDebugLog(`Realtime: Evento ${payload.eventType} recebido`, 'info');
                 fetchSettings(); // Refresh list on any change
 
                 // If we are currently waiting for QR of this specific channel:
                 if (payload.new && (payload.new as any).id === currentId && view === 'qr') {
                     const newData = payload.new as WhatsAppSettings;
+                    addDebugLog(`Realtime: Update na conexão atual! Conectado=${newData.is_connected}, QR=${!!newData.qr_code}`, 'info');
                     setIsConnected(newData.is_connected);
                     setQrCode(newData.qr_code || null);
                     if (newData.is_connected) {
+                        addDebugLog('Conexão detectada via Realtime!', 'success');
                         setTimeout(() => setView('list'), 2000); // go back to list on connect
                     }
                 }
             })
-            .subscribe();
+            .subscribe((status) => {
+                addDebugLog(`Realtime Status: ${status}`, status === 'SUBSCRIBED' ? 'success' : 'info');
+            });
 
         return () => {
             supabase.removeChannel(subscription);
@@ -109,9 +129,17 @@ const Channels: React.FC = () => {
     };
 
     const startSession = async (companyId: string, connectionId: string) => {
+        addDebugLog(`Iniciando sessão: Empresa=${companyId}, Conexão=${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            const res = await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`, {
+            if (!session) {
+                addDebugLog('Erro: Nascunha sessão Supabase encontrada!', 'error');
+            }
+
+            const url = `https://pandanet.grupopixel.com.br/api/sessions/${companyId}/start/${connectionId}`;
+            addDebugLog(`Chamando API: ${url}`, 'info');
+
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${session?.access_token}`,
@@ -119,11 +147,16 @@ const Channels: React.FC = () => {
                 }
             });
             const jsonResp = await res.json().catch(() => null);
-            console.log('[startSession] Status:', res.status, 'Response:', jsonResp);
-            if (!res.ok) {
-                console.error('[startSession] Falha na API:', jsonResp);
+
+            if (res.ok) {
+                addDebugLog('API retornou SUCESSO. Aguardando QR no Banco...', 'success');
+            } else {
+                addDebugLog(`API retornou ERRO (${res.status}): ${JSON.stringify(jsonResp)}`, 'error');
             }
-        } catch (error) {
+
+            console.log('[startSession] Status:', res.status, 'Response:', jsonResp);
+        } catch (error: any) {
+            addDebugLog(`Erro de Rede/Fetch: ${error.message}`, 'error');
             console.error('[startSession] Network/Fetch Error:', error);
         }
     };
@@ -485,6 +518,48 @@ const Channels: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Debug Toggle & Panel */}
+            <div className="mt-auto pt-10">
+                <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    className="text-[9px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-[0.3em] flex items-center gap-2 mx-auto transition-all"
+                >
+                    <Smartphone className="w-3 h-3" /> {showDebug ? 'Ocultar Diagnóstico' : 'Mostrar Diagnóstico'}
+                </button>
+
+                {showDebug && (
+                    <div className="mt-6 bg-slate-900 border border-white/5 rounded-3xl p-6 font-mono text-[10px] text-gray-400 animate-in slide-in-from-bottom-4 duration-500 overflow-hidden shadow-2xl">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
+                            <span className="text-emerald-500 font-bold uppercase tracking-widest">Painel de Diagnóstico WhatsPanda</span>
+                            <span className="text-[9px] opacity-50 uppercase">v1.2.0</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="opacity-50 mb-1">Empresa ID:</p>
+                                <p className="text-white truncate">{profile?.company_id || user?.user_metadata?.company_id || 'N/A'}</p>
+                            </div>
+                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                <p className="opacity-50 mb-1">Conexão Ativa:</p>
+                                <p className="text-white truncate">{currentId || 'NENHUMA'}</p>
+                            </div>
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                            {debugLogs.length === 0 ? (
+                                <p className="opacity-30 italic">Aguardando eventos...</p>
+                            ) : debugLogs.map((log, i) => (
+                                <div key={i} className="flex gap-3 leading-relaxed">
+                                    <span className="opacity-30 flex-shrink-0">[{log.time}]</span>
+                                    <span className={
+                                        log.type === 'error' ? 'text-red-400' :
+                                            log.type === 'success' ? 'text-emerald-400' :
+                                                'text-gray-300'
+                                    }>{log.msg}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

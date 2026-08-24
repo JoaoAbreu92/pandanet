@@ -30,10 +30,29 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const [showTooltip, setShowTooltip] = useState(false);
     const [tooltipDismissed, setTooltipDismissed] = useState(false);
 
-    // Draggable state
-    const [position, setPosition] = useState({ x: window.innerWidth - 90, y: window.innerHeight - 90 });
+    // Draggable state with localStorage persistence
+    const [position, setPosition] = useState(() => {
+        try {
+            const saved = localStorage.getItem('panda-ai-position');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Validate if saved position is within current window bounds
+                return {
+                    x: Math.max(20, Math.min(parsed.x, window.innerWidth - 90)),
+                    y: Math.max(20, Math.min(parsed.y, window.innerHeight - 90))
+                };
+            }
+        } catch (e) { console.error('Error loading AI position', e); }
+        return { x: window.innerWidth - 90, y: window.innerHeight - 90 };
+    });
+
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+    // Save position to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('panda-ai-position', JSON.stringify(position));
+    }, [position]);
 
     useEffect(() => {
         const handleResize = () => {
