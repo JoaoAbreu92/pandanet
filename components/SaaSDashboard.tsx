@@ -98,6 +98,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [planDistribution, setPlanDistribution] = useState<any[]>([]);
     const [globalAnnouncements, setGlobalAnnouncements] = useState<any[]>([]);
     const [pendingUsers, setPendingUsers] = useState<Employee[]>([]);
+    const [rejectedUsers, setRejectedUsers] = useState<Employee[]>([]);
+    const [validationSubTab, setValidationSubTab] = useState<'pending' | 'rejected'>('pending');
     const [isValidating, setIsValidating] = useState<string | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -171,12 +173,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 console.error("Erro ao buscar status do WhatsApp:", e);
             }
 
-            // NEW: Fetch Pending Users
+            // Fetch Pending Users (includes orphaned active users without company)
             const { data: pendingData } = await supabase
                 .from('profiles')
                 .select('*, company:companies(*)')
                 .eq('status', 'pending');
             if (pendingData) setPendingUsers(pendingData as any);
+
+            // Fetch Rejected Users
+            const { data: rejectedData } = await supabase
+                .from('profiles')
+                .select('*, company:companies(*)')
+                .eq('status', 'rejected');
+            if (rejectedData) setRejectedUsers(rejectedData as any);
         } catch (error) {
             console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
         } finally {
@@ -1375,75 +1384,169 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 {/* VALIDATIONS */}
                 {activeTab === 'validations' && (
                     <div className="space-y-6 animate-fadeIn pb-20">
-                        <div className="flex items-center gap-2 mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
+                        <div className="flex items-center gap-2 mb-4 border-b border-gray-100 dark:border-gray-700 pb-4">
                             <ShieldCheckIcon className="w-6 h-6 text-brand-primary" />
                             <div>
-                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Validação de Novos Cadastros</h2>
-                                <p className="text-xs text-gray-500 mt-1">Aprove ou rejeite solicitações de acesso pendentes no sistema.</p>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Validação de Cadastros</h2>
+                                <p className="text-xs text-gray-500 mt-1">Aprove ou rejeite solicitações de acesso no sistema.</p>
                             </div>
                         </div>
 
-                        {pendingUsers.length === 0 ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-dashed border-gray-200 dark:border-gray-700">
-                                <CheckCircleIcon className="w-12 h-12 text-green-500/20 mx-auto mb-4" />
-                                <h3 className="text-lg font-bold text-gray-400">Tudo limpo por aqui!</h3>
-                                <p className="text-sm text-gray-400">Não há solicitações pendentes de validação no momento.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {pendingUsers.map((user: any) => (
-                                    <div key={user.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col group hover:shadow-lg transition-all duration-300">
-                                        <div className="p-6 flex-1">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-lg">
-                                                    {(user.full_name || user.email || '?')[0].toUpperCase()}
+                        {/* Sub-abas */}
+                        <div className="flex gap-2 border-b border-gray-100 dark:border-gray-700 mb-6">
+                            <button
+                                onClick={() => setValidationSubTab('pending')}
+                                className={`pb-3 px-4 text-sm font-bold transition-colors relative ${validationSubTab === 'pending'
+                                        ? 'text-brand-primary border-b-2 border-brand-primary'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                    }`}
+                            >
+                                Pendentes
+                                {pendingUsers.length > 0 && (
+                                    <span className="ml-2 bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                        {pendingUsers.length}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setValidationSubTab('rejected')}
+                                className={`pb-3 px-4 text-sm font-bold transition-colors relative ${validationSubTab === 'rejected'
+                                        ? 'text-red-500 border-b-2 border-red-500'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                    }`}
+                            >
+                                Rejeitados
+                                {rejectedUsers.length > 0 && (
+                                    <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                        {rejectedUsers.length}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* PENDENTES */}
+                        {validationSubTab === 'pending' && (
+                            pendingUsers.length === 0 ? (
+                                <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-dashed border-gray-200 dark:border-gray-700">
+                                    <CheckCircleIcon className="w-12 h-12 text-green-500/20 mx-auto mb-4" />
+                                    <h3 className="text-lg font-bold text-gray-400">Tudo limpo por aqui!</h3>
+                                    <p className="text-sm text-gray-400">Não há solicitações pendentes de validação no momento.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {pendingUsers.map((user: any) => (
+                                        <div key={user.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col group hover:shadow-lg transition-all duration-300">
+                                            <div className="p-6 flex-1">
+                                                <div className="flex items-center gap-4 mb-4">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-lg">
+                                                        {(user.full_name || user.email || '?')[0].toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-bold text-gray-800 dark:text-white truncate">{user.full_name || 'Usuário s/ Nome'}</h4>
+                                                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="font-bold text-gray-800 dark:text-white truncate">{user.full_name || 'Usuário s/ Nome'}</h4>
-                                                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                                                <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">Empresa Detectada:</span>
+                                                        <span className="font-bold text-gray-600 dark:text-gray-300">
+                                                            {user.company?.name || user.email?.split('@')[1] || 'Desconhecida'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">Data do Cadastro:</span>
+                                                        <span className="text-gray-600 dark:text-gray-300">
+                                                            {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-
-                                            <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
-                                                <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-gray-400">Empresa Detectada:</span>
-                                                    <span className="font-bold text-gray-600 dark:text-gray-300">
-                                                        {user.company?.name || user.email?.split('@')[1] || 'Desconhecida'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-gray-400">Data do Cadastro:</span>
-                                                    <span className="text-gray-600 dark:text-gray-300">
-                                                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-                                                    </span>
-                                                </div>
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/30 flex gap-2">
+                                                <button
+                                                    onClick={() => handleRejectUser(user.id)}
+                                                    disabled={!!isValidating}
+                                                    className="flex-1 py-2 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-100 dark:border-red-900/30 disabled:opacity-50"
+                                                >
+                                                    Rejeitar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleApproveUser(user)}
+                                                    disabled={!!isValidating}
+                                                    className="flex-[2] py-2 rounded-lg text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 transition-all shadow-md hover:shadow-brand-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                                                >
+                                                    {isValidating === user.id ? (
+                                                        <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                                                    ) : (
+                                                        <CheckCircleIcon className="w-3 h-3" />
+                                                    )}
+                                                    Aprovar Acesso
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <div className="p-4 bg-gray-50 dark:bg-gray-700/30 flex gap-2">
-                                            <button
-                                                onClick={() => handleRejectUser(user.id)}
-                                                disabled={!!isValidating}
-                                                className="flex-1 py-2 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-red-100 dark:border-red-900/30 disabled:opacity-50"
-                                            >
-                                                Rejeitar
-                                            </button>
-                                            <button
-                                                onClick={() => handleApproveUser(user)}
-                                                disabled={!!isValidating}
-                                                className="flex-[2] py-2 rounded-lg text-xs font-bold text-white bg-brand-primary hover:bg-brand-primary/90 transition-all shadow-md hover:shadow-brand-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
-                                            >
-                                                {isValidating === user.id ? (
-                                                    <ArrowPathIcon className="w-3 h-3 animate-spin" />
-                                                ) : (
-                                                    <CheckCircleIcon className="w-3 h-3" />
-                                                )}
-                                                Aprovar Acesso
-                                            </button>
-                                        </div>
+                                    ))}
                                     </div>
-                                ))}
-                            </div>
+                            )
+                        )}
+
+                        {/* REJEITADOS */}
+                        {validationSubTab === 'rejected' && (
+                            rejectedUsers.length === 0 ? (
+                                <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-dashed border-gray-200 dark:border-gray-700">
+                                    <XMarkIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-bold text-gray-400">Nenhum usuário rejeitado</h3>
+                                    <p className="text-sm text-gray-400">Usuários rejeitados aparecerão aqui e poderão ser reaprovados.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {rejectedUsers.map((user: any) => (
+                                        <div key={user.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden flex flex-col group hover:shadow-lg transition-all duration-300">
+                                            <div className="px-4 py-1.5 bg-red-50 dark:bg-red-900/20 flex items-center gap-1">
+                                                <XMarkIcon className="w-3 h-3 text-red-400" />
+                                                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Acesso Rejeitado</span>
+                                            </div>
+                                            <div className="p-6 flex-1">
+                                                <div className="flex items-center gap-4 mb-4">
+                                                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-400 font-bold text-lg">
+                                                        {(user.full_name || user.email || '?')[0].toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-bold text-gray-800 dark:text-white truncate">{user.full_name || 'Usuário s/ Nome'}</h4>
+                                                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-3 pt-4 border-t border-gray-50 dark:border-gray-700/50">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">Domínio:</span>
+                                                        <span className="font-bold text-gray-600 dark:text-gray-300">
+                                                            {user.email?.split('@')[1] || 'Desconhecido'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">Rejeitado em:</span>
+                                                        <span className="text-gray-600 dark:text-gray-300">
+                                                            {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/30">
+                                                <button
+                                                    onClick={() => handleApproveUser(user)}
+                                                    disabled={!!isValidating}
+                                                    className="w-full py-2 rounded-lg text-xs font-bold text-white bg-green-500 hover:bg-green-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                                >
+                                                    {isValidating === user.id ? (
+                                                        <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                                                    ) : (
+                                                        <CheckCircleIcon className="w-3 h-3" />
+                                                    )}
+                                                    Reativar Acesso
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
                         )}
                     </div>
                 )}      {/* --- MODALS --- */}
