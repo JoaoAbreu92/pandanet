@@ -956,7 +956,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             }
 
             // Se for figurinha MAS for GIF, melhor tratar como mídia imagem (Evolution converte melhor no celular)
-            const isGif = mediaUrl.toLowerCase().split('?')[0].endsWith('.gif');
+            // Nunca tentar .toLowerCase() em data URIs base64 (pode ter MB de dados)
+            const isGif = !mediaUrl.startsWith('data:') && mediaUrl.toLowerCase().split('?')[0].endsWith('.gif');
             const isSticker = mediaType === 'sticker' && !isGif;
             const isAudio = mediaType && (mediaType.startsWith('audio') || mediaType === 'audio');
             
@@ -977,7 +978,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             } : isAudio ? {
                 number: phoneNumber,
-                audio: base64Data.startsWith('data:') ? base64Data : `data:${mediaType || 'audio/ogg'};base64,${base64Data}`,
+                // A Evolution API espera base64 puro (sem prefixo data:) no campo audio
+                audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data,
+                delay: 1200,
                 options: {
                     encoding: true
                 }
@@ -1179,6 +1182,52 @@ async function updateInstanceSettings(instanceName) {
 // API: Debug Logs em Memória
 router.get('/debug-logs', (req, res) => {
     res.json(global.debugLogs);
+});
+
+// API: Proxy de Download de Mídia do Supabase Storage
+// Permite que o frontend baixe arquivos via rede Docker interna, evitando
+// problemas de CORS, nginx proxy ou permissão no navegador.
+router.get('/media/proxy', authMiddleware, async (req, res) => {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
+
+    try {
+        let targetUrl = decodeURIComponent(url);
+
+        // Redireciona para a rede interna do Docker para evitar NAT Loopback
+        const storageIdx = targetUrl.indexOf('/storage/v1/object/public/');
+        if (storageIdx !== -1 && internalSupabaseUrl) {
+            const storagePath = targetUrl.substring(storageIdx);
+            const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
+            targetUrl = `${base}${storagePath}`;
+            console.log(`[MEDIA-PROXY] Redirecionando para rede interna: ${targetUrl}`);
+        }
+
+        const fetchRes = await fetch(targetUrl, { signal: AbortSignal.timeout(30000) });
+        if (!fetchRes.ok) {
+            return res.status(fetchRes.status).json({ error: `Falha ao buscar mídia: HTTP ${fetchRes.status}` });
+        }
+
+        const contentType = fetchRes.headers.get('content-type') || 'application/octet-stream';
+        const contentLength = fetchRes.headers.get('content-length');
+
+        // Extrai o nome do arquivo da URL original
+        const originalUrl = decodeURIComponent(url);
+        const filename = originalUrl.split('/').pop()?.split('?')[0] || 'download';
+        const safeFilename = encodeURIComponent(filename);
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+
+        // Stream direto para o cliente
+        const buffer = await fetchRes.arrayBuffer();
+        res.send(Buffer.from(buffer));
+    } catch (err) {
+        console.error('[MEDIA-PROXY] Erro:', err.message);
+        res.status(500).json({ error: `Erro ao baixar mídia: ${err.message}` });
+    }
 });
 
 // API: Status de Conexão Realtime

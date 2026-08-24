@@ -569,10 +569,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       })
       .subscribe((status) => {
         console.log(`[WP-DEBUG] Realtime Status (Mensagens): ${status}`);
+        // Se a conexão cair, tenta recarregar as mensagens e reconectar
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[WP-DEBUG] Realtime desconectado. Recarregando mensagens via HTTP...');
+          fetchMessages(selectedConversation.id);
+          // Tenta reconectar o realtime após 3 segundos
+          setTimeout(() => {
+            try { supabase.realtime.connect(); } catch (e) { }
+          }, 3000);
+        }
       });
+
+    // Fallback de polling: atualiza as mensagens a cada 30s caso o Realtime falhe
+    // Isso garante que as mensagens do WhatsApp sempre apareçam no WhatsPanda
+    const pollingInterval = setInterval(() => {
+      if (selectedConversation?.id && document.visibilityState === 'visible') {
+        fetchMessages(selectedConversation.id);
+      }
+    }, 30000);
 
     return () => {
       supabase.removeChannel(msgSubscription);
+      clearInterval(pollingInterval);
     };
   }, [selectedConversation]);
 
@@ -1664,20 +1682,35 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     e.preventDefault();
     e.stopPropagation();
     if (!rawUrl) return;
-    const url = fixMediaUrl(rawUrl);
-    if (!url) return;
 
     // Se estiver rodando dentro do APK (Capacitor), abre a URL no navegador padrão do Android
     // para que o download seja gerenciado de forma nativa pelo sistema operacional.
     const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor;
     if (isCapacitor) {
-      window.open(url, '_system');
+      const url = fixMediaUrl(rawUrl);
+      if (url) window.open(url, '_system');
       return;
     }
 
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      // Usa o proxy do backend para baixar a mídia com headers corretos (Content-Disposition: attachment)
+      // Isso evita problemas de CORS e garante que o nginx não sirva index.html ao invés do arquivo.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Sessão expirada');
+
+      const encodedUrl = encodeURIComponent(rawUrl);
+      const proxyUrl = `/api/whatsapp/media/proxy?url=${encodedUrl}`;
+
+      const response = await fetch(proxyUrl, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        // Se o proxy falhar, tenta abrir diretamente (fallback)
+        throw new Error(`Proxy retornou ${response.status}`);
+      }
+
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
 
@@ -1686,7 +1719,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       let filename = defaultFilename;
       if (!filename) {
-        const urlParts = url.split('/');
+        const urlParts = rawUrl.split('/');
         const lastPart = urlParts[urlParts.length - 1]?.split('?')[0];
         filename = lastPart || 'documento';
       }
@@ -1700,6 +1733,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         else if (mime.includes('zip') || mime.includes('compressed')) filename += '.zip';
         else if (mime.includes('png')) filename += '.png';
         else if (mime.includes('jpeg') || mime.includes('jpg')) filename += '.jpg';
+        else if (mime.includes('ogg') || mime.includes('webm') || mime.includes('mp4') || mime.includes('mpeg')) filename += '.mp3';
       }
 
       link.download = filename;
@@ -1708,15 +1742,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (err) {
-      console.warn('Direct fetch download failed, using fallback trigger:', err);
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.download = defaultFilename || 'documento';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      console.warn('Download via proxy falhou, tentando fallback direto:', err);
+      // Fallback: abre a URL limpa em nova aba (o navegador pode oferecer download)
+      const url = fixMediaUrl(rawUrl);
+      if (url) window.open(url, '_blank');
     }
   };
 
@@ -1796,9 +1825,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao acessar microfone:', err);
-      alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+      const isCapacitorApp = typeof window !== 'undefined' && (window as any).Capacitor;
+      if (isCapacitorApp) {
+        alert('Não foi possível acessar o microfone.\n\nNo celular, vá em:\nConfigurações → Aplicativos → PandaNet → Permissões → Microfone → Permitir\n\nSe já estiver ativado, feche e abra o app novamente.');
+      } else {
+        alert('Não foi possível acessar o microfone. Verifique as permissões do navegador e se está usando HTTPS.');
+      }
     }
   };
 
@@ -1853,9 +1887,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       fetchMessages(selectedConversation.id);
       scrollToBottom(true, 'smooth');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending audio message:', error);
-      alert('Erro ao enviar áudio. Verifique sua conexão e tente novamente.');
+      const msg = error?.message || 'Erro desconhecido';
+      alert(`Erro ao enviar áudio: ${msg}\n\nVerifique sua conexão e tente novamente.`);
     }
   };
 
