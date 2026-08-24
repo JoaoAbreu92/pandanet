@@ -79,11 +79,23 @@ const TicketPage: React.FC = () => {
                 setTickets(formattedTickets);
             }
             // Fetch Departments
-            const { data: deptsData } = await supabase
+            const { data: deptsData, error: deptsErr } = await supabase
                 .from('departments')
                 .select('*')
                 .eq('company_id', currentUser.company_id);
-            if (deptsData) setDepartments(deptsData);
+
+            if (deptsErr) {
+                console.error('Error fetching departments:', deptsErr);
+            } else if (deptsData) {
+                console.log('Departments fetched:', deptsData.length);
+                setDepartments(deptsData);
+
+                // If no departments exist and it's an admin, we might want to suggest creating one, 
+                // but for now let's just log it.
+                if (deptsData.length === 0) {
+                    console.log('No departments found for this company.');
+                }
+            }
 
         } catch (error) {
             console.error('Error fetching tickets:', error);
@@ -125,10 +137,12 @@ const TicketPage: React.FC = () => {
                 }]);
 
             if (error) throw error;
+            console.log('Ticket criado com sucesso!');
             setFormOpen(false);
-        } catch (error) {
+            fetchTickets();
+        } catch (error: any) {
             console.error('Error creating ticket:', error);
-            alert('Erro ao criar chamado. Tente novamente.');
+            alert(`Erro ao criar chamado: ${error.message || 'Erro desconhecido'}. Verifique os campos.`);
         }
     };
 

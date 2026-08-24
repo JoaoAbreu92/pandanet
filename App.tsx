@@ -138,8 +138,11 @@ const AppContent: React.FC = () => {
                                     role: p.role || 'Colaborador',
                                     team: p.team || p.department || 'Geral',
                                     isAdmin: p.is_admin || false,
-                                    isOnline: true, // Should implement real status later
-                                    company_id: p.company_id
+                                    isOnline: true,
+                                    company_id: p.company_id,
+                                    performance: p.performance,
+                                    following: p.following || [],
+                                    permissions: p.permissions || {}
                                 })),
                                 announcements: baseData.announcements || [],
                                 banners: baseData.banners || [],

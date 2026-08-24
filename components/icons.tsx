@@ -70,4 +70,6 @@ export {
   ArchiveBoxIcon,
   CloudIcon,
   PlusCircleIcon,
+  BugAntIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';

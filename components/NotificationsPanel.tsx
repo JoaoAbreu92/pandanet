@@ -8,9 +8,10 @@ interface NotificationsPanelProps {
     notifications: Notification[];
     onMarkAsRead: (id: string) => void;
     onClearAll: () => void;
+    onNavigate: (page: any) => void;
 }
 
-const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose, notifications, onMarkAsRead, onClearAll }) => {
+const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose, notifications, onMarkAsRead, onClearAll, onNavigate }) => {
 
     // Sort notifications by read/unread and then date (assuming logic handles this, or just map as is)
     // For now, render as received but filtered logic could be added here.
@@ -55,12 +56,19 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ isOpen, onClose
 
                     {/* List */}
                     <div className="overflow-y-auto max-h-[450px] p-2 space-y-2">
-                        {notifications.length > 0 ? (
-                            notifications.map((notification) => (
+                        {notifications.filter(n => !n.isRead).length > 0 ? (
+                            notifications.filter(n => !n.isRead).map((notification) => (
                                 <div
                                     key={notification.id}
                                     className={`p-3 rounded-lg flex items-start space-x-3 transition-all cursor-pointer hover:bg-gray-50 ${notification.isRead ? 'opacity-70' : 'bg-blue-50/50 border-l-4 border-brand-primary'}`}
-                                    onClick={() => onMarkAsRead(notification.id)}
+                                    onClick={() => {
+                                        onMarkAsRead(notification.id);
+                                        if (notification.link) {
+                                            const page = notification.link.split('/')[1];
+                                            onNavigate(page);
+                                        }
+                                        onClose();
+                                    }}
                                 >
                                     <div className="flex-shrink-0 mt-1">
                                         {notification.avatarUrl ? (

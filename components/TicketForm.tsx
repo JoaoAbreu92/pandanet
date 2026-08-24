@@ -32,15 +32,22 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
             title,
             description,
             priority,
-            department_id: departmentId || undefined,
-            assigned_to_id: assignedTo || undefined,
+            department_id: departmentId || null,
+            assigned_to_id: assignedTo || null,
         });
     };
 
     const technicians = allEmployees.filter(e => {
         if (!departmentId) return true;
-        // Check department_id or team as fallback
-        return (e as any).department_id === departmentId || e.team === 'TI' || e.role.includes('Técnico');
+
+        // Get the selected department name to use as fallback check for team
+        const selectedDept = departments.find(d => d.id === departmentId);
+        const deptName = selectedDept?.name.toUpperCase();
+
+        // Check department_id or team/role as fallback
+        return (e as any).department_id === departmentId ||
+            (deptName && e.team?.toUpperCase() === deptName) ||
+            (deptName === 'TI' && (e.role?.includes('Técnico') || e.team === 'TI'));
     });
 
     return (
@@ -100,16 +107,18 @@ const TicketForm: React.FC<TicketFormProps> = ({ onSubmit, onCancel, allEmployee
                 ></textarea>
             </div>
 
-            {departmentId && (
+            {((departmentId && technicians.length > 0) || (!departmentId && allEmployees.length > 0)) && (
                 <div>
-                    <label htmlFor="assignedTo" className="block text-sm font-medium text-brand-text">Mencionar Pessoa Específica (Opcional)</label>
+                    <label htmlFor="assignedTo" className="block text-sm font-medium text-brand-text">
+                        {departmentId ? 'Direcionar para Pessoa Específica (Opcional)' : 'Mencionar Pessoa (Opcional)'}
+                    </label>
                     <select
                         id="assignedTo"
                         value={assignedTo}
                         onChange={(e) => setAssignedTo(e.target.value)}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-primary focus:border-brand-primary sm:text-sm rounded-md bg-white text-brand-text"
                     >
-                        <option value="">Qualquer Pessoa do Setor</option>
+                        <option value="">{departmentId ? 'Qualquer Pessoa do Setor' : 'Selecione uma Pessoa'}</option>
                         {technicians.map(user => (
                             <option key={user.id} value={user.id}>{user.name} {user.team ? `(${user.team})` : ''}</option>
                         ))}

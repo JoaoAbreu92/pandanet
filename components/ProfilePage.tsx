@@ -283,9 +283,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
             if (isFollowing) {
                 newFollowing = newFollowing.filter(id => id !== effectiveUser.id);
+                console.log('Unfollowing user:', effectiveUser.id);
             } else {
                 newFollowing.push(effectiveUser.id);
+                console.log('Following user:', effectiveUser.id);
             }
+
+            console.log('New following list:', newFollowing);
 
             const { error } = await supabase
                 .from('profiles')
@@ -294,7 +298,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
 
             if (error) throw error;
 
+            console.log('Database updated successfully');
             onUpdateUser({ ...currentUser, following: newFollowing });
+
+            // If it's the target user profile, update it locally too to reflect follower count if we had one
+            if (targetUser && !isOwnProfile) {
+                // No change needed to targetUser as we are the one following them, 
+                // but we can force a re-render of the follow button by just state change
+            }
         } catch (err) {
             console.error("Error toggling follow:", err);
             alert("Erro ao processar solicitação de seguir.");

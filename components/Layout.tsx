@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import type { Page, Employee, Company, Notification } from '../types';
 import NotificationsPanel from './NotificationsPanel';
+import DebugPanel from './DebugPanel';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -96,10 +97,12 @@ const Layout: React.FC<LayoutProps> = ({
                     notifications={notifications}
                     onMarkAsRead={onMarkAsRead}
                     onClearAll={onClearAllNotifications}
+                    onNavigate={onNavigate}
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 relative">
                     {children}
                 </main>
+                <DebugPanel currentUser={currentUser} currentCompany={currentCompany} />
             </div>
         </div>
     );
