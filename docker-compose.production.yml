@@ -125,7 +125,7 @@ networks:
   pandanet_network:
     driver: bridge
   supabase_default:
-    name: docker_default
+    name: supabase_default
     external: true
 
 # ============================================
