@@ -26,6 +26,9 @@ interface LayoutProps {
     // Theme
     theme: 'light' | 'dark';
     toggleTheme: () => void;
+
+    // Nudge
+    isShaking?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({
@@ -43,7 +46,8 @@ const Layout: React.FC<LayoutProps> = ({
     onMarkAsRead,
     onClearAllNotifications,
     theme,
-    toggleTheme
+    toggleTheme,
+    isShaking
 }) => {
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isNotificationsOpen, setNotificationsOpen] = useState(false);
@@ -80,7 +84,7 @@ const Layout: React.FC<LayoutProps> = ({
                 isImpersonating={isImpersonating}
                 customFeatures={currentCompany.custom_features}
             />
-            <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300 ${isSidebarOpen ? 'md:pl-0' : 'md:pl-0'}`}>
+                <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300 ${isSidebarOpen ? 'md:pl-0' : 'md:pl-0'} ${isShaking ? 'nudge-shake' : ''}`}>
                 <Header
                     onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
                     currentUser={currentUser}

@@ -9,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './components/ToastContext';
 import { NotificationProvider, useNotifications } from './components/NotificationContext';
+import { PresenceProvider } from './components/PresenceContext';
 
 
 import HomePage from './components/HomePage';
@@ -52,11 +53,56 @@ const AppContent: React.FC = () => {
     const [initError, setInitError] = useState<string | null>(null);
 
     const [theme, setTheme] = useState<'light'>('light');
+    const [isShaking, setIsShaking] = useState(false);
 
     useEffect(() => {
         document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
     }, []);
+
+    // Global Nudge Listener
+    useEffect(() => {
+        if (!currentUser?.id) return;
+
+        const channel = supabase
+            .channel('global-nudges')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `company_id=eq.${currentUser.company_id}`
+            }, async (payload) => {
+                const newMsg = payload.new;
+                // Verificamos se é um "nudge" (chamar atenção)
+                if (newMsg.file_type === 'nudge') {
+                    // Verificamos se o usuário atual é o destinatário
+                    const { data: participation } = await supabase
+                        .from('conversation_participants')
+                        .select('user_id')
+                        .eq('conversation_id', newMsg.conversation_id)
+                        .eq('user_id', currentUser.id)
+                        .single();
+
+                    if (participation && newMsg.sender_id !== currentUser.id) {
+                        // Reproduzir som de alerta
+                        playNotificationSound('nudge');
+
+                        // Direcionar para o chat
+                        setCurrentPage('messages');
+                        setPageContext({ conversationId: newMsg.conversation_id });
+
+                        // Tremer a tela
+                        setIsShaking(true);
+                        setTimeout(() => setIsShaking(false), 5000);
+                    }
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [currentUser?.id, currentUser?.company_id]);
 
     const toggleTheme = () => {
         setTheme('light');
@@ -113,7 +159,7 @@ const AppContent: React.FC = () => {
     const [companyData, setCompanyData] = useState<AppData | null>(null);
     const [companySettings, setCompanySettings] = useState<any>(null);
 
-    const { notifications, markAsRead, markAllAsRead } = useNotifications();
+    const { notifications, markAsRead, markAllAsRead, playNotificationSound } = useNotifications();
 
     // Robust Initialization Logic
     useEffect(() => {
@@ -414,7 +460,7 @@ const AppContent: React.FC = () => {
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
-            case 'messages': return <Messages />;
+            case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events} currentUser={currentUser} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
@@ -496,6 +542,7 @@ const AppContent: React.FC = () => {
                 onClearAllNotifications={markAllAsRead}
                 theme={theme}
                 toggleTheme={toggleTheme}
+                isShaking={isShaking}
             >
                 {renderPage()}
             </Layout>
@@ -565,11 +612,13 @@ const App: React.FC = () => {
     return (
         <LanguageProvider>
             <AuthProvider>
-                <NotificationProvider>
-                    <ToastProvider>
-                        <AppContent />
-                    </ToastProvider>
-                </NotificationProvider>
+                <PresenceProvider>
+                    <NotificationProvider>
+                        <ToastProvider>
+                            <AppContent />
+                        </ToastProvider>
+                    </NotificationProvider>
+                </PresenceProvider>
             </AuthProvider>
         </LanguageProvider>
     );

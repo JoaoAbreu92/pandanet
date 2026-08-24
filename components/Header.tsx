@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon } from './icons';
+import { Bars3Icon, MagnifyingGlassIcon, BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, UserCircleIcon, ArrowPathIcon, PlayCircleIcon } from './icons';
 import type { Employee, Page } from '../types';
 import { supabase } from '../supabaseClient';
+import { useNotifications } from './NotificationContext';
 
 interface HeaderProps {
     onToggleSidebar: () => void;
@@ -22,6 +23,7 @@ import { useLanguage } from './LanguageContext';
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const { language, setLanguage, t } = useLanguage();
+    const { testNotifications } = useNotifications();
 
     return (
         <header className="bg-white border-b flex-shrink-0 relative z-20 dark:bg-gray-800 dark:border-gray-700 premium-card">
@@ -85,6 +87,17 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentUser, onLogout,
                             </button>
                         </>
                     )}
+
+                    {/* Botão de Ativar Sons/Notificações */}
+                    <button
+                        onClick={testNotifications}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition-all text-xs font-bold border border-emerald-200"
+                        title="Testar Sons e Notificações"
+                    >
+                        <PlayCircleIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Ativar Toques</span>
+                    </button>
+
                     <button onClick={onToggleNotifications} className="p-2 text-gray-500 rounded-full hover:bg-gray-100 relative dark:text-gray-400 dark:hover:bg-gray-700">
                         <BellIcon className="w-6 h-6" />
                         {unreadNotificationsCount > 0 && (

@@ -252,6 +252,7 @@ export interface Conversation {
   is_closed?: boolean;
   participantName: string;
   participantAvatarUrl: string;
+  participantId?: string; // Add this for nudge and notifications
   messages: Message[];
   lastMessage: string;
   lastMessageTimestamp: string;

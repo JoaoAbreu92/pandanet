@@ -13,11 +13,13 @@ import {
     XMarkIcon,
     SparklesIcon,
     LockClosedIcon,
+    BellIcon,
 } from './icons';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, Message } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
+import { usePresence } from './PresenceContext';
 
 const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡', '🤔', '🎉', '🔥', '👀'];
 const availableEmojis = [
@@ -65,16 +67,24 @@ interface Note {
 }
 
 interface MessagesProps {
-    // No props needed now
+    initialConversationId?: string;
 }
 
-const Messages: React.FC<MessagesProps> = () => {
+const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const { profile: currentUser } = useAuth();
-    const { addNotification } = useNotifications();
+    const { addNotification, playNotificationSound, showDesktopNotification } = useNotifications();
+    const { onlineUsers } = usePresence();
     const [companyEmployees, setCompanyEmployees] = useState<Employee[]>([]);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeTab, setActiveTab] = useState<'conversations' | 'contacts' | 'teams'>('conversations');
-    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
+
+    // Sync with prop for deep linking/nudges
+    useEffect(() => {
+        if (initialConversationId) {
+            setSelectedConversationId(initialConversationId);
+        }
+    }, [initialConversationId]);
     // Ref para evitar stale closure no Realtime
     const selectedConvRef = useRef<string | null>(null);
     useEffect(() => {
@@ -92,6 +102,82 @@ const Messages: React.FC<MessagesProps> = () => {
     const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({}); // Changed key to string
     const [showMembersModal, setShowMembersModal] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // MSN Nudge States
+    const [nudgeCooldowns, setNudgeCooldowns] = useState<Record<string, number>>(() => {
+        const saved = localStorage.getItem('nudge_cooldowns');
+        return saved ? JSON.parse(saved) : {};
+    });
+    const [cooldownTimeouts, setCooldownTimeouts] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        localStorage.setItem('nudge_cooldowns', JSON.stringify(nudgeCooldowns));
+
+        // Update local state for remaining timers
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const newTimeouts: Record<string, number> = {};
+            let hasChanges = false;
+
+            Object.entries(nudgeCooldowns).forEach(([id, ts]) => {
+                const diff = now - (ts as number);
+                const remaining = Math.max(0, (5 * 60 * 1000) - diff);
+                if (remaining > 0) {
+                    newTimeouts[id] = Math.ceil(remaining / 1000);
+                    hasChanges = true;
+                }
+            });
+
+            setCooldownTimeouts(newTimeouts);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [nudgeCooldowns]);
+
+    const handleSendNudge = async () => {
+        if (!selectedConversationId || !selectedConversation) return;
+
+        const now = Date.now();
+        const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
+        if (now - lastNudge < 5 * 60 * 1000) return;
+
+        try {
+            const compId = currentUser?.company_id;
+            if (!compId) return;
+
+            const { error } = await supabase.from('messages').insert({
+                conversation_id: selectedConversationId,
+                sender_id: currentUser?.id,
+                company_id: compId,
+                text: '!!! CHAMEI SUA ATENÇÃO !!!',
+                file_type: 'nudge'
+            });
+
+            if (error) throw error;
+
+            await supabase.from('conversations').update({
+                last_message: 'Chamou sua atenção!',
+                last_message_at: new Date().toISOString()
+            }).eq('id', selectedConversationId);
+
+            setNudgeCooldowns(prev => ({ ...prev, [selectedConversationId]: now }));
+
+            if (selectedConversation.participantId) {
+                addNotification({
+                    user_id: selectedConversation.participantId as any,
+                    type: 'message',
+                    title: 'Pedindo Atenção!',
+                    description: `${currentUser?.name} chamou sua atenção!`,
+                    avatarUrl: currentUser?.avatarUrl,
+                    link: '/messages'
+                } as any);
+            }
+
+            fetchMessages(selectedConversationId);
+        } catch (err) {
+            console.error('Erro ao enviar nudge:', err);
+        }
+    };
 
     // Sticky Notes State (Local Storage)
     const [notes, setNotes] = useState<Note[]>(() => {
@@ -345,9 +431,28 @@ const Messages: React.FC<MessagesProps> = () => {
                 console.log("Mudança em conversas detectada:", payload);
                 fetchConversations();
             })
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+                const newMsg = payload.new as any;
+
+                // Se a mensagem não for minha, notificar
+                if (newMsg.sender_id !== currentUser.id) {
+                    playNotificationSound('message');
+
+                    // Notificação de Desktop se não for a conversa ativa
+                    if (newMsg.conversation_id !== selectedConvRef.current) {
+                        try {
+                            const { data: sender } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', newMsg.sender_id).single();
+                            showDesktopNotification(
+                                `Mensagem de ${sender?.full_name || 'Usuário'}`,
+                                newMsg.text || 'Enviou um anexo',
+                                sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.full_name || 'U')}`
+                            );
+                        } catch (e) { }
+                    }
+                }
+
                 fetchConversations();
-                if (selectedConvRef.current) {
+                if (selectedConvRef.current === newMsg.conversation_id) {
                     fetchMessages(selectedConvRef.current);
                 }
             })
@@ -802,6 +907,17 @@ const Messages: React.FC<MessagesProps> = () => {
                                     }
                                 };
 
+                                if (message.file?.type === 'nudge') {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center py-2 px-4 gap-2">
+                                            <BellIcon className={`w-12 h-12 ${isMe ? 'text-white' : 'text-orange-500'} animate-bounce`} />
+                                            <p className={`font-black text-center text-sm italic uppercase tracking-tighter ${isMe ? 'text-white' : 'text-orange-600'}`}>
+                                                {isMe ? 'Você chamou a atenção!' : 'Chamou sua atenção!'}
+                                            </p>
+                                        </div>
+                                    );
+                                }
+
                                 if (isImageUrl(message.text) && !message.file) {
                                     return (
                                         <div className="rounded-lg overflow-hidden border bg-gray-50 bg-opacity-50">
@@ -925,7 +1041,17 @@ const Messages: React.FC<MessagesProps> = () => {
                                     <li key={conv.id} onClick={() => handleSelectConversation(conv.id)}>
                                         <div className={`p-4 flex items-center space-x-3 cursor-pointer border-l-4 premium-card ${selectedConversationId === conv.id ? 'bg-emerald-50 border-brand-primary' : 'border-transparent hover:bg-gray-50'}`}>
                                             <div className="relative">
-                                                <img src={conv.participantAvatarUrl} alt={conv.participantName} className={`w-10 h-10 rounded-full border-2 border-gray-400`} />
+                                                <img
+                                                    src={conv.participantAvatarUrl}
+                                                    alt={conv.participantName}
+                                                    className={`w-10 h-10 rounded-full border-2 transition-colors ${conv.participantId && onlineUsers.has(conv.participantId)
+                                                        ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                                                        : 'border-gray-300'
+                                                        }`}
+                                                />
+                                                {conv.participantId && onlineUsers.has(conv.participantId) && (
+                                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                                )}
                                                 {conv.unreadCount > 0 && <span className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 bg-red-500 text-white text-xs rounded-full">{conv.unreadCount}</span>}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -944,7 +1070,19 @@ const Messages: React.FC<MessagesProps> = () => {
                     {activeTab === 'contacts' && (
                         <ul> {companyEmployees.filter(e => e.id !== currentUser.id).map(emp => (
                             <li key={emp.id} onClick={() => handleStartConversation(emp.id)} className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50">
-                                <img src={emp.avatarUrl} alt={emp.name} className={`w-10 h-10 rounded-full border-2 border-gray-400`} />
+                                <div className="relative">
+                                    <img
+                                        src={emp.avatarUrl}
+                                        alt={emp.name}
+                                        className={`w-10 h-10 rounded-full border-2 transition-colors ${onlineUsers.has(emp.id)
+                                            ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                                            : 'border-gray-300'
+                                            }`}
+                                    />
+                                    {onlineUsers.has(emp.id) && (
+                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                    )}
+                                </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold text-brand-text truncate">{emp.name}</p>
                                     <p className="text-sm text-brand-subtle-text truncate">{emp.role}</p>
@@ -1129,6 +1267,25 @@ const Messages: React.FC<MessagesProps> = () => {
                                         <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-brand-primary">
                                             <PaperClipIcon className="w-6 h-6" />
                                         </button>
+
+                                            {/* Nudge Button */}
+                                            <button
+                                                type="button"
+                                                onClick={handleSendNudge}
+                                                disabled={!!cooldownTimeouts[selectedConversationId || '']}
+                                                className={`p-2 rounded-full transition-all relative ${cooldownTimeouts[selectedConversationId || '']
+                                                    ? 'text-gray-300 cursor-not-allowed'
+                                                    : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50'
+                                                    }`}
+                                                title="Chamar Atenção (MSN Nudge)"
+                                            >
+                                                <BellIcon className={`w-6 h-6 ${!cooldownTimeouts[selectedConversationId || ''] ? 'animate-bounce' : ''}`} />
+                                                {cooldownTimeouts[selectedConversationId || ''] && (
+                                                    <span className="absolute -top-1 -right-1 bg-gray-600 text-white text-[9px] px-1 rounded-full font-bold">
+                                                        {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
+                                                    </span>
+                                                )}
+                                            </button>
                                         <input
                                             type="text"
                                             value={newMessageText}

@@ -3,6 +3,7 @@ import Card from './Card';
 // FIX: Correcting the import path for types.
 import type { Employee } from '../types';
 import { SearchIcon } from './icons';
+import { usePresence } from './PresenceContext';
 
 interface TeamDirectoryProps {
   employees: Employee[];
@@ -10,6 +11,7 @@ interface TeamDirectoryProps {
 
 const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { onlineUsers } = usePresence();
 
   const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -30,8 +32,18 @@ const TeamDirectory: React.FC<TeamDirectoryProps> = ({ employees }) => {
         </div>
         <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
             {filteredEmployees.map(employee => (
-                <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50">
-                    <img src={employee.avatarUrl} alt={employee.name} className="w-10 h-10 rounded-full" />
+              <div key={employee.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-50 transition-colors">
+                <div className="relative">
+                  <img
+                    src={employee.avatarUrl}
+                    alt={employee.name}
+                    className={`w-10 h-10 rounded-full border-2 ${onlineUsers.has(employee.id) ? 'border-emerald-500' : 'border-gray-200'
+                      }`}
+                  />
+                  {onlineUsers.has(employee.id) && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                  )}
+                </div>
                     <div>
                         <p className="font-semibold text-sm text-brand-text">{employee.name}</p>
                         <p className="text-xs text-brand-subtle-text">{employee.role}, {employee.team}</p>

@@ -8,6 +8,7 @@ const SOUNDS: Record<string, string> = {
     message: '/sounds/message.mp3',
     mention: '/sounds/mention.mp3',
     event: '/sounds/event.mp3',
+    nudge: '/sounds/nudge.mp3',
     default: '/sounds/message.mp3'
 };
 
@@ -17,6 +18,9 @@ interface NotificationContextType {
     markAsRead: (id: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
     addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => Promise<void>;
+    testNotifications: () => Promise<void>;
+    showDesktopNotification: (title: string, body: string, icon?: string) => void;
+    playNotificationSound: (type: NotificationType | 'nudge') => void;
     loading: boolean;
 }
 
@@ -34,10 +38,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, []);
 
-    const playNotificationSound = useCallback((type: NotificationType) => {
+    const playNotificationSound = useCallback((type: NotificationType | 'nudge') => {
         const soundPath = SOUNDS[type] || SOUNDS.default;
         const audio = new Audio(soundPath);
-        audio.play().catch(err => console.error('Audio playback failed:', err));
+        audio.play().catch(err => {
+            console.warn('Playback bloqueado ou falhou:', err);
+            // Não alertamos em todas as falhas para não irritar, 
+            // mas o log ajuda no debug.
+        });
     }, []);
 
     const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
@@ -207,10 +215,32 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     };
 
+    const testNotifications = async () => {
+        // Request Permission
+        if ("Notification" in window) {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                alert('Permissão de notificação negada. Ative nas configurações do navegador.');
+            }
+        }
+
+        // Play Sound
+        try {
+            const audio = new Audio(SOUNDS.message);
+            await audio.play();
+        } catch (err) {
+            console.error('Falha ao tocar áudio de teste:', err);
+            alert('Falha ao tocar som. O navegador pode estar bloqueando áudio automático.');
+        }
+
+        // Show Desktop Notif
+        showDesktopNotification('Teste de Notificação', 'Se você está vendo isso, as notificações estão funcionando!', currentUser?.avatarUrl);
+    };
+
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
-        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, loading }}>
+        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, testNotifications, showDesktopNotification, playNotificationSound, loading }}>
             {children}
         </NotificationContext.Provider>
     );
