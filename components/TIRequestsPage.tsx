@@ -178,18 +178,45 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 table: 'ti_requests',
                 filter: `company_id=eq.${currentUser.company_id}`
             }, (payload) => {
-                console.log('[TIRequestsPage] Realtime change detected:', payload);
+                console.log('[TIRequestsPage] Realtime change detected (postgres):', payload);
                 fetchRequests();
-
-                // Se o usuário estiver com o modal de detalhes aberto para ESTA solicitação, atualiza os comentários nela
                 if (selectedRequest && payload.new && (payload.new as any).id === selectedRequest.id) {
-                    console.log('[TIRequestsPage] Updating selected request comments in realtime');
                     const updatedData = payload.new as any;
                     setSelectedRequest(prev => prev ? {
                         ...prev,
                         status: updatedData.status as TIRequestStatus,
                         comments: updatedData.comments || []
                     } : null);
+                }
+            })
+            .on('broadcast', { event: 'comment_update' }, (payload) => {
+                console.log('[TIRequestsPage] Realtime change detected (broadcast):', payload);
+                const { requestId } = payload.payload;
+                fetchRequests();
+                if (selectedRequest && requestId === selectedRequest.id) {
+                    // Force refresh comments if this is the open request
+                    fetchRequests().then(() => {
+                        // The fetchRequests updates the submissions list, we need to update selectedRequest too
+                        supabase.from('ti_requests').select('*, requester:requester_id(full_name, avatar_url), assigned:assigned_user_id(full_name, avatar_url)').eq('id', requestId).single().then(({ data }) => {
+                            if (data) {
+                                setSelectedRequest({
+                                    id: data.id,
+                                    requesterId: data.requester_id,
+                                    requesterName: data.requester?.full_name || 'Desconhecido',
+                                    requesterAvatarUrl: data.requester?.avatar_url,
+                                    requestType: data.request_type as TIRequestType,
+                                    itemName: data.item_name,
+                                    justification: data.justification,
+                                    assignedUserId: data.assigned_user_id,
+                                    assignedUserName: data.assigned?.full_name || 'Não atribuído',
+                                    assignedUserAvatarUrl: data.assigned?.avatar_url,
+                                    comments: data.comments || [],
+                                    status: data.status as TIRequestStatus,
+                                    submittedAt: data.created_at
+                                });
+                            }
+                        });
+                    });
                 }
             })
             .subscribe();
@@ -262,6 +289,15 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 .eq('id', id);
 
             if (error) throw error;
+
+            // Broadcast the update
+            const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
+            channel.send({
+                type: 'broadcast',
+                event: 'comment_update',
+                payload: { requestId: id, status: newStatus }
+            });
+
             fetchRequests();
         } catch (error) {
             console.error('Error updating TI request status:', error);
@@ -519,6 +555,15 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             .update({ comments: updatedComments })
                                             .eq('id', selectedRequest.id);
                                         if (error) throw error;
+
+                                        // Broadcast the update
+                                        const channel = supabase.channel(`public:ti_requests:${currentUser.company_id}`);
+                                        channel.send({
+                                            type: 'broadcast',
+                                            event: 'comment_update',
+                                            payload: { requestId: selectedRequest.id }
+                                        });
+
                                         setSelectedRequest({ ...selectedRequest, comments: updatedComments });
                                         setNewComment('');
                                         // Também atualizar na lista principal para que ao fechar o modal a lista esteja certa

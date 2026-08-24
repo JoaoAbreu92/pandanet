@@ -123,6 +123,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     };
 
     const tabs = [
+        { id: 'ti-requests', label: 'T.I.' },
         { id: 'dashboard', label: 'Conteúdo', featureId: 'feed' },
         { id: 'users', label: 'Usuários' },
         { id: 'departments', label: 'Departamentos' },
@@ -139,7 +140,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'bem-estar', label: 'Bem Estar', featureId: 'wellness' },
         { id: 'settings', label: 'Geral' },
         { id: 'mural', label: 'Mural' },
-        { id: 'ti-requests', label: 'T.I.' },
     ].filter(tab => {
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
