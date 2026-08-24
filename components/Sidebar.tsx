@@ -112,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
                 <NavItem page="whatspanda" label="WhatsPanda" icon={ChatBubbleLeftRightIcon} permission="viewWhatsPanda" featureId="whatspanda" />
                 <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
-                <NavItem page="email" label="E-mail" icon={EnvelopeIcon} permission="viewEmail" />
+                <NavItem page="email" label="PandaMail" icon={EnvelopeIcon} permission="viewEmail" />
                 <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />

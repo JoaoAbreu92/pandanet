@@ -26,6 +26,7 @@ services:
       - supabase_network # Conecta à rede do Supabase
 
   pandanet-frontend:
+  
     container_name: pandanet_frontend_prod
     build:
       context: .
@@ -34,6 +35,8 @@ services:
         - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
         - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot

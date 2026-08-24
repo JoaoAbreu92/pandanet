@@ -25,7 +25,7 @@ const CompanyPoll: React.FC = () => {
         .eq('company_id', currentUser.company_id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (pollError || !pollData) {
         setPoll(null);

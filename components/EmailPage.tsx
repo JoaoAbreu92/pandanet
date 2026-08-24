@@ -353,14 +353,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 >
                                     {/* ... Email Item Content ... */}
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className={`font-medium text-sm truncate pr-2 ${email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-bold'}`}>
+                                        <span className={`font-medium text-sm truncate pr-2 ${email.flags && email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-bold'}`}>
                                             {email.from.replace(/<.*>/, '')}
                                         </span>
                                         <span className="text-xs text-gray-400 whitespace-nowrap">
                                             {new Date(email.date).toLocaleDateString()}
                                         </span>
                                     </div>
-                                    <div className={`text-sm mb-1 truncate ${email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-semibold'}`}>
+                                    <div className={`text-sm mb-1 truncate ${email.flags && email.flags.includes('\\Seen') ? 'text-gray-600' : 'text-gray-900 font-semibold'}`}>
                                         {email.subject}
                                     </div>
                                     <div className="text-xs text-gray-500 line-clamp-2">

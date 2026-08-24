@@ -162,3 +162,12 @@
 .nudge-shake {
   animation: nudge-shake-anim 0.3s ease-in-out infinite !important;
 }
+/* React Quill Overrides */
+.ql-container { font-family: inherit !important; font-size: 0.95rem !important; }
+.ql-editor { min-height: 150px; }
+
+/* Scrollbar polish */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
