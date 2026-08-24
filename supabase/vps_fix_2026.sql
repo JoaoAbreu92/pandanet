@@ -810,8 +810,82 @@ BEGIN
     END IF;
 END $$;
 
+-- 12. WHATSAPP CONVERSATIONS RLS POLICIES (QUEUE-BASED)
+-- Drop legacy department-based RLS policies
+DROP POLICY IF EXISTS "Users see conversations from their department or assigned to them" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can view conversations" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can insert conversations" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can update conversations" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_conversations;
+
+-- Create queue-aware SELECT policy
+CREATE POLICY "whatsapp_conversations_select_policy"
+  ON public.whatsapp_conversations
+  FOR SELECT
+  USING (
+    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+    AND (
+      -- Admins and Super Admins see everything in their company
+      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
+      OR
+      -- Assigned to the user
+      assigned_to = auth.uid()
+      OR
+      -- Assigned to a queue the user has access to
+      (
+        queue_id IS NOT NULL 
+        AND (SELECT COALESCE(whatspanda_permissions->'assigned_queues', '[]'::jsonb) FROM public.profiles WHERE id = auth.uid()) ? queue_id::text
+      )
+      OR
+      -- Unassigned and no queue (global triage)
+      (assigned_to IS NULL AND queue_id IS NULL)
+    )
+  );
+
+-- Create INSERT policy
+CREATE POLICY "whatsapp_conversations_insert_policy"
+  ON public.whatsapp_conversations
+  FOR INSERT
+  WITH CHECK (
+    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+  );
+
+-- Create UPDATE policy
+CREATE POLICY "whatsapp_conversations_update_policy"
+  ON public.whatsapp_conversations
+  FOR UPDATE
+  USING (
+    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+    AND (
+      -- Admins and Super Admins can update everything in their company
+      (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
+      OR
+      -- Assigned to the user
+      assigned_to = auth.uid()
+      OR
+      -- Assigned to a queue the user has access to
+      (
+        queue_id IS NOT NULL 
+        AND (SELECT COALESCE(whatspanda_permissions->'assigned_queues', '[]'::jsonb) FROM public.profiles WHERE id = auth.uid()) ? queue_id::text
+      )
+      OR
+      -- Unassigned and no queue
+      (assigned_to IS NULL AND queue_id IS NULL)
+    )
+  );
+
+-- Create DELETE policy
+CREATE POLICY "whatsapp_conversations_delete_policy"
+  ON public.whatsapp_conversations
+  FOR DELETE
+  USING (
+    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
+    AND (SELECT is_admin OR is_company_admin OR role = 'Super Admin' FROM public.profiles WHERE id = auth.uid())
+  );
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
 
 
