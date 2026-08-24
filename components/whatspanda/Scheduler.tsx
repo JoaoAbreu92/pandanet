@@ -3,7 +3,8 @@ import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
 import { 
   Plus, Calendar, Clock, Play, Pause, Trash2, Send, 
-  Sparkles, CheckCircle2, AlertCircle, Loader2, X, Users, Image as ImageIcon
+  Sparkles, CheckCircle2, AlertCircle, Loader2, X, Users, Image as ImageIcon,
+  Video, Search
 } from 'lucide-react';
 
 interface Campaign {
@@ -51,6 +52,153 @@ const Scheduler: React.FC = () => {
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('18:00');
   const [intervalSeconds, setIntervalSeconds] = useState(30);
+
+  // Mídia de Upload
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+
+  // Modal da Agenda
+  const [isAgendaOpen, setIsAgendaOpen] = useState(false);
+  const [agendaContacts, setAgendaContacts] = useState<{ name: string; phone: string }[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [dddFilter, setDddFilter] = useState('');
+  const [searchContact, setSearchContact] = useState('');
+  const [selectedContacts, setSelectedContacts] = useState<Record<string, boolean>>({});
+
+  const fetchAgendaContacts = async () => {
+    const companyId = activeProfile?.company_id;
+    if (!companyId) return;
+
+    setLoadingContacts(true);
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_conversations')
+        .select('contact_name, contact_phone')
+        .eq('company_id', companyId)
+        .not('contact_phone', 'is', null);
+
+      if (error) throw error;
+
+      if (data) {
+        const uniqueMap = new Map<string, string>();
+        data.forEach(c => {
+          const cleanPhone = c.contact_phone.replace(/\D/g, '');
+          if (cleanPhone && cleanPhone.length >= 8) {
+            const existingName = uniqueMap.get(cleanPhone);
+            if (!existingName || (!existingName.startsWith('+') && c.contact_name)) {
+              uniqueMap.set(cleanPhone, c.contact_name || `+${cleanPhone}`);
+            }
+          }
+        });
+
+        const contactsList = Array.from(uniqueMap.entries()).map(([phone, name]) => ({
+          name,
+          phone
+        }));
+
+        contactsList.sort((a, b) => a.name.localeCompare(b.name));
+        setAgendaContacts(contactsList);
+      }
+    } catch (err) {
+      console.error('[AGENDA] Erro ao carregar contatos:', err);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAgendaOpen) {
+      fetchAgendaContacts();
+    }
+  }, [isAgendaOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setMediaFile(null);
+      setMediaType(null);
+      return;
+    }
+
+    if (file.type.startsWith('image/')) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('A imagem deve ter no máximo 10MB.');
+        e.target.value = '';
+        return;
+      }
+      setMediaFile(file);
+      setMediaType('image');
+      setImageUrl(''); // Limpar URL direta
+    } else if (file.type.startsWith('video/')) {
+      if (file.size > 50 * 1024 * 1024) {
+        alert('O vídeo deve ter no máximo 50MB.');
+        e.target.value = '';
+        return;
+      }
+      setMediaFile(file);
+      setMediaType('video');
+      setImageUrl(''); // Limpar URL direta
+    } else {
+      alert('Apenas arquivos de imagem ou vídeo são permitidos.');
+      e.target.value = '';
+    }
+  };
+
+  const filteredContacts = agendaContacts.filter(contact => {
+    const matchesSearch = 
+      contact.name.toLowerCase().includes(searchContact.toLowerCase()) ||
+      contact.phone.includes(searchContact);
+
+    let matchesDDD = true;
+    if (dddFilter.trim() !== '') {
+      const cleanPhone = contact.phone.replace(/\D/g, '');
+      let contactDDD = '';
+      if (cleanPhone.startsWith('55') && cleanPhone.length >= 4) {
+        contactDDD = cleanPhone.slice(2, 4);
+      } else if (cleanPhone.length >= 2) {
+        contactDDD = cleanPhone.slice(0, 2);
+      }
+      matchesDDD = contactDDD === dddFilter.trim();
+    }
+
+    return matchesSearch && matchesDDD;
+  });
+
+  const isAllFilteredSelected = filteredContacts.length > 0 && filteredContacts.every(c => selectedContacts[c.phone]);
+
+  const handleSelectAllFiltered = (checked: boolean) => {
+    const newSelected = { ...selectedContacts };
+    filteredContacts.forEach(contact => {
+      if (checked) {
+        newSelected[contact.phone] = true;
+      } else {
+        delete newSelected[contact.phone];
+      }
+    });
+    setSelectedContacts(newSelected);
+  };
+
+  const handleConfirmSelectedContacts = () => {
+    const selectedPhones = Object.keys(selectedContacts).filter(phone => selectedContacts[phone]);
+    if (selectedPhones.length === 0) {
+      alert('Nenhum contato selecionado.');
+      return;
+    }
+
+    const existingPhones = phonesText
+      .split(/[\n,]/)
+      .map(p => p.trim().replace(/\D/g, ''))
+      .filter(p => p.length >= 10);
+
+    const allPhones = Array.from(new Set([...existingPhones, ...selectedPhones]));
+
+    setPhonesText(allPhones.join('\n'));
+    setIsAgendaOpen(false);
+    setSelectedContacts({});
+    setSearchContact('');
+    setDddFilter('');
+  };
 
   useEffect(() => {
     fetchCampaigns();
@@ -124,7 +272,27 @@ const Scheduler: React.FC = () => {
     }
 
     setActionLoading('create');
+    let finalImageUrl = imageUrl.trim() || null;
+    let finalMediaType = mediaType || 'image';
+
     try {
+      if (mediaFile) {
+        setUploadingMedia(true);
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `campaigns/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const { data: uploadData, error: uploadErr } = await supabase.storage
+          .from('chat-media')
+          .upload(fileName, mediaFile);
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabase.storage
+          .from('chat-media')
+          .getPublicUrl(fileName);
+
+        finalImageUrl = urlData.publicUrl;
+      }
+
       // 1. Criar a campanha
       const { data: newCampaign, error: campaignErr } = await supabase
         .from('whatsapp_scheduled_campaigns')
@@ -135,7 +303,8 @@ const Scheduler: React.FC = () => {
           template_2: template2.trim() || null,
           template_3: template3.trim() || null,
           template_4: template4.trim() || null,
-          image_url: imageUrl.trim() || null,
+          image_url: finalImageUrl,
+          media_type: finalMediaType,
           scheduled_date: scheduledDate,
           start_time: startTime + ':00',
           end_time: endTime + ':00',
@@ -170,6 +339,8 @@ const Scheduler: React.FC = () => {
         setTemplate3('');
         setTemplate4('');
         setImageUrl('');
+        setMediaFile(null);
+        setMediaType(null);
         setScheduledDate(new Date().toISOString().split('T')[0]);
         setStartTime('08:00');
         setEndTime('18:00');
@@ -183,6 +354,7 @@ const Scheduler: React.FC = () => {
       alert('Erro ao criar campanha: ' + err.message);
     } finally {
       setActionLoading(null);
+      setUploadingMedia(false);
     }
   };
 
@@ -377,7 +549,13 @@ const Scheduler: React.FC = () => {
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                       <span>Lista de Contatos (Telefones) *</span>
-                      <span className="text-[9px] text-emerald-500 font-bold">Separados por vírgula ou linha</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAgendaOpen(true)}
+                        className="text-[9px] text-emerald-500 hover:text-emerald-600 font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-xl transition-all"
+                      >
+                        <Users className="w-3.5 h-3.5" /> Agenda do WhatsPanda
+                      </button>
                     </label>
                     <textarea
                       required
@@ -436,15 +614,62 @@ const Scheduler: React.FC = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Imagem Anexa (Opcional - URL)</label>
-                    <input
-                      type="url"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      className="w-full px-5 py-3.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-white/10 dark:text-white transition-all font-medium text-xs placeholder:text-gray-400"
-                      placeholder="https://sua-imagem.com/imagem.png"
-                    />
+                  <div className="space-y-3 bg-gray-50 dark:bg-white/5 p-4 rounded-3xl border border-gray-100 dark:border-white/5">
+                    <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Mídia da Campanha (Imagem ou Vídeo)
+                    </label>
+                    
+                    <div>
+                      <span className="block text-[9px] text-gray-400 dark:text-gray-400 font-bold mb-1.5 uppercase">Opção A: Upload de arquivo local</span>
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        onChange={handleFileChange}
+                        disabled={uploadingMedia}
+                        className="w-full text-xs text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-500 hover:file:bg-emerald-500/20 file:transition-all cursor-pointer"
+                      />
+                      <span className="block text-[9px] text-gray-400 dark:text-gray-500 mt-1 font-medium">Imagem: máx 10MB | Vídeo: máx 50MB</span>
+                    </div>
+
+                    {mediaFile && (
+                      <div className="flex items-center justify-between bg-emerald-500/5 border border-emerald-500/10 p-2.5 rounded-2xl">
+                        <div className="flex items-center gap-2">
+                          {mediaType === 'image' ? <ImageIcon className="w-4 h-4 text-emerald-500" /> : <Video className="w-4 h-4 text-emerald-500" />}
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[200px]">{mediaFile.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setMediaFile(null); setMediaType(null); }}
+                          className="text-[10px] text-red-500 font-bold uppercase tracking-wider hover:underline"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="relative flex py-1 items-center">
+                      <div className="flex-grow border-t border-gray-250 dark:border-white/10"></div>
+                      <span className="flex-shrink mx-4 text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">OU</span>
+                      <div className="flex-grow border-t border-gray-250 dark:border-white/10"></div>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] text-gray-400 dark:text-gray-400 font-bold mb-1.5 uppercase">Opção B: URL direta da mídia</span>
+                      <input
+                        type="url"
+                        value={imageUrl}
+                        onChange={(e) => {
+                          setImageUrl(e.target.value);
+                          if (e.target.value) {
+                            setMediaFile(null);
+                            setMediaType(null);
+                          }
+                        }}
+                        disabled={!!mediaFile}
+                        className="w-full px-4 py-2.5 bg-gray-100/50 dark:bg-white/5 border border-transparent dark:border-white/5 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 dark:text-white font-medium text-xs placeholder:text-gray-400"
+                        placeholder="https://sua-midia.com/arquivo.mp4 ou .png"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -526,6 +751,146 @@ const Scheduler: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* Modal - Agenda do WhatsPanda */}
+      {isAgendaOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-all duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100 dark:border-white/5">
+            <div className="p-6 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-transparent">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <Users className="w-6 h-6 text-emerald-500" /> Agenda WhatsPanda
+                </h3>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-widest mt-1 opacity-70">
+                  Selecione os contatos das conversas existentes.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => { setIsAgendaOpen(false); setSelectedContacts({}); setSearchContact(''); setDddFilter(''); }} 
+                className="p-2 hover:bg-gray-150 dark:hover:bg-white/10 rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Filtros */}
+            <div className="p-5 bg-slate-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2 relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-4 top-3.5" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar por nome ou telefone..."
+                  value={searchContact}
+                  onChange={(e) => setSearchContact(e.target.value)}
+                  className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-transparent rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 dark:text-white"
+                />
+              </div>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Filtro DDD (ex: 41)"
+                  value={dddFilter}
+                  onChange={(e) => setDddFilter(e.target.value.replace(/\D/g, ''))}
+                  maxLength={3}
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-transparent rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 dark:text-white text-center"
+                />
+              </div>
+            </div>
+
+            {/* Listagem */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2 max-h-[45vh]">
+              {loadingContacts ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Carregando contatos...</span>
+                </div>
+              ) : filteredContacts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400 text-center">
+                  <Users className="w-10 h-10 text-gray-300 dark:text-gray-700 mb-3" />
+                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Nenhum contato encontrado</p>
+                  <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">Tente ajustar a busca ou o DDD.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Cabeçalho "Selecionar Todos" */}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50/50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5 mb-3">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isAllFilteredSelected}
+                        onChange={(e) => handleSelectAllFiltered(e.target.checked)}
+                        className="w-4.5 h-4.5 rounded border-gray-300 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 transition-all cursor-pointer"
+                      />
+                      <span className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
+                        Selecionar Todos ({filteredContacts.length} contatos filtrados)
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-emerald-500 font-bold uppercase bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      {Object.values(selectedContacts).filter(Boolean).length} marcados
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {filteredContacts.map(c => {
+                      const isSelected = !!selectedContacts[c.phone];
+                      return (
+                        <div 
+                          key={c.phone} 
+                          className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-200 ${
+                            isSelected 
+                              ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-500/10' 
+                              : 'bg-white dark:bg-slate-900/40 border-gray-100 dark:border-white/5 hover:border-gray-250 dark:hover:border-white/10'
+                          }`}
+                        >
+                          <label className="flex items-center gap-3 cursor-pointer flex-1 select-none min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const newSelected = { ...selectedContacts };
+                                if (e.target.checked) {
+                                  newSelected[c.phone] = true;
+                                } else {
+                                  delete newSelected[c.phone];
+                                }
+                                setSelectedContacts(newSelected);
+                              }}
+                              className="w-4.5 h-4.5 rounded border-gray-300 dark:border-white/10 text-emerald-500 focus:ring-emerald-500/20 transition-all cursor-pointer"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{c.name}</p>
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold mt-0.5">{c.phone}</p>
+                            </div>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="p-6 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setIsAgendaOpen(false); setSelectedContacts({}); setSearchContact(''); setDddFilter(''); }}
+                className="px-6 py-3 text-xs font-bold text-gray-650 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl transition-all uppercase tracking-widest"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSelectedContacts}
+                disabled={Object.values(selectedContacts).filter(Boolean).length === 0}
+                className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-white rounded-2xl transition-all font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20"
+              >
+                Importar Contatos ({Object.values(selectedContacts).filter(Boolean).length})
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

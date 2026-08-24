@@ -141,6 +141,16 @@ async function runAutoMigration() {
         } else {
             console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna chatbot_delay).');
         }
+
+        console.log('[MIGRATION] Verificando e adicionando coluna media_type à public.whatsapp_scheduled_campaigns...');
+        const { error: errMedia } = await supabase.rpc('exec_sql', {
+            sql: 'ALTER TABLE public.whatsapp_scheduled_campaigns ADD COLUMN IF NOT EXISTS media_type VARCHAR(50) DEFAULT \'image\';'
+        });
+        if (errMedia) {
+            console.error('[MIGRATION] Erro ao adicionar media_type a whatsapp_scheduled_campaigns:', errMedia.message);
+        } else {
+            console.log('[MIGRATION] Auto-migração concluída com sucesso (coluna media_type em whatsapp_scheduled_campaigns).');
+        }
     } catch (err) {
         console.error('[MIGRATION] Falha ao rodar auto-migração:', err.message);
     }
@@ -2583,13 +2593,25 @@ async function processScheduledCampaigns() {
             try {
                 if (camp.image_url && camp.image_url.trim() !== '') {
                     const cleanPhone = target.contact_phone.replace(/\D/g, "");
+                    
+                    // Determinar mediatype ('video' ou 'image')
+                    let determinedMediaType = 'image';
+                    if (camp.media_type) {
+                        determinedMediaType = camp.media_type;
+                    } else {
+                        const cleanUrl = camp.image_url.toLowerCase().split('?')[0];
+                        if (cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.mov') || cleanUrl.endsWith('.avi') || cleanUrl.endsWith('.m4v') || cleanUrl.endsWith('.3gp') || cleanUrl.endsWith('.mkv') || cleanUrl.endsWith('.webm')) {
+                            determinedMediaType = 'video';
+                        }
+                    }
+
                     const res = await fetch(`${evoUrl}/messages/sendMedia/${instanceName}`, {
                         method: 'POST',
                         headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             number: cleanPhone,
                             mediaMessage: {
-                                mediatype: 'image',
+                                mediatype: determinedMediaType,
                                 media: camp.image_url.trim(),
                                 caption: messageText
                             }
