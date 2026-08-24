@@ -43,8 +43,19 @@ ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS whatsapp_message_id VARCH
 -- Criar índice para evitar duplicidade de mensagens
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_wa_id ON whatsapp_messages(whatsapp_message_id);
 
--- 5. CORREÇÃO DE POLÍTICA RLS (Row Level Security) - RESOLVER ERRO DE TRANSFERÊNCIA DE ATENDIMENTOS
--- Garante que atendentes possam transferir conversas para outros atendentes/setores sem violação de RLS
+-- 5. Tabela whatsapp_contacts (Colunas para cadastro e vinculação de contatos)
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS assigned_to UUID;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS queue_id UUID;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS ignore_contact BOOLEAN DEFAULT false;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_transcription BOOLEAN DEFAULT false;
+ALTER TABLE whatsapp_contacts ADD COLUMN IF NOT EXISTS disable_kanban BOOLEAN DEFAULT false;
+
+-- 6. CORREÇÃO DE POLÍTICA RLS (Row Level Security) - RESOLVER ERRO DE TRANSFERÊNCIA DE ATENDIMENTOS
+DROP POLICY IF EXISTS "Users can view conversations" ON whatsapp_conversations;
 DROP POLICY IF EXISTS "Users can update conversations" ON whatsapp_conversations;
 DROP POLICY IF EXISTS "Users see conversations from their department or assigned to them" ON whatsapp_conversations;
 DROP POLICY IF EXISTS "Allow company users to update conversations" ON whatsapp_conversations;
@@ -67,4 +78,4 @@ CREATE POLICY "Users can update conversations"
   );
 
 -- Confirmação
-SELECT 'Atualização de tabelas, colunas e permissões RLS concluída com sucesso!' AS resultado;
+SELECT 'Atualização completa de tabelas, colunas e permissões RLS concluída com sucesso!' AS resultado;

@@ -215,6 +215,23 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
             }
 
             if (res.error) {
+                // Se o erro for de coluna ausente (ex: assigned_to), tentar salvar apenas com os campos essenciais
+                if (res.error.message?.includes('schema cache') || res.error.message?.includes('assigned_to')) {
+                    delete contactData.assigned_to;
+                    delete contactData.queue_id;
+                    delete contactData.disable_transcription;
+                    delete contactData.disable_kanban;
+                    delete contactData.ignore_contact;
+                    let fallbackRes = editingContact
+                        ? await supabase.from('whatsapp_contacts').update(contactData).eq('id', editingContact.id)
+                        : await supabase.from('whatsapp_contacts').insert({ ...contactData, company_id: companyId });
+                    
+                    if (!fallbackRes.error) {
+                        fetchContacts();
+                        setIsModalOpen(false);
+                        return;
+                    }
+                }
                 console.error('Erro ao salvar contato:', res.error);
                 alert(`Erro ao salvar contato: ${res.error.message}`);
             } else {
