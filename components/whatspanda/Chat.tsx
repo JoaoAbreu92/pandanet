@@ -97,7 +97,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const recordingIntervalRef = useRef<any>(null);
 
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'fechados'>('aguardando');
+  const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'fechados'>('meus');
   const [useSignature, setUseSignature] = useState(false);
   const [signatureText, setSignatureText] = useState('');
   
@@ -1512,7 +1512,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
-            {(['aguardando', 'meus', 'fechados'] as const).map((tab) => (
+            {(['meus', 'aguardando', 'fechados'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

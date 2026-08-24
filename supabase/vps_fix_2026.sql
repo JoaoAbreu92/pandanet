@@ -796,7 +796,22 @@ ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS sender_phone TEXT;
 ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS sender_name TEXT;
 GRANT ALL ON TABLE public.whatsapp_messages TO anon, authenticated, service_role;
 
+-- 11. WHATSAPP CONVERSATIONS QUEUE_ID RELATIONSHIP
+DO $$
+BEGIN
+    -- Check if column exists, if not create it
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'whatsapp_conversations' AND column_name = 'queue_id') THEN
+        ALTER TABLE public.whatsapp_conversations ADD COLUMN queue_id UUID;
+    END IF;
+
+    -- Add foreign key constraint if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_schema = 'public' AND table_name = 'whatsapp_conversations' AND constraint_name = 'whatsapp_conversations_queue_id_fkey') THEN
+        ALTER TABLE public.whatsapp_conversations ADD CONSTRAINT whatsapp_conversations_queue_id_fkey FOREIGN KEY (queue_id) REFERENCES public.whatsapp_queues(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
 
