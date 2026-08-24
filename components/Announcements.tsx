@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Card from './Card';
-// FIX: Correcting the import path for types.
 import type { Announcement } from '../types';
 import { CalendarDaysIcon } from './icons';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface AnnouncementsProps {
-    announcements: Announcement[];
     onNavigate: (page: string, context: any) => void;
 }
 
@@ -21,14 +21,72 @@ const AnnouncementSkeleton: React.FC = () => (
     </div>
 );
 
-const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate }) => {
-    const [localAnnouncements, setLocalAnnouncements] = useState(announcements);
+const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
+    const { currentUser } = useAuth();
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+    const [loading, setLoading] = useState(true);
 
-    const currentUser = 'Ana Williams';
     const availableReactions = ['👍', '❤️', '🎉', '🤔'];
-    
+
+    const getCompanyId = async () => {
+        if (!currentUser) return null;
+        if (currentUser.is_company_admin && currentUser.permissions) return null; // Logic might vary, let's fetch from profile
+        const { data } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+        return data?.company_id;
+    };
+
+    const fetchAnnouncements = async () => {
+        try {
+            setLoading(true);
+            const companyId = await getCompanyId();
+            if (!companyId) return;
+
+            const { data, error } = await supabase
+                .from('announcements')
+                .select('*')
+                .eq('company_id', companyId)
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+
+            const formatted: Announcement[] = data.map(a => ({
+                id: a.id, // Keep UUID
+                title: a.title,
+                summary: a.summary,
+                category: a.category,
+                // Ensure date string is compatible or formatted
+                date: new Date(a.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+                imageUrl: a.image_url,
+                videoUrl: a.video_url,
+                reactions: a.reactions || []
+            }));
+
+            setAnnouncements(formatted);
+        } catch (error) {
+            console.error('Error fetching announcements:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAnnouncements();
+
+        const channel = supabase
+            .channel('public:announcements')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchAnnouncements())
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [currentUser]);
+
     const parsePtBrDate = (dateString: string): Date => {
+        // ... existing logic or use actual Date object comparison if source is Date
+        // Since we formatted it for display, we might need original date for sorting if we rely on display string.
+        // But wait, our `formatted` list has strings.
+        // Better to store original timestamp in state? Or just parse.
+        // Let's stick to existing parse logic for now as it handles the 'de ' format if present.
         const months: { [key: string]: number } = { 'janeiro': 0, 'fevereiro': 1, 'março': 2, 'abril': 3, 'maio': 4, 'junho': 5, 'julho': 6, 'agosto': 7, 'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11 };
         const parts = dateString.toLowerCase().replace('de ', '').split(' ');
         if (parts.length === 3) {
@@ -43,7 +101,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate
     };
 
     const sortedAnnouncements = useMemo(() => {
-        const sorted = [...localAnnouncements].sort((a, b) => {
+        const sorted = [...announcements].sort((a, b) => {
             const dateA = parsePtBrDate(a.date);
             const dateB = parsePtBrDate(b.date);
             return dateB.getTime() - dateA.getTime();
@@ -54,30 +112,42 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate
         }
         return sorted;
 
-    }, [localAnnouncements, sortOrder]);
+    }, [announcements, sortOrder]);
 
 
-    const handleReact = (announcementTitle: string, emoji: string) => {
-        const newAnnouncements = localAnnouncements.map(announcement => {
-            if (announcement.title === announcementTitle) {
-                const reaction = announcement.reactions?.find(r => r.emoji === emoji);
-                if (reaction) {
-                    const userIndex = reaction.users.indexOf(currentUser);
-                    if (userIndex > -1) {
-                        reaction.users.splice(userIndex, 1);
-                    } else {
-                        reaction.users.push(currentUser);
-                    }
-                } else if (announcement.reactions) {
-                    announcement.reactions.push({ emoji, users: [currentUser] });
-                } else {
-                    announcement.reactions = [{ emoji, users: [currentUser] }];
+    const handleReact = async (announcement: Announcement, emoji: string) => {
+        if (!currentUser) return;
+
+        const currentReactions = announcement.reactions || [];
+        // Find if this emoji group exists
+        const reactionGroupIndex = currentReactions.findIndex(r => r.emoji === emoji);
+        let newReactions = [...currentReactions];
+
+        if (reactionGroupIndex > -1) {
+            const users = newReactions[reactionGroupIndex].users;
+            const userIndex = users.indexOf(currentUser.name); // Using name as per schema/Types? Schema uses JSONB. Types uses {emoji, users: string[]}. Ideally use ID but preserving existing logic.
+
+            if (userIndex > -1) {
+                users.splice(userIndex, 1);
+                if (users.length === 0) {
+                    newReactions.splice(reactionGroupIndex, 1);
                 }
-                return { ...announcement };
+            } else {
+                users.push(currentUser.name);
             }
-            return announcement;
-        });
-        setLocalAnnouncements(newAnnouncements);
+        } else {
+            newReactions.push({ emoji, users: [currentUser.name] });
+        }
+
+        // Optimistic update
+        setAnnouncements(prev => prev.map(a => a.id === announcement.id ? { ...a, reactions: newReactions } : a)); // Match by ID now!
+
+        try {
+            await supabase.from('announcements').update({ reactions: newReactions }).eq('id', announcement.id); // Match by ID
+        } catch (error) {
+            console.error('Error updating reaction:', error);
+            fetchAnnouncements(); // Revert on error
+        }
     };
 
     const getCategoryStyle = (category: Announcement['category']) => {
@@ -99,15 +169,18 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate
             </div>
         }>
             <div className="space-y-8">
-                {announcements.length === 0 ? (
-                     [...Array(2)].map((_, i) => <AnnouncementSkeleton key={i} />)
+                {loading && announcements.length === 0 ? (
+                    [...Array(2)].map((_, i) => <AnnouncementSkeleton key={i} />)
+                ) : announcements.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">Nenhum anúncio encontrado.</div>
                 ) : (
                     sortedAnnouncements.map((item, index) => (
-                        <div 
-                            key={index} 
+                        <div
+                            key={item.id || index}
                             className="announcement-item border-b border-gray-100 pb-6 last:border-b-0 last:pb-0"
-                            style={{ animationDelay: `${index * 150}ms`, opacity: 0 }}
+                            style={{ animationDelay: `${index * 150}ms` }}
                         >
+                            {/* Same UI as before */}
                             {item.imageUrl && (
                                 <div className="w-full h-64 bg-gray-50 rounded-lg mb-4 flex items-center justify-center overflow-hidden border border-gray-100">
                                     <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain" />
@@ -118,20 +191,20 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate
                                     {item.category}
                                 </span>
                                 <div className="flex items-center text-sm text-brand-subtle-text">
-                                    <CalendarDaysIcon className="w-4 h-4 mr-1.5"/>
+                                    <CalendarDaysIcon className="w-4 h-4 mr-1.5" />
                                     <span>{item.date}</span>
                                 </div>
                             </div>
                             <h4 className="font-bold text-lg text-brand-text mb-1">{item.title}</h4>
                             <p className="text-brand-subtle-text text-sm mb-3">{item.summary}</p>
                             <div className="flex justify-between items-center">
-                                 <div className="flex items-center space-x-2">
-                                    {(item.reactions || availableReactions.map(e => ({emoji: e, users: []}))).map(reaction => {
-                                        const userHasReacted = reaction.users.includes(currentUser);
+                                <div className="flex items-center space-x-2">
+                                    {(item.reactions || availableReactions.map(e => ({ emoji: e, users: [] }))).map(reaction => {
+                                        const userHasReacted = reaction.users.includes(currentUser?.name || '');
                                         return (
-                                            <button 
+                                            <button
                                                 key={reaction.emoji}
-                                                onClick={() => handleReact(item.title, reaction.emoji)}
+                                                onClick={() => handleReact(item, reaction.emoji)}
                                                 className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs transform transition-all duration-150 ease-in-out active:scale-110 ${userHasReacted ? 'bg-emerald-100 text-brand-primary font-semibold' : 'bg-gray-100 hover:bg-gray-200'}`}
                                             >
                                                 <span>{reaction.emoji}</span>
@@ -141,7 +214,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, onNavigate
                                     })}
                                 </div>
                             </div>
-                             <button onClick={() => onNavigate('announcement-detail', item)} className="mt-4 w-full text-center px-4 py-2 text-sm font-medium text-brand-primary bg-emerald-50 rounded-md hover:bg-emerald-100 transition-colors">
+                            <button onClick={() => onNavigate('announcement-detail', item)} className="mt-4 w-full text-center px-4 py-2 text-sm font-medium text-brand-primary bg-emerald-50 rounded-md hover:bg-emerald-100 transition-colors">
                                 Ver Detalhes
                             </button>
                         </div>

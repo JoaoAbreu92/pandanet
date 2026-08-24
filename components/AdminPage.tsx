@@ -57,8 +57,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                 return <Dashboard
                     banners={company.data.banners}
                     setBanners={(b) => handleSetData('banners', b)}
-                    announcements={company.data.announcements}
-                    setAnnouncements={(a) => handleSetData('announcements', a)}
                 />;
             case 'users':
                 return <UserManager users={company.data.employees} setUsers={(u) => handleSetData('employees', u)} plan={plan} />;
@@ -77,7 +75,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Base de Conhecimento"
                     items={company.data.kbArticles}
                     setItems={(i) => handleSetData('kbArticles', i)}
-                    newItemTemplate={{ id: 0, title: '', category: 'Geral', content: '', views: 0, mediaUrl: '', mediaType: 'image' }}
+                    newItemTemplate={{ id: '', title: '', category: 'Geral', content: '', views: 0, mediaUrl: '', mediaType: 'image' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'category', label: 'Categoria' },
@@ -92,7 +90,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Status de Serviços"
                     items={company.data.services}
                     setItems={(i) => handleSetData('services', i)}
-                    newItemTemplate={{ id: 0, name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
+                    newItemTemplate={{ id: '', name: '', status: 'operational', uptime: '99%', imageUrl: '' }}
                     fields={[
                         { key: 'name', label: 'Serviço' },
                         { key: 'status', label: 'Status', type: 'select', options: ['operational', 'maintenance', 'outage'] },
@@ -114,7 +112,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Alertas de Segurança"
                     items={company.data.securityAlerts}
                     setItems={(i) => handleSetData('securityAlerts', i)}
-                    newItemTemplate={{ id: 0, title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
+                    newItemTemplate={{ id: '', title: '', description: '', level: 'info', date: new Date().toISOString().split('T')[0] }}
                     fields={[{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descrição', type: 'textarea' }, { key: 'level', label: 'Nível', type: 'select', options: ['info', 'warning', 'critical'] }, { key: 'date', label: 'Data' }]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.description}</p></div>}
                 />;
@@ -123,7 +121,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Documentos e Políticas"
                     items={company.data.documents}
                     setItems={(i) => handleSetData('documents', i)}
-                    newItemTemplate={{ id: 0, title: '', category: 'RH', type: 'PDF', url: '#', updatedAt: new Date().toISOString().split('T')[0] }}
+                    newItemTemplate={{ id: '', title: '', category: 'RH', type: 'PDF', url: '#', updatedAt: new Date().toISOString().split('T')[0] }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'category', label: 'Categoria' },
@@ -139,7 +137,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
                     title="Itens de Bem-Estar"
                     items={company.data.wellnessItems}
                     setItems={(i) => handleSetData('wellnessItems', i)}
-                    newItemTemplate={{ id: 0, title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
+                    newItemTemplate={{ id: '', title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição', type: 'textarea' },

@@ -1,61 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
-// FIX: Correcting the import path for types.
 import type { Announcement } from '../types';
+import { supabase } from '../supabaseClient';
+import { useAuth } from './AuthContext';
 
 interface AnnouncementManagerProps {
-    announcements: Announcement[];
-    setAnnouncements: (announcements: Announcement[]) => void;
+    // No longer needs props passed from parent, fetches own data
 }
 
 const AnnouncementFormModal: React.FC<{
     announcement: Partial<Announcement> | null;
     onClose: () => void;
-    onSave: (announcement: Omit<Announcement, 'date'> | Announcement) => void;
-}> = ({ announcement, onClose, onSave }) => {
+    onSave: () => void;
+    currentUser: any;
+}> = ({ announcement, onClose, onSave, currentUser }) => {
     const [formData, setFormData] = useState({
         title: announcement?.title || '',
         summary: announcement?.summary || '',
         category: announcement?.category || 'Notícias da Empresa',
         imageUrl: announcement?.imageUrl || '',
         videoUrl: announcement?.videoUrl || '',
-        videoFile: announcement?.videoFile || '',
     });
-    const [isProcessingVideo, setIsProcessingVideo] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [videoFile, setVideoFile] = useState<File | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            const fileUrl = URL.createObjectURL(file);
-
-            if (type === 'image') {
-                setFormData(prev => ({ ...prev, imageUrl: fileUrl }));
-            } else if (type === 'video') {
-                // Validate video duration (max 2 minutes)
-                setIsProcessingVideo(true);
-                const video = document.createElement('video');
-                video.preload = 'metadata';
-                
-                video.onloadedmetadata = function() {
-                    window.URL.revokeObjectURL(video.src);
-                    const duration = video.duration;
-                    if (duration > 120) {
-                        alert("O vídeo excede o limite de 2 minutos.");
-                        setFormData(prev => ({ ...prev, videoFile: '' }));
-                    } else {
-                        setFormData(prev => ({ ...prev, videoFile: fileUrl }));
-                    }
-                    setIsProcessingVideo(false);
-                }
-
-                video.onerror = function() {
-                    alert("Erro ao carregar vídeo. Tente outro arquivo.");
-                    setIsProcessingVideo(false);
-                }
-
-                video.src = URL.createObjectURL(file);
-            }
+            if (type === 'image') setImageFile(file);
+            else setVideoFile(file);
         }
     };
 
@@ -63,19 +38,73 @@ const AnnouncementFormModal: React.FC<{
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(announcement?.title ? { ...announcement, ...formData } as Announcement : formData as any);
+        setIsProcessing(true);
+
+        try {
+            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            const companyId = profile?.company_id;
+
+            let uploadedImageUrl = formData.imageUrl;
+            let uploadedVideoUrl = formData.videoUrl; // Actually stores URL of uploaded file if videoFile is present
+
+            // Upload Image
+            if (imageFile) {
+                const fileName = `img_${Date.now()}_${imageFile.name}`;
+                const { data: imgData, error: imgError } = await supabase.storage.from('announcements-media').upload(fileName, imageFile);
+                if (imgError) throw imgError;
+                const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(fileName);
+                uploadedImageUrl = publicUrl;
+            }
+
+            // Upload Video
+            if (videoFile) {
+                const fileName = `vid_${Date.now()}_${videoFile.name}`;
+                const { data: vidData, error: vidError } = await supabase.storage.from('announcements-media').upload(fileName, videoFile);
+                if (vidError) throw vidError;
+                const { data: { publicUrl } } = supabase.storage.from('announcements-media').getPublicUrl(fileName);
+                uploadedVideoUrl = publicUrl; // Use video_url column for both external and internal hosted videos
+            }
+
+            const payload = {
+                title: formData.title,
+                summary: formData.summary,
+                category: formData.category,
+                image_url: uploadedImageUrl,
+                video_url: uploadedVideoUrl,
+                company_id: companyId,
+                date: new Date().toISOString(), // Update date on edit? Or keep original? Usually update.
+            };
+
+            if (announcement?.id) {
+                const { error } = await supabase.from('announcements').update(payload).eq('id', announcement.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('announcements').insert(payload);
+                if (error) throw error;
+            }
+
+            onSave();
+            onClose();
+
+        } catch (error) {
+            console.error('Error saving announcement:', error);
+            alert('Erro ao salvar anúncio.');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative animate-fade-in-up">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">{announcement?.title ? 'Editar Anúncio' : 'Criar Novo Anúncio'}</h3>
+                <h3 className="text-xl font-bold text-brand-text mb-4">{announcement?.id ? 'Editar Anúncio' : 'Criar Novo Anúncio'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
-                    <div><label className="block text-sm font-medium text-brand-subtle-text">Título</label><input type="text" name="title" value={formData.title} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/></div>
-                    <div><label className="block text-sm font-medium text-brand-subtle-text">Resumo</label><textarea name="summary" value={formData.summary} onChange={handleChange} rows={4} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/></div>
+                    {/* Form Fields */}
+                    <div><label className="block text-sm font-medium text-brand-subtle-text">Título</label><input type="text" name="title" value={formData.title} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
+                    <div><label className="block text-sm font-medium text-brand-subtle-text">Resumo</label><textarea name="summary" value={formData.summary} onChange={handleChange} rows={4} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
                     <div>
                         <label className="block text-sm font-medium text-brand-subtle-text">Categoria</label>
                         <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text">
@@ -85,32 +114,24 @@ const AnnouncementFormModal: React.FC<{
                             <option>Evento</option>
                         </select>
                     </div>
+                    {/* Media Inputs */}
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">URL do Vídeo (YouTube)</label>
-                        <input type="url" name="videoUrl" value={formData.videoUrl} onChange={handleChange} placeholder="https://www.youtube.com/watch?v=..." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"/>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Upload de Vídeo Direto (Máx. 2 min)</label>
-                        {formData.videoFile && (
-                             <div className="mt-2 w-full bg-gray-50 rounded-md p-2 border">
-                                <p className="text-xs text-green-600 font-semibold">Vídeo carregado com sucesso</p>
-                            </div>
-                        )}
-                         <input type="file" accept="video/*" onChange={(e) => handleFileChange(e, 'video')} className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100"/>
+                        <label className="block text-sm font-medium text-brand-subtle-text">Upload Imagem</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Imagem (Opcional)</label>
-                        {formData.imageUrl && (
-                            <div className="mt-2 w-full h-40 bg-gray-50 rounded-md flex items-center justify-center overflow-hidden border">
-                                <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-contain"/>
-                            </div>
-                        )}
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100"/>
+                        <label className="block text-sm font-medium text-brand-subtle-text">Upload Vídeo (ou URL externa abaixo)</label>
+                        <input type="file" accept="video/*" onChange={(e) => handleFileChange(e, 'video')} className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100" />
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text">URL do Vídeo (YouTube/Externo)</label>
+                        <input type="url" name="videoUrl" value={formData.videoUrl} onChange={handleChange} placeholder="https://..." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
+                    </div>
+
                     <div className="flex justify-end space-x-3 pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" disabled={isProcessingVideo} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:bg-emerald-300">
-                            {isProcessingVideo ? 'Processando...' : 'Salvar Anúncio'}
+                        <button type="submit" disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:bg-emerald-300">
+                            {isProcessing ? 'Salvando...' : 'Salvar Anúncio'}
                         </button>
                     </div>
                 </form>
@@ -119,32 +140,44 @@ const AnnouncementFormModal: React.FC<{
     );
 };
 
-const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ announcements, setAnnouncements }) => {
+const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
+    const { currentUser } = useAuth();
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
-    const handleSave = (announcementData: Omit<Announcement, 'date'> | Announcement) => {
-        if ('date' in announcementData) { // Editing
-            setAnnouncements(announcements.map(a => a.title === announcementData.title ? announcementData : a));
-        } else { // Creating
-            const newAnnouncement: Announcement = {
-                ...(announcementData as Announcement),
-                date: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
-            };
-            setAnnouncements([newAnnouncement, ...announcements]);
+    const fetchAnnouncements = async () => {
+        if (!currentUser) return;
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+        const { data, error } = await supabase
+            .from('announcements')
+            .select('*')
+            .eq('company_id', profile?.company_id)
+            .order('date', { ascending: false });
+
+        if (data) {
+            const formatted: Announcement[] = data.map(a => ({
+                id: a.id,
+                title: a.title,
+                summary: a.summary,
+                category: a.category,
+                date: new Date(a.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+                imageUrl: a.image_url,
+                videoUrl: a.video_url,
+                reactions: a.reactions || []
+            }));
+            setAnnouncements(formatted);
         }
-        setModalOpen(false);
-        setEditingAnnouncement(null);
-    };
-    
-    const handleEdit = (announcement: Announcement) => {
-        setEditingAnnouncement(announcement);
-        setModalOpen(true);
     };
 
-    const handleDelete = (announcementTitle: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este anúncio?")) {
-            setAnnouncements(announcements.filter(a => a.title !== announcementTitle));
+    useEffect(() => {
+        fetchAnnouncements();
+    }, [currentUser]);
+
+    const handleDelete = async (id: string, title: string) => {
+        if (window.confirm(`Tem certeza que deseja apagar "${title}"?`)) {
+            await supabase.from('announcements').delete().eq('id', id);
+            fetchAnnouncements();
         }
     };
 
@@ -157,26 +190,26 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ announcements
                 </button>
             }>
                 <div className="space-y-3">
-                    {announcements.length === 0 ? <p className="text-brand-subtle-text">Carregando anúncios...</p> : 
-                    announcements.slice(0, 4).map(ann => (
-                        <div key={ann.title} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
-                            <div>
-                                <p className="font-semibold text-brand-text">{ann.title}</p>
-                                <p className="text-sm text-brand-subtle-text">{ann.category} - {ann.date}</p>
+                    {announcements.length === 0 ? <p className="text-brand-subtle-text">Nenhum anúncio encontrado.</p> :
+                        announcements.map(ann => (
+                            <div key={ann.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+                                <div>
+                                    <p className="font-semibold text-brand-text">{ann.title}</p>
+                                    <p className="text-sm text-brand-subtle-text">{ann.category} - {ann.date}</p>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <button onClick={() => { setEditingAnnouncement(ann); setModalOpen(true); }} className="p-2 text-brand-subtle-text hover:text-brand-primary">
+                                        <PencilIcon className="w-5 h-5" />
+                                    </button>
+                                    <button onClick={() => handleDelete(ann.id, ann.title)} className="p-2 text-brand-subtle-text hover:text-red-500">
+                                        <TrashIcon className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex space-x-2">
-                                <button onClick={() => handleEdit(ann)} className="p-2 text-brand-subtle-text hover:text-brand-primary">
-                                    <PencilIcon className="w-5 h-5" />
-                                </button>
-                                <button onClick={() => handleDelete(ann.title)} className="p-2 text-brand-subtle-text hover:text-red-500">
-                                    <TrashIcon className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
                 </div>
             </Card>
-            {isModalOpen && <AnnouncementFormModal announcement={editingAnnouncement} onClose={() => setModalOpen(false)} onSave={handleSave} />}
+            {isModalOpen && <AnnouncementFormModal announcement={editingAnnouncement} onClose={() => setModalOpen(false)} onSave={fetchAnnouncements} currentUser={currentUser} />}
         </>
     );
 };

@@ -53,6 +53,7 @@ export interface QuickLink {
 }
 
 export interface Announcement {
+  id: string; // Add UUID
   title: string;
   summary: string;
   category: 'Notícias da Empresa' | 'Atualização de Produto' | 'RH & Cultura' | 'Evento';

@@ -14,7 +14,7 @@ interface GenericManagerProps<T> {
     newItemTemplate: Partial<T>;
 }
 
-export function GenericManager<T extends { id: number }>({ title, items, setItems, renderItem, fields, newItemTemplate }: GenericManagerProps<T>) {
+export function GenericManager<T extends { id: number | string }>({ title, items, setItems, renderItem, fields, newItemTemplate }: GenericManagerProps<T>) {
     const { t } = useLanguage();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<T | null>(null);
@@ -41,7 +41,7 @@ export function GenericManager<T extends { id: number }>({ title, items, setItem
         setIsModalOpen(false);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = (id: number | string) => {
         if (confirm(t('generic.delete_confirm'))) setItems(items.filter(i => i.id !== id));
     };
 

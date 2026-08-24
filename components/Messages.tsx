@@ -218,8 +218,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, allEmployees: companyE
             const formattedMessages: Message[] = data.map((m: any) => ({
                 id: m.id, // UUID
                 sender: m.sender_id === currentUser.id ? 'me' : 'other',
-                senderName: m.profiles?.full_name || 'Desconhecido',
-                avatarUrl: m.profiles?.avatar_url || 'https://via.placeholder.com/150',
+                senderName: (m.profiles as any)?.full_name || 'Desconhecido',
+                avatarUrl: (m.profiles as any)?.avatar_url || 'https://via.placeholder.com/150',
                 text: m.text,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],
