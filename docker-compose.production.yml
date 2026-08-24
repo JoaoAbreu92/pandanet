@@ -45,8 +45,11 @@ services:
     depends_on:
       whatsapp-backend:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - pandanet_network
+      - supabase_default
     volumes:
       # Para certificados SSL (se usar Certbot)
       - ./certbot/conf:/etc/letsencrypt:ro
