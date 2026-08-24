@@ -322,7 +322,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             // Update local emails list with the body
             setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments } : e));
 
-            // Mark as seen locally if needed
+            // Mark local real-state emails as seen
             setEmails(prev => prev.map(e => {
                 const flags = e.flags || [];
                 if (e.uid === uid && !flags.includes('\\Seen')) {
@@ -344,18 +344,19 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 };
             });
 
-            // Background update Seen flag on server if not seen
+            // Always update cache with the new body data
+            const cacheKey = `${currentUser.id}_${folder}_${page}`;
+            if (emailCache[cacheKey]) {
+                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
+                    e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html, attachments: data.attachments } : e
+                );
+            }
+
+            // Background update Seen flag on server if not seen (using stale reference, but that's fine for calling the server)
             const email = emails.find(e => e.uid === uid);
             if (email && !(email.flags || []).includes('\\Seen')) {
-                toggleFlag(email, '\\Seen', true);
-            } else if (email) {
-                // If it was already seen, still ensure cache is fresh with new text/html bodies
-                const cacheKey = `${currentUser.id}_${folder}_${page}`;
-                if (emailCache[cacheKey]) {
-                    emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
-                        e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html } : e
-                    );
-                }
+                // Background call to server, don't await to avoid blocking UI
+                toggleFlag(email, '\\Seen', true).catch(e => console.error("Error setting Seen flag:", e));
             }
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
