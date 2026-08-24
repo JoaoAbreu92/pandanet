@@ -370,7 +370,7 @@ export interface FormSubmission {
   employeeManager?: string; // New field
 }
 
-export type TIRequestStatus = 'Pendente' | 'Em Análise' | 'Aprovado' | 'Pedido Realizado' | 'Entregue' | 'Rejeitado';
+export type TIRequestStatus = 'Pendente' | 'Em Análise' | 'Aprovado' | 'Pedido Realizado' | 'Entregue' | 'Rejeitado' | 'Finalizado';
 export type TIRequestType = 'Hardware' | 'Software';
 
 export interface TIRequest {

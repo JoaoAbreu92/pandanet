@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import { PlusIcon, XCircleIcon } from './icons';
+import { PlusIcon, XCircleIcon, TrashIcon, CheckCircleIcon, ArchiveBoxIcon } from './icons';
 import type { TIRequest, TIRequestStatus, TIRequestType, Employee } from '../types';
 import { supabase } from '../supabaseClient';
 
@@ -66,6 +66,7 @@ const RequestModal: React.FC<{
 
 const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmissions, currentUser }) => {
     const [isModalOpen, setModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<'active' | 'finalized'>('active');
     const [loading, setLoading] = useState(true);
 
     const fetchRequests = async () => {
@@ -130,6 +131,37 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
         }
     };
 
+    const handleDelete = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta solicitação?')) return;
+        try {
+            const { error } = await supabase
+                .from('ti_requests')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            fetchRequests();
+        } catch (error) {
+            console.error('Error deleting TI request:', error);
+            alert('Erro ao excluir solicitação.');
+        }
+    };
+
+    const handleUpdateStatus = async (id: string, newStatus: TIRequestStatus) => {
+        try {
+            const { error } = await supabase
+                .from('ti_requests')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+            fetchRequests();
+        } catch (error) {
+            console.error('Error updating TI request status:', error);
+            alert('Erro ao atualizar status.');
+        }
+    };
+
     const getStatusColor = (status: TIRequestStatus) => {
         switch (status) {
             case 'Pendente': return 'bg-yellow-100 text-yellow-800';
@@ -138,12 +170,23 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
             case 'Pedido Realizado': return 'bg-indigo-100 text-indigo-800';
             case 'Entregue': return 'bg-green-100 text-green-800';
             case 'Rejeitado': return 'bg-red-100 text-red-800';
+            case 'Finalizado': return 'bg-gray-100 text-gray-800';
             default: return 'bg-gray-100 text-gray-800';
         }
     };
 
     const isTIUser = currentUser.department_name === 'TI';
-    const displaySubmissions = isTIUser ? submissions : submissions.filter(sub => sub.requesterId === currentUser.id);
+    const filteredSubmissions = submissions.filter(sub => {
+        const belongsToUser = sub.requesterId === currentUser.id;
+        const isVisible = isTIUser || belongsToUser;
+        if (!isVisible) return false;
+
+        if (activeTab === 'active') {
+            return sub.status !== 'Finalizado';
+        } else {
+            return sub.status === 'Finalizado';
+        }
+    });
 
     return (
         <>
@@ -160,7 +203,22 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 </div>
 
 
-                <Card title={isTIUser ? "Solicitações da Empresa" : "Minhas Solicitações"}>
+                <div className="flex bg-gray-100 p-1 rounded-lg w-fit">
+                    <button
+                        onClick={() => setActiveTab('active')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'active' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Solicitações Ativas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('finalized')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'finalized' ? 'bg-white text-brand-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Finalizadas
+                    </button>
+                </div>
+
+                <Card title={activeTab === 'active' ? (isTIUser ? "Solicitações da Empresa" : "Minhas Solicitações") : "Solicitações Finalizadas"}>
                     <div className="overflow-x-auto">
                         {loading ? (
                             <p className="text-center text-brand-subtle-text py-8">Carregando solicitações...</p>
@@ -173,24 +231,62 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                         <th scope="col" className="px-6 py-3">Tipo</th>
                                         <th scope="col" className="px-6 py-3">Data de Envio</th>
                                         <th scope="col" className="px-6 py-3">Status</th>
+                                            {isTIUser && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {displaySubmissions.map(sub => (
+                                        {filteredSubmissions.map(sub => (
                                         <tr key={sub.id} className="bg-white border-b hover:bg-gray-50">
                                             {isTIUser && <td className="px-6 py-4 font-medium text-gray-900">{sub.requesterName}</td>}
                                             <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{sub.itemName}</td>
                                             <td className="px-6 py-4">{sub.requestType}</td>
                                             <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR')}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
-                                            </td>
+                                                    {isTIUser && activeTab === 'active' ? (
+                                                        <select
+                                                            value={sub.status}
+                                                            onChange={(e) => handleUpdateStatus(sub.id, e.target.value as TIRequestStatus)}
+                                                            className={`px-2 py-1 rounded-full text-xs font-medium border-none focus:ring-0 ${getStatusColor(sub.status)}`}
+                                                        >
+                                                            <option value="Pendente">Pendente</option>
+                                                            <option value="Em Análise">Em Análise</option>
+                                                            <option value="Aprovado">Aprovado</option>
+                                                            <option value="Pedido Realizado">Pedido Realizado</option>
+                                                            <option value="Entregue">Entregue</option>
+                                                            <option value="Rejeitado">Rejeitado</option>
+                                                        </select>
+                                                    ) : (
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
+                                                    )}
+                                                </td>
+                                                {isTIUser && (
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end space-x-2">
+                                                            {activeTab === 'active' && sub.status !== 'Finalizado' && (
+                                                                <button
+                                                                    onClick={() => handleUpdateStatus(sub.id, 'Finalizado')}
+                                                                    className="text-emerald-600 hover:text-emerald-900 p-1"
+                                                                    title="Finalizar"
+                                                                >
+                                                                    <CheckCircleIcon className="w-5 h-5" />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleDelete(sub.id)}
+                                                                className="text-red-600 hover:text-red-900 p-1"
+                                                                title="Excluir"
+                                                            >
+                                                                <TrashIcon className="w-5 h-5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                )}
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         )}
-                        {!loading && displaySubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">Nenhuma solicitação encontrada.</p>}
+                        {!loading && filteredSubmissions.length === 0 && <p className="text-center text-brand-subtle-text py-4">Nenhuma solicitação encontrada.</p>}
                     </div>
                 </Card>
             </div>
