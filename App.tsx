@@ -320,6 +320,7 @@ const AppContent: React.FC = () => {
                                         role: p.role || 'Colaborador',
                                         team: p.team || p.department || 'Geral',
                                         isAdmin: p.is_admin || false,
+                                        isCompanyAdmin: p.is_company_admin || false,
                                         isOnline: false, // Default to false
                                         company_id: p.company_id,
                                         performance: p.performance,

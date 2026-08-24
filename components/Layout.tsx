@@ -116,6 +116,7 @@ const Layout: React.FC<LayoutProps> = ({
                 companyName={companySettings.companyName}
                 companyLogo={companySettings.logoUrl}
                 isImpersonating={isImpersonating}
+                isMasterAdmin={isMasterAdmin}
                 customFeatures={currentCompany.custom_features}
             />
                 <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>

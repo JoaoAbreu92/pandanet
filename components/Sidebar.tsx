@@ -42,10 +42,11 @@ interface SidebarProps {
     companyName: string;
     companyLogo?: string;
     isImpersonating: boolean;
+    isMasterAdmin?: boolean; // New prop
     customFeatures?: Record<string, boolean>;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, customFeatures }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, crm: false });
     const navRef = useRef<HTMLDivElement>(null);
@@ -75,8 +76,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     };
 
     const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
-        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
-        const hasPermission = permission === true || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
+        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || (isImpersonating && isMasterAdmin);
+        const hasPermission = permission === true || (isImpersonating && isMasterAdmin) || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
 
         if (!isAdmin && !hasPermission) {
             return null;
@@ -162,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             }
         }
 
-        if (!isAdmin && !permission) return null;
+        if (!isAdmin && !permission && !(isImpersonating && isMasterAdmin)) return null;
 
         const isActive = React.Children.toArray(children).some(child =>
             React.isValidElement(child) && (child.props as any).page === currentPage
@@ -216,10 +217,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     };
 
     const rhPermissionKeys: (keyof EmployeePermissions)[] = ['viewDirectory', 'viewForms', 'viewBenefits', 'viewOnboarding', 'viewRecognition', 'viewDocuments', 'viewTraining', 'viewSurveys', 'viewPolicies'];
-    const hasRhAccess = rhPermissionKeys.some(key => !!currentUser.permissions[key]);
+    const hasRhAccess = rhPermissionKeys.some(key => !!currentUser.permissions[key]) || (isImpersonating && isMasterAdmin);
 
     const tiPermissionKeys: (keyof EmployeePermissions)[] = ['viewTiDashboard', 'openTickets', 'openTiRequests', 'viewKnowledgeBase', 'viewServiceStatus', 'viewInfoSec'];
-    const hasTiAccess = tiPermissionKeys.some(key => !!currentUser.permissions[key]);
+    const hasTiAccess = tiPermissionKeys.some(key => !!currentUser.permissions[key]) || (isImpersonating && isMasterAdmin);
     const { t } = useLanguage();
 
     return (
