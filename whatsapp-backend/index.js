@@ -71,13 +71,44 @@ async function authMiddleware(req, res, next) {
       try {
         const decodedUser = jwt.verify(token, JWT_SECRET);
         req.user = { id: decodedUser.sub, email: decodedUser.email, role: decodedUser.role };
-        return next();
       } catch (jwtErr) {
         console.error('[AUTH] JWT verification failed:', jwtErr.message);
         return res.status(401).json({ error: 'Invalid token (JWT)' });
       }
+    } else {
+      req.user = user;
     }
-    req.user = user;
+
+    // --- Enterprise Isolation Validation ---
+    const { companyId } = req.params;
+    if (companyId) {
+      // Fetch profile to check permissions and company_id
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('company_id, role, is_admin, is_company_admin')
+        .eq('id', req.user.id)
+        .single();
+
+      if (profileErr || !profile) {
+        // Special case for Master Admin TI email if profile doesn't exist yet
+        const isMasterAdmin = req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
+        if (!isMasterAdmin) {
+          console.error('[AUTH] Profile not found or error:', profileErr?.message);
+          return res.status(403).json({ error: 'Forbidden: Profile not found' });
+        }
+        // Master Admin can use any companyId
+      } else {
+        const isMasterAdmin = profile.role === 'Super Admin' || req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
+        const isCompanyAdmin = profile.is_company_admin || profile.is_admin;
+        
+        // If not Master and trying to access another company
+        if (!isMasterAdmin && profile.company_id !== companyId) {
+          console.warn(`[AUTH] Access denied: User ${req.user.id} (Company ${profile.company_id}) tried to access Company ${companyId}`);
+          return res.status(403).json({ error: 'Forbidden: Cross-company access denied' });
+        }
+      }
+    }
+
     next();
   } catch (error) {
     console.error('[AUTH] Fatal error:', error.message);
@@ -207,6 +238,14 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
 
         if (convErr || !conv) {
             return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        // --- Security Check: Validate user ownership ---
+        const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', userId).single();
+        const isMaster = profile?.role === 'Super Admin' || req.user.email?.toLowerCase() === 'ti@grupopixel.com.br';
+        if (!isMaster && profile?.company_id !== conv.company_id) {
+            console.warn(`[SEND API] Unauthorized send attempt by user ${userId} in conversation ${conversationId}`);
+            return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation' });
         }
 
         const instanceName = `conn_${conv.connection_id}`;
@@ -551,6 +590,42 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     console.log(`[MSG] Mensagem ${msgId} salva com sucesso.`);
                     // Disparar Chatbot se for do cliente e não for histórico
                     if (!isFromMe) {
+                        // 5. Executar Roteamento Inteligente Gemini (se habilitado)
+                        if (!conv || (!conv.queue_id && !conv.user_id)) { 
+                            try {
+                                const { data: settings } = await supabase
+                                    .from('whatsapp_settings')
+                                    .select('gemini_api_key')
+                                    .eq('company_id', companyId)
+                                    .limit(1)
+                                    .single();
+
+                                if (settings?.gemini_api_key) {
+                                    const { data: queues } = await supabase.from('whatsapp_queues').select('id, name').eq('company_id', companyId);
+                                    const suggestedQueueId = await analyzeMessageForTransfer(text, queues || [], settings.gemini_api_key);
+
+                                    if (suggestedQueueId) {
+                                        console.log(`[GEMINI] Sugestão de transferência para fila ${suggestedQueueId}`);
+                                        await supabase.from('whatsapp_conversations').update({ 
+                                            queue_id: suggestedQueueId,
+                                            status: 'pending'
+                                        }).eq('id', conversationId);
+                                        
+                                        await supabase.from('whatsapp_messages').insert({
+                                            conversation_id: conversationId,
+                                            company_id: companyId,
+                                            message_text: `[🤖 IA] Atendimento movido para a fila: ${queues.find(q => q.id === suggestedQueueId)?.name}`,
+                                            is_from_me: true,
+                                            is_system: true
+                                        });
+                                    }
+                                }
+                            } catch (geminiErr) {
+                                console.error('[GEMINI] Erro no roteamento:', geminiErr.message);
+                            }
+                        }
+
+                        // 6. Rodar Chatbot Legado
                         runChatbot(message, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
                     }
                 }

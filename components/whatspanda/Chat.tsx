@@ -36,10 +36,11 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' }) => {
-  const { user, profile } = useAuth();
-  const permissions = (profile?.whatspanda_permissions as any) || {};
-  const isAdmin = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
-  const canSendMessages = isAdmin || permissions.can_send_messages !== false; // Default true if undefined? No, types say boolean. Let's assume false default if not admin.
+  const { user, profile, currentUser } = useAuth();
+  const activeProfile = currentUser || profile;
+  const permissions = (activeProfile?.whatspanda_permissions as any) || {};
+  const isAdmin = activeProfile?.isAdmin || activeProfile?.isCompanyAdmin || activeProfile?.role === 'Super Admin';
+  const canSendMessages = isAdmin || permissions.can_send_messages !== false;
   // Actually, UsersTab set defaults.
   // Let's being strict:
   // const canSendMessages = isAdmin || !!permissions.can_send_messages;
@@ -58,11 +59,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   const [activeTab, setActiveTab] = useState<'aberto' | 'pendente' | 'fechado'>('aberto');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false); // Added loading state for messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // const [user] = useState({ id: 'current-user-id' }); // Mock removed
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showContactSidebar, setShowContactSidebar] = useState(false);
-  const canTransfer = isAdmin || profile?.whatspanda_permissions?.can_transfer;
+  const canTransfer = isAdmin || activeProfile?.whatspanda_permissions?.can_transfer;
 
   useEffect(() => {
     if (onConversationSelect) {
@@ -120,7 +122,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   };
 
   const fetchSettings = async () => {
-    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    const companyId = currentUser?.company_id;
     if (!companyId) return;
 
     const { data } = await supabase
@@ -140,16 +142,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   }, [initialSearch]);
 
   const fetchConversations = async () => {
-    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    const companyId = currentUser?.company_id;
     if (!companyId) return;
 
+    console.log(`[CHAT] Buscando conversas para empresa: ${companyId}`);
     let query = supabase
       .from('whatsapp_conversations')
       .select(`
         *,
         assigned_user:profiles!assigned_to(id, full_name, avatar_url),
         department:departments(id, name),
-        channel:whatsapp_settings!connection_id(channel_type, connection_name)
+        channel:whatsapp_settings!connection_id(channel_type, connection_name, is_connected)
       `)
       .eq('company_id', companyId);
 
@@ -164,23 +167,26 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
     }
 
     const { data } = await query
-      .order('last_message_at', { ascending: false })
-      .limit(50);
+      .order('last_message_at', { ascending: false });
     
     if (data) setConversations(data as WhatsAppConversationWithDetails[]);
     setLoading(false);
   };
 
   const fetchMessages = async (conversationId: string) => {
-    const { data } = await supabase
+    const companyId = currentUser?.company_id;
+    if (!companyId) return;
+
+    setLoadingMessages(true);
+    const { data, error } = await supabase
       .from('whatsapp_messages')
       .select('*')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: true });
     
-    // Reverse the array after fetching the latest 50 so they display top-down chronologically
-    if (data) setMessages(data.reverse());
+    if (data) setMessages(data);
+    setLoadingMessages(false);
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
@@ -204,7 +210,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   }, [selectedConversation]);
 
   const fetchAvailableTags = async () => {
-    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+    const companyId = currentUser?.company_id;
     if (!companyId) return;
     const { data } = await supabase.from('whatsapp_tags').select('*').eq('company_id', companyId);
     if (data) setAvailableTags(data);
@@ -249,10 +255,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+    if (!newMessage.trim() || !selectedConversation || !currentUser?.company_id) return;
 
     const messageToSend = newMessage;
     setNewMessage(''); // Clear input optimistically
+    const conversationId = selectedConversation.id;
+    const companyId = currentUser.company_id;
 
     try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -338,7 +346,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
             <button
               onClick={async () => {
                   try {
-                    const companyId = profile?.company_id || user?.user_metadata?.company_id;
+                    const companyId = currentUser?.company_id;
                     if (!companyId) return;
 
                     const { error } = await supabase

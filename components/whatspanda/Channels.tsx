@@ -6,7 +6,7 @@ import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
 const Channels: React.FC = () => {
-    const { user, profile } = useAuth();
+    const { profile, user, currentUser } = useAuth();
 
     const [channels, setChannels] = useState<WhatsAppSettings[]>([]);
     const [loading, setLoading] = useState(true);
@@ -124,7 +124,11 @@ const Channels: React.FC = () => {
 
     const fetchSettings = async () => {
         setLoading(true);
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
+        if (!companyId) {
+            setLoading(false);
+            return;
+        }
 
         const { data, error } = await supabase
             .from('whatsapp_settings')

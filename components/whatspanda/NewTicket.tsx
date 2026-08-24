@@ -10,7 +10,7 @@ interface NewTicketProps {
 }
 
 const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) => {
-    const { profile, user } = useAuth();
+    const { profile, user, currentUser } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [queues, setQueues] = useState<WhatsAppQueue[]>([]);
@@ -36,7 +36,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
     }, [profile]);
 
     const fetchChannels = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         const { data } = await supabase
@@ -62,7 +62,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
     };
 
     const fetchQueues = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         const { data } = await supabase
@@ -74,7 +74,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
     };
 
     const searchContacts = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         let query = supabase
@@ -94,7 +94,7 @@ const NewTicket: React.FC<NewTicketProps> = ({ onBack, onConversationSelect }) =
     };
 
     const handleStartConversation = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         let contactPhone = '';

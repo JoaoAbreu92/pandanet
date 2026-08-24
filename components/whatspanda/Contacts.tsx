@@ -39,7 +39,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     const [availableQueues, setAvailableQueues] = useState<WhatsAppQueue[]>([]);
     const [availableUsers, setAvailableUsers] = useState<any[]>([]);
 
-    const { profile, user } = useAuth();
+    const { profile, user, currentUser } = useAuth();
     
     useEffect(() => {
         fetchContacts();
@@ -53,7 +53,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     }, [initialSearch]);
 
     const fetchContacts = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         setLoading(true);
@@ -69,7 +69,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     };
 
     const fetchAuxData = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
 
         const { data: tags } = await supabase.from('whatsapp_tags').select('*').eq('company_id', companyId);
@@ -83,7 +83,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
     };
 
     const handleSyncContacts = async () => {
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         if (!companyId) return;
         setSyncing(true);
         try {
@@ -139,7 +139,7 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
 
     const handleSave = async () => {
         if (!name.trim() || !phone.trim()) return;
-        const companyId = profile?.company_id || user?.user_metadata?.company_id;
+        const companyId = currentUser?.company_id;
         
         const contactData = {
             name,
