@@ -287,34 +287,10 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                 }).eq('id', conversationId);
             }
 
-            // 4. Buscar Mensagens deste Chat (Histórico 30 dias)
-            if (conversationId) {
-                const msgRes = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, {
-                    method: 'POST',
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        where: { remoteJid },
-                        limit: 30 // Reduzi o limite para ser mais rápido na carga inicial
-                    })
-                }).catch(() => null);
-
-                if (msgRes && msgRes.ok) {
-                    let messages = await msgRes.json();
-                    if (messages && !Array.isArray(messages) && Array.isArray(messages.data)) messages = messages.data;
-                    
-                    if (Array.isArray(messages)) {
-                        console.log(`[SYNC] ${messages.length} mensagens encontradas para ${fromPhone}.`);
-                        // Processar em ordem cronológica (mais antiga primeiro) se possível
-                        const sortedMessages = [...messages].reverse(); 
-                        for (const msg of sortedMessages) {
-                            await processInboundMessage(msg, companyId, connectionId, true);
-                        }
-                    }
-                }
-                console.log(`[SYNC] Finalizado chat ${fromPhone}.`);
+                console.log(`[SYNC] Chat sincronizado para ${fromPhone} (sem histórico).`);
             }
         }
-        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso!`);
+        console.log(`[SYNC] [Empresa: ${companyId}] Sincronização concluída com sucesso! (Light)`);
     } catch (err) {
         console.error(`[SYNC] Erro durante a sincronização:`, err.message);
     }
