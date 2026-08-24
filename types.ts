@@ -448,6 +448,8 @@ export interface Company {
   plan?: Plan;
   subscriptionEndDate?: string; // YYYY-MM-DD
   status?: 'active' | 'inactive' | 'expired';
+  responsible_name?: string;
+  responsible_email?: string;
   settings: CompanySettings;
   data: AppData;
   employees?: Employee[];

@@ -188,10 +188,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
             const newCompany = {
                 name: formData.name,
-                domain: formData.domain,
                 status: 'active',
                 cnpj: formData.cnpj, // Assuming added field
                 plan_id: selectedPlan?.id,
+                domain: formData.domain, // Ensure domain is sent
+                responsible_name: formData.responsibleName,
+                responsible_email: formData.responsibleEmail,
                 subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
                 settings: { companyName: formData.name }
             };
@@ -566,8 +568,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                             <>
                                 <input type="text" placeholder="Whatsapp" value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                                 <div className="pt-4 border-t"><h4 className="font-bold text-gray-700 mb-2">Responsável</h4>
-                                    <input type="text" placeholder="Nome" className="w-full p-3 border rounded text-sm mb-2" />
-                                    <input type="email" placeholder="Email" className="w-full p-3 border rounded text-sm" />
+                                    <input type="text" placeholder="Nome" value={formData.responsibleName || ''} onChange={(e) => handleInputChange('responsibleName', e.target.value)} className="w-full p-3 border rounded text-sm mb-2" />
+                                    <input type="email" placeholder="Email" value={formData.responsibleEmail || ''} onChange={(e) => handleInputChange('responsibleEmail', e.target.value)} className="w-full p-3 border rounded text-sm" />
                                 </div>
                             </>
                         )}
