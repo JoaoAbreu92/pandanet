@@ -5,11 +5,12 @@ import TagsTab from './settings/TagsTab';
 import TerminationReasonsTab from './settings/TerminationReasonsTab';
 import ChatbotSettings from './ChatbotSettings';
 import GeneralTab from './settings/GeneralTab';
+import QuickMessagesTab from './settings/QuickMessagesTab';
 import { useAuth } from '../AuthContext';
 
 const Settings: React.FC = () => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags' | 'reasons' | 'chatbot' | 'general'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'queues' | 'tags' | 'reasons' | 'chatbot' | 'general' | 'quick-messages'>('users');
 
     const canAccess = profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin' || profile?.whatspanda_permissions?.can_manage_settings;
 
@@ -40,6 +41,7 @@ const Settings: React.FC = () => {
                         { id: 'tags', label: 'Etiquetas' },
                         { id: 'reasons', label: 'Motivos de Fechamento' },
                         { id: 'chatbot', label: 'Chatbot' },
+                        { id: 'quick-messages', label: 'Mensagens Rápidas' },
                         { id: 'general', label: 'Geral' },
                     ].map((tab) => (
                         <button 
@@ -67,6 +69,7 @@ const Settings: React.FC = () => {
                     {activeTab === 'tags' && <TagsTab />}
                     {activeTab === 'reasons' && <TerminationReasonsTab />}
                     {activeTab === 'chatbot' && <ChatbotSettings />}
+                    {activeTab === 'quick-messages' && <QuickMessagesTab />}
                     {activeTab === 'general' && <GeneralTab />}
                 </div>
             </div>

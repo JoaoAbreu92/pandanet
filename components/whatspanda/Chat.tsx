@@ -121,6 +121,46 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<any>(null);
 
+  // Estados e Funções para as Mensagens Rápidas com atalho '/'
+  const [quickMessages, setQuickMessages] = useState<any[]>([]);
+  const [showQuickMsgPopup, setShowQuickMsgPopup] = useState(false);
+  const [quickMsgFilter, setQuickMsgFilter] = useState('');
+  const [selectedQuickMsgIdx, setSelectedQuickMsgIdx] = useState(0);
+
+  const fetchQuickMessages = async () => {
+    const companyId = activeProfile?.company_id || profile?.company_id;
+    const userId = activeProfile?.id || profile?.id;
+    if (!companyId || !userId) return;
+
+    try {
+      const { data } = await supabase
+        .from('whatsapp_quick_messages')
+        .select('*')
+        .eq('company_id', companyId)
+        .or(`is_public.eq.true,created_by.eq.${userId}`)
+        .order('shortcut', { ascending: true });
+
+      if (data) {
+        setQuickMessages(data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar mensagens rápidas:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuickMessages();
+  }, [activeProfile?.company_id, activeProfile?.id]);
+
+  const selectQuickMessage = (msg: any) => {
+    const words = newMessage.split(/\s+/);
+    words.pop(); // Remove o atalho ex: "/pix"
+    const prefix = words.join(' ');
+    const updatedMessage = prefix ? `${prefix} ${msg.message}` : msg.message;
+    setNewMessage(updatedMessage);
+    setShowQuickMsgPopup(false);
+  };
+
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'todos' | 'fechados'>('meus');
   const [useSignature, setUseSignature] = useState(false);
@@ -889,6 +929,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.queue_id = null;
         updateData.chatbot_node_id = null;
         updateData.closed_at = new Date().toISOString();
+        updateData.closed_by = activeProfile?.id || profile?.id || null;
         updateData.termination_reason_id = reasonId || null;
         updateData.termination_reason = reasonName || null;
       }
@@ -897,6 +938,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.termination_reason_id = null;
         updateData.termination_reason = null;
         updateData.closed_at = null;
+        updateData.closed_by = null;
       }
 
       // Enviar mensagem de encerramento se configurado no canal
@@ -2618,12 +2660,71 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </button>
                       </div>
                     )}
+                    {/* Popup de Mensagens Rápidas */}
+                    {showQuickMsgPopup && (
+                      <div className="absolute bottom-[100%] left-4 right-4 md:left-12 md:right-12 mb-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2 duration-200 font-sans max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="p-3 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-transparent flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Atalhos Rápidos (/{quickMsgFilter})</span>
+                          <span className="text-[9px] text-gray-400">Use ↑ ↓ e Enter para selecionar</span>
+                        </div>
+                        {quickMessages.filter(m => m.shortcut.toLowerCase().includes(quickMsgFilter.toLowerCase())).length === 0 ? (
+                          <div className="p-4 text-xs text-gray-400 text-center font-bold opacity-60">Nenhum atalho correspondente</div>
+                        ) : (
+                          quickMessages.filter(m => m.shortcut.toLowerCase().includes(quickMsgFilter.toLowerCase())).map((msg, idx) => (
+                            <button
+                              key={msg.id}
+                              type="button"
+                              onClick={() => selectQuickMessage(msg)}
+                              className={`w-full flex flex-col items-start gap-1 p-3 text-left transition-all ${
+                                selectedQuickMsgIdx === idx 
+                                  ? 'bg-emerald-500/10 dark:bg-emerald-500/20' 
+                                  : 'hover:bg-slate-50 dark:hover:bg-white/5'
+                              }`}
+                            >
+                              <span className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                /{msg.shortcut}
+                              </span>
+                              <p className="text-xs text-slate-700 dark:text-slate-200 truncate w-full font-medium">{msg.message}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+
                     <textarea
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewMessage(val);
+                        const lastWord = val.split(/\s+/).pop() || '';
+                        if (lastWord.startsWith('/')) {
+                          setShowQuickMsgPopup(true);
+                          setQuickMsgFilter(lastWord.slice(1));
+                          setSelectedQuickMsgIdx(0);
+                        } else {
+                          setShowQuickMsgPopup(false);
+                        }
+                      }}
                       onPaste={handlePaste}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        const filtered = quickMessages.filter(m => 
+                          m.shortcut.toLowerCase().includes(quickMsgFilter.toLowerCase())
+                        );
+                        if (showQuickMsgPopup && filtered.length > 0) {
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setSelectedQuickMsgIdx(prev => (prev + 1) % filtered.length);
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setSelectedQuickMsgIdx(prev => (prev - 1 + filtered.length) % filtered.length);
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            selectQuickMessage(filtered[selectedQuickMsgIdx]);
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setShowQuickMsgPopup(false);
+                          }
+                        } else if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           canSendMessagesResult && !isSending && handleSendMessage();
                         }

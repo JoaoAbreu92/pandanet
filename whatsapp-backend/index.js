@@ -2240,70 +2240,105 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                             });
                         }
                     } else {
-                        // Só executa o chatbot se estiver dentro do horário de expediente
-                        // Triagem Inteligente via IA se não houver fila nem atendente atribuídos
+                        // Só executa o chatbot/IA se estiver dentro do horário de expediente
                         const currentConv = conv || { id: conversationId, contact_phone: fromPhone, queue_id: null, assigned_to: null };
-                        let hasTransferred = false;
+                        
+                        let chatbotMode = 'disabled';
+                        let geminiKey = null;
+                        let businessHours = null;
 
-                        // Verificar se há fluxo de chatbot ativo
-                        let hasActiveChatbot = false;
                         try {
-                            const { data: activeFlow } = await supabase
-                                .from('whatsapp_chatbot_flows')
-                                .select('id')
-                                .eq('company_id', companyId)
-                                .eq('is_active', true)
+                            const { data: settings } = await supabase
+                                .from('whatsapp_settings')
+                                .select('chatbot_mode, gemini_api_key, business_hours')
+                                .eq('id', connectionId)
                                 .maybeSingle();
-                            if (activeFlow) {
-                                hasActiveChatbot = true;
+
+                            if (settings) {
+                                chatbotMode = settings.chatbot_mode || 'disabled';
+                                geminiKey = settings.gemini_api_key;
+                                businessHours = settings.business_hours;
                             }
                         } catch (err) {
-                            console.error('[IA TRIAGEM] Erro ao verificar fluxo ativo:', err.message);
+                            console.error('[CHATBOT-MODE] Erro ao carregar configurações da conexão:', err.message);
                         }
 
-                        if (!hasActiveChatbot && !currentConv.queue_id && !currentConv.assigned_to) {
+                        let hasTransferred = false;
+
+                        // Se o modo de triagem por IA estiver ativo e não houver fila nem agente atribuído
+                        if (chatbotMode === 'gemini' && geminiKey && !currentConv.queue_id && !currentConv.assigned_to) {
                             try {
-                                const { data: settings } = await supabase
-                                    .from('whatsapp_settings')
-                                    .select('gemini_api_key, business_hours')
-                                    .eq('id', connectionId)
-                                    .maybeSingle();
+                                const { data: queues } = await supabase
+                                    .from('whatsapp_queues')
+                                    .select('id, name')
+                                    .eq('company_id', companyId);
 
-                                if (settings && settings.gemini_api_key) {
-                                    const { data: queues } = await supabase
-                                        .from('whatsapp_queues')
-                                        .select('id, name')
-                                        .eq('company_id', companyId);
+                                const { data: team } = await supabase
+                                    .from('profiles')
+                                    .select('id, full_name')
+                                    .eq('company_id', companyId);
 
-                                    if (queues && queues.length > 0) {
-                                        const suggestedQueueId = await analyzeMessageForTransfer(text, queues, settings.gemini_api_key, settings.business_hours);
-                                        if (suggestedQueueId) {
-                                            console.log(`[IA TRIAGEM] Sugeriu transferir para fila: ${suggestedQueueId}`);
-                                            addDebugLog('IA_TRIAGEM_OK', `Transferência automática via IA para fila ${suggestedQueueId} sugerida com sucesso.`);
-                                            await supabase
-                                                .from('whatsapp_conversations')
-                                                .update({ queue_id: suggestedQueueId, chatbot_node_id: null })
-                                                .eq('id', conversationId);
-                                            
-                                            // Enviar mensagem informando sobre a transferência
-                                            const destQueue = queues.find(q => q.id === suggestedQueueId);
-                                            const notifyText = `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
-                                            
-                                            const instanceName = `conn_${connectionId}`;
-                                            await dispatchTextEvolution(instanceName, fromPhone, notifyText)
-                                                .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
+                                if ((queues && queues.length > 0) || (team && team.length > 0)) {
+                                    const suggestion = await analyzeMessageForTransfer(
+                                        text, 
+                                        queues || [], 
+                                        team || [], 
+                                        geminiKey, 
+                                        businessHours
+                                    );
 
-                                            await supabase.from('whatsapp_messages').insert({
-                                                company_id: companyId,
-                                                conversation_id: conversationId,
-                                                message_text: notifyText,
-                                                is_from_customer: false,
-                                                sent_by: null,
-                                                queue_id: suggestedQueueId
-                                            });
+                                    if (suggestion && suggestion.target_type === 'queue' && suggestion.target_id) {
+                                        console.log(`[IA TRIAGEM] Sugeriu transferir para fila: ${suggestion.target_id}`);
+                                        addDebugLog('IA_TRIAGEM_OK', `Transferência automática via IA para fila ${suggestion.target_id} sugerida com sucesso.`);
+                                        
+                                        await supabase
+                                            .from('whatsapp_conversations')
+                                            .update({ queue_id: suggestion.target_id, chatbot_node_id: null, assigned_to: null })
+                                            .eq('id', conversationId);
+                                        
+                                        const destQueue = queues.find(q => q.id === suggestion.target_id);
+                                        const notifyText = `Olá! Entendi seu interesse. Vou transferir seu atendimento para o setor de *${destQueue.name}*. Um momento, por favor.`;
+                                        
+                                        const instanceName = `conn_${connectionId}`;
+                                        await dispatchTextEvolution(instanceName, fromPhone, notifyText)
+                                            .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação:', e.message));
 
-                                            hasTransferred = true;
-                                        }
+                                        await supabase.from('whatsapp_messages').insert({
+                                            company_id: companyId,
+                                            conversation_id: conversationId,
+                                            message_text: notifyText,
+                                            is_from_customer: false,
+                                            sent_by: null,
+                                            queue_id: suggestion.target_id
+                                        });
+
+                                        hasTransferred = true;
+                                    } else if (suggestion && suggestion.target_type === 'agent' && suggestion.target_id) {
+                                        console.log(`[IA TRIAGEM] Sugeriu transferir para agente: ${suggestion.target_id}`);
+                                        addDebugLog('IA_TRIAGEM_AGENT_OK', `Transferência automática via IA para agente ${suggestion.target_id} sugerida com sucesso.`);
+                                        
+                                        await supabase
+                                            .from('whatsapp_conversations')
+                                            .update({ assigned_to: suggestion.target_id, chatbot_node_id: null, queue_id: null })
+                                            .eq('id', conversationId);
+                                        
+                                        const destAgent = team.find(u => u.id === suggestion.target_id);
+                                        const notifyText = `Olá! Vou transferir você para o especialista *${destAgent.full_name}*. Por favor, aguarde um instante.`;
+                                        
+                                        const instanceName = `conn_${connectionId}`;
+                                        await dispatchTextEvolution(instanceName, fromPhone, notifyText)
+                                            .catch(e => console.error('[IA TRIAGEM] Erro ao enviar notificação para agente:', e.message));
+
+                                        await supabase.from('whatsapp_messages').insert({
+                                            company_id: companyId,
+                                            conversation_id: conversationId,
+                                            message_text: notifyText,
+                                            is_from_customer: false,
+                                            sent_by: null,
+                                            assigned_to: suggestion.target_id
+                                        });
+
+                                        hasTransferred = true;
                                     }
                                 }
                             } catch (triagemErr) {
@@ -2311,7 +2346,8 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                             }
                         }
 
-                        if (!hasTransferred) {
+                        // Se o modo for chatbot de fluxo e não tiver sido transferido pela IA
+                        if (chatbotMode === 'flow' && !hasTransferred) {
                             runChatbot(text, conv || { id: conversationId, contact_phone: fromPhone }, companyId, connectionId);
                         }
                     }
@@ -2424,6 +2460,202 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
         }
     }
 });
+
+
+/**
+ * Loop do Disparador de Mensagens Agendadas (Campanhas em Lote)
+ */
+async function processScheduledCampaigns() {
+    try {
+        // 1. Obter campanhas ativas (running) ou pendentes (pending) cuja data agendada seja hoje ou anterior
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        const { data: campaigns, error: campErr } = await supabase
+            .from('whatsapp_scheduled_campaigns')
+            .select('*')
+            .in('status', ['running', 'pending'])
+            .lte('scheduled_date', todayStr);
+
+        if (campErr) throw campErr;
+        if (!campaigns || campaigns.length === 0) return;
+
+        // Horário de Brasília atual
+        const now = new Date();
+        const spOffset = -3;
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const spTime = new Date(utc + (3600000 * spOffset));
+        const currentHourStr = spTime.toTimeString().slice(0, 8); // "HH:MM:SS"
+
+        for (const camp of campaigns) {
+            // Verificar limite de horário do expediente da campanha
+            if (currentHourStr < camp.start_time || currentHourStr > camp.end_time) {
+                console.log(`[CAMPANHA] Ignorando campanha "${camp.name}" (${camp.id}) porque está fora do horário permitido (${camp.start_time} - ${camp.end_time}). Hora atual: ${currentHourStr}`);
+                continue;
+            }
+
+            // Verificar intervalo (interval_seconds) desde o último envio
+            if (camp.last_sent_at) {
+                const elapsedMs = Date.now() - new Date(camp.last_sent_at).getTime();
+                if (elapsedMs < camp.interval_seconds * 1000) {
+                    continue;
+                }
+            }
+
+            // Se o status era 'pending', atualiza para 'running'
+            if (camp.status === 'pending') {
+                await supabase
+                    .from('whatsapp_scheduled_campaigns')
+                    .update({ status: 'running' })
+                    .eq('id', camp.id);
+            }
+
+            // 2. Buscar o próximo alvo pendente
+            const { data: targets, error: targetErr } = await supabase
+                .from('whatsapp_scheduled_targets')
+                .select('*')
+                .eq('campaign_id', camp.id)
+                .eq('status', 'pending')
+                .order('created_at', { ascending: true })
+                .limit(1);
+
+            if (targetErr) {
+                console.error(`[CAMPANHA] Erro ao buscar alvos para campanha ${camp.id}:`, targetErr.message);
+                continue;
+            }
+
+            // Se não houver mais alvos pendentes, a campanha está finalizada!
+            if (!targets || targets.length === 0) {
+                console.log(`[CAMPANHA] Campanha "${camp.name}" finalizada com sucesso!`);
+                await supabase
+                    .from('whatsapp_scheduled_campaigns')
+                    .update({ status: 'completed' })
+                    .eq('id', camp.id);
+                continue;
+            }
+
+            const target = targets[0];
+
+            // 3. Obter uma conexão conectada da empresa para disparar
+            const { data: connection } = await supabase
+                .from('whatsapp_settings')
+                .select('id, connection_name')
+                .eq('company_id', camp.company_id)
+                .eq('is_connected', true)
+                .limit(1)
+                .maybeSingle();
+
+            if (!connection) {
+                console.warn(`[CAMPANHA] Nenhuma conexão conectada para empresa da campanha ${camp.id}.`);
+                await supabase
+                    .from('whatsapp_scheduled_targets')
+                    .update({ 
+                        status: 'failed', 
+                        error_message: 'Nenhum canal de WhatsApp conectado no painel',
+                        sent_at: new Date().toISOString()
+                    })
+                    .eq('id', target.id);
+                
+                await supabase
+                    .from('whatsapp_scheduled_campaigns')
+                    .update({ last_sent_at: new Date().toISOString() })
+                    .eq('id', camp.id);
+                continue;
+            }
+
+            const instanceName = connection.connection_name || `conn_${connection.id}`;
+
+            // 4. Selecionar template aleatoriamente
+            const templates = [
+                camp.template_1, 
+                camp.template_2, 
+                camp.template_3, 
+                camp.template_4
+            ].filter(t => t && t.trim() !== '');
+
+            const selectedIdx = Math.floor(Math.random() * templates.length);
+            const messageText = templates[selectedIdx];
+
+            console.log(`[CAMPANHA] Disparando para ${target.contact_phone} | Template #${selectedIdx + 1}`);
+
+            let sendSuccess = false;
+            let errMsg = null;
+
+            try {
+                if (camp.image_url && camp.image_url.trim() !== '') {
+                    const cleanPhone = target.contact_phone.replace(/\D/g, "");
+                    const res = await fetch(`${evoUrl}/messages/sendMedia/${instanceName}`, {
+                        method: 'POST',
+                        headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            number: cleanPhone,
+                            mediaMessage: {
+                                mediatype: 'image',
+                                media: camp.image_url.trim(),
+                                caption: messageText
+                            }
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        sendSuccess = true;
+                    } else {
+                        const body = await res.text();
+                        errMsg = `Erro no envio de mídia: HTTP ${res.status} | ${body}`;
+                    }
+                } else {
+                    await dispatchTextEvolution(instanceName, target.contact_phone, messageText);
+                    sendSuccess = true;
+                }
+            } catch (sendErr) {
+                console.error(`[CAMPANHA] Falha no disparo:`, sendErr.message);
+                errMsg = sendErr.message;
+            }
+
+            const nowIso = new Date().toISOString();
+            await supabase
+                .from('whatsapp_scheduled_targets')
+                .update({
+                    status: sendSuccess ? 'sent' : 'failed',
+                    selected_template_index: selectedIdx + 1,
+                    sent_at: nowIso,
+                    error_message: errMsg
+                })
+                .eq('id', target.id);
+
+            await supabase
+                .from('whatsapp_scheduled_campaigns')
+                .update({ last_sent_at: nowIso })
+                .eq('id', camp.id);
+
+            // Inserir no histórico se conversa existir
+            try {
+                const { data: existingConv } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('id')
+                    .eq('company_id', camp.company_id)
+                    .eq('contact_phone', target.contact_phone)
+                    .maybeSingle();
+
+                if (existingConv) {
+                    await supabase.from('whatsapp_messages').insert({
+                        company_id: camp.company_id,
+                        conversation_id: existingConv.id,
+                        message_text: camp.image_url ? `[Imagem Agendada] ${messageText}` : messageText,
+                        is_from_customer: false,
+                        sent_by: null
+                    });
+                }
+            } catch (histErr) {
+                console.warn('[CAMPANHA-HISTORICO] Erro ao gravar histórico:', histErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('[CAMPANHA-LOOP] Erro fatal:', err.message);
+    }
+}
+
+// Iniciar o loop de disparos a cada 15 segundos
+setInterval(processScheduledCampaigns, 15000);
 
 
 app.listen(port, () => {

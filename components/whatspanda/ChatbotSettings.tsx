@@ -39,6 +39,7 @@ const ChatbotSettings: React.FC = () => {
     const [team, setTeam] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [geminiKey, setGeminiKey] = useState('');
+    const [chatbotMode, setChatbotMode] = useState<'disabled' | 'flow' | 'gemini'>('disabled');
     const activeProfile = currentUser || profile;
     const [signature, setSignature] = useState('');
     const [useSignature, setUseSignature] = useState(false);
@@ -239,12 +240,51 @@ const ChatbotSettings: React.FC = () => {
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
         const { data: queuesData } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         const { data: teamData } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
-        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key').eq('company_id', companyId).limit(1).single();
+        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode').eq('company_id', companyId).limit(1).single();
 
         if (flowsData) setFlows(flowsData);
         if (queuesData) setQueues(queuesData);
         if (teamData) setTeam(teamData);
-        if (settingsData) setGeminiKey(settingsData.gemini_api_key || '');
+        if (settingsData) {
+            setGeminiKey(settingsData.gemini_api_key || '');
+            setChatbotMode((settingsData.chatbot_mode as any) || 'disabled');
+        }
+    };
+
+    const handleUpdateChatbotMode = async (mode: 'disabled' | 'flow' | 'gemini') => {
+        const companyId = currentUser?.company_id || profile?.company_id;
+        if (!companyId) return;
+
+        setLoading(true);
+        const { error } = await supabase
+            .from('whatsapp_settings')
+            .update({ chatbot_mode: mode })
+            .eq('company_id', companyId);
+        
+        setLoading(false);
+        if (error) {
+            console.error('Erro ao atualizar modo de atendimento:', error);
+            alert('Erro ao atualizar modo de atendimento: ' + error.message);
+        } else {
+            setChatbotMode(mode);
+            if (mode === 'gemini') {
+                await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+                fetchData();
+            } else if (mode === 'flow') {
+                if (selectedFlow) {
+                    await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+                    await supabase.from('whatsapp_chatbot_flows').update({ is_active: true }).eq('id', selectedFlow.id);
+                    fetchData();
+                } else if (flows.length > 0) {
+                    await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+                    await supabase.from('whatsapp_chatbot_flows').update({ is_active: true }).eq('id', flows[0].id);
+                    fetchData();
+                }
+            } else {
+                await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+                fetchData();
+            }
+        }
     };
 
     const fetchNodes = async (flowId: string) => {
@@ -868,6 +908,77 @@ const ChatbotSettings: React.FC = () => {
 
     return (
         <div className="space-y-8 max-w-7xl pb-10">
+            {/* Modo de Atendimento Automático */}
+            <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl space-y-6">
+                <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white tracking-tight">
+                        <Zap className="w-6 h-6 text-emerald-500" /> Modo de Atendimento Automático
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-bold opacity-75 uppercase tracking-widest mt-1">
+                        Escolha como o PandaNet deve responder às novas conversas recebidas.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Opção 1: Desativado */}
+                    <button
+                        onClick={() => handleUpdateChatbotMode('disabled')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group
+                            ${chatbotMode === 'disabled'
+                                ? 'bg-slate-50 dark:bg-white/5 border-slate-500 text-slate-900 dark:text-white shadow-lg shadow-slate-500/5'
+                                : 'bg-transparent border-gray-200 dark:border-white/5 text-gray-500 hover:border-slate-350 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                    >
+                        <Pause className="w-8 h-8 mb-2" />
+                        <span className="font-bold text-sm">Desativado</span>
+                        <span className="text-[10px] opacity-75 mt-1 text-center font-medium">Nenhum robô responderá de forma automática.</span>
+                        {chatbotMode === 'disabled' && (
+                            <div className="absolute top-0 right-0 bg-slate-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-xl uppercase tracking-wider">
+                                Ativo
+                            </div>
+                        )}
+                    </button>
+
+                    {/* Opção 2: Fluxo Manual */}
+                    <button
+                        onClick={() => handleUpdateChatbotMode('flow')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group
+                            ${chatbotMode === 'flow'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-lg shadow-emerald-500/5'
+                                : 'bg-transparent border-gray-200 dark:border-white/5 text-gray-500 hover:border-emerald-350 hover:text-emerald-600 dark:hover:text-emerald-450'
+                            }`}
+                    >
+                        <List className="w-8 h-8 mb-2" />
+                        <span className="font-bold text-sm">Fluxo de Chatbot (Manual)</span>
+                        <span className="text-[10px] opacity-75 mt-1 text-center font-medium">Usa a árvore de menus e etapas criada manualmente abaixo.</span>
+                        {chatbotMode === 'flow' && (
+                            <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-xl uppercase tracking-wider">
+                                Ativo
+                            </div>
+                        )}
+                    </button>
+
+                    {/* Opção 3: Triagem por IA (Gemini) */}
+                    <button
+                        onClick={() => handleUpdateChatbotMode('gemini')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden group
+                            ${chatbotMode === 'gemini'
+                                ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-lg shadow-indigo-500/5'
+                                : 'bg-transparent border-gray-200 dark:border-white/5 text-gray-500 hover:border-indigo-350 hover:text-indigo-650 dark:hover:text-indigo-450'
+                            }`}
+                    >
+                        <SparklesIcon className="w-8 h-8 mb-2" />
+                        <span className="font-bold text-sm">Triagem Inteligente (Gemini IA)</span>
+                        <span className="text-[10px] opacity-75 mt-1 text-center font-medium">A IA do Gemini atende e faz a triagem para setores e atendentes.</span>
+                        {chatbotMode === 'gemini' && (
+                            <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-xl uppercase tracking-wider">
+                                Ativo
+                            </div>
+                        )}
+                    </button>
+                </div>
+            </div>
+
             {/* Configuração do Google Gemini */}
             <div className="bg-white/50 dark:bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-2xl">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

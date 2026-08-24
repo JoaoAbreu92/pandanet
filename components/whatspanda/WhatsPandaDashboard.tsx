@@ -38,7 +38,9 @@ const WhatsPandaDashboard: React.FC = () => {
     avgResponseTime: '0 min',
     chatsByAgent: [] as any[],
     messageVolume: [] as any[],
-    chatsByStatus: [] as any[]
+    chatsByStatus: [] as any[],
+    chatsByReason: [] as any[],
+    closuresByAgent: [] as any[]
   });
 
   const fetchData = async () => {
@@ -47,10 +49,10 @@ const WhatsPandaDashboard: React.FC = () => {
     if (!companyId) return;
 
     try {
-      // 1. Atendimentos Ativos e Totais
+      // 1. Atendimentos Ativos e Totais (Carrega perfis de atribuição e encerramento)
       const { data: convs, error: convError } = await supabase
         .from('whatsapp_conversations')
-        .select('*, assigned_to_profile:profiles(full_name)')
+        .select('*, assigned_to_profile:profiles(full_name), closed_by_profile:profiles(full_name)')
         .eq('company_id', companyId);
 
       if (convError) throw convError;
@@ -102,16 +104,39 @@ const WhatsPandaDashboard: React.FC = () => {
 
       const messageVolume = Object.entries(volumeMap).reverse().map(([name, value]) => ({ name, value }));
 
-      // 5. Tempo Médio de Resposta (Simulado/Calculado)
-      // Para um cálculo real, precisaríamos cruzar a primeira msg do cliente com a primeira do agente.
-      // Vou colocar um valor fictício ou simplificado baseado em conversas fechadas se houver dados.
+      // 5. Motivos de Encerramento
+      const reasonsMap: Record<string, number> = {};
+      convs.forEach(c => {
+        if (c.status === 'fechado') {
+          const reason = c.termination_reason || 'Sem motivo específico';
+          reasonsMap[reason] = (reasonsMap[reason] || 0) + 1;
+        }
+      });
+      const chatsByReason = Object.entries(reasonsMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
+      // 6. Encerramentos por Agente
+      const closureAgentMap: Record<string, number> = {};
+      convs.forEach(c => {
+        if (c.status === 'fechado') {
+          const name = c.closed_by_profile?.full_name || c.assigned_to_profile?.full_name || 'Desconhecido';
+          closureAgentMap[name] = (closureAgentMap[name] || 0) + 1;
+        }
+      });
+      const closuresByAgent = Object.entries(closureAgentMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
       setStats({
         activeChats: active,
         totalChats: total,
-        avgResponseTime: '12 min', // Estimativa fixa para o exemplo ou cálculo real se preferir
+        avgResponseTime: '12 min',
         chatsByAgent,
         messageVolume,
-        chatsByStatus
+        chatsByStatus,
+        chatsByReason,
+        closuresByAgent
       });
 
     } catch (error) {
@@ -274,6 +299,83 @@ const WhatsPandaDashboard: React.FC = () => {
                     <p className="text-xl font-bold">14:00</p>
                 </div>
             </div>
+        </div>
+      </div>
+
+      {/* Novo Bloco: Estatísticas de Encerramento */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+        {/* Motivos de Encerramento (Pie Chart) */}
+        <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-8 flex items-center gap-2">
+            <PieChartIcon className="w-5 h-5 text-emerald-500" /> Motivos de Encerramento
+          </h3>
+          <div className="h-[250px] w-full">
+            {stats.chatsByReason.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-gray-400 font-bold opacity-60">
+                Nenhum atendimento finalizado ainda.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.chatsByReason}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {stats.chatsByReason.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <div className="mt-4 space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar no-scrollbar">
+            {stats.chatsByReason.map((reason, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                  <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate max-w-[180px]">{reason.name}</span>
+                </div>
+                <span className="text-[10px] font-bold text-gray-900 dark:text-white">{reason.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Encerramentos por Agente (Bar Chart) */}
+        <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-8 flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-500" /> Encerramentos por Agente
+          </h3>
+          <div className="h-[250px] w-full">
+            {stats.closuresByAgent.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-gray-400 font-bold opacity-60">
+                Nenhum atendimento finalizado ainda.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.closuresByAgent} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" opacity={0.1} />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} width={100} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: '16px', border: 'none' }}
+                    itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#6366f1' }}
+                  />
+                  <Bar dataKey="value" fill="#6366f1" radius={[0, 10, 10, 0]} barSize={15} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
     </div>

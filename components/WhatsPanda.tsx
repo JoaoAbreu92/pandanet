@@ -15,14 +15,15 @@ import NewTicket from './whatspanda/NewTicket';
 import Channels from './whatspanda/Channels';
 import Settings from './whatspanda/Settings';
 import WhatsPandaDashboard from './whatspanda/WhatsPandaDashboard';
-import { BarChart3 } from 'lucide-react';
+import Scheduler from './whatspanda/Scheduler';
+import { BarChart3, Calendar } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard';
+type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard' | 'scheduler';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -140,6 +141,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     ...(permissions.can_view_chats ? [{ id: 'privados', label: 'Privados', icon: Lock, view: 'privados' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'grupos', label: 'Grupos', icon: MessagesSquare, view: 'grupos' }] : []),
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
+    ...(permissions.can_view_chats ? [{ id: 'scheduler', label: 'Campanhas', icon: Calendar, view: 'scheduler' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
     ...(isAdmin ? [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3, view: 'dashboard' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
@@ -178,6 +180,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
       case 'privados': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="private" initialConversationId={selectedConversationId} /> : null;
       case 'grupos': return permissions.can_view_chats ? <Chat onConversationSelect={setIsChatActive} initialSearch={internalSearch} type="group" initialConversationId={selectedConversationId} /> : null;
       case 'contacts': return permissions.can_view_contacts ? <Contacts initialSearch={internalSearch} onChat={handleContactChat} /> : null;
+      case 'scheduler': return permissions.can_view_chats ? <Scheduler /> : null;
       case 'new-ticket': return (permissions.can_view_chats && permissions.can_start_chats !== false) ? (
         <NewTicket
           onBack={() => setCurrentView('privados')}
