@@ -30,6 +30,8 @@ RUN echo '<Directory /var/www/html>\n\
     Options FollowSymLinks\n\
     AllowOverride All\n\
     Require all granted\n\
+    \n\
+    SetEnvIf X-Forwarded-Proto "^https$" HTTPS=on\n\
 </Directory>' > /etc/apache2/conf-available/perfex.conf \
     && a2enconf perfex
 

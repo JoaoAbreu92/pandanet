@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import {
     FaceSmileIcon,
     PaperClipIcon,
@@ -505,6 +505,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const stickerUploadRefHeader = useRef<HTMLInputElement>(null);
     const stickerUploadRefInput = useRef<HTMLInputElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
     const typingTimeoutRef = useRef<any>(null);
     
@@ -932,17 +933,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     };
 
     // Auto-scroll inteligente: apenas no carregamento inicial ou ao enviar mensagem
+    useLayoutEffect(() => {
+        if (isInitialLoad.current && messages.length > 0 && scrollContainerRef.current) {
+            // Scroll INSTANTÂNEO no carregamento inicial via useLayoutEffect
+            // Isso acontece antes do componente ser pintado na tela
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+            isInitialLoad.current = false;
+        }
+    }, [messages]);
+
     useEffect(() => {
         const lastMsg = messages[messages.length - 1];
         const isFromMe = lastMsg?.sender === 'me';
-        const shouldScroll = isInitialLoad.current || isFromMe;
         
-        if (shouldScroll && messages.length > 0) {
-            // Scroll instantâneo sem animação
+        // Se for mensagem minha ou se a flag ainda estiver true (fallback)
+        if (isFromMe && messages.length > 0) {
             setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: isInitialLoad.current ? 'auto' : 'smooth' });
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 50);
-            isInitialLoad.current = false;
         }
         
         lastMessageCount.current = messages.length;
@@ -1659,6 +1667,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             </div>
                         </div>
                         <div 
+                            ref={scrollContainerRef}
                             className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto scrollbar-hide hover-scrollbar"
                             onScroll={(e) => {
                                 const target = e.currentTarget;
