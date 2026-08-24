@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from './LanguageContext';
 import { useNotifications } from './NotificationContext';
+import { useAuth } from './AuthContext';
 import { supabase } from '../supabaseClient';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -88,6 +89,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const { t, language } = useLanguage();
     const { showToast } = useToast();
     const { setModuleUnreadCount, notifications, markAsRead, markNotificationsByLink } = useNotifications();
+    const { isGhostMode } = useAuth();
 
     // --- State: Confirm Modal ---
     const [confirmState, setConfirmState] = useState<{
@@ -383,14 +385,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments, cc: data.cc } : e));
 
             // Mark local real-state emails as seen
-            setEmails(prev => prev.map(e => {
-                const flags = e.flags || [];
-                if (e.uid === uid && !flags.includes('\\Seen')) {
-                    setLocallySeenUids(prevSet => new Set(prevSet).add(uid));
-                    return { ...e, flags: [...flags, '\\Seen'] };
-                }
-                return e;
-            }));
+            if (!isGhostMode) {
+                setEmails(prev => prev.map(e => {
+                    const flags = e.flags || [];
+                    if (e.uid === uid && !flags.includes('\\Seen')) {
+                        setLocallySeenUids(prevSet => new Set(prevSet).add(uid));
+                        return { ...e, flags: [...flags, '\\Seen'] };
+                    }
+                    return e;
+                }));
+            }
 
             // Integration: Mark related notifications as read
             const relatedNotifs = notifications.filter(n => !n.isRead && (n.link?.includes(`uid=${uid}`) || (n.link === '/email' && n.title.toLowerCase().includes('e-mail'))));
@@ -406,26 +410,32 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     html: data.html, 
                     attachments: data.attachments,
                     cc: data.cc,
-                    flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen'] 
+                    flags: (!isGhostMode && !flags.includes('\\Seen')) ? [...flags, '\\Seen'] : flags 
                 };
             });
 
             // Always update cache with the new body data
             const cacheKey = `${currentUser.id}_${folder}_${page}`;
             if (emailCache[cacheKey]) {
-                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
-                    e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html, attachments: data.attachments, cc: data.cc } : e
-                );
+                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => {
+                    if (e.uid === uid) {
+                        const newFlags = (!isGhostMode && !(e.flags || []).includes('\\Seen')) ? [...(e.flags || []), '\\Seen'] : (e.flags || []);
+                        return { ...e, flags: newFlags, text: data.text, html: data.html, attachments: data.attachments, cc: data.cc };
+                    }
+                    return e;
+                });
             }
 
             // Background update Seen flag on server if not seen (using stale reference, but that's fine for calling the server)
-            const email = emails.find(e => e.uid === uid);
-            if (email && !(email.flags || []).includes('\\Seen')) {
-                // Background call to server, don't await to avoid blocking UI
-                toggleFlag(email, '\\Seen', true).catch(e => console.error("Error setting Seen flag:", e));
-                
-                // Also clean notification
-                markNotificationsByLink(`/email?uid=${uid}`);
+            if (!isGhostMode) {
+                const email = emails.find(e => e.uid === uid);
+                if (email && !(email.flags || []).includes('\\Seen')) {
+                    // Background call to server, don't await to avoid blocking UI
+                    toggleFlag(email, '\\Seen', true).catch(e => console.error("Error setting Seen flag:", e));
+                    
+                    // Also clean notification
+                    markNotificationsByLink(`/email?uid=${uid}`);
+                }
             }
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
@@ -433,7 +443,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         } finally {
             setLoadingBody(false);
             // Mark global notification as read if it looks like an email notification
-            if (currentUser?.id) {
+            if (currentUser?.id && !isGhostMode) {
                 supabase.from('notifications')
                     .update({ is_read: true })
                     .eq('user_id', currentUser.id)
@@ -479,6 +489,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         }
     };
     const toggleFlag = async (email: EmailMessage, flag: string, add: boolean) => {
+        if (isGhostMode && flag === '\\Seen' && add) return; // Auditoria não deixa rastro
         // Optimistic update
         const updateFlags = (flags: string[]) => {
             if (add) return [...flags, flag];
@@ -545,6 +556,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const markAllAsRead = async () => {
+        if (isGhostMode) {
+            showToast("Modo Auditoria: Não é possível marcar como lido.", "warning");
+            return;
+        }
         const unreadEmails = emails.filter(e => !(e.flags || []).includes('\\Seen'));
         if (unreadEmails.length === 0) return;
 

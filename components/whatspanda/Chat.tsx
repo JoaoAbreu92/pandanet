@@ -53,11 +53,11 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private', initialConversationId }) => {
-  const { user, profile, currentUser } = useAuth();
+  const { user, profile, currentUser, isGhostMode } = useAuth();
   const activeProfile = currentUser || profile;
   const permissions = (activeProfile?.whatspanda_permissions as any) || {};
   const isAdmin = activeProfile?.isAdmin || activeProfile?.isCompanyAdmin || activeProfile?.role === 'Super Admin';
-  const canSendMessages = isAdmin || permissions.can_send_messages !== false;
+  const canSendMessages = (isAdmin || permissions.can_send_messages !== false) && !isGhostMode;
   // Actually, UsersTab set defaults.
   // Let's being strict:
   // const canSendMessages = isAdmin || !!permissions.can_send_messages;
@@ -65,8 +65,8 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   // However, for existing users without permissions set, we might want to allow or block?
   // Block is safer.
 
-  const canSendMedia = isAdmin || !!permissions.can_send_media;
-  const canSendMessagesResult = isAdmin || !!permissions.can_send_messages;
+  const canSendMedia = (isAdmin || !!permissions.can_send_media) && !isGhostMode;
+  const canSendMessagesResult = (isAdmin || !!permissions.can_send_messages) && !isGhostMode;
   const [conversations, setConversations] = useState<WhatsAppConversationWithDetails[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversationWithDetails | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
@@ -457,11 +457,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
+    if (isGhostMode) {
+      alert('Modo Auditoria: Não é permitido alterar o status do atendimento.');
+      return;
+    }
     try {
       const updateData: any = { status: newStatus };
       
       // Aceitar Atendimento: sempre atribuir ao usuário logado
       if (newStatus === 'aberto' && assignToMe) {
+        if (isGhostMode) {
+          alert('Modo Auditoria: Não é permitido aceitar atendimentos.');
+          return;
+        }
         const userId = activeProfile?.id || profile?.id;
         if (!userId) {
           alert('Não foi possível identificar o usuário logado. Faça login novamente.');
@@ -513,6 +521,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
+    if (isGhostMode) return;
     setConversations(prev => prev.map(conv => 
       conv.id === conversationId ? { ...conv, kanban_column_id: newColumnId } : conv
     ));
@@ -548,7 +557,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleToggleTag = async (tagId: string) => {
-    if (!selectedConversation) return;
+    if (!selectedConversation || isGhostMode) return;
 
     if (selectedConvTags.includes(tagId)) {
       // Remove
@@ -568,8 +577,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const markAsRead = async (conversationId: string) => {
+    if (isGhostMode) return; // Ghost mode blocks marking as read
+    
     const isImpersonating = localStorage.getItem('pixel_is_impersonating') === 'true';
-    if (isImpersonating) return; // Ghost mode blocks marking as read
+    if (isImpersonating) return; 
 
     await supabase
       .from('whatsapp_conversations')
@@ -650,6 +661,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
   
   const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
+    if (isGhostMode) {
+      alert('Modo Auditoria: O envio de mensagens está desabilitado.');
+      return;
+    }
     if (e) e.preventDefault();
     if (!newMessage.trim() && !attachedFile && type !== 'sticker') return;
     if (!selectedConversation || !currentUser?.company_id) return;
@@ -950,6 +965,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           {isAdmin && activeTab === 'fechado' && (
             <button
               onClick={async () => {
+                  if (isGhostMode) return;
                   try {
                     const companyId = currentUser?.company_id;
                     if (!companyId) return;
@@ -1382,6 +1398,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
               )}
 
+              {isGhostMode ? (
+                <div className="bg-purple-50 p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
+                  <p className="text-xs md:text-sm font-bold text-purple-600 flex items-center justify-center gap-2">
+                    MODO AUDITORIA ATIVO
+                  </p>
+                  <p className="text-[10px] md:text-xs text-purple-500 mt-1">
+                    Você não pode interagir neste WhatsApp.
+                  </p>
+                </div>
+              ) : (
               <div className="flex-1 bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
                 <input 
                   type="file" 
@@ -1449,6 +1475,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                   <Send className="w-5 h-5 md:ml-1" />
                 </button>
               </div>
+              )}
             </div>
           </div>
         ) : (

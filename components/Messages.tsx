@@ -1241,7 +1241,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     };
 
     const handleCloseConversation = async () => {
-        if (!selectedConversationId) return;
+        if (!selectedConversationId || isGhostMode) return;
         if (!window.confirm("Deseja encerrar este suporte? O chat será bloqueado para novas mensagens.")) return;
 
         try {
@@ -1264,6 +1264,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
     };
 
     const handleDeleteMessage = async (messageId: string) => {
+        if (isGhostMode) {
+            showToast("Modo Fantasma: A exclusão de mensagens está desabilitada.", "warning");
+            return;
+        }
         if (!window.confirm("Deseja apagar esta mensagem? Ela sumirá para você agora e em 20 minutos para o destinatário.")) return;
 
         try {
@@ -1718,7 +1722,17 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-2 md:p-4 bg-white/90 dark:bg-[#020617]/80 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative pb-[max(env(safe-area-inset-bottom),8px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
-                            {selectedConversation?.is_closed ? (
+                            {isGhostMode ? (
+                                <div className="bg-purple-50 p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
+                                    <p className="text-xs md:text-sm font-bold text-purple-600 flex items-center justify-center gap-2">
+                                        <LockClosedIcon className="w-5 h-5" />
+                                        MODO AUDITORIA ATIVO
+                                    </p>
+                                    <p className="text-[10px] md:text-xs text-purple-500 mt-1">
+                                        Você não pode enviar mensagens ou reagir neste modo. O envio automático de leitura está bloqueado.
+                                    </p>
+                                </div>
+                            ) : selectedConversation?.is_closed ? (
                                 <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200 text-center animate-pulse">
                                     <p className="text-xs md:text-sm font-bold text-gray-500 flex items-center justify-center gap-2">
                                         <LockClosedIcon className="w-4 h-4" />
@@ -1952,3 +1966,4 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 };
 
 export default Messages;
+// End of Messages component

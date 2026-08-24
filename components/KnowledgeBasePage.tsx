@@ -7,7 +7,7 @@ import { useLanguage } from './LanguageContext';
 
 const KnowledgeBasePage: React.FC = () => {
     const { t } = useLanguage();
-    const { currentUser } = useAuth();
+    const { currentUser, isGhostMode } = useAuth();
     const [articles, setArticles] = useState<KBArticle[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -17,8 +17,8 @@ const KnowledgeBasePage: React.FC = () => {
         const isExpanding = !expandedIds.includes(id);
         setExpandedIds(prev => isExpanding ? [...prev, id] : prev.filter(i => i !== id));
 
-        // Increment view count if expanding
-        if (isExpanding) {
+        // Increment view count if expanding and not in ghost mode
+        if (isExpanding && !isGhostMode) {
             const { error } = await supabase.rpc('increment_kb_views', { article_id: id });
             // If RPC doesn't exist, ignore for now.
         }

@@ -6,7 +6,7 @@ import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
 const Channels: React.FC = () => {
-    const { profile, user, currentUser } = useAuth();
+    const { profile, user, currentUser, isGhostMode } = useAuth();
 
     const [channels, setChannels] = useState<WhatsAppSettings[]>([]);
     const [loading, setLoading] = useState(true);
@@ -143,6 +143,7 @@ const Channels: React.FC = () => {
     };
 
     const startSession = async (companyId: string, connectionId: string) => {
+        if (isGhostMode) return;
         addDebugLog(`Iniciando sessão: Empresa=${companyId}, Conexão=${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -178,6 +179,7 @@ const Channels: React.FC = () => {
     };
 
     const stopSession = async (companyId: string, connectionId: string) => {
+        if (isGhostMode) return;
         try {
             const { data: { session } } = await supabase.auth.getSession();
             await fetch(`https://pandanet.grupopixel.com.br/api/sessions/${companyId}/stop/${connectionId}`, {
@@ -193,6 +195,7 @@ const Channels: React.FC = () => {
     };
 
     const repairWebhook = async (companyId: string, connectionId: string) => {
+        if (isGhostMode) return;
         addDebugLog(`Iniciando REPARO de webhook para: ${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -220,6 +223,7 @@ const Channels: React.FC = () => {
     };
 
     const syncContacts = async (companyId: string, connectionId: string) => {
+        if (isGhostMode) return;
         addDebugLog(`Iniciando SINCRONIZAÇÃO de contatos para: ${connectionId}`, 'info');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -244,6 +248,7 @@ const Channels: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
+        if (isGhostMode) return;
         if (!confirm('Deseja realmente remover esta conexão? ATENÇÃO: Se houverem contatos e conversas vinculadas, a exclusão será bloqueada.')) return;
         const { error } = await supabase.from('whatsapp_settings').delete().eq('id', id);
         if (error) {
@@ -276,6 +281,7 @@ const Channels: React.FC = () => {
     };
 
     const handleSaveConfig = async () => {
+        if (isGhostMode) return;
         if (!connectionName) {
             alert('Por favor, preencha o Nome da Conexão.');
             return;
@@ -339,12 +345,14 @@ const Channels: React.FC = () => {
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Canais de Atendimento</h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm font-bold opacity-80 uppercase tracking-widest mt-1">Gerencie seus números de WhatsApp e redes sociais.</p>
                         </div>
-                        <button
-                            onClick={handleNew}
-                            className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
-                        >
-                            <Plus className="w-4 h-4" /> Adicionar Canal
-                        </button>
+                        {!isGhostMode && (
+                            <button
+                                onClick={handleNew}
+                                className="bg-emerald-500 hover:bg-emerald-600 dark:hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
+                            >
+                                <Plus className="w-4 h-4" /> Adicionar Canal
+                            </button>
+                        )}
                     </div>
 
                     {loading ? (
@@ -384,7 +392,7 @@ const Channels: React.FC = () => {
                                     )}
 
                                     <div className="flex gap-3 mt-4 pt-6 border-t border-gray-50 dark:border-white/5">
-                                        <button onClick={() => handleEdit(channel)} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:text-white dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
+                                        <button onClick={() => isGhostMode ? null : handleEdit(channel)} className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 hover:text-white dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all duration-300 flex justify-center items-center gap-2">
                                             <Edit2 className="w-3.5 h-3.5" /> Editar
                                         </button>
 
@@ -424,9 +432,11 @@ const Channels: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <button onClick={() => handleDelete(channel.id)} className="p-2.5 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all duration-300">
-                                            <Trash2 className="w-4.5 h-4.5" />
-                                        </button>
+                                        {!isGhostMode && (
+                                            <button onClick={() => handleDelete(channel.id)} className="p-2.5 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-white/5 hover:bg-red-500/10 rounded-xl transition-all duration-300">
+                                                <Trash2 className="w-4.5 h-4.5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

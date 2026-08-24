@@ -7,7 +7,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
-import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon } from './icons';
+import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon, ShieldCheckIcon as ShieldCheck } from './icons';
 import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page } from '../types';
 
 export const PostCard: React.FC<{
@@ -17,7 +17,8 @@ export const PostCard: React.FC<{
     onSubmitComment: (postId: string, text: string) => void;
     onShare: (post: Post) => void;
     onDelete: (postId: string) => void;
-}> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare, onDelete }) => {
+    isGhostMode?: boolean;
+}> = ({ post, currentUser, onToggleReaction, onSubmitComment, onShare, onDelete, isGhostMode }) => {
     const [commentText, setCommentText] = useState('');
     const [showReactionMenu, setShowReactionMenu] = useState(false);
     const timeoutRef = useRef<any>(null);
@@ -138,8 +139,10 @@ export const PostCard: React.FC<{
             </div>
 
             <div className="flex justify-around py-1 relative">
-                <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="flex-1">
-                    <button className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                <div onMouseEnter={isGhostMode ? undefined : handleMouseEnter} onMouseLeave={isGhostMode ? undefined : handleMouseLeave} className="flex-1">
+                    <button 
+                        disabled={isGhostMode}
+                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
@@ -155,7 +158,7 @@ export const PostCard: React.FC<{
                 <button onClick={() => commentInputRef.current?.focus()} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                     <ChatBubbleLeftIcon className="w-5 h-5" /><span>{t('feed.comment')}</span>
                 </button>
-                <button onClick={() => onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
+                <button onClick={() => isGhostMode ? null : onShare(post)} className="flex-1 flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-emerald-50 dark:hover:bg-slate-700/50 hover:text-emerald-600 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                     <ShareIcon className="w-5 h-5" /><span>{t('feed.share')}</span>
                 </button>
             </div>
@@ -175,22 +178,24 @@ export const PostCard: React.FC<{
                 </div>
             )}
 
-            <form onSubmit={handleCommentSubmit} className="mt-4 flex space-x-3 items-center">
-                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
-                <div className="flex-1 relative">
-                    <input
-                        ref={commentInputRef}
-                        type="text"
-                        placeholder={t('feed.write_comment')}
-                        className="w-full bg-gray-50 dark:bg-slate-700/50 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-brand-primary outline-none dark:text-gray-100"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                    />
-                    <button type="submit" className="absolute right-2 top-1.5 text-brand-primary p-1 rounded-full hover:bg-emerald-50 transition-colors">
-                        <PaperAirplaneIcon className="w-4 h-4" />
-                    </button>
-                </div>
-            </form>
+            {!isGhostMode && (
+                <form onSubmit={handleCommentSubmit} className="mt-4 flex space-x-3 items-center">
+                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                    <div className="flex-1 relative">
+                        <input
+                            ref={commentInputRef}
+                            type="text"
+                            placeholder={t('feed.write_comment')}
+                            className="w-full bg-gray-50 dark:bg-slate-700/50 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-brand-primary outline-none dark:text-gray-100"
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                        />
+                        <button type="submit" className="absolute right-2 top-1.5 text-brand-primary p-1 rounded-full hover:bg-emerald-50 transition-colors">
+                            <PaperAirplaneIcon className="w-4 h-4" />
+                        </button>
+                    </div>
+                </form>
+            )}
         </Card>
     );
 };
@@ -704,56 +709,66 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                 <div className="lg:col-span-8 space-y-6">
                     <Card title="" className="p-0 border-none shadow-sm overflow-visible">
-                        <div className="premium-card p-4 mb-6">
-                            <div className="flex space-x-4 mb-4">
-                                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover" />
-                                <div className="flex-1 relative">
-                                    <textarea
-                                        ref={postTextareaRef}
-                                        placeholder={t('feed.placeholder')}
-                                        className="w-full p-4 border border-gray-100 dark:border-slate-700 rounded-xl bg-gray-50/50 dark:bg-slate-700/30 text-brand-text dark:text-gray-100 focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/20 outline-none transition-all resize-none min-h-[120px]"
-                                        value={newPostContent}
-                                        onChange={handlePostContentChange}
-                                    ></textarea>
-                                    {mentionSearch !== '' && (
-                                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                                            {allEmployees
-                                                .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
-                                                .map(user => (
-                                                    <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
-                                                        <img src={user.avatarUrl || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full object-cover" alt="" />
-                                                        <div><p className="text-sm font-bold text-brand-text dark:text-gray-100">{user.name}</p><p className="text-xs text-brand-subtle-text dark:text-gray-400">{user.role}</p></div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    )}
+                        {isGhostMode ? (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-6 rounded-2xl flex items-center justify-center space-x-3 shadow-md animate-pulse">
+                                <ShieldCheck className="w-8 h-8 text-amber-500" />
+                                <div className="text-center">
+                                    <h4 className="text-amber-800 dark:text-amber-200 font-bold uppercase tracking-widest text-sm">Modo Auditoria Ativo</h4>
+                                    <p className="text-amber-600 dark:text-amber-400 text-xs mt-1">Interação e publicações desativadas para garantir zero rastros.</p>
                                 </div>
                             </div>
-
-                            {mediaFile && (
-                                <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800">
-                                    <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
-                                    <button onClick={() => setMediaFile(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-all shadow-lg scale-90 group-hover:scale-100 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-5 h-5" /></button>
+                        ) : (
+                            <div className="premium-card p-4 mb-6">
+                                <div className="flex space-x-4 mb-4">
+                                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-12 h-12 rounded-full object-cover" />
+                                    <div className="flex-1 relative">
+                                        <textarea
+                                            ref={postTextareaRef}
+                                            placeholder={t('feed.placeholder')}
+                                            className="w-full p-4 border border-gray-100 dark:border-slate-700 rounded-xl bg-gray-50/50 dark:bg-slate-700/30 text-brand-text dark:text-gray-100 focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/20 outline-none transition-all resize-none min-h-[120px]"
+                                            value={newPostContent}
+                                            onChange={handlePostContentChange}
+                                        ></textarea>
+                                        {mentionSearch !== '' && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                                {allEmployees
+                                                    .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
+                                                    .map(user => (
+                                                        <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
+                                                            <img src={user.avatarUrl || 'https://via.placeholder.com/32'} className="w-8 h-8 rounded-full object-cover" alt="" />
+                                                            <div><p className="text-sm font-bold text-brand-text dark:text-gray-100">{user.name}</p><p className="text-xs text-brand-subtle-text dark:text-gray-400">{user.role}</p></div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
-                                <div className="flex justify-around sm:justify-start space-x-2">
-                                    <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
-                                    <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
+    
+                                {mediaFile && (
+                                    <div className="relative mb-4 group ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800">
+                                        <img src={mediaFile.url} className="w-full h-48 object-cover rounded-xl" alt="" />
+                                        <button onClick={() => setMediaFile(null)} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-all shadow-lg scale-90 group-hover:scale-100 opacity-0 group-hover:opacity-100"><XCircleIcon className="w-5 h-5" /></button>
+                                    </div>
+                                )}
+    
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
+                                    <div className="flex justify-around sm:justify-start space-x-2">
+                                        <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
+                                        <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-brand-primary/5 hover:text-brand-primary rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
+                                    </div>
+                                    <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
                                 </div>
-                                <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-brand-primary transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
+                                <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 dark:border-slate-800 pt-3 gap-2">
+                                    <div className="flex items-start space-x-2">
+                                        <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
+                                        <span className="text-orange-600 font-bold leading-tight">{t('feed.important')}</span>
+                                    </div>
+                                    <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organizado e eficiente'}</span>
+                                </div>
+    
+                                <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
                             </div>
-                            <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between text-[11px] text-gray-400 font-medium border-t border-gray-50 dark:border-slate-800 pt-3 gap-2">
-                                <div className="flex items-start space-x-2">
-                                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse mt-1 shrink-0"></div>
-                                    <span className="text-orange-600 font-bold leading-tight">{t('feed.important')}</span>
-                                </div>
-                                <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organizado e eficiente'}</span>
-                            </div>
-
-                            <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
-                        </div>
+                        )}
                     </Card>
 
                     {/* Espaço para mural removendo o clima */}
@@ -776,6 +791,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                         onSubmitComment={handleSubmitComment}
                                         onShare={() => { }}
                                         onDelete={handleDeletePost}
+                                        isGhostMode={isGhostMode}
                                     />
                                 ))}
                             </div>

@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
 const TicketPage: React.FC = () => {
-    const { currentUser } = useAuth();
+    const { currentUser, isGhostMode } = useAuth();
     const { addNotification } = useNotifications();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
@@ -118,7 +118,7 @@ const TicketPage: React.FC = () => {
     }, [currentUser?.company_id]);
 
     const handleCreateTicket = async (ticketData: any) => {
-        if (!currentUser) return;
+        if (!currentUser || isGhostMode) return;
         try {
             let mediaUrls: string[] = [];
 
@@ -182,6 +182,7 @@ const TicketPage: React.FC = () => {
     };
 
     const handleUpdateTicket = async (updatedTicket: Ticket) => {
+        if (isGhostMode) return;
         // Optimistic update for UI
         setTickets(tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t));
         setSelectedTicket(updatedTicket);
@@ -272,12 +273,14 @@ const TicketPage: React.FC = () => {
             </div>
 
             <Card title={currentTab === 'active' ? "Central de Suporte (Chamados Ativos)" : "Histórico de Chamados"} headerAction={
-                <button
-                    onClick={() => { console.log('Button CLICKED'); handleRepairForm(); }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-50 cursor-pointer"
-                >
-                    Abrir Novo Chamado
-                </button>
+                !isGhostMode && (
+                    <button
+                        onClick={() => { console.log('Button CLICKED'); handleRepairForm(); }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-50 cursor-pointer"
+                    >
+                        Abrir Novo Chamado
+                    </button>
+                )
             }>
                 <div className="overflow-x-auto">
                     {tickets.length === 0 ? (
@@ -351,6 +354,7 @@ const TicketPage: React.FC = () => {
                             onClose={handleCloseDetail}
                             onUpdateTicket={handleUpdateTicket}
                             currentUser={currentUser}
+                            isGhostMode={isGhostMode}
                         />
                     </div>
                 </div>

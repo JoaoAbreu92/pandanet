@@ -9,9 +9,10 @@ interface TicketDetailProps {
     onClose: () => void;
     onUpdateTicket: (ticket: Ticket) => void;
     currentUser: Employee;
+    isGhostMode: boolean;
 }
 
-const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTicket, currentUser }) => {
+const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTicket, currentUser, isGhostMode }) => {
     const isTechOrAdmin = currentUser?.role?.toLowerCase() === 'admin' ||
         currentUser?.role?.toLowerCase() === 'super admin' ||
         currentUser?.team?.toUpperCase() === 'TI' ||
@@ -111,7 +112,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="text-xl font-bold text-brand-text pr-8">Chamado #{ticket.id}: {ticket.title}</h3>
                     <div className="flex items-center space-x-2">
-                        {isTechOrAdmin && ticket.status !== 'Resolvido' && ticket.status !== 'Fechado' && (
+                        {isTechOrAdmin && !isGhostMode && ticket.status !== 'Resolvido' && ticket.status !== 'Fechado' && (
                             <>
                                 <button
                                     onClick={() => handleAction('Resolvido', false)}
@@ -220,23 +221,25 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose, onUpdateTi
                         </div>
                     </div>
 
-                    <div>
-                        <form onSubmit={handleCommentSubmit} className="mt-6 flex items-center space-x-3">
-                            <img src={currentUser.avatarUrl} alt="Sua foto" className="w-8 h-8 rounded-full object-cover" />
-                            <div className="relative flex-1">
-                                <input
-                                    type="text"
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Adicionar um comentário..."
-                                    className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text"
-                                />
-                                <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:opacity-50">
-                                    <PaperAirplaneIcon className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                    {!isGhostMode && (
+                        <div>
+                            <form onSubmit={handleCommentSubmit} className="mt-6 flex items-center space-x-3">
+                                <img src={currentUser.avatarUrl} alt="Sua foto" className="w-8 h-8 rounded-full object-cover" />
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Adicionar um comentário..."
+                                        className="w-full pl-4 pr-12 py-2 bg-gray-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary text-brand-text"
+                                    />
+                                    <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-brand-primary text-white rounded-full hover:bg-emerald-600 disabled:opacity-50">
+                                        <PaperAirplaneIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
                 </div>
             </div>
 
