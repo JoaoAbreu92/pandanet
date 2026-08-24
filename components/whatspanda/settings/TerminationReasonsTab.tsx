@@ -37,7 +37,7 @@ const TerminationReasonsTab: React.FC = () => {
             .select('*')
             .eq('company_id', companyId)
             .order('created_at', { ascending: true });
-        
+
         if (error) console.error('Error fetching reasons:', error);
         else setReasons(data || []);
         setLoading(false);

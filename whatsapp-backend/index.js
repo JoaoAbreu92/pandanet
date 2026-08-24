@@ -1492,21 +1492,57 @@ async function downloadEvolutionMedia(instanceName, message, mediatype) {
             
             const endpoint = 'getBase64FromMediaMessage';
             
-            // Tentar extrair a mensagem "limpa" para a Evolution
-            const cleanMessage = JSON.parse(JSON.stringify(message));
-            const unwrap = (obj) => {
-                if (obj.message?.ephemeralMessage) obj.message = obj.message.ephemeralMessage.message;
-                if (obj.message?.viewOnceMessage) obj.message = obj.message.viewOnceMessage.message;
-                if (obj.message?.viewOnceMessageV2) obj.message = obj.message.viewOnceMessageV2.message;
-                if (obj.message?.documentWithCaptionMessage) obj.message = obj.message.documentWithCaptionMessage.message;
-            };
-            unwrap(cleanMessage);
+            // Tentar extrair a mensagem de forma inteligente
+            let payloadMessage;
+            if (mediatype === 'sticker' || mediatype === 'gif') {
+                // Para sticker e gif, o payload simplificado costuma funcionar melhor pois evita urls/dados quebrados
+                if (attempt === 1) {
+                    payloadMessage = {
+                        key: {
+                            id: message.key.id,
+                            fromMe: message.key.fromMe,
+                            remoteJid: message.key.remoteJid
+                        }
+                    };
+                } else {
+                    const cleanMessage = JSON.parse(JSON.stringify(message));
+                    const unwrap = (obj) => {
+                        if (obj.message?.ephemeralMessage) obj.message = obj.message.ephemeralMessage.message;
+                        if (obj.message?.viewOnceMessage) obj.message = obj.message.viewOnceMessage.message;
+                        if (obj.message?.viewOnceMessageV2) obj.message = obj.message.viewOnceMessageV2.message;
+                        if (obj.message?.documentWithCaptionMessage) obj.message = obj.message.documentWithCaptionMessage.message;
+                    };
+                    unwrap(cleanMessage);
+                    payloadMessage = cleanMessage;
+                }
+            } else {
+                // Outras mídias tentam primeiro o objeto completo (legado)
+                if (attempt === 1) {
+                    const cleanMessage = JSON.parse(JSON.stringify(message));
+                    const unwrap = (obj) => {
+                        if (obj.message?.ephemeralMessage) obj.message = obj.message.ephemeralMessage.message;
+                        if (obj.message?.viewOnceMessage) obj.message = obj.message.viewOnceMessage.message;
+                        if (obj.message?.viewOnceMessageV2) obj.message = obj.message.viewOnceMessageV2.message;
+                        if (obj.message?.documentWithCaptionMessage) obj.message = obj.message.documentWithCaptionMessage.message;
+                    };
+                    unwrap(cleanMessage);
+                    payloadMessage = cleanMessage;
+                } else {
+                    payloadMessage = {
+                        key: {
+                            id: message.key.id,
+                            fromMe: message.key.fromMe,
+                            remoteJid: message.key.remoteJid
+                        }
+                    };
+                }
+            }
 
             const resp = await fetch(`${evoUrl}/chat/${endpoint}/${instanceName}`, {
                 method: 'POST',
                 headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: cleanMessage
+                    message: payloadMessage
                 })
             });
 

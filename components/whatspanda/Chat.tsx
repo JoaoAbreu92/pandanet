@@ -499,14 +499,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     };
   }, [selectedConversation]);
 
+  const shouldForceScrollRef = useRef(true);
+
   useEffect(() => {
     if (selectedConversation) {
+      shouldForceScrollRef.current = true;
       fetchMessages(selectedConversation.id);
       fetchContactNotes(selectedConversation.id);
       markAsRead(selectedConversation.id);
-      
-      // Force scroll on conversation change
-      scrollToBottom(true);
       
       // Clear bell notifications for this conversation
       markNotificationsByLink('/whatspanda');
@@ -517,17 +517,19 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [isUserReading, setIsUserReading] = useState(false);
 
   useEffect(() => {
-    // Only scroll if we are not actively reading the history
-    if (!isUserReading) {
+    if (shouldForceScrollRef.current) {
+      scrollToBottom(true, 'auto');
+      shouldForceScrollRef.current = false;
+    } else if (!isUserReading) {
       scrollToBottom();
     }
   }, [messages]);
 
-  const scrollToBottom = (force = false) => {
+  const scrollToBottom = (force = false, behavior: 'smooth' | 'auto' = 'smooth') => {
     if (force) {
       // Força scroll apenas quando o user abre uma nova conversa ou envia mensagem
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior });
         setIsUserReading(false);
       }, 100);
       return;
@@ -1394,7 +1396,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       }
 
       fetchMessages(selectedConversation.id);
-      scrollToBottom(true);
+      scrollToBottom(true, 'smooth');
     } catch (error) {
         console.error('Error sending audio message:', error);
         alert('Erro ao enviar áudio.');
@@ -1508,7 +1510,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         // Recarregar mensagens após o envio
         fetchMessages(selectedConversation.id);
         // Forçar scroll para baixo para ver a própria mensagem enviada
-        scrollToBottom(true);
+        scrollToBottom(true, 'smooth');
     } catch (error: any) {
         console.error('Error sending message:', error);
         alert(`Erro ao enviar mensagem: ${error?.message || error}`);
