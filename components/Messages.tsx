@@ -1148,7 +1148,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                             <span className="bg-red-100 text-red-600 text-[10px] uppercase font-black px-2 py-0.5 rounded-full border border-red-200">Encerrado</span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-gray-500">Panda Offline</p>
+                                    <p className="text-xs font-medium">
+                                        {selectedConversation?.participantId && onlineUsers.has(selectedConversation.participantId)
+                                            ? <span className="text-emerald-500 flex items-center gap-1">● Online</span>
+                                            : <span className="text-gray-400 flex items-center gap-1">○ Offline</span>
+                                        }
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -1269,23 +1274,25 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                                         </button>
 
                                             {/* Nudge Button */}
-                                            <button
-                                                type="button"
-                                                onClick={handleSendNudge}
-                                                disabled={!!cooldownTimeouts[selectedConversationId || '']}
-                                                className={`p-2 rounded-full transition-all relative ${cooldownTimeouts[selectedConversationId || '']
-                                                    ? 'text-gray-300 cursor-not-allowed'
-                                                    : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50'
-                                                    }`}
-                                                title="Chamar Atenção (MSN Nudge)"
-                                            >
-                                                <BellIcon className={`w-6 h-6 ${!cooldownTimeouts[selectedConversationId || ''] ? 'animate-bounce' : ''}`} />
-                                                {cooldownTimeouts[selectedConversationId || ''] && (
-                                                    <span className="absolute -top-1 -right-1 bg-gray-600 text-white text-[9px] px-1 rounded-full font-bold">
-                                                        {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
-                                                    </span>
-                                                )}
-                                            </button>
+                                            <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSendNudge}
+                                                    disabled={!!cooldownTimeouts[selectedConversationId || '']}
+                                                    className={`p-2 rounded-full transition-all relative flex items-center justify-center w-full h-full ${cooldownTimeouts[selectedConversationId || '']
+                                                        ? 'text-gray-300 cursor-not-allowed bg-gray-50/50'
+                                                        : 'text-orange-500 hover:text-orange-600 hover:bg-orange-50 active:scale-95'
+                                                        }`}
+                                                    title="Chamar Atenção (MSN Nudge)"
+                                                >
+                                                    <BellIcon className={`w-6 h-6 ${!cooldownTimeouts[selectedConversationId || ''] ? 'animate-bounce' : ''}`} />
+                                                    {cooldownTimeouts[selectedConversationId || ''] && (
+                                                        <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap min-w-[28px] text-center border border-white">
+                                                            {Math.floor(cooldownTimeouts[selectedConversationId || ''] / 60)}:{(cooldownTimeouts[selectedConversationId || ''] % 60).toString().padStart(2, '0')}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            </div>
                                         <input
                                             type="text"
                                             value={newMessageText}

@@ -60,7 +60,7 @@ const Layout: React.FC<LayoutProps> = ({
     }, []);
 
     return (
-        <div className="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-gray-900">
+        <div className={`flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-gray-900 ${isShaking ? 'nudge-shake' : ''}`}>
             <SystemUpdateNotification />
             <div className="flex flex-1 w-full overflow-hidden relative">
             {/* Mobile Overlay */}
@@ -84,7 +84,7 @@ const Layout: React.FC<LayoutProps> = ({
                 isImpersonating={isImpersonating}
                 customFeatures={currentCompany.custom_features}
             />
-                <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300 ${isSidebarOpen ? 'md:pl-0' : 'md:pl-0'} ${isShaking ? 'nudge-shake' : ''}`}>
+                <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
                 <Header
                     onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
                     currentUser={currentUser}

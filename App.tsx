@@ -75,6 +75,7 @@ const AppContent: React.FC = () => {
                 const newMsg = payload.new;
                 // Verificamos se é um "nudge" (chamar atenção)
                 if (newMsg.file_type === 'nudge') {
+                    console.log('[PandaNet] Nudge detectado:', newMsg);
                     // Verificamos se o usuário atual é o destinatário
                     const { data: participation } = await supabase
                         .from('conversation_participants')
@@ -84,6 +85,7 @@ const AppContent: React.FC = () => {
                         .single();
 
                     if (participation && newMsg.sender_id !== currentUser.id) {
+                        console.log('[PandaNet] Nudge direcionado a mim! Ativando efeitos...');
                         // Reproduzir som de alerta
                         playNotificationSound('nudge');
 
@@ -93,7 +95,12 @@ const AppContent: React.FC = () => {
 
                         // Tremer a tela
                         setIsShaking(true);
-                        setTimeout(() => setIsShaking(false), 5000);
+                        setTimeout(() => {
+                            console.log('[PandaNet] Parando tremor.');
+                            setIsShaking(false);
+                        }, 5000);
+                    } else {
+                        console.log('[PandaNet] Nudge ignorado (não sou o destinatário ou sou o autor).');
                     }
                 }
             })

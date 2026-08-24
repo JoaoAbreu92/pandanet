@@ -39,20 +39,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, []);
 
     const playNotificationSound = useCallback((type: NotificationType | 'nudge') => {
-        const soundPath = SOUNDS[type] || SOUNDS.default;
-        const audio = new Audio(soundPath);
-        audio.play().catch(err => {
-            console.warn('Playback bloqueado ou falhou:', err);
-            // Não alertamos em todas as falhas para não irritar, 
-            // mas o log ajuda no debug.
-        });
+        try {
+            const soundPath = SOUNDS[type] || SOUNDS.default;
+            const audio = new Audio(soundPath);
+            audio.volume = 0.9;
+
+            console.log(`[PandaNet] Playing sound: ${type} (${soundPath})`);
+
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.warn('[PandaNet] Audio playback blocked or failed. Please click "Ativar Toques" in the header.', err);
+                });
+            }
+        } catch (e) {
+            console.error('[PandaNet] Fatal error in playNotificationSound:', e);
+        }
     }, []);
 
     const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, {
-                body,
-                icon: icon || '/logo.png'
+        if (!('Notification' in window)) {
+            console.warn('[PandaNet] Browser does not support desktop notifications.');
+            return;
+        }
+
+        const options = {
+            body,
+            icon: icon || '/logo.png',
+            silent: false
+        };
+
+        if (Notification.permission === 'granted') {
+            new Notification(title, options);
+        } else if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    new Notification(title, options);
+                }
             });
         }
     }, []);
