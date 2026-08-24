@@ -75,11 +75,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             
             if (provider === 'gemini') {
                 const cleanKey = currentUser.ai_api_key.trim();
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`, {
+
+                // Using the specific v1beta endpoint structure exactly as documented in Google AI Studio
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: userText }] }]
+                        contents: [{
+                            parts: [{
+                                text: userText
+                            }]
+                        }]
                     })
                 });
                 
