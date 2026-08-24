@@ -453,7 +453,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         }) : [];
 
                         return (
-                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-colors ${day ? (isPast ? 'bg-slate-50/70 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/60 cursor-pointer' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer') : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
+                             <div key={idx} className={`h-32 border-b border-r dark:border-slate-800 p-2 relative transition-all duration-300 ${day ? (isPast ? 'bg-slate-100/50 dark:bg-slate-950/30 hover:bg-slate-100/80 dark:hover:bg-slate-900/60 cursor-pointer opacity-50 hover:opacity-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer') : 'bg-slate-50/50 dark:bg-slate-800/30'} last:border-r-0`}
                                   onClick={() => { if (day) { setSelectedDayOptionsDate(day); setDayOptionsOpen(true); } }}>
                                 {day && (
                                     <>

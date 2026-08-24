@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api\/whatsapp/, '')
           },
+          '/api/email': {
+            target: 'http://localhost:3001',
+            changeOrigin: true
+          },
           '/api': {
             target: 'http://localhost:3001',
             changeOrigin: true,
@@ -60,6 +64,9 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      build: {
+        sourcemap: true
       },
       resolve: {
         alias: {

@@ -154,9 +154,7 @@ app.post('/api/email/fetch-by-ids', authMiddleware, async (req, res) => {
                 const uids = [...new Set(uidsArrays.flat())];
                 
                 if (uids.length > 0) {
-                    for await (const message of client.fetch(uids, { envelope: true, uid: true, source: true })) {
-                        const parsed = await simpleParser(message.source);
-                        const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
+                    for await (const message of client.fetch(uids, { envelope: true, uid: true })) {
                         allResults.push({
                             uid: message.uid,
                             messageId: message.envelope.messageId,
@@ -174,7 +172,7 @@ app.post('/api/email/fetch-by-ids', authMiddleware, async (req, res) => {
                             })),
                             date: message.envelope.date,
                             flags: Array.from(message.flags || []),
-                            snippet: snippet + (snippet.length === 100 ? '...' : ''),
+                            snippet: '',
                             folder: folder.path
                         });
                     }
@@ -232,10 +230,7 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                     // Limit to newest 20 per folder to avoid timeout/bloat
                     const sortedUids = uids.sort((a, b) => b - a).slice(0, 20);
                     
-                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true, source: true })) {
-                        const parsed = await simpleParser(message.source);
-                        const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
-                        
+                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true })) {
                         allResults.push({
                             uid: message.uid,
                             messageId: message.envelope.messageId,
@@ -253,7 +248,7 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                             })),
                             date: message.envelope.date,
                             flags: Array.from(message.flags || []),
-                            snippet: snippet + (snippet.length === 100 ? '...' : ''),
+                            snippet: '',
                             folder: folder.path
                         });
                     }
@@ -306,7 +301,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
 
         try {
             // Fetch Status (Unseen count)
-            const status = await client.status(mailboxPath, { unseen: true, messages: true });
+            const status = await client.status(finalPath, { unseen: true, messages: true });
 
             if (!status || status.messages === 0) return res.json({ emails: [], total: 0, unseen: 0 });
 
@@ -330,11 +325,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const range = `${startIndex}:${endIndex}`;
             console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
-            for await (const message of client.fetch(range, { envelope: true, uid: true, source: true })) {
-                // Generate a simple snippet by parsing the source briefly or just first part
-                const parsed = await simpleParser(message.source);
-                const snippet = parsed.text ? parsed.text.substring(0, 100).replace(/\s+/g, ' ') : '';
-
+            for await (const message of client.fetch(range, { envelope: true, uid: true })) {
                 emails.push({
                     uid: message.uid,
                     messageId: message.envelope.messageId,
@@ -352,7 +343,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
                     })),
                     date: message.envelope.date,
                     flags: Array.from(message.flags || []),
-                    snippet: snippet + (snippet.length === 100 ? '...' : '')
+                    snippet: ''
                 });
             }
             // Sort by date desc
