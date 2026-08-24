@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SYSTEM_VERSION } from '../version';
+import { supabase } from '../supabaseClient';
 
-const logoSrc = '/logo.png';
+const defaultLogo = '/logo.png';
 
 interface LogoProps {
     showText?: boolean;
@@ -10,9 +11,34 @@ interface LogoProps {
 }
 
 const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLogo }) => {
+    const [systemLogo, setSystemLogo] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchSystemLogo = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'main_logo')
+                    .maybeSingle();
+
+                if (!error && data?.value) {
+                    setSystemLogo(data.value);
+                }
+            } catch (err) {
+                console.error("Error fetching system logo:", err);
+            }
+        };
+        fetchSystemLogo();
+    }, []);
+
     return (
         <div className={`flex flex-col items-center ${className}`}>
-            <img src={companyLogo || logoSrc} alt="Logo" className="h-12 w-auto object-contain" />
+            <img
+                src={(companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo)}
+                alt="Logo"
+                className="h-12 w-auto object-contain transition-all duration-300"
+            />
             {showText && (
                 <span className="text-[10px] text-gray-400 font-medium tracking-wider -mt-1">
                     v{SYSTEM_VERSION}

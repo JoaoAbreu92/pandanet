@@ -29,7 +29,8 @@ import {
     CheckCircleIcon,
     LockClosedIcon,
     MagnifyingGlassIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    PhotoIcon
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon } from '@heroicons/react/24/outline';
 import { useToast } from './ToastContext';
@@ -70,6 +71,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
+    const [systemLogo, setSystemLogo] = useState<string | null>(null);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [updateDuration, setUpdateDuration] = useState(15);
+    const [updateDurationUnit, setUpdateDurationUnit] = useState<'hours' | 'days'>('hours');
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     // --- Buscar Dados ---
     const fetchData = async () => {
@@ -101,11 +108,124 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
             const { data: updatesData, error: updatesError } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
             if (updatesError) console.error('Error fetching updates', updatesError);
             else setSystemUpdates(updatesData || []);
+            // Fetch System Logo
+            console.log("[SaaS] Buscando logomarca do sistema...");
+            const { data: logoData, error: logoErr } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'main_logo')
+                .maybeSingle();
+
+            if (logoErr) console.error("[SaaS] Erro ao buscar logo:", logoErr);
+            if (logoData?.value) {
+                console.log("[SaaS] Logo encontrada no banco:", logoData.value);
+                setSystemLogo(logoData.value);
+            } else {
+                console.log("[SaaS] Nenhuma logo customizada encontrada no banco.");
+            }
+
+            // Fetch System Update Duration
+            const { data: durationData } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'update_notification_duration')
+                .maybeSingle();
+            if (durationData?.value) setUpdateDuration(parseInt(durationData.value) || 15);
+
+            const { data: unitData } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'update_notification_unit')
+                .maybeSingle();
+            if (unitData?.value) setUpdateDurationUnit(unitData.value as any || 'hours');
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSaveGeneralSettings = async () => {
+        setIsSavingSettings(true);
+        console.log("[SaaS] Iniciando salvamento de configurações...");
+        try {
+            const updates: any[] = [
+                { key: 'update_notification_duration', value: updateDuration.toString() },
+                { key: 'update_notification_unit', value: updateDurationUnit }
+            ];
+
+            // If a new logo file was selected, upload it first
+            if (logoFile) {
+                console.log("[SaaS] Novo arquivo de logo detectado. Fazendo upload...", logoFile.name);
+                const fileExt = logoFile.name.split('.').pop();
+                const fileName = `main_logo_${Date.now()}.${fileExt}`;
+                const filePath = `system/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('announcements-media')
+                    .upload(filePath, logoFile, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (uploadError) {
+                    console.error("[SaaS] Erro no upload da logo:", uploadError);
+                    throw new Error("Falha ao enviar arquivo para o storage: " + uploadError.message);
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('announcements-media')
+                    .getPublicUrl(filePath);
+
+                console.log("[SaaS] Logo enviada. URL pública:", publicUrl);
+                updates.push({ key: 'main_logo', value: publicUrl });
+
+                // Update local state and clear file
+                setSystemLogo(publicUrl);
+                setLogoFile(null);
+            } else if (systemLogo) {
+                // If we have a logo in state but no new file, keep it
+                // Note: Optional, but good to ensure it stays in DB if upserting whole list
+                updates.push({ key: 'main_logo', value: systemLogo });
+            }
+
+            console.log("[SaaS] Executando UPSERT no banco:", updates);
+            const { error: upsertError, data: upsertData } = await supabase
+                .from('system_settings')
+                .upsert(updates, { onConflict: 'key' })
+                .select();
+
+            if (upsertError) {
+                console.error("[SaaS] Erro no upsert das configurações:", upsertError);
+                throw new Error("Erro ao salvar no banco de dados: " + upsertError.message);
+            }
+
+            console.log("[SaaS] ✅ Configurações salvas com sucesso!", upsertData);
+            showToast('Configurações salvas e aplicadas!', 'success');
+
+            // Force a reload of the current page data
+            fetchData();
+
+            // Optional: Alert the user to refresh to see changes globally
+            // showToast('Recarregue a página (F5) para ver a nova logo no menu lateral.', 'info');
+            setTimeout(() => {
+                window.location.reload(); // Hard reload to ensure all Logo components re-fetch
+            }, 1500);
+        } catch (error: any) {
+            console.error('[SaaS] Erro crítico no salvamento:', error);
+            showToast(error.message || 'Erro ao salvar configurações.', 'error');
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        setLogoFile(file);
+        // Immediate local preview
+        const objectUrl = URL.createObjectURL(file);
+        setSystemLogo(objectUrl);
     };
 
     useEffect(() => {
@@ -511,7 +631,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 {/* DASHBOARD */}
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6 animate-fadeIn">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
                                 <p className="text-sm text-gray-500 font-medium">Versão do Sistema</p>
                                 <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">
@@ -657,23 +777,98 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                 {/* SETTINGS / UPDATES */}
                 {activeTab === 'settings' && (
                     <div className="space-y-6 animate-fadeIn">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                             <div className="flex items-center gap-2">
                                 <AdjustmentsHorizontalIcon className="w-5 h-5 text-gray-800 dark:text-white" />
                                 <h2 className="text-xl font-bold text-gray-800 dark:text-white">Configurações & Atualizações</h2>
                             </div>
                             <button
                                 onClick={() => openModal('newUpdate')}
-                                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2 transition-colors shadow-md"
+                                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded text-sm font-bold uppercase flex items-center justify-center gap-2 transition-colors shadow-md w-full sm:w-auto"
                             >
                                 <PlusIcon className="w-4 h-4" /> Postar Atualização
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* LOGO CONFIGURATION */}
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <PhotoIcon className="w-5 h-5 text-gray-500" />
+                                    <h3 className="text-lg font-bold text-gray-700 dark:text-white">Logomarca do Sistema</h3>
+                                </div>
+
+                                <div className="flex flex-col items-center justify-center flex-1 space-y-4">
+                                    <div className="w-full max-w-[240px] h-32 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 flex items-center justify-center overflow-hidden group relative">
+                                        {systemLogo ? (
+                                            <img src={systemLogo} alt="Logo Atual" className="max-h-24 w-auto object-contain transition-transform group-hover:scale-105" />
+                                        ) : (
+                                            <div className="text-center">
+                                                <BuildingOfficeIcon className="w-10 h-10 text-gray-300 mx-auto" />
+                                                <p className="text-xs text-gray-400 mt-2">Nenhuma logo definida</p>
+                                            </div>
+                                        )}
+
+                                        {isUploadingLogo && (
+                                            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 flex items-center justify-center z-10">
+                                                <ArrowPathIcon className="w-8 h-8 text-brand-primary animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-full">
+                                        <label className="block w-full text-center px-4 py-2.5 bg-brand-primary hover:bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer transition-all shadow-sm">
+                                            {logoFile ? 'LOGO SELECIONADA' : 'SELECIONAR NOVA LOGO'}
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                accept="image/*"
+                                                onChange={handleLogoSelect}
+                                                disabled={isSavingSettings}
+                                            />
+                                        </label>
+                                        <p className="text-[10px] text-gray-400 text-center mt-2 italic">
+                                            * Esta logo será exibida em todas as áreas que não possuem logo própria.
+                                        </p>
+                                    </div>
+
+                                    {/* UPDATE DURATION SETTING */}
+                                    <div className="w-full pt-4 border-t border-gray-100 dark:border-gray-700 mt-4 space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Manter Notificação Ativa Por:</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={updateDuration}
+                                                    onChange={(e) => setUpdateDuration(parseInt(e.target.value) || 0)}
+                                                    className="w-20 p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 text-sm font-bold text-center"
+                                                />
+                                                <select
+                                                    value={updateDurationUnit}
+                                                    onChange={(e) => setUpdateDurationUnit(e.target.value as any)}
+                                                    className="flex-1 p-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 text-sm font-medium"
+                                                >
+                                                    <option value="hours">Horas</option>
+                                                    <option value="days">Dias</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={handleSaveGeneralSettings}
+                                            disabled={isSavingSettings}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-xs uppercase transition-all shadow-md disabled:opacity-50"
+                                        >
+                                            {isSavingSettings ? 'SALVANDO...' : 'SALVAR CONFIGURAÇÕES'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* VERSION HISTORY */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-bold text-gray-700 dark:text-white mb-4">Histórico de Versões</h3>
-                                <div className="space-y-4">
+                                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
                                     {systemUpdates.length === 0 ? (
                                         <p className="text-sm text-gray-400 italic">Nenhuma atualização registrada.</p>
                                     ) : (

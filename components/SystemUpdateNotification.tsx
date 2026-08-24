@@ -8,6 +8,25 @@ const SystemUpdateNotification: React.FC = () => {
 
     useEffect(() => {
         const fetchLatestUpdate = async () => {
+            // Fetch configuration
+            const { data: configDur } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'update_notification_duration')
+                .maybeSingle();
+
+            const { data: configUnit } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'update_notification_unit')
+                .maybeSingle();
+
+            const duration = parseInt(configDur?.value || '48');
+            const unit = configUnit?.value || 'hours';
+
+            // Calculate duration in milliseconds
+            const durationMs = unit === 'days' ? duration * 24 * 60 * 60 * 1000 : duration * 60 * 60 * 1000;
+
             const { data, error } = await supabase
                 .from('system_updates')
                 .select('*')
@@ -17,11 +36,16 @@ const SystemUpdateNotification: React.FC = () => {
 
             if (!error && data && data.length > 0) {
                 const update = data[0];
-                const dismissedVersion = localStorage.getItem('dismissed_update_version');
-                
-                if (dismissedVersion !== update.version) {
-                    setLatestUpdate(update);
-                    setIsVisible(true);
+                const updateDate = new Date(update.created_at).getTime();
+                const now = new Date().getTime();
+
+                // Only show if within duration
+                if (now - updateDate < durationMs) {
+                    const dismissedVersion = localStorage.getItem('dismissed_update_version');
+                    if (dismissedVersion !== update.version) {
+                        setLatestUpdate(update);
+                        setIsVisible(true);
+                    }
                 }
             }
         };
@@ -42,6 +66,7 @@ const SystemUpdateNotification: React.FC = () => {
         };
     }, []);
 
+
     const handleDismiss = () => {
         if (latestUpdate) {
             localStorage.setItem('dismissed_update_version', latestUpdate.version);
@@ -49,14 +74,14 @@ const SystemUpdateNotification: React.FC = () => {
         setIsVisible(false);
     };
 
-    const handleDownloadPDF = () => {
+    const handleDownloadNota = () => {
         // Mock download logic
-        const content = `Atualização PandaNet - Versão ${latestUpdate.version}\n\n${latestUpdate.description}`;
-        const blob = new Blob([content], { type: 'application/pdf' });
+        const content = `Nota de Atualização PandaNet - Versão ${latestUpdate.version}\n\n${latestUpdate.description}`;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `PandaNet_Update_${latestUpdate.version}.txt`; // Forcing txt since we are mocking pdf content string
+        a.download = `PandaNet_Nota_Atualizacao_${latestUpdate.version}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -78,11 +103,11 @@ const SystemUpdateNotification: React.FC = () => {
             
             <div className="flex items-center space-x-4 flex-shrink-0 ml-4">
                 <button 
-                    onClick={handleDownloadPDF}
+                    onClick={handleDownloadNota}
                     className="flex items-center space-x-1 bg-white text-red-600 px-3 py-1 rounded-full text-xs font-bold hover:bg-red-50 transition-colors shadow-sm"
                 >
                     <ArrowDownTrayIcon className="w-4 h-4" />
-                    <span>BAIXAR PDF</span>
+                    <span>BAIXAR NOTA</span>
                 </button>
                 <button onClick={handleDismiss} className="hover:text-red-200 transition-colors">
                     <XMarkIcon className="w-5 h-5" />
