@@ -86,6 +86,9 @@ const AppContent: React.FC = () => {
                 table: 'nudges'
                 // Filter removed to ensure reception, filtering manually below
             }, async (payload) => {
+                console.log('[PandaNet] 🔔 RAW EVENT RECEIVED FROM NUDGES TABLE');
+                console.log('[PandaNet] Full payload:', JSON.stringify(payload, null, 2));
+
                 const newNudge = payload.new as any;
                 console.log('[PandaNet] NUDGE TABLE EVENT (RAW):', newNudge);
 

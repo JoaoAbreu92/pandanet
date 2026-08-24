@@ -209,16 +209,27 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
             // 2. DEDICATED NUDGE TABLE (Garantia de entrega)
             if (selectedConversation?.participantId) {
-                const { error: nudgeError } = await supabase
+                console.log('[PandaNet] Inserting nudge into table...');
+                console.log('[PandaNet] Sender ID:', currentUser.id);
+                console.log('[PandaNet] Receiver ID:', selectedConversation.participantId);
+                console.log('[PandaNet] Conversation ID:', selectedConversationId);
+
+                const { data, error: nudgeError } = await supabase
                     .from('nudges')
                     .insert({
                         sender_id: currentUser.id,
                         receiver_id: selectedConversation.participantId, // ID do destinatário direto
                         conversation_id: selectedConversationId
-                    });
+                    })
+                    .select();
 
-                if (nudgeError) console.error('Erro ao registrar nudge na tabela:', nudgeError);
-                else console.log('Nudge registrado na tabela dedicada.');
+                if (nudgeError) {
+                    console.error('[PandaNet] ❌ Erro ao registrar nudge na tabela:', nudgeError);
+                } else {
+                    console.log('[PandaNet] ✅ Nudge registrado na tabela dedicada:', data);
+                }
+            } else {
+                console.warn('[PandaNet] ⚠️ participantId não encontrado, nudge não foi inserido na tabela');
             }
 
 
