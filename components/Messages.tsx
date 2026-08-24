@@ -189,22 +189,24 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
             fetchMessages(selectedConversationId);
 
 
-            // 1. BROADCAST NUDGE (Imediato)
-            const channel = supabase.channel('global-nudges');
-            channel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('Enviando nudge broadcast...');
-                    channel.send({
-                        type: 'broadcast',
-                        event: 'nudge',
-                        payload: {
-                            sender_id: currentUser?.id,
-                            conversation_id: selectedConversationId,
-                            receiver_id: selectedConversation?.participantId // Importante para o novo filtro
-                        }
-                    });
-                    // Do NOT remove channel here
+            // 1. BROADCAST NUDGE (Imediato) - Use the GLOBAL channel
+            console.log('[PandaNet] Sending broadcast nudge to global-nudges channel...');
+            const broadcastChannel = supabase.channel('global-nudges');
+
+            // Send broadcast immediately without waiting for subscription
+            // The global listener in App.tsx is already subscribed
+            broadcastChannel.send({
+                type: 'broadcast',
+                event: 'nudge',
+                payload: {
+                    sender_id: currentUser?.id,
+                    conversation_id: selectedConversationId,
+                    receiver_id: selectedConversation?.participantId
                 }
+            }).then(() => {
+                console.log('[PandaNet] ✅ Broadcast sent successfully');
+            }).catch((err) => {
+                console.error('[PandaNet] ❌ Broadcast failed:', err);
             });
 
             // 2. DEDICATED NUDGE TABLE (Garantia de entrega)
