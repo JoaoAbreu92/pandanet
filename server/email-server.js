@@ -629,7 +629,10 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
         port: ensureNumber(config.smtp_port),
         secure: config.smtp_ssl !== false,
         auth: { user: config.smtp_user, pass: config.smtp_pass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000
     });
 
     try {
@@ -790,7 +793,10 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
         port: ensureNumber(config.smtp_port),
         secure: config.smtp_ssl !== false,
         auth: { user: config.smtp_user, pass: config.smtp_pass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000
     });
     try {
         await transporter.verify();

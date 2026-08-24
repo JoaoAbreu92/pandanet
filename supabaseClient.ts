@@ -24,6 +24,51 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
+ * Sanitiza o nome de um arquivo para evitar problemas de caracteres especiais e acentos no Supabase Storage.
+ */
+export function sanitizeFileName(name: string): string {
+    if (!name) return name;
+    return name
+        .split('/')
+        .map(part => part
+            .normalize('NFD') // Decompõe caracteres acentuados
+            .replace(/[\u0300-\u036f]/g, '') // Remove os acentos
+            .replace(/[^a-zA-Z0-9.-]/g, '_') // Substitui caracteres especiais/espaços por underscore
+            .replace(/_+/g, '_') // Evita múltiplos underscores
+        )
+        .join('/');
+}
+
+// Wrapper para interceptar todas as chamadas do Storage e sanitizar os nomes dos arquivos transparentemente
+const originalFrom = supabase.storage.from.bind(supabase.storage);
+supabase.storage.from = (bucket: string) => {
+    const fileApi = originalFrom(bucket);
+    
+    const originalUpload = fileApi.upload.bind(fileApi);
+    const originalUpdate = fileApi.update.bind(fileApi);
+    const originalGetPublicUrl = fileApi.getPublicUrl.bind(fileApi);
+    const originalRemove = fileApi.remove.bind(fileApi);
+
+    fileApi.upload = (path: string, file: any, options?: any) => {
+        return originalUpload(sanitizeFileName(path), file, options);
+    };
+
+    fileApi.update = (path: string, file: any, options?: any) => {
+        return originalUpdate(sanitizeFileName(path), file, options);
+    };
+
+    fileApi.getPublicUrl = (path: string, options?: any) => {
+        return originalGetPublicUrl(sanitizeFileName(path), options);
+    };
+
+    fileApi.remove = (paths: string[]) => {
+        return originalRemove(paths.map(p => sanitizeFileName(p)));
+    };
+
+    return fileApi;
+};
+
+/**
  * Normaliza e reescreve URLs absolutas de mídia do Supabase que utilizam HTTP
  * na porta 8000 da VPS para usar o origin atual do site (HTTPS/Nginx),
  * prevenindo o bloqueio de conteúdo misto pelo navegador.

@@ -664,6 +664,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Criar tabela policies
+CREATE TABLE IF NOT EXISTS public.policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    type TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.policies ENABLE ROW LEVEL SECURITY;
+
 -- Re-aplicar políticas em todas as tabelas
 SELECT apply_tenant_policies();
 

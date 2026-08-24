@@ -22,10 +22,9 @@ const PoliciesPage: React.FC = () => {
                 // Or maybe we treat everything in ResourceCenter as potential policy if tagged so.
                 // Let's assume strict category 'Políticas' for now to distinguish.
                 const { data, error } = await supabase
-                    .from('documents')
+                    .from('policies')
                     .select('*')
                     .eq('company_id', currentUser.company_id)
-                    .ilike('category', '%Políticas%') // Flexible match
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -35,7 +34,7 @@ const PoliciesPage: React.FC = () => {
                         id: doc.id,
                         title: doc.title,
                         category: doc.category,
-                        type: doc.file_type as any,
+                        type: doc.type as any,
                         url: doc.url,
                         updatedAt: new Date(doc.created_at).toISOString().split('T')[0]
                     }));
