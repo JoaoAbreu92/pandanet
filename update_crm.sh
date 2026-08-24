@@ -14,9 +14,16 @@ echo "🚀 Reiniciando apenas o Ayla CRM..."
 docker compose -f docker-compose.perfex.yml down
 docker compose -f docker-compose.perfex.yml up -d --build
 
-# 3. Aplicar permissões de novo para garantir (caso o Git mude algo)
-echo "🔐 Ajustando permissões da pasta de dados..."
-chmod -R 755 perfex-data/app
+# 3. Ajustar permissões da pasta de dados (Imprescindível para o instalador)
+echo "🔐 Ajustando permissões para o instalador..."
+# Dar permissão total para as pastas que o Perfex precisa escrever
+chmod -R 777 perfex-data/app/uploads
+chmod -R 777 perfex-data/app/application/config
+chmod -R 777 perfex-data/app/temp
+# Garante que o usuário do Apache (33) seja o dono
+chown -R 33:33 perfex-data/app/uploads
+chown -R 33:33 perfex-data/app/application/config
+chown -R 33:33 perfex-data/app/temp
 
 echo "✅ Atualização do CRM concluída!"
 docker ps | grep perfex
