@@ -15,7 +15,9 @@ const CompanyPoll: React.FC = () => {
   const fetchLatestPoll = async () => {
     if (!currentUser?.company_id) return;
     setLoading(true);
+    setHasVoted(false); // Reset to allow fresh check for new user
     try {
+      console.log('Fetching poll for company:', currentUser.company_id, 'User:', currentUser.id);
       // 1. Fetch latest poll
       const { data: pollData, error: pollError } = await supabase
         .from('polls')
@@ -44,8 +46,13 @@ const CompanyPoll: React.FC = () => {
 
       // 4. Check if current user has voted
       const userVote = (votesData || []).find(v => v.user_id === currentUser.id);
+      console.log('Votes found for this poll:', (votesData || []).length);
+      console.log('Is current user among voters?', !!userVote);
+
       if (userVote) {
         setHasVoted(true);
+      } else {
+        setHasVoted(false);
       }
 
       // 5. Map to Poll type
@@ -74,6 +81,13 @@ const CompanyPoll: React.FC = () => {
   const handleVote = async () => {
     if (selectedOption !== null && poll && currentUser) {
       try {
+        console.log('Voting payload:', {
+          poll_id: poll.id,
+          option_id: selectedOption,
+          user_id: currentUser.id,
+          company_id: currentUser.company_id
+        });
+
         const { error } = await supabase
           .from('poll_votes')
           .insert([
