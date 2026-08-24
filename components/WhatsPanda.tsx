@@ -16,14 +16,15 @@ import Channels from './whatspanda/Channels';
 import Settings from './whatspanda/Settings';
 import WhatsPandaDashboard from './whatspanda/WhatsPandaDashboard';
 import Scheduler from './whatspanda/Scheduler';
-import { BarChart3, Calendar } from 'lucide-react';
+import ProtocolsView from './whatspanda/ProtocolsView';
+import { BarChart3, Calendar, FileText } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { Loader2 } from 'lucide-react';
 
-type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'settings' | 'dashboard' | 'scheduler';
+type View = 'privados' | 'grupos' | 'contacts' | 'new-ticket' | 'channels' | 'protocols' | 'settings' | 'dashboard' | 'scheduler';
 
 interface WhatsPandaProps {
   initialSearch?: string;
@@ -143,6 +144,7 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
     ...(permissions.can_view_contacts ? [{ id: 'contacts', label: 'Contatos', icon: Users, view: 'contacts' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'scheduler', label: 'Campanhas', icon: Calendar, view: 'scheduler' }] : []),
     ...(permissions.can_view_chats ? [{ id: 'channels', label: 'Canais', icon: QrCode, view: 'channels' }] : []),
+    ...(permissions.can_view_chats ? [{ id: 'protocols', label: 'Protocolos', icon: FileText, view: 'protocols' }] : []),
     ...(isAdmin ? [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3, view: 'dashboard' }] : []),
     ...(permissions.can_manage_settings ? [{ id: 'settings', label: 'Configurações', icon: SettingsIcon, view: 'settings' }] : []),
   ], [permissions.can_view_chats, permissions.can_view_contacts, permissions.can_manage_settings]);
@@ -191,6 +193,14 @@ const WhatsPanda: React.FC<WhatsPandaProps> = ({ initialSearch = '' }) => {
         />
       ) : null;
       case 'channels': return permissions.can_manage_settings ? <Channels /> : null;
+      case 'protocols': return permissions.can_view_chats ? (
+        <ProtocolsView
+          onSelectConversation={(convId) => {
+            setSelectedConversationId(convId);
+            setCurrentView('privados');
+          }}
+        />
+      ) : null;
       case 'dashboard': return isAdmin ? <WhatsPandaDashboard /> : null;
       case 'settings': return permissions.can_manage_settings ? <Settings /> : null;
       default: return null;

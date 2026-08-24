@@ -923,7 +923,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     try {
       let query = supabase
         .from('whatsapp_conversations')
-        .select('id, status, assigned_to, unread_count')
+        .select('id, status, assigned_to, unread_count, queue_id, is_group')
         .eq('company_id', companyId)
         .eq('status', 'aberto')
         .gt('unread_count', 0);
@@ -934,6 +934,16 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           return;
         }
         query = query.in('connection_id', accessibleChannelIds);
+      }
+
+      // Filtrar contagem de não lidos pelos setores/filas do atendente não-admin
+      if (!isAdmin) {
+        const allowedQueues = permissions.assigned_queues || [];
+        if (allowedQueues.length > 0) {
+          query = query.or(`is_group.eq.true,queue_id.in.(${allowedQueues.join(',')}),queue_id.is.null`);
+        } else {
+          query = query.or(`is_group.eq.true,queue_id.is.null`);
+        }
       }
 
       const { data, error } = await query;
@@ -953,9 +963,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   async function fetchConversations() {
-    const companyId = currentUser?.company_id;
+    const companyId = currentUser?.company_id || profile?.company_id;
     if (!companyId) return;
 
+    setLoading(true);
     const userId = activeProfile?.id || profile?.id;
 
     let query = supabase
@@ -1019,9 +1030,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       }
     }
 
-    // Pesquisa por nome ou telefone
+    // Pesquisa por nome, telefone ou número de protocolo
     if (searchTerm) {
-      query = query.or(`contact_name.ilike.%${searchTerm}%,contact_phone.ilike.%${searchTerm}%`);
+      query = query.or(`contact_name.ilike.%${searchTerm}%,contact_phone.ilike.%${searchTerm}%,protocol_number.ilike.%${searchTerm}%`);
     }
     
     // Filtros de departamento
@@ -1083,8 +1094,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     }
     try {
       const updateData: any = { status: newStatus };
+      const targetConv = conversations.find(c => c.id === conversationId) || selectedConversation;
       
-      // Aceitar Atendimento: sempre atribuir ao usuário logado
+      // Aceitar Atendimento: sempre atribuir ao usuário logado e gerar protocolo se não existir
+      let generatedProtocol: string | null = null;
       if (newStatus === 'aberto' && assignToMe) {
         if (isGhostMode) {
           alert('Modo Auditoria: Não é permitido aceitar atendimentos.');
@@ -1096,6 +1109,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           return;
         }
         updateData.assigned_to = userId;
+
+        // Gerar protocolo se a conversa ainda não possui um
+        if (!targetConv?.protocol_number) {
+          const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+          const rand = Math.floor(1000 + Math.random() * 9000);
+          generatedProtocol = `PROT-${nowStr}-${rand}`;
+          updateData.protocol_number = generatedProtocol;
+          updateData.protocol_created_at = new Date().toISOString();
+        }
       }
       
       // Finalizar: desvincula o setor (queue_id), atendente (assigned_to) e reseta o chatbot_node_id para recomeçar o fluxo do bot
@@ -1124,8 +1146,27 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
       if (error) throw error;
 
+      // 1.1 Enviar mensagem de protocolo ao cliente se gerado agora
+      if (generatedProtocol) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          fetch(`/api/whatsapp/messages/send/${conversationId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+              message: `*Atendimento Iniciado*\nSeu número de protocolo é: *${generatedProtocol}*`
+            })
+          }).catch(err => {
+            console.error('Erro ao enviar mensagem de protocolo:', err);
+          });
+        }
+      }
+
       // 2. Enviar mensagem de encerramento se configurado no canal
-      const targetConv = conversations.find(c => c.id === conversationId) || selectedConversation;
       const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
       const closeMsg = conn?.enable_close_message !== false ? conn?.close_message : null;
 
@@ -1571,7 +1612,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       if (!filename) {
         const urlParts = url.split('/');
         const lastPart = urlParts[urlParts.length - 1]?.split('?')[0];
-        filename = lastPart || 'download';
+        filename = lastPart || 'documento';
+      }
+
+      // Se o nome do arquivo não possuir extensão, tentar inferir do MIME type do Blob
+      if (!filename.includes('.')) {
+        const mime = blob.type.toLowerCase();
+        if (mime.includes('pdf')) filename += '.pdf';
+        else if (mime.includes('spreadsheetml') || mime.includes('excel') || mime.includes('xls')) filename += '.xlsx';
+        else if (mime.includes('wordprocessingml') || mime.includes('msword')) filename += '.docx';
+        else if (mime.includes('zip') || mime.includes('compressed')) filename += '.zip';
+        else if (mime.includes('png')) filename += '.png';
+        else if (mime.includes('jpeg') || mime.includes('jpg')) filename += '.jpg';
       }
       
       link.download = filename;
@@ -1585,7 +1637,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       link.href = url;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.download = defaultFilename || 'download';
+      link.download = defaultFilename || 'documento';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

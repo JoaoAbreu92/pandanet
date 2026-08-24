@@ -348,6 +348,69 @@ const DataChangeRequestModal: React.FC<{
     );
 };
 
+const RefundRequestModal: React.FC<{
+    onClose: () => void;
+    onSubmit: (data: { reason: string, amount: string, pixKey: string, pixType: string, attachmentFile: File | null }) => void;
+    submitting?: boolean;
+}> = ({ onClose, onSubmit, submitting }) => {
+    const { t } = useLanguage();
+    const [reason, setReason] = useState('');
+    const [amount, setAmount] = useState('');
+    const [pixKey, setPixKey] = useState('');
+    const [pixType, setPixType] = useState('CPF');
+    const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit({ reason, amount, pixKey, pixType, attachmentFile });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
+                <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
+                <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Reembolso</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Motivo do Reembolso</label>
+                        <textarea value={reason} onChange={e => setReason(e.target.value)} required rows={3} placeholder="Descreva a despesa (ex: Alimentação em viagem de trabalho, combustível, etc.)" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2"></textarea>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Valor (R$)</label>
+                        <input type="text" value={amount} onChange={e => setAmount(e.target.value)} required placeholder="0,00" className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Tipo de Chave PIX</label>
+                            <select value={pixType} onChange={e => setPixType(e.target.value)} className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2">
+                                <option value="CPF">CPF</option>
+                                <option value="CNPJ">CNPJ</option>
+                                <option value="E-mail">E-mail</option>
+                                <option value="Telefone">Telefone</option>
+                                <option value="Chave Aleatória">Chave Aleatória</option>
+                            </select>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Chave PIX para Devolução</label>
+                            <input type="text" value={pixKey} onChange={e => setPixKey(e.target.value)} required placeholder="Informe sua chave PIX..." className="mt-1 w-full border-gray-350 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Comprovante / Recibo (Upload)</label>
+                        <input type="file" accept="image/*,.pdf" onChange={e => setAttachmentFile(e.target.files?.[0] || null)} required className="mt-1 w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-2">
+                        <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700">Cancelar</button>
+                        <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 transition-colors">
+                            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const FormsPage: React.FC = () => {
     const { t } = useLanguage();
     const { currentUser } = useAuth();
@@ -359,6 +422,7 @@ const FormsPage: React.FC = () => {
     const [isUniformModalOpen, setUniformModalOpen] = useState(false);
     const [isDocModalOpen, setDocModalOpen] = useState(false);
     const [isDataChangeModalOpen, setDataChangeModalOpen] = useState(false);
+    const [isRefundModalOpen, setRefundModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const fetchSubmissions = async () => {
@@ -606,6 +670,40 @@ const FormsPage: React.FC = () => {
         }
     };
 
+    const handleRefundRequest = async (data: { reason: string, amount: string, pixKey: string, pixType: string, attachmentFile: File | null }) => {
+        if (!currentUser?.id || !currentUser?.company_id) return;
+
+        setSubmitting(true);
+        try {
+            let uploaded = null;
+            if (data.attachmentFile) {
+                uploaded = await uploadAttachment(data.attachmentFile);
+            }
+
+            const { error } = await supabase
+                .from('form_submissions')
+                .insert([{
+                    company_id: currentUser.company_id,
+                    requester_id: currentUser.id,
+                    form_type: 'Solicitação de Reembolso',
+                    status: 'Pendente',
+                    reason: `Motivo: ${data.reason} | Valor: R$ ${data.amount} | PIX (${data.pixType}): ${data.pixKey}`,
+                    attachment_url: uploaded?.url || null,
+                    attachment_name: uploaded?.name || null
+                }]);
+
+            if (error) throw error;
+
+            setRefundModalOpen(false);
+            fetchSubmissions();
+        } catch (err) {
+            console.error('Error submitting Refund request:', err);
+            alert('Erro ao enviar solicitação.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const getStatusColor = (status: FormStatus) => {
         switch (status) {
             case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400';
@@ -627,6 +725,17 @@ const FormsPage: React.FC = () => {
                             <div>
                                 <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">{t('forms.vacation')}</h3>
                                 <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">{t('forms.vacation_desc')}</p>
+                            </div>
+                            <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Solicitar</span>
+                            </button>
+                        </div>
+
+                        <div onClick={() => setRefundModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">
+                            <div>
+                                <h3 className="font-bold text-lg text-brand-text dark:text-white group-hover:text-brand-primary transition-colors">Solicitação de Reembolso</h3>
+                                <p className="text-sm text-brand-subtle-text dark:text-gray-400 mt-1">Solicite reembolso de despesas corporativas anexando o comprovante e chave PIX.</p>
                             </div>
                             <button className="mt-4 flex items-center justify-center w-full space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-xl hover:bg-emerald-600 transition-colors shadow-md font-bold">
                                 <PlusIcon className="w-4 h-4" />
@@ -697,7 +806,7 @@ const FormsPage: React.FC = () => {
                             <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-slate-900 border-b dark:border-white/5">
                                 <tr>
                                     <th scope="col" className="px-6 py-3">Tipo</th>
-                                    <th scope="col" className="px-6 py-3">Período</th>
+                                    <th scope="col" className="px-6 py-3">Período / Detalhes</th>
                                     <th scope="col" className="px-6 py-3">Data</th>
                                     <th scope="col" className="px-6 py-3">Status</th>
                                 </tr>
@@ -713,12 +822,13 @@ const FormsPage: React.FC = () => {
                                             <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap flex items-center">
                                                 {sub.formType}
                                                 {sub.attachment_url && (
-                                                    <a href={sub.attachment_url} target="_blank" rel="noreferrer" className="ml-2 inline-block px-1.5 py-0.5 text-[9px] bg-brand-primary/10 border border-brand-primary/20 text-brand-primary rounded font-bold hover:bg-emerald-50">Atestado 📎</a>
+                                                    <a href={sub.attachment_url} target="_blank" rel="noreferrer" className="ml-2 inline-block px-1.5 py-0.5 text-[9px] bg-brand-primary/10 border border-brand-primary/20 text-brand-primary rounded font-bold hover:bg-emerald-50">Comprovante 📎</a>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 {sub.startDate ? new Date(sub.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : ''}
                                                 {sub.endDate ? ` - ${new Date(sub.endDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}` : ''}
+                                                {!sub.startDate && sub.reason ? <span className="text-xs text-slate-500 line-clamp-1">{sub.reason}</span> : ''}
                                             </td>
                                             <td className="px-6 py-4">{new Date(sub.submittedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                                             <td className="px-6 py-4">
@@ -733,6 +843,7 @@ const FormsPage: React.FC = () => {
                 </Card>
             </div>
             {isVacationModalOpen && <VacationRequestModal onClose={() => setVacationModalOpen(false)} onSubmit={handleVacationRequest} submitting={submitting} />}
+            {isRefundModalOpen && <RefundRequestModal onClose={() => setRefundModalOpen(false)} onSubmit={handleRefundRequest} submitting={submitting} />}
             {isLeaveModalOpen && <LeaveRequestModal onClose={() => setLeaveModalOpen(false)} onSubmit={handleLeaveRequest} submitting={submitting} />}
             {isEpiModalOpen && <EpiRequestModal onClose={() => setEpiModalOpen(false)} onSubmit={handleEpiRequest} submitting={submitting} />}
             {isUniformModalOpen && <UniformRequestModal onClose={() => setUniformModalOpen(false)} onSubmit={handleUniformRequest} submitting={submitting} />}

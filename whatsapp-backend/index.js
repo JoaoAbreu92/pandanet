@@ -829,6 +829,46 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
     }
 });
 
+// API: Sincronização de Histórico / Backup por Data (Até 60 dias)
+router.post('/sync-history/:companyId/:connectionId', authMiddleware, async (req, res) => {
+    const { companyId, connectionId } = req.params;
+    const { startDate, endDate } = req.body;
+    
+    try {
+        console.log(`[SYNC-HISTORY-API] Requisição recebida. Empresa: ${companyId}, Conexão: ${connectionId} | Período: ${startDate} a ${endDate}`);
+
+        if (!companyId || !connectionId) {
+            return res.status(400).json({ error: 'Parâmetros companyId e connectionId são obrigatórios' });
+        }
+
+        const { data: settings, error } = await supabase
+            .from('whatsapp_settings')
+            .select('id, company_id')
+            .eq('id', connectionId)
+            .eq('company_id', companyId)
+            .maybeSingle();
+        
+        if (error || !settings) {
+            return res.status(403).json({ error: 'Você não tem permissão para sincronizar esta conexão ou ela não existe.' });
+        }
+
+        const instanceName = `conn_${connectionId}`;
+        
+        // Disparar sincronização de histórico em background
+        syncEvolutionData(instanceName, companyId, connectionId).catch(err => {
+            console.error(`[SYNC-HISTORY-API] Erro em background para ${instanceName}:`, err.message);
+        });
+        
+        res.json({ status: 'success', message: 'Sincronização de histórico e backup iniciada em segundo plano.' });
+    } catch (err) {
+        console.error('[SYNC-HISTORY-API] Erro fatal:', err);
+        res.status(500).json({ 
+            error: 'Erro interno ao processar sincronização de histórico',
+            details: err.message
+        });
+    }
+});
+
 // API: Enviar Mensagem
 router.post('/messages/send/:conversationId', authMiddleware, async (req, res) => {
     const { conversationId } = req.params;

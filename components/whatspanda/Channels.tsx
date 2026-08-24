@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
-import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key, ShieldCheck, Zap, Users, UserPlus, UserMinus, PenLine } from 'lucide-react';
+import { QrCode, RefreshCw, CheckCircle, Smartphone, Save, PhoneOff, MessageSquare, Plus, Trash2, Edit2, Send, Instagram, MessageCircle, ArrowLeft, Key, ShieldCheck, Zap, Users, UserPlus, UserMinus, PenLine, Database, AlertTriangle } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { WhatsAppSettings } from '../../types';
 
@@ -13,6 +13,16 @@ const Channels: React.FC = () => {
     
     // View State
     const [view, setView] = useState<'list' | 'form' | 'qr'>('list');
+
+    // History Modal State
+    const [historyModalChannel, setHistoryModalChannel] = useState<WhatsAppSettings | null>(null);
+    const [historyStartDate, setHistoryStartDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().slice(0, 10);
+    });
+    const [historyEndDate, setHistoryEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [syncingHistory, setSyncingHistory] = useState(false);
 
     // Form State
     const [currentId, setCurrentId] = useState<string | null>(null);
@@ -498,6 +508,43 @@ const Channels: React.FC = () => {
         setView('form');
     };
 
+    const handleStartHistorySync = async () => {
+        if (!historyModalChannel) return;
+        const companyId = profile?.company_id || (user as any)?.user_metadata?.company_id;
+        if (!companyId) return;
+
+        setSyncingHistory(true);
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            
+            const response = await fetch(`/api/whatsapp/sync-history/${companyId}/${historyModalChannel.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    startDate: historyStartDate,
+                    endDate: historyEndDate
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+            }
+
+            alert('Sincronização de histórico/backup iniciada em segundo plano! Suas mensagens e chamados antigos serão importados nos próximos minutos.');
+            setHistoryModalChannel(null);
+        } catch (err: any) {
+            console.error('Erro ao iniciar backup de histórico:', err);
+            alert(`Erro ao iniciar sincronização de histórico: ${err.message}`);
+        } finally {
+            setSyncingHistory(false);
+        }
+    };
+
     const handleNew = () => {
         setCurrentId(null);
         setChannelType('whatsapp');
@@ -685,9 +732,16 @@ const Channels: React.FC = () => {
                                                         if (companyId) syncContacts(companyId, channel.id);
                                                     }} 
                                                     className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
-                                                    title="Sincronizar"
+                                                    title="Sincronizar Rápido"
                                                 >
                                                     <RefreshCw className="w-3 h-3" /> Sync
+                                                </button>
+                                                <button 
+                                                    onClick={() => setHistoryModalChannel(channel)} 
+                                                    className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
+                                                    title="Backup e Histórico de Atendimentos"
+                                                >
+                                                    <Database className="w-3 h-3" /> Backup
                                                 </button>
                                                 <button 
                                                     onClick={() => {
@@ -1134,6 +1188,83 @@ const Channels: React.FC = () => {
                                     }>{log.msg}</span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal de Backup / Sincronização de Histórico */}
+                {historyModalChannel && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+                            <div className="flex items-center gap-3 text-purple-600 dark:text-purple-400">
+                                <Database className="w-8 h-8" />
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-800 dark:text-white">Backup e Histórico de Conversas</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{historyModalChannel.connection_name} ({historyModalChannel.phone_number})</p>
+                                </div>
+                            </div>
+
+                            {/* Alerta de Desempenho */}
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex gap-3 text-amber-700 dark:text-amber-300 text-xs leading-relaxed">
+                                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+                                <div>
+                                    <p className="font-bold mb-1">Aviso de Desempenho:</p>
+                                    <p>Sincronizar históricos longos de WhatsApp pode levar de 2 a 10 minutos. Dependendo da quantidade de conversas e mídias, o sistema pode apresentar lentidão temporária durante o download.</p>
+                                </div>
+                            </div>
+
+                            {/* Seletor de Datas */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Data Inicial (Até 60 dias)</label>
+                                    <input 
+                                        type="date" 
+                                        value={historyStartDate}
+                                        onChange={e => setHistoryStartDate(e.target.value)}
+                                        className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-800 dark:text-white outline-none focus:border-purple-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Data Final</label>
+                                    <input 
+                                        type="date" 
+                                        value={historyEndDate}
+                                        onChange={e => setHistoryEndDate(e.target.value)}
+                                        className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-800 dark:text-white outline-none focus:border-purple-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setHistoryModalChannel(null)}
+                                    disabled={syncingHistory}
+                                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleStartHistorySync}
+                                    disabled={syncingHistory}
+                                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {syncingHistory ? (
+                                        <>
+                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                            <span>Iniciando...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Database className="w-4 h-4" />
+                                            <span>Iniciar Backup</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
