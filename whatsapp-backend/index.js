@@ -1584,6 +1584,7 @@ router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (
                     'MESSAGES_UPSERT', 
                     'MESSAGES_UPDATE', 
                     'MESSAGES_DELETE',
+                    'MESSAGES_REVOKE',
                     'SEND_MESSAGE',
                     'CALL'
                 ]
@@ -4032,7 +4033,7 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
 
     // ----- MENSAGEM RECEBIDA OU ENVIADA -----
     // Cobre event names de v1 e v2: messages.upsert, MESSAGES_UPSERT, messages_upsert, send.message, SEND_MESSAGE
-    const isMessageEvent = ['messages.upsert','messages_upsert','message.upsert','message_upsert','messages.update','send.message','send_message','message','messages'].includes(event);
+    const isMessageEvent = ['messages.upsert','messages_upsert','message.upsert','message_upsert','send.message','send_message','message','messages'].includes(event);
     if (isMessageEvent) {
         let rawList = [];
         if (data?.messages && Array.isArray(data.messages)) {
