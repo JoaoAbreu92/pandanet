@@ -1,4 +1,4 @@
--- SCRIPT DE CORREÇÃO GERAL PARA VPS (CORRIGIDO)
+-- SCRIPT DE CORREÇÃO GERAL PARA VPS (CORRIGIDO v3)
 -- Objetivo: Garantir que o usuário ti@grupopixel.com.br tenha um perfil válido vinculado a uma empresa
 -- e que as permissões de Storage e RLS estejam corretas.
 
@@ -30,7 +30,9 @@ BEGIN
 
     IF target_user_id IS NOT NULL THEN
         -- Inserir ou Atualizar o Perfil
-        INSERT INTO public.profiles (id, email, name, role, company_id, department)
+        -- Use full_name em vez de name
+        -- Use team em vez de department (se department for UUID, team deve ser o texto)
+        INSERT INTO public.profiles (id, email, full_name, role, company_id, team)
         VALUES (
             target_user_id, 
             'ti@grupopixel.com.br', 
@@ -41,7 +43,9 @@ BEGIN
         )
         ON CONFLICT (id) DO UPDATE SET
             company_id = EXCLUDED.company_id,
-            role = EXCLUDED.role;
+            role = EXCLUDED.role,
+            team = EXCLUDED.team,
+            full_name = EXCLUDED.full_name;
             
         RAISE NOTICE 'Perfil do usuário % atualizado com sucesso.', target_user_id;
     ELSE
