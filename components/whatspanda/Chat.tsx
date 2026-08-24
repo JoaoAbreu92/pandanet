@@ -163,7 +163,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       }
     }
 
-    const { data } = await query.order('last_message_at', { ascending: false });
+    const { data } = await query
+      .order('last_message_at', { ascending: false })
+      .limit(50);
     
     if (data) setConversations(data as WhatsAppConversationWithDetails[]);
     setLoading(false);
@@ -174,9 +176,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '' })
       .from('whatsapp_messages')
       .select('*')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(50);
     
-    if (data) setMessages(data);
+    // Reverse the array after fetching the latest 50 so they display top-down chronologically
+    if (data) setMessages(data.reverse());
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {

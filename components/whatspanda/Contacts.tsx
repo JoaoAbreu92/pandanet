@@ -49,7 +49,8 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
             .from('whatsapp_contacts')
             .select('*')
             .eq('company_id', companyId)
-            .order('name', { ascending: true });
+            .order('name', { ascending: true })
+            .limit(100);
         
         if (error) {
             // handle specialized error if table doesn't exist yet (migration might be needed)
