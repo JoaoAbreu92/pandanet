@@ -778,14 +778,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
         console.log("[Realtime] Iniciando subscription para usuário:", currentUser.id);
 
+        const companyFilter = `company_id=eq.${currentUser.company_id}`;
+
         // Subscrição para atualizações de novas conversas/mensagens
         const channel = supabase
-            .channel('public:messages_and_convs')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+            .channel(`public:messages_and_convs:${currentUser.company_id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: companyFilter }, (payload) => {
                 console.log("[Realtime] Mudança em conversas detectada:", payload);
                 fetchConversations();
             })
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: companyFilter }, async (payload) => {
                 const newMsg = payload.new as any;
                 console.log("[Realtime] Nova mensagem recebida:", newMsg);
                 console.log("[Realtime] Conversa ativa:", selectedConvRef.current);
