@@ -298,28 +298,42 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             return res.status(400).json({ error: 'WhatsApp instance not found for this conversation' });
         }
 
-        // 2. Send via Evolution API
-        const sendReq = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        // Garantir que o número está limpo e tem código do país
+        let phoneNumber = (conv.contact_phone || '').replace(/\D/g, '');
+        if (!phoneNumber.startsWith('55') && phoneNumber.length <= 11) {
+            phoneNumber = '55' + phoneNumber;
+        }
+        console.log(`[SEND API] Enviando para: ${phoneNumber} | Instância: ${instanceName}`);
+
+        // 2. Send via Evolution API - tenta v2 primeiro, depois v1 como fallback
+        let sendRes = null;
+        let sendOk = false;
+
+        // Formato v2
+        const sendReqV2 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                number: conv.contact_phone,
-                text: message,
-                textMessage: {
-                    text: message
-                }
-            })
+            body: JSON.stringify({ number: phoneNumber, text: message })
         });
+        try { sendRes = await sendReqV2.json(); } catch(e) { sendRes = {}; }
+        console.log(`[SEND API] Resposta v2 (${sendReqV2.status}):`, JSON.stringify(sendRes));
 
-        let sendRes;
-        try {
-            sendRes = await sendReq.json();
-        } catch (e) {
-            sendRes = { error: 'Invalid response from Evolution API' };
+        if (sendReqV2.ok && sendRes?.key) {
+            sendOk = true;
+        } else {
+            // Formato v1
+            const sendReqV1 = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                method: 'POST',
+                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: phoneNumber, textMessage: { text: message } })
+            });
+            try { sendRes = await sendReqV1.json(); } catch(e) { sendRes = {}; }
+            console.log(`[SEND API] Resposta v1 (${sendReqV1.status}):`, JSON.stringify(sendRes));
+            if (sendReqV1.ok) sendOk = true;
         }
 
-        if (!sendReq.ok || (sendRes.error && !sendRes.key)) {
-            console.error('[SEND API] Erro ao enviar na Evolution. Status:', sendReq.status, 'Body:', sendRes);
+        if (!sendOk) {
+            console.error('[SEND API] AMBOS OS FORMATOS FALHARAM:', JSON.stringify(sendRes));
             return res.status(500).json({ error: 'Failed to send message via WhatsApp', details: sendRes });
         }
 
@@ -357,6 +371,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         res.status(500).json({ error: 'Internal server error while sending message' });
     }
 });
+
 
 // API: Reparar Webhooks
 router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (req, res) => {
