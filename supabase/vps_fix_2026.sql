@@ -818,6 +818,13 @@ DROP POLICY IF EXISTS "Users can insert conversations" ON public.whatsapp_conver
 DROP POLICY IF EXISTS "Users can update conversations" ON public.whatsapp_conversations;
 DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_conversations;
 
+-- Drop new policies to make script idempotent
+DROP POLICY IF EXISTS "whatsapp_conversations_select_policy" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "whatsapp_conversations_insert_policy" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "whatsapp_conversations_update_policy" ON public.whatsapp_conversations;
+DROP POLICY IF EXISTS "whatsapp_conversations_delete_policy" ON public.whatsapp_conversations;
+
+
 -- Create queue-aware SELECT policy
 CREATE POLICY "whatsapp_conversations_select_policy"
   ON public.whatsapp_conversations
