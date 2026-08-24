@@ -418,11 +418,15 @@ const AppContent: React.FC = () => {
 
             // 1. Find Company
             const domain = session.user.email.split('@')[1];
-            const { data: companies } = await supabase.from('companies').select('id, responsible_email').ilike('domain', domain);
+            // Search by domain OR search by responsible email (for master admins)
+            const { data: companies } = await supabase.from('companies')
+                .select('id, responsible_email')
+                .or(`domain.ilike.${domain},responsible_email.eq.${session.user.email}`);
 
             if (companies && companies.length > 0) {
                 const companyId = companies[0].id;
                 const isResp = (companies[0].responsible_email || '').toLowerCase() === session.user.email.toLowerCase();
+                const isMaster = session.user.email.toLowerCase() === 'ti@acrilight.com.br';
 
                 // 2. Insert or Update Profile (Upsert)
                 const { error } = await supabase.from('profiles').upsert({
@@ -430,7 +434,9 @@ const AppContent: React.FC = () => {
                     full_name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
                     email: session.user.email,
                     company_id: companyId,
-                    role: isResp ? 'admin' : 'employee'
+                    role: isMaster ? 'Super Admin' : (isResp ? 'admin' : 'employee'),
+                    is_admin: isMaster || isResp,
+                    is_company_admin: isMaster || isResp
                 }, { onConflict: 'id' });
 
                 if (error) {
