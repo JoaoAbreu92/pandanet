@@ -42,7 +42,7 @@ const Channels: React.FC = () => {
         const { data } = await supabase
             .from('whatsapp_settings')
             .select('*')
-            .single();
+            .maybeSingle(); // Usar maybeSingle para evitar erro 406 se não existir registro
         
         if (data) {
             setIsConnected(data.is_connected);
