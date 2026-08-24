@@ -90,7 +90,7 @@ async function testBrevoAuth(apiKey: string) {
   return { ok: true, data };
 }
 
-console.log("Edge Function 'email-handler' V35 iniciada.");
+console.log("Edge Function 'email-handler' V36 iniciada.");
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Edge Function Online (V35). Brevo & Multi-Pass Supported.'
+      message: 'Edge Function Online (V36). Brevo & Multi-Pass Supported.'
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
@@ -110,18 +110,21 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V34] Ação: ${action}`);
+    console.log(`[V36] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
 
-      // Garantir que as portas sejam números (Evita erro de types no native Deno)
-      const smtpPort = Number(settings.smtp_port);
-      const imapPort = Number(settings.imap_port);
+      // PROTEÇÃO CONTRA NaN (Causa crash no Deno.connect)
+      const smtpPort = Number(settings.smtp_port) || (settings.smtp_ssl ? 465 : 587);
+      const imapPort = Number(settings.imap_port) || (settings.imap_ssl ? 993 : 143);
+
+      if (isNaN(smtpPort) || isNaN(imapPort)) {
+        throw new Error("Portas SMTP ou IMAP inválidas.");
+      }
 
       // BREVO & MULTI-PASS DETECT
-      // Se o usuário digitar "senha:chave", dividimos. Se não, usamos a mesma para ambos.
       let imapPass = settings.pass;
       let smtpPass = settings.pass;
 
@@ -129,7 +132,7 @@ Deno.serve(async (req) => {
         const parts = settings.pass.split(':');
         imapPass = parts[0];
         smtpPass = parts[1];
-        console.log("[V33] Senhas múltiplas detectadas (Separadas por :)");
+        console.log("[V36] Senhas múltiplas detectadas");
       }
 
       const isBrevo = settings.smtp_host?.includes('brevo');
@@ -141,7 +144,7 @@ Deno.serve(async (req) => {
 
       // 1. TESTE SMTP / BREVO
       if (isBrevo && brevoKey) {
-        console.log(`[V33] Testando via Brevo API... (Key detectada)`);
+        console.log(`[V36] Testando via Brevo API...`);
         const auth = await testBrevoAuth(brevoKey);
         if (auth.ok) {
           smtpResult = { status: 'fulfilled', value: "Brevo API OK" };
@@ -150,10 +153,10 @@ Deno.serve(async (req) => {
         }
       } else {
         // Teste SMTP tradicional
-        const [smtpHostOk] = await Promise.all([verifyHost(settings.smtp_host)]);
+        const smtpHostOk = await verifyHost(settings.smtp_host);
         if (!smtpHostOk.ok) throw new Error(`DNS SMTP: ${smtpHostOk.error}`);
 
-        const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
+        const useSmtpSsl = settings.smtp_ssl ?? (smtpPort === 465);
         const probe = useSmtpSsl ? await probeTls(settings.smtp_host, smtpPort) : await testConnection(settings.smtp_host, smtpPort);
 
         if (!probe.ok) {
@@ -163,7 +166,7 @@ Deno.serve(async (req) => {
             host: settings.smtp_host,
             port: smtpPort,
             secure: useSmtpSsl,
-            auth: { user: settings.user, pass: smtpPass }, // Usa smtpPass
+            auth: { user: settings.user, pass: smtpPass },
             tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
             connectionTimeout: 10000,
           });
@@ -176,7 +179,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 2. TESTE IMAP (Sempre via Hostinger/Tradicional por enquanto)
+      // 2. TESTE IMAP
       const imapHostOk = await verifyHost(settings.imap_host);
       if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error}`);
 
@@ -190,7 +193,7 @@ Deno.serve(async (req) => {
           host: settings.imap_host,
           port: imapPort,
           secure: useImapSsl,
-          auth: { user: settings.user, pass: imapPass }, // Usa imapPass
+          auth: { user: settings.user, pass: imapPass },
           logger: false,
           tls: { rejectUnauthorized: false, servername: settings.imap_host, minVersion: 'TLSv1.2' },
           connectionTimeout: 15000,
@@ -215,9 +218,8 @@ Deno.serve(async (req) => {
       if (smtpResult.status === 'rejected') errorMsg += `SMTP/Brevo: ${smtpResult.reason.message}. `;
       if (imapResult.status === 'rejected') errorMsg += `IMAP: ${imapResult.reason.message}. `;
 
-      // Dica específica para Hostinger + Brevo
-      if (isBrevo && imapResult.status === 'rejected' && imapResult.reason.message.includes('Unexpected close')) {
-        errorMsg += " Dica: Hostinger bloqueou o IMAP. Tente porta 143 sem SSL ou verifique permissões.";
+      if (isBrevo && imapResult.status === 'rejected' && imapResult.reason?.message?.includes('Unexpected close')) {
+        errorMsg += " Dica: Hostinger bloqueou o IMAP. Tente porta 143 sem SSL.";
       }
 
       return new Response(JSON.stringify({
@@ -228,17 +230,12 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Ação: Send (Para uso futuro quando implementarmos o envio real)
-    if (action === 'send-email') {
-      // Lógica de envio aqui (usando Brevo se configurado)
-    }
-
-    return new Response(JSON.stringify({ success: true, message: 'V32 Online' }), { 
+    return new Response(JSON.stringify({ success: true, message: 'V36 Online' }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
 
   } catch (error: any) {
-    console.error(`[V32 ERROR]`, error.message);
+    console.error(`[V36 ERROR]`, error.message);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
