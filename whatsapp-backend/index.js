@@ -20,7 +20,7 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 const port = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-token-pandanet-2026-verified';
 
 // --- Security Middlewares ---
 app.use(helmet());
