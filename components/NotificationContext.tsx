@@ -154,7 +154,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     const flashPageTitle = useCallback((message: string) => {
-        const originalTitle = 'PandaNet';
+        const originalTitle = 'grupopixel.com.br';
         let showMessage = true;
 
         const interval = setInterval(() => {

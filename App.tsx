@@ -215,7 +215,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'scheduling', 'scheduling-book'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'scheduling', 'scheduling-events', 'scheduling-book'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -759,7 +759,14 @@ const AppContent: React.FC = () => {
                 if (schedulingFeat === false || schedulingFeat === 'disabled') {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
-                return <SchedulingPage customFeatures={currentCompany?.custom_features} />;
+                return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="appointments" />;
+            }
+            case 'scheduling-events': {
+                const schedulingFeat = currentCompany?.custom_features?.scheduling as any;
+                if (schedulingFeat === false || schedulingFeat === 'disabled') {
+                    return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
+                }
+                return <SchedulingPage customFeatures={currentCompany?.custom_features} mode="events" />;
             }
             case 'scheduling-book': return <SchedulingBookPage eventTypeId={pageContext?.eventTypeId} isPublic={false} />;
             case 'personal-notes': return <PersonalNotesPage currentUser={currentUser} isGhostMode={isGhostMode} />;

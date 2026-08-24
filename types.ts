@@ -49,6 +49,7 @@ export type Page =
   | 'projects-metrics'
   | 'whatspanda'
   | 'scheduling'
+  | 'scheduling-events'
   | 'scheduling-book';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';

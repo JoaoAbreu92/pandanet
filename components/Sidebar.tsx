@@ -52,7 +52,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures }) => {
     const { notifications, moduleUnreadCounts } = useNotifications();
-    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false });
+    const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false, agenda: false });
     const navRef = useRef<HTMLDivElement>(null);
 
     const [hasSelectedProject, setHasSelectedProject] = useState(() => {
@@ -70,10 +70,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         return () => window.removeEventListener('pixel_selected_project_changed', handleProjectChange);
     }, []);
 
-    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects' | 'social') => {
+    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects' | 'social' | 'agenda') => {
         setOpenMenus(prev => {
             const isCurrentlyOpen = prev[menu];
-            const newState = { rh: false, ti: false, portal: false, projects: false, social: false };
+            const newState = { rh: false, ti: false, portal: false, projects: false, social: false, agenda: false };
             newState[menu] = !isCurrentlyOpen;
             // Se estamos abrindo o menu, vamos rolar para ele
             if (newState[menu]) {
@@ -108,6 +108,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         }
         if (['messages', 'whatspanda', 'feed'].includes(currentPage)) {
             setOpenMenus(prev => ({ ...prev, social: true }));
+        }
+        if (['scheduling', 'scheduling-events'].includes(currentPage)) {
+            setOpenMenus(prev => ({ ...prev, agenda: true }));
         }
     }, [currentPage]);
 
@@ -188,7 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects' | 'social'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects' | 'social' | 'agenda'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
@@ -282,7 +285,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission={true} featureId="scheduling" />
+                <NavMenu label="Agenda" icon={CalendarDaysIcon} menuKey="agenda" permission={true} featureId="scheduling">
+                    <NavItem page="scheduling" label="Agendamentos" icon={CalendarIcon} permission={true} featureId="scheduling" />
+                    <NavItem page="scheduling-events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="scheduling" />
+                </NavMenu>
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">

@@ -20,7 +20,10 @@ import {
     ChartBarIcon,
     PaperAirplaneIcon,
     ChevronDownIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    PaperClipIcon,
+    XMarkIcon,
+    DocumentTextIcon
 } from './icons';
 import type { Employee } from '../types';
 
@@ -68,6 +71,7 @@ interface ProjectTask {
     cover_url?: string | null;
     timesheets?: ProjectTimesheet[];
     checklist_status?: Record<string, Record<string, boolean>>;
+    checklist_items?: Record<string, string[]>;
 }
 
 interface ProjectSubtask {
@@ -210,6 +214,25 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
     const [taskHistory, setTaskHistory] = useState<any[]>([]);
     const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
     const [justDroppedTaskId, setJustDroppedTaskId] = useState<string | null>(null);
+
+    // Cronômetro (Timer) State
+    const [timerState, setTimerState] = useState<any>(null);
+    const [elapsedTimeStr, setElapsedTimeStr] = useState('00:00:00');
+    const [stopDescription, setStopDescription] = useState('');
+    const [showStopConfirm, setShowStopConfirm] = useState(false);
+    const [showPauseMenu, setShowPauseMenu] = useState(false);
+
+    // Mudar Setor / Transição Modal State
+    const [transitionData, setTransitionData] = useState<{
+        taskId: string;
+        fromStageId: string;
+        toStageId: string;
+        nextStageName: string;
+        checklist: string[];
+        uploadedFiles: { name: string; url: string }[];
+    } | null>(null);
+    const [uploadingFile, setUploadingFile] = useState(false);
+    const [newTransitionItem, setNewTransitionItem] = useState('');
 
     useEffect(() => {
         if (isProjectModalOpen) {
@@ -443,7 +466,8 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                 ...t,
                 subtasks: t.subtasks || [],
                 timesheets: t.timesheets || [],
-                checklist_status: t.checklist_status || {}
+                checklist_status: t.checklist_status || {},
+                checklist_items: t.checklist_items || {}
             }));
             setTasks(mappedTasks);
         } catch (e: any) {
@@ -452,6 +476,43 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
             setLoading(false);
         }
     };
+
+    // Cronômetro poll effect
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const active = localStorage.getItem('pixel_active_timer');
+            if (active) {
+                try {
+                    const parsed = JSON.parse(active);
+                    setTimerState(parsed);
+                    
+                    // Se o timer for desta tarefa, atualizar string
+                    if (selectedTask && parsed.taskId === selectedTask.id) {
+                        let totalMs = parsed.accumulatedTime || 0;
+                        if (!parsed.isPaused) {
+                            totalMs += (Date.now() - parsed.startTime);
+                        }
+                        
+                        const seconds = Math.floor((totalMs / 1000) % 60);
+                        const minutes = Math.floor((totalMs / (1000 * 60)) % 60);
+                        const hours = Math.floor((totalMs / (1000 * 60 * 60)));
+                        
+                        const pad = (n: number) => String(n).padStart(2, '0');
+                        setElapsedTimeStr(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+                    } else {
+                        setElapsedTimeStr('00:00:00');
+                    }
+                } catch {
+                    localStorage.removeItem('pixel_active_timer');
+                    setTimerState(null);
+                }
+            } else {
+                setTimerState(null);
+                setElapsedTimeStr('00:00:00');
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [selectedTask]);
 
     // Auto-carregar detalhes se o projeto já estiver selecionado no localStorage
     useEffect(() => {
@@ -906,6 +967,255 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
         }
     };
 
+    // --- TIMER / CRONÔMETRO OPERATIONS ---
+    const startTimer = async (task: ProjectTask) => {
+        const active = localStorage.getItem('pixel_active_timer');
+        if (active) {
+            showToast('Você já possui um cronômetro ativo em outra tarefa.', 'warning');
+            return;
+        }
+
+        const newState = {
+            taskId: task.id,
+            taskTitle: task.title,
+            startTime: Date.now(),
+            accumulatedTime: 0,
+            isPaused: false
+        };
+        localStorage.setItem('pixel_active_timer', JSON.stringify(newState));
+        setTimerState(newState);
+
+        try {
+            await supabase.from('project_task_comments').insert([{
+                task_id: task.id,
+                user_id: currentUser?.id,
+                comment: `[CRONÔMETRO] Usuário iniciou a contagem de tempo.`
+            }]);
+            fetchTaskDetails(task.id);
+        } catch (e) {
+            console.error('Error logging timer start:', e);
+        }
+    };
+
+    const pauseTimer = async (reason: string, durationMinutes?: number) => {
+        if (!timerState || !selectedTask) return;
+
+        let newAccumulated = timerState.accumulatedTime || 0;
+        if (!timerState.isPaused) {
+            newAccumulated += (Date.now() - timerState.startTime);
+        }
+
+        let pauseExpectedEndTime: number | undefined;
+        if (durationMinutes) {
+            pauseExpectedEndTime = Date.now() + durationMinutes * 60 * 1000;
+        }
+
+        const updated = {
+            ...timerState,
+            isPaused: true,
+            pauseTime: Date.now(),
+            accumulatedTime: newAccumulated,
+            pauseReason: reason,
+            pauseExpectedEndTime
+        };
+
+        localStorage.setItem('pixel_active_timer', JSON.stringify(updated));
+        setTimerState(updated);
+        setShowPauseMenu(false);
+
+        try {
+            await supabase.from('project_task_comments').insert([{
+                task_id: selectedTask.id,
+                user_id: currentUser?.id,
+                comment: `[CRONÔMETRO] Usuário pausou a contagem. Motivo: ${reason}`
+            }]);
+            fetchTaskDetails(selectedTask.id);
+        } catch (e) {
+            console.error('Error logging timer pause:', e);
+        }
+    };
+
+    const resumeTimer = async () => {
+        if (!timerState || !selectedTask) return;
+
+        const updated = {
+            ...timerState,
+            isPaused: false,
+            startTime: Date.now(),
+            pauseTime: undefined,
+            pauseReason: undefined,
+            pauseExpectedEndTime: undefined
+        };
+
+        localStorage.setItem('pixel_active_timer', JSON.stringify(updated));
+        setTimerState(updated);
+
+        try {
+            await supabase.from('project_task_comments').insert([{
+                task_id: selectedTask.id,
+                user_id: currentUser?.id,
+                comment: `[CRONÔMETRO] Usuário retomou a contagem de tempo.`
+            }]);
+            fetchTaskDetails(selectedTask.id);
+        } catch (e) {
+            console.error('Error logging timer resume:', e);
+        }
+    };
+
+    const stopTimer = async () => {
+        if (!timerState || !selectedTask) return;
+
+        let totalMs = timerState.accumulatedTime || 0;
+        if (!timerState.isPaused) {
+            totalMs += (Date.now() - timerState.startTime);
+        }
+
+        const hours = parseFloat((totalMs / (1000 * 60 * 60)).toFixed(2));
+
+        if (hours <= 0.01) {
+            localStorage.removeItem('pixel_active_timer');
+            setTimerState(null);
+            setShowStopConfirm(false);
+            setStopDescription('');
+            showToast('Cronômetro finalizado (tempo inferior a 30 segundos, descartado).', 'warning');
+            return;
+        }
+
+        try {
+            const { error: timesheetError } = await supabase
+                .from('project_timesheets')
+                .insert([{
+                    task_id: selectedTask.id,
+                    user_id: currentUser?.id,
+                    hours: hours,
+                    description: stopDescription || 'Apontamento via cronômetro',
+                    date: new Date().toISOString().split('T')[0]
+                }]);
+
+            if (timesheetError) throw timesheetError;
+
+            const mins = Math.round((totalMs / (1000 * 60)) % 60);
+            const hrs = Math.floor(totalMs / (1000 * 60 * 60));
+            const timeStr = `${hrs}h ${mins}m`;
+
+            await supabase.from('project_task_comments').insert([{
+                task_id: selectedTask.id,
+                user_id: currentUser?.id,
+                comment: `[CRONÔMETRO] Usuário finalizou a contagem de tempo. Total apontado: ${timeStr}. Descrição: ${stopDescription || 'Apontamento via cronômetro'}`
+            }]);
+
+            localStorage.removeItem('pixel_active_timer');
+            setTimerState(null);
+            setShowStopConfirm(false);
+            setStopDescription('');
+
+            showToast('Apontamento de horas lançado com sucesso!', 'success');
+            fetchTaskDetails(selectedTask.id);
+        } catch (e: any) {
+            showToast('Erro ao finalizar cronômetro: ' + e.message, 'error');
+        }
+    };
+
+    // --- TRANSITION FILES & CUSTOM CHECKLISTS ---
+    const handleTransitionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !transitionData) return;
+
+        setUploadingFile(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `task_transition_${transitionData.taskId}_${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('feed-media')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('feed-media').getPublicUrl(filePath);
+
+            setTransitionData(prev => prev ? {
+                ...prev,
+                uploadedFiles: [...prev.uploadedFiles, { name: file.name, url: data.publicUrl }]
+            } : null);
+            showToast('Arquivo enviado com sucesso!', 'success');
+        } catch (err: any) {
+            showToast('Erro ao enviar arquivo: ' + err.message, 'error');
+        } finally {
+            setUploadingFile(false);
+        }
+    };
+
+    const handleConfirmTransition = async () => {
+        if (!transitionData || !currentUser) return;
+        const { taskId, fromStageId, toStageId, checklist, uploadedFiles } = transitionData;
+
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+        const targetStage = stages.find(s => s.id === toStageId);
+        if (!targetStage) return;
+
+        try {
+            // 1. Gravar arquivos se houver
+            for (const file of uploadedFiles) {
+                await supabase.from('project_task_comments').insert([{
+                    task_id: taskId,
+                    user_id: currentUser.id,
+                    comment: `[ARQUIVO] ${file.name}|${file.url}`
+                }]);
+            }
+
+            // 2. Gravar modificações no checklist se houver
+            const defaultChecklist = targetStage.checklist_items || [];
+            const added = checklist.filter(item => !defaultChecklist.includes(item));
+            const deleted = defaultChecklist.filter(item => !checklist.includes(item));
+
+            let historyLog = '';
+            if (added.length > 0) {
+                historyLog += `Adicionados itens no checklist do setor ${targetStage.name}: ${added.join(', ')}. `;
+            }
+            if (deleted.length > 0) {
+                historyLog += `Removidos itens no checklist do setor ${targetStage.name}: ${deleted.join(', ')}. `;
+            }
+
+            if (historyLog) {
+                await supabase.from('project_task_comments').insert([{
+                    task_id: taskId,
+                    user_id: currentUser.id,
+                    comment: `[HISTÓRICO] ${historyLog}`
+                }]);
+            }
+
+            // 3. Atualizar o checklist customizado do task no banco
+            const updatedChecklists = {
+                ...(task.checklist_items || {}),
+                [toStageId]: checklist
+            };
+
+            const { error: checklistError } = await supabase
+                .from('project_tasks')
+                .update({ checklist_items: updatedChecklists })
+                .eq('id', taskId);
+
+            if (checklistError) throw checklistError;
+
+            // Atualiza localmente
+            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, checklist_items: updatedChecklists } : t));
+            if (selectedTask && selectedTask.id === taskId) {
+                setSelectedTask(prev => prev ? { ...prev, checklist_items: updatedChecklists } : null);
+            }
+
+            // 4. Executar transição forçada de estágio
+            await moveTaskStage(taskId, fromStageId, toStageId, true);
+
+            // Fechar modal
+            setTransitionData(null);
+        } catch (e: any) {
+            showToast('Erro ao confirmar transição: ' + e.message, 'error');
+        }
+    };
+
     // --- HELPERS PARA FLUXO E PERMISSÕES DE SETOR ---
     const canUserModifyTaskInStage = (task: ProjectTask | null, stage: ProjectStage | null | undefined) => {
         if (!task || !stage) return false;
@@ -919,11 +1229,13 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
     };
 
     const getIncompleteStageChecklistItems = (task: ProjectTask, stage: ProjectStage | undefined) => {
-        if (!stage || !stage.checklist_items || stage.checklist_items.length === 0) {
+        if (!stage) return [];
+        const items = task.checklist_items?.[stage.id] || stage.checklist_items || [];
+        if (items.length === 0) {
             return [];
         }
         const status = task.checklist_status?.[stage.id] || {};
-        return stage.checklist_items.filter((item: string) => !status[item]);
+        return items.filter((item: string) => !status[item]);
     };
 
     // --- DRAG AND DROP KANBAN ---
@@ -941,7 +1253,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
         setDraggedTaskId(null);
     };
 
-    const moveTaskStage = async (taskId: string, fromStageId: string, toStageId: string) => {
+    const moveTaskStage = async (taskId: string, fromStageId: string, toStageId: string, force = false) => {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -964,6 +1276,19 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                 showToast(`Bloqueio: Conclua todos os itens de checklist do setor "${sourceStage.name}" (${incompleteItems.length} pendentes) antes de transferir para o próximo setor.`, 'error');
                 return;
             }
+        }
+
+        // Se estiver avançando e não forçado, abre o modal de transição
+        if (isMovingForward && !force) {
+            setTransitionData({
+                taskId,
+                fromStageId,
+                toStageId,
+                nextStageName: targetStage.name,
+                checklist: task.checklist_items?.[toStageId] || targetStage.checklist_items || [],
+                uploadedFiles: []
+            });
+            return;
         }
 
         // Atualização Otimista local
@@ -1080,7 +1405,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                         )}
                     </h1>
                     <p className="text-slate-500 dark:text-gray-400 font-medium">
-                        {selectedProject ? selectedProject.description || 'Gestão de tarefas do projeto' : 'Organize, planeje e acompanhe projetos e equipes ao estilo Odoo'}
+                        {selectedProject ? selectedProject.description || 'Gestão de tarefas do projeto' : 'Organize, planeje e acompanhe projetos e equipes'}
                     </p>
                 </div>
 
@@ -1416,12 +1741,17 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                         {stages.map(stage => {
                                             const stageTasks = filteredTasks.filter(t => t.stage_id === stage.id);
                                             
-                                            const totalStageItems = stageTasks.length * (stage.checklist_items?.length || 0);
+                                            const totalStageItems = stageTasks.reduce((acc, t) => {
+                                                const items = t.checklist_items?.[stage.id] || stage.checklist_items || [];
+                                                return acc + items.length;
+                                            }, 0);
                                             const completedStageItems = stageTasks.reduce((acc, t) => {
+                                                const items = t.checklist_items?.[stage.id] || stage.checklist_items || [];
                                                 const statusObj = t.checklist_status?.[stage.id] || {};
-                                                const completedCount = (stage.checklist_items || []).filter(item => statusObj[item]).length;
+                                                const completedCount = items.filter(item => statusObj[item]).length;
                                                 return acc + completedCount;
                                             }, 0);
+                                            
                                             const columnProgress = totalStageItems > 0
                                                 ? Math.round((completedStageItems / totalStageItems) * 100)
                                                 : (stageTasks.length > 0
@@ -1530,55 +1860,58 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                                                         );
                                                                     })()}
 
-                                                                    {/* Checklist Setorizado do Kanban */}
-                                                                    {currentStage && currentStage.checklist_items && currentStage.checklist_items.length > 0 && (
-                                                                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
-                                                                            <div className="text-[9px] font-bold text-slate-450 dark:text-slate-500 mb-1 uppercase">Checklist do Setor</div>
-                                                                            {currentStage.checklist_items.map((item, idx) => {
-                                                                                const isCompleted = !!task.checklist_status?.[currentStage.id]?.[item];
-                                                                                const isReadOnly = !canUserModifyTaskInStage(task, currentStage);
-                                                                                return (
-                                                                                    <label
-                                                                                        key={idx}
-                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                        className="flex items-center space-x-2 text-[10px] text-slate-600 dark:text-slate-450 cursor-pointer hover:text-brand-primary"
-                                                                                    >
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            checked={isCompleted}
-                                                                                            disabled={isReadOnly}
-                                                                                            onChange={async () => {
-                                                                                                if (isReadOnly) {
-                                                                                                    showToast("Sem permissão para alterar o checklist deste setor.", "error");
-                                                                                                    return;
-                                                                                                }
-                                                                                                const updatedStatus = {
-                                                                                                    ...(task.checklist_status || {}),
-                                                                                                    [currentStage.id]: {
-                                                                                                        ...(task.checklist_status?.[currentStage.id] || {}),
-                                                                                                        [item]: !isCompleted
+                                                                    {(() => {
+                                                                        const items = task.checklist_items?.[currentStage.id] || currentStage.checklist_items || [];
+                                                                        if (!currentStage || items.length === 0) return null;
+                                                                        return (
+                                                                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                                                                                <div className="text-[9px] font-bold text-slate-450 dark:text-slate-500 mb-1 uppercase">Checklist do Setor</div>
+                                                                                {items.map((item, idx) => {
+                                                                                    const isCompleted = !!task.checklist_status?.[currentStage.id]?.[item];
+                                                                                    const isReadOnly = !canUserModifyTaskInStage(task, currentStage);
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={idx}
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                            className="flex items-center space-x-2 text-[10px] text-slate-600 dark:text-slate-450 cursor-pointer hover:text-brand-primary"
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isCompleted}
+                                                                                                disabled={isReadOnly}
+                                                                                                onChange={async () => {
+                                                                                                    if (isReadOnly) {
+                                                                                                        showToast("Sem permissão para alterar o checklist deste setor.", "error");
+                                                                                                        return;
                                                                                                     }
-                                                                                                };
-                                                                                                try {
-                                                                                                    const { error } = await supabase
-                                                                                                        .from('project_tasks')
-                                                                                                        .update({ checklist_status: updatedStatus })
-                                                                                                        .eq('id', task.id);
-                                                                                                    if (error) throw error;
-                                                                                                    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, checklist_status: updatedStatus } : t));
-                                                                                                    showToast("Checklist atualizado!", "success");
-                                                                                                } catch (err: any) {
-                                                                                                    showToast("Erro ao atualizar checklist: " + err.message, "error");
-                                                                                                }
-                                                                                            }}
-                                                                                            className="rounded text-brand-primary focus:ring-emerald-500 w-3 h-3"
-                                                                                        />
-                                                                                        <span className={isCompleted ? 'line-through opacity-50' : ''}>{item}</span>
-                                                                                    </label>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    )}
+                                                                                                    const updatedStatus = {
+                                                                                                        ...(task.checklist_status || {}),
+                                                                                                        [currentStage.id]: {
+                                                                                                            ...(task.checklist_status?.[currentStage.id] || {}),
+                                                                                                            [item]: !isCompleted
+                                                                                                        }
+                                                                                                    };
+                                                                                                    try {
+                                                                                                        const { error } = await supabase
+                                                                                                            .from('project_tasks')
+                                                                                                            .update({ checklist_status: updatedStatus })
+                                                                                                            .eq('id', task.id);
+                                                                                                        if (error) throw error;
+                                                                                                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, checklist_status: updatedStatus } : t));
+                                                                                                        showToast("Checklist atualizado!", "success");
+                                                                                                    } catch (err: any) {
+                                                                                                        showToast("Erro ao atualizar checklist: " + err.message, "error");
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="rounded text-brand-primary focus:ring-emerald-500 w-3 h-3"
+                                                                                            />
+                                                                                            <span className={isCompleted ? 'line-through opacity-50' : ''}>{item}</span>
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Footer do Card */}
                                                                     <div className="flex items-center justify-between text-[10px] mt-2 pt-2 border-t dark:border-slate-800">
@@ -2270,72 +2603,79 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                     </div>
 
                                     {/* CHECKLIST DO SETOR ATUAL */}
-                                    {!isNewTaskMode && currentStage && currentStage.checklist_items && currentStage.checklist_items.length > 0 && (
-                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
-                                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
-                                                <ClipboardDocumentCheckIcon className="w-4 h-4 text-brand-primary" />
-                                                Checklist do Setor: {currentStage.name}
-                                            </h4>
-                                            <div className="space-y-2">
-                                                {currentStage.checklist_items.map((item, idx) => {
-                                                    const isCompleted = !!selectedTask?.checklist_status?.[currentStage.id]?.[item];
-                                                    return (
-                                                        <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl">
-                                                            <label className={`flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-650 dark:text-slate-350 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isCompleted}
-                                                                    disabled={isReadOnly}
-                                                                    onChange={async () => {
-                                                                        if (!selectedTask) return;
-                                                                        if (isReadOnly) {
-                                                                            showToast("Sem permissão para alterar o checklist deste setor.", "error");
-                                                                            return;
-                                                                        }
-                                                                        const updatedStatus = {
-                                                                            ...(selectedTask.checklist_status || {}),
-                                                                            [currentStage.id]: {
-                                                                                ...(selectedTask.checklist_status?.[currentStage.id] || {}),
-                                                                                [item]: !isCompleted
-                                                                            }
-                                                                        };
-                                                                        try {
-                                                                            const { error } = await supabase
-                                                                                .from('project_tasks')
-                                                                                .update({ checklist_status: updatedStatus })
-                                                                                .eq('id', selectedTask.id);
-                                                                            if (error) throw error;
-                                                                            
-                                                                            setSelectedTask({
-                                                                                ...selectedTask,
-                                                                                checklist_status: updatedStatus
-                                                                            });
-                                                                            setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, checklist_status: updatedStatus } : t));
-                                                                            showToast("Checklist atualizado!", "success");
-                                                                        } catch (err: any) {
-                                                                            showToast("Erro ao atualizar checklist: " + err.message, "error");
-                                                                        }
-                                                                    }}
-                                                                    className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary w-4 h-4 cursor-pointer"
-                                                                />
-                                                                <span className={isCompleted ? 'line-through text-slate-400 dark:text-slate-500 font-normal' : ''}>
-                                                                    {item}
-                                                                </span>
-                                                            </label>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {!isNewTaskMode && currentStage && (!currentStage.checklist_items || currentStage.checklist_items.length === 0) && (
-                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-dashed dark:border-slate-800 text-center py-6">
-                                            <ClipboardDocumentCheckIcon className="w-8 h-8 text-slate-300 dark:text-slate-650 mx-auto mb-2" />
-                                            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                                                Sem checklist para o setor {currentStage.name}
-                                            </h4>
-                                        </div>
+                                    {/* CHECKLIST DO SETOR ATUAL */}
+                                    {!isNewTaskMode && currentStage && (
+                                        (() => {
+                                            const items = selectedTask?.checklist_items?.[currentStage.id] || currentStage.checklist_items || [];
+                                            if (items.length === 0) {
+                                                return (
+                                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-dashed dark:border-slate-800 text-center py-6">
+                                                        <ClipboardDocumentCheckIcon className="w-8 h-8 text-slate-300 dark:text-slate-650 mx-auto mb-2" />
+                                                        <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                                            Sem checklist para o setor {currentStage.name}
+                                                        </h4>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
+                                                    <h4 className="text-xs font-black text-slate-800 dark:text-slate-250 uppercase tracking-wider flex items-center gap-2">
+                                                        <ClipboardDocumentCheckIcon className="w-4 h-4 text-brand-primary" />
+                                                        Checklist do Setor: {currentStage.name}
+                                                    </h4>
+                                                    <div className="space-y-2">
+                                                        {items.map((item, idx) => {
+                                                            const isCompleted = !!selectedTask?.checklist_status?.[currentStage.id]?.[item];
+                                                            return (
+                                                                <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl">
+                                                                    <label className={`flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-650 dark:text-slate-350 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isCompleted}
+                                                                            disabled={isReadOnly}
+                                                                            onChange={async () => {
+                                                                                if (!selectedTask) return;
+                                                                                if (isReadOnly) {
+                                                                                    showToast("Sem permissão para alterar o checklist deste setor.", "error");
+                                                                                    return;
+                                                                                }
+                                                                                const updatedStatus = {
+                                                                                    ...(selectedTask.checklist_status || {}),
+                                                                                    [currentStage.id]: {
+                                                                                        ...(selectedTask.checklist_status?.[currentStage.id] || {}),
+                                                                                        [item]: !isCompleted
+                                                                                    }
+                                                                                };
+                                                                                try {
+                                                                                    const { error } = await supabase
+                                                                                        .from('project_tasks')
+                                                                                        .update({ checklist_status: updatedStatus })
+                                                                                        .eq('id', selectedTask.id);
+                                                                                    if (error) throw error;
+                                                                                    
+                                                                                    setSelectedTask({
+                                                                                        ...selectedTask,
+                                                                                        checklist_status: updatedStatus
+                                                                                    });
+                                                                                    setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, checklist_status: updatedStatus } : t));
+                                                                                    showToast("Checklist atualizado!", "success");
+                                                                                } catch (err: any) {
+                                                                                    showToast("Erro ao atualizar checklist: " + err.message, "error");
+                                                                                }
+                                                                            }}
+                                                                            className="rounded border-gray-300 text-brand-primary focus:ring-brand-primary w-4 h-4 cursor-pointer"
+                                                                        />
+                                                                        <span className={isCompleted ? 'line-through text-slate-400 dark:text-slate-500 font-normal' : ''}>
+                                                                            {item}
+                                                                        </span>
+                                                                    </label>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()
                                     )}
 
                                     {/* TIMESHEETS / APONTAMENTO DE HORAS */}
@@ -2405,6 +2745,149 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
 
                                 {/* LADO DIREITO: Configurações Rápidas & Chatter */}
                                 <div className="space-y-6">
+                                    {/* TIMER WIDGET (CRONÔMETRO DE TAREFA) */}
+                                    {!isNewTaskMode && (
+                                        <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4">
+                                            <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest border-b pb-2 flex items-center gap-1.5">
+                                                <ClockIcon className="w-4 h-4 text-brand-primary" />
+                                                Apontamento em Tempo Real
+                                            </h4>
+                                            
+                                            {timerState ? (
+                                                timerState.taskId === selectedTask?.id ? (
+                                                    <div className="flex flex-col items-center justify-center py-4 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-xl space-y-3 relative overflow-hidden">
+                                                        {timerState.isPaused && (
+                                                            <div className="absolute top-1.5 left-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">
+                                                                Pausado ({timerState.pauseReason})
+                                                            </div>
+                                                        )}
+                                                        <div className={`text-3xl font-black tracking-widest tabular-nums ${timerState.isPaused ? 'text-slate-400' : 'text-brand-primary'}`}>
+                                                            {elapsedTimeStr}
+                                                        </div>
+                                                        
+                                                        <div className="flex w-full px-3 gap-2">
+                                                            {timerState.isPaused ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={resumeTimer}
+                                                                    className="flex-1 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-1"
+                                                                >
+                                                                    <span>Retomar</span>
+                                                                </button>
+                                                            ) : (
+                                                                <div className="relative flex-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowPauseMenu(!showPauseMenu)}
+                                                                        className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-650 dark:text-slate-350 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1"
+                                                                    >
+                                                                        <span>Pausar</span>
+                                                                        <ChevronDownIcon className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    
+                                                                    {showPauseMenu && (
+                                                                        <div className="absolute bottom-full mb-1 left-0 w-44 bg-white dark:bg-slate-950 border dark:border-slate-800 rounded-xl shadow-xl z-10 py-1 overflow-hidden">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => pauseTimer('Intervalo de 10 min', 10)}
+                                                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold"
+                                                                            >
+                                                                                10 minutos
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => pauseTimer('Intervalo de 20 min', 20)}
+                                                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold"
+                                                                            >
+                                                                                20 minutos
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => pauseTimer('Intervalo de 30 min', 30)}
+                                                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold"
+                                                                            >
+                                                                                30 minutos
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => pauseTimer('Almoço', 60)}
+                                                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold"
+                                                                            >
+                                                                                Almoço
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => pauseTimer('Pausa Livre')}
+                                                                                className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold border-t dark:border-slate-800"
+                                                                            >
+                                                                                Pausa Livre
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowStopConfirm(true)}
+                                                                className="flex-1 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all flex items-center justify-center gap-1"
+                                                            >
+                                                                <span>Finalizar</span>
+                                                            </button>
+                                                        </div>
+
+                                                        {showStopConfirm && (
+                                                            <div className="absolute inset-0 bg-white dark:bg-slate-900 p-3 flex flex-col justify-between z-20 rounded-xl">
+                                                                <div className="space-y-2">
+                                                                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase">Lançar Apontamento</p>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="O que você desenvolveu?"
+                                                                        value={stopDescription}
+                                                                        onChange={(e) => setStopDescription(e.target.value)}
+                                                                        className="w-full p-2 border rounded-lg text-xs outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-slate-50 dark:bg-slate-950"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { setShowStopConfirm(false); setStopDescription(''); }}
+                                                                        className="flex-1 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-lg"
+                                                                    >
+                                                                        Voltar
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={stopTimer}
+                                                                        className="flex-1 py-1.5 bg-brand-primary text-white text-xs font-bold rounded-lg hover:bg-emerald-600"
+                                                                    >
+                                                                        Confirmar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 dark:text-amber-400 font-semibold leading-relaxed">
+                                                        <ExclamationTriangleIcon className="w-4 h-4 inline mr-1 mb-0.5" />
+                                                        Você possui um cronômetro ativo em: <strong className="underline">{timerState.taskTitle}</strong>.
+                                                        Finalize-o lá para poder iniciar o controle nesta tarefa.
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={isReadOnly}
+                                                    onClick={() => selectedTask && startTimer(selectedTask)}
+                                                    className="w-full py-2.5 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase transition-all shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                                >
+                                                    <ClockIcon className="w-4 h-4" />
+                                                    Iniciar Cronômetro
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Definições Rápidas */}
                                     <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border dark:border-slate-800 space-y-4 text-xs">
                                         <h4 className="text-xs font-black text-slate-850 dark:text-slate-200 uppercase tracking-widest border-b pb-2 mb-4">Informações Gerais</h4>
@@ -2531,7 +3014,46 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                                                                     )}
                                                                     <div className="flex-grow bg-white dark:bg-slate-900 border dark:border-slate-800 p-2.5 rounded-2xl relative shadow-sm">
                                                                         <p className="font-bold text-[10px] text-slate-500">{item.user?.full_name || 'Usuário'}</p>
-                                                                        <p className="text-slate-700 dark:text-slate-200 mt-1 leading-normal">{item.content}</p>
+                                                                        {(() => {
+                                                                            if (item.content.startsWith('[ARQUIVO]')) {
+                                                                                const filePart = item.content.replace('[ARQUIVO]', '').trim();
+                                                                                const [fileName, fileUrl] = filePart.split('|');
+                                                                                return (
+                                                                                    <div className="flex flex-col gap-1.5 p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl mt-1 text-[11px]">
+                                                                                        <div className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                                                                                            <PaperClipIcon className="w-3.5 h-3.5" />
+                                                                                            <span>Arquivo de Transição Anexado</span>
+                                                                                        </div>
+                                                                                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-800 dark:text-slate-200 underline font-medium break-all hover:text-brand-primary">
+                                                                                            {fileName || 'Download do arquivo'}
+                                                                                        </a>
+                                                                                    </div>
+                                                                                );
+                                                                            } else if (item.content.startsWith('[HISTÓRICO]')) {
+                                                                                const historyText = item.content.replace('[HISTÓRICO]', '').trim();
+                                                                                return (
+                                                                                    <div className="flex flex-col gap-1 p-2 bg-amber-500/5 border border-amber-500/10 rounded-xl mt-1 text-[11px]">
+                                                                                        <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                                                                                            <ClockIcon className="w-3.5 h-3.5" />
+                                                                                            <span>Histórico de Checklist</span>
+                                                                                        </div>
+                                                                                        <p className="text-slate-650 dark:text-slate-350">{historyText}</p>
+                                                                                    </div>
+                                                                                );
+                                                                            } else if (item.content.startsWith('[CRONÔMETRO]')) {
+                                                                                const timerText = item.content.replace('[CRONÔMETRO]', '').trim();
+                                                                                return (
+                                                                                    <div className="flex flex-col gap-1 p-2 bg-blue-500/5 border border-blue-500/10 rounded-xl mt-1 text-[11px]">
+                                                                                        <div className="flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400">
+                                                                                            <ClockIcon className="w-3.5 h-3.5 animate-pulse" />
+                                                                                            <span>Apontamento de Tempo</span>
+                                                                                        </div>
+                                                                                        <p className="text-slate-650 dark:text-slate-350">{timerText}</p>
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            return <p className="text-slate-700 dark:text-slate-200 mt-1 leading-normal">{item.content}</p>;
+                                                                        })()}
                                                                         <span className="text-[8px] text-slate-400 absolute bottom-1 right-2">
                                                                             {item.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                                         </span>
@@ -2584,6 +3106,151 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures 
                     </div>
                 );
             })()}
+
+            {/* --- MODAL 4: TRANSIÇÃO SETOR / PRÓXIMO CHECKLIST --- */}
+            {transitionData && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+                        <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-850 dark:text-slate-100">
+                                    Avançar para: {transitionData.nextStageName}
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    Configure o checklist do próximo setor e anexe arquivos importantes.
+                                </p>
+                            </div>
+                            <button onClick={() => setTransitionData(null)} className="text-slate-450 hover:text-slate-600 font-bold">✕</button>
+                        </div>
+
+                        <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                            {/* Checklist Section */}
+                            <div className="space-y-3">
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">
+                                    Checklist do Próximo Setor
+                                </label>
+                                
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Adicionar novo item de checklist..."
+                                        value={newTransitionItem}
+                                        onChange={(e) => setNewTransitionItem(e.target.value)}
+                                        className="flex-grow p-2.5 border rounded-xl text-xs outline-none dark:bg-slate-850 dark:border-slate-750 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!newTransitionItem.trim()) return;
+                                            setTransitionData(prev => prev ? {
+                                                ...prev,
+                                                checklist: [...prev.checklist, newTransitionItem.trim()]
+                                            } : null);
+                                            setNewTransitionItem('');
+                                        }}
+                                        className="px-4 py-2.5 bg-brand-primary hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                                    >
+                                        Adicionar
+                                    </button>
+                                </div>
+
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                    {transitionData.checklist.length === 0 ? (
+                                        <p className="text-xs text-slate-450 italic text-center py-4 bg-slate-50 dark:bg-slate-850/50 rounded-xl">
+                                            Nenhum item definido. O setor começará sem checklist ou você pode adicionar acima.
+                                        </p>
+                                    ) : (
+                                        transitionData.checklist.map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-100 dark:border-slate-800">
+                                                <span className="text-xs font-medium text-slate-750 dark:text-slate-300">{item}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTransitionData(prev => prev ? {
+                                                            ...prev,
+                                                            checklist: prev.checklist.filter((_, i) => i !== idx)
+                                                        } : null);
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 p-1.5 rounded-lg transition-all"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Files Section */}
+                            <div className="space-y-3 pt-4 border-t dark:border-slate-800">
+                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">
+                                    Anexar Arquivos para o Próximo Setor
+                                </label>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                    Formatos aceitos: PDF, DOC, Planilhas, PNG, JPEG.
+                                </p>
+
+                                <div className="flex items-center gap-3">
+                                    <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-150 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-750 dark:text-slate-200 rounded-xl cursor-pointer text-xs font-bold transition-all border dark:border-slate-700">
+                                        <PaperClipIcon className="w-4 h-4" />
+                                        <span>{uploadingFile ? 'Enviando...' : 'Selecionar Arquivo'}</span>
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                            onChange={handleTransitionFileUpload}
+                                            disabled={uploadingFile}
+                                        />
+                                    </label>
+                                </div>
+
+                                {transitionData.uploadedFiles.length > 0 && (
+                                    <div className="space-y-2 mt-2">
+                                        {transitionData.uploadedFiles.map((file, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-2.5 bg-brand-primary/5 border border-brand-primary/10 rounded-xl">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <DocumentTextIcon className="w-4 h-4 text-brand-primary flex-shrink-0" />
+                                                    <span className="text-xs font-semibold text-brand-primary truncate">{file.name}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTransitionData(prev => prev ? {
+                                                            ...prev,
+                                                            uploadedFiles: prev.uploadedFiles.filter((_, i) => i !== idx)
+                                                        } : null);
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 p-1 rounded-lg"
+                                                >
+                                                    <XMarkIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t dark:border-slate-800 flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/50">
+                            <button
+                                type="button"
+                                onClick={() => setTransitionData(null)}
+                                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded-xl text-xs font-bold uppercase"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmTransition}
+                                disabled={uploadingFile}
+                                className="px-6 py-2.5 bg-brand-primary text-white hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase shadow-lg shadow-emerald-100 disabled:opacity-50"
+                            >
+                                Avançar Setor
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- MODAL 3: GERENCIAR ESTÁGIO (COLUNAS) --- */}
             {isStageModalOpen && (

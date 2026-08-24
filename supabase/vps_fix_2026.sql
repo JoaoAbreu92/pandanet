@@ -380,5 +380,8 @@ WITH CHECK (
     )
 );
 
+-- 3. PROJECT TASK-SPECIFIC CHECKLIST ITEMS SUPPORT
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS checklist_items JSONB DEFAULT '{}'::jsonb;
+
 -- Force Schema Cache Reload (Standard trick)
 NOTIFY pgrst, 'reload schema';

@@ -18,9 +18,10 @@ import type { SchedulingEventType, SchedulingBooking, SchedulingTemplate } from 
 
 interface SchedulingPageProps {
     customFeatures?: Record<string, any>;
+    mode?: 'appointments' | 'events';
 }
 
-const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
+const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 'appointments' }) => {
     const { currentUser } = useAuth();
     const { addNotification } = useNotifications();
     const [activeTab, setActiveTab] = useState<'events' | 'bookings' | 'templates' | 'settings'>('events');
@@ -116,7 +117,17 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
             }
             const { data, error } = await query.order('created_at', { ascending: false });
             if (error) throw error;
-            setEventTypes(data || []);
+
+            // Client-side filtering by mode
+            const allEvents = data || [];
+            const filteredEvents = allEvents.filter(e => {
+                if (mode === 'events') {
+                    return e.disable_time_slots === true;
+                } else {
+                    return !e.disable_time_slots;
+                }
+            });
+            setEventTypes(filteredEvents);
         } catch (err: any) {
             console.error('Erro ao buscar tipos de eventos:', err);
         } finally {
@@ -132,7 +143,18 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
             }
             const { data, error } = await query.order('booking_date', { ascending: true }).order('booking_time', { ascending: true });
             if (error) throw error;
-            setBookings(data || []);
+
+            // Client-side filtering by mode
+            const allBookings = data || [];
+            const filteredBookings = allBookings.filter(b => {
+                const disableTimeSlots = b.event_types?.disable_time_slots || false;
+                if (mode === 'events') {
+                    return disableTimeSlots === true;
+                } else {
+                    return !disableTimeSlots;
+                }
+            });
+            setBookings(filteredBookings);
         } catch (err: any) {
             console.error('Erro ao buscar agendamentos:', err);
         }
@@ -270,10 +292,10 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
         const doc = iframe.contentDocument || iframe.contentWindow?.document;
         if (!doc) return;
 
-        const companyName = settingsCompanyName || 'PandaNet Empresa';
+        const companyName = settingsCompanyName || 'Grupo Pixel';
         const logoUrl = settingsLogoUrl || '';
         const reportTitle = selectedId === 'all' 
-            ? 'Relatório Geral de Reservas' 
+            ? (mode === 'events' ? 'Relatório de Locações (Salas & Espaços)' : 'Relatório Geral de Agendamentos') 
             : `Relatório de Reservas - ${eventTypes.find(e => e.id === selectedId)?.name || ''}`;
 
         const rowsHtml = filtered.map(booking => {
@@ -284,19 +306,22 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                 booking.guest_cnpj ? `CNPJ: ${booking.guest_cnpj}` : ''
             ].filter(Boolean).join(' / ') || '-';
             
+            const statusText = booking.status === 'confirmed' ? 'Confirmado' : booking.status === 'pending' ? 'Pendente' : 'Cancelado/Recusado';
+            const statusClass = booking.status === 'confirmed' ? 'status-confirmed' : booking.status === 'pending' ? 'status-pending' : 'status-cancelled';
+
             return `
                 <tr>
-                    <td>${booking.guest_name}</td>
+                    <td><strong>${booking.guest_name}</strong></td>
                     <td>${booking.guest_email}</td>
                     <td>${booking.guest_phone || '-'}</td>
                     <td>${documents}</td>
-                    <td>${formattedDate} às ${booking.booking_time}</td>
-                    <td>${booking.status === 'confirmed' ? 'Confirmado' : booking.status === 'pending' ? 'Pendente' : 'Cancelado/Recusado'}</td>
+                    <td>${formattedDate} ${booking.booking_time === 'Dia Inteiro' ? ' - Dia Inteiro' : `às ${booking.booking_time}`}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                 </tr>
             `;
         }).join('');
 
-        const pandanetLogoUrl = window.location.origin + '/logo.png';
+        const logoPixelUrl = window.location.origin + '/logo_pixel.png';
 
         const printHtml = `
             <!DOCTYPE html>
@@ -317,24 +342,25 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        border-bottom: 2px solid #e2e8f0;
-                        padding-bottom: 20px;
+                        border-bottom: 3px solid #10b981;
+                        padding-bottom: 25px;
                         margin-bottom: 30px;
                     }
                     .header-left {
                         display: flex;
                         align-items: center;
-                        gap: 15px;
+                        gap: 20px;
                     }
                     .company-logo {
-                        max-height: 60px;
-                        max-width: 150px;
+                        max-height: 70px;
+                        max-width: 180px;
                         object-fit: contain;
                     }
                     .company-name {
-                        font-size: 20px;
+                        font-size: 24px;
                         font-weight: 800;
                         color: #0f172a;
+                        letter-spacing: -0.5px;
                     }
                     .header-right {
                         text-align: right;
@@ -342,48 +368,88 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                     .report-date {
                         font-size: 11px;
                         color: #64748b;
-                        margin-top: 4px;
+                        margin-top: 6px;
+                        font-weight: 500;
                     }
                     h1 {
-                        font-size: 18px;
+                        font-size: 20px;
                         font-weight: 900;
-                        margin: 0 0 10px 0;
+                        margin: 0 0 8px 0;
                         color: #0f172a;
+                        letter-spacing: -0.5px;
                     }
                     .summary {
-                        background-color: #f8fafc;
+                        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                         border: 1px solid #e2e8f0;
-                        border-radius: 12px;
-                        padding: 15px;
-                        margin-bottom: 25px;
-                        font-size: 12px;
+                        border-radius: 16px;
+                        padding: 20px;
+                        margin-bottom: 30px;
+                        font-size: 13px;
                         display: flex;
-                        gap: 30px;
+                        gap: 40px;
+                        box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+                    }
+                    .summary-item {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                    }
+                    .summary-item span {
+                        font-size: 11px;
+                        color: #64748b;
+                        text-transform: uppercase;
+                        font-weight: 700;
+                        letter-spacing: 0.5px;
                     }
                     .summary-item strong {
-                        color: #475569;
+                        font-size: 18px;
+                        color: #0f172a;
+                        font-weight: 800;
                     }
                     table {
                         width: 100%;
                         border-collapse: collapse;
-                        margin-bottom: 60px;
-                        font-size: 11px;
+                        margin-bottom: 80px;
+                        font-size: 12px;
                     }
                     th {
-                        background-color: #f1f5f9;
-                        color: #475569;
+                        background-color: #0f172a;
+                        color: #fff;
                         text-align: left;
-                        padding: 10px 12px;
+                        padding: 14px 16px;
                         font-weight: 700;
-                        border-bottom: 2px solid #cbd5e1;
+                        border-bottom: 3px solid #e2e8f0;
+                        text-transform: uppercase;
+                        font-size: 10px;
+                        letter-spacing: 0.5px;
                     }
                     td {
-                        padding: 10px 12px;
+                        padding: 14px 16px;
                         border-bottom: 1px solid #e2e8f0;
                         color: #334155;
                     }
                     tr:nth-child(even) {
-                        background-color: #fafafa;
+                        background-color: #f8fafc;
+                    }
+                    .status-badge {
+                        display: inline-block;
+                        padding: 4px 10px;
+                        border-radius: 9999px;
+                        font-size: 10px;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                    }
+                    .status-confirmed {
+                        background-color: #d1fae5;
+                        color: #065f46;
+                    }
+                    .status-pending {
+                        background-color: #fef3c7;
+                        color: #92400e;
+                    }
+                    .status-cancelled {
+                        background-color: #fee2e2;
+                        color: #991b1b;
                     }
                     .footer {
                         position: fixed;
@@ -391,23 +457,26 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                         left: 40px;
                         right: 40px;
                         border-top: 1px solid #e2e8f0;
-                        padding-top: 15px;
+                        padding-top: 20px;
                         display: flex;
-                        flex-direction: column;
                         align-items: center;
-                        justify-content: center;
-                        gap: 5px;
+                        justify-content: space-between;
                         background: #fff;
                     }
-                    .pandanet-logo {
-                        height: 25px;
+                    .footer-left {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    .pixel-logo {
+                        height: 30px;
                         object-fit: contain;
                     }
-                    .pandanet-site {
-                        font-size: 10px;
-                        color: #94a3b8;
+                    .pixel-site {
+                        font-size: 11px;
+                        color: #64748b;
                         text-decoration: none;
-                        font-weight: 600;
+                        font-weight: 700;
                     }
                     @media print {
                         body {
@@ -433,9 +502,18 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                 </div>
 
                 <div class="summary">
-                    <div class="summary-item"><strong>Total de Reservas:</strong> ${filtered.length}</div>
-                    <div class="summary-item"><strong>Confirmadas:</strong> ${filtered.filter(b => b.status === 'confirmed').length}</div>
-                    <div class="summary-item"><strong>Pendentes:</strong> ${filtered.filter(b => b.status === 'pending').length}</div>
+                    <div class="summary-item">
+                        <span>Total de Reservas</span>
+                        <strong>${filtered.length}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Confirmadas</span>
+                        <strong style="color: #10b981;">${filtered.filter(b => b.status === 'confirmed').length}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Pendentes</span>
+                        <strong style="color: #d97706;">${filtered.filter(b => b.status === 'pending').length}</strong>
+                    </div>
                 </div>
 
                 <table>
@@ -455,8 +533,10 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                 </table>
 
                 <div class="footer">
-                    <img src="${pandanetLogoUrl}" class="pandanet-logo" alt="PandaNet" />
-                    <a href="https://www.pandanet.com.br" class="pandanet-site" target="_blank">www.pandanet.com.br</a>
+                    <div class="footer-left">
+                        <img src="${logoPixelUrl}" class="pixel-logo" alt="Grupo Pixel" />
+                    </div>
+                    <a href="https://www.grupopixel.com.br" class="pixel-site" target="_blank">www.grupopixel.com.br</a>
                 </div>
             </body>
             </html>
@@ -820,14 +900,16 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                         <CalendarIcon className="w-8 h-8 text-brand-primary" />
-                        Agendamentos
+                        {mode === 'events' ? 'Aluguel de Salas & Espaços' : 'Agendamentos'}
                         <span className="text-xs bg-brand-primary/10 text-brand-primary font-bold px-2.5 py-1 rounded-full border border-brand-primary/20 flex items-center gap-1">
                             <SparklesIcon className="w-3.5 h-3.5" />
                             Premium Cal.com
                         </span>
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">
-                        Crie agendas de reuniões, jantares, consultas ou eventos. Compartilhe o link e receba reservas profissionais.
+                        {mode === 'events' 
+                            ? 'Gerencie o aluguel de salas comerciais, salas de reunião e outros espaços do Grupo Pixel.' 
+                            : 'Crie agendas de reuniões, jantares, consultas ou eventos. Compartilhe o link e receba reservas profissionais.'}
                     </p>
                 </div>
                 
@@ -843,7 +925,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                                 onClick={() => {
                                     setEditingEvent(null);
                                     setEventForm({
-                                        name: '', slug: '', description: '', duration: 30, duration_unit: 'minutes', disable_time_slots: false, is_paid: false, price: 0,
+                                        name: '', slug: '', description: '', duration: mode === 'events' ? 1 : 30, duration_unit: mode === 'events' ? 'days' : 'minutes', disable_time_slots: mode === 'events' ? true : false, is_paid: false, price: 0,
                                         requirements: { phone: true, cnpj: false, company_name: false, cpf: false },
                                         availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
                                         is_active: true,
@@ -859,7 +941,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                                 className="bg-brand-primary hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-brand-primary/20 flex items-center gap-2 transition-all hover:scale-[1.02]"
                             >
                                 <PlusIcon className="w-5 h-5" />
-                                Criar Nova Agenda
+                                {mode === 'events' ? 'Cadastrar Novo Espaço' : 'Criar Nova Agenda'}
                             </button>
                         )
                     )}
@@ -899,7 +981,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                             : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
                     }`}
                 >
-                    Suas Agendas
+                    {mode === 'events' ? 'Nossos Espaços / Salas' : 'Suas Agendas'}
                 </button>
                 <button
                     onClick={() => setActiveTab('bookings')}
@@ -951,8 +1033,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                             {eventTypes.length === 0 ? (
                                 <div className="col-span-full text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
                                     <CalendarIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Nenhuma agenda criada</h3>
-                                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Crie seu primeiro tipo de evento para compartilhar com seus clientes.</p>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{mode === 'events' ? 'Nenhum espaço cadastrado' : 'Nenhuma agenda criada'}</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{mode === 'events' ? 'Cadastre seu primeiro espaço ou sala comercial para locação.' : 'Crie seu primeiro tipo de evento para compartilhar com seus clientes.'}</p>
                                 </div>
                             ) : (
                                 eventTypes.map(event => (
@@ -1320,7 +1402,9 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                                 <CalendarIcon className="w-6 h-6 text-brand-primary" />
-                                {editingEvent ? 'Editar Agenda' : 'Criar Nova Agenda'}
+                                {editingEvent 
+                                    ? (mode === 'events' ? 'Editar Espaço / Sala' : 'Editar Agenda') 
+                                    : (mode === 'events' ? 'Cadastrar Novo Espaço' : 'Criar Nova Agenda')}
                             </h2>
                             <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-slate-600">
                                 <XMarkIcon className="w-6 h-6" />
@@ -1330,24 +1414,28 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                         <form onSubmit={handleSaveEvent} className="p-6 space-y-4 overflow-y-auto flex-1">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Nome da Agenda *</label>
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                                        {mode === 'events' ? 'Nome do Espaço / Sala *' : 'Nome da Agenda *'}
+                                    </label>
                                     <input 
                                         type="text" 
                                         required 
                                         value={eventForm.name}
                                         onChange={e => setEventForm({ ...eventForm, name: e.target.value })}
-                                        placeholder="Ex: Jantar de Aniversário"
+                                        placeholder={mode === 'events' ? 'Ex: Sala de Reunião Pixel B' : 'Ex: Jantar de Aniversário'}
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Slug da URL *</label>
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                                        {mode === 'events' ? 'Identificador da URL *' : 'Slug da URL *'}
+                                    </label>
                                     <input 
                                         type="text" 
                                         required 
                                         value={eventForm.slug}
                                         onChange={e => setEventForm({ ...eventForm, slug: e.target.value })}
-                                        placeholder="Ex: jantar-aniversario"
+                                        placeholder={mode === 'events' ? 'Ex: sala-reuniao-b' : 'Ex: jantar-aniversario'}
                                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
                                     />
                                 </div>
@@ -1358,7 +1446,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                                 <textarea 
                                     value={eventForm.description}
                                     onChange={e => setEventForm({ ...eventForm, description: e.target.value })}
-                                    placeholder="Explique o que é este evento, local, traje, etc."
+                                    placeholder={mode === 'events' ? 'Descreva o espaço, comodidades, localização, capacidade de pessoas, etc.' : 'Explique o que é este evento, local, traje, etc.'}
                                     rows={3}
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-primary"
                                 />
@@ -1419,21 +1507,23 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures }) => {
                             </div>
 
                             {/* Option to disable time slots (hourly booking) */}
-                            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Reserva por Dia Inteiro / Múltiplos Dias</label>
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Desativa a seleção de horários no calendário. O convidado reserva o dia todo (ou dias inteiros).</p>
+                            {mode !== 'events' && (
+                                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Reserva por Dia Inteiro / Múltiplos Dias</label>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Desativa a seleção de horários no calendário. O convidado reserva o dia todo (ou dias inteiros).</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.disable_time_slots}
+                                            onChange={e => setEventForm({ ...eventForm, disable_time_slots: e.target.checked })}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                                    </label>
                                 </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={eventForm.disable_time_slots}
-                                        onChange={e => setEventForm({ ...eventForm, disable_time_slots: e.target.checked })}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
-                                </label>
-                            </div>
+                            )}
 
                             {/* Requirements Checklist */}
                             <div className="space-y-2">

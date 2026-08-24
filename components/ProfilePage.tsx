@@ -1,11 +1,33 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Card from './Card';
-import { PencilIcon, SparklesIcon } from './icons';
+import { PencilIcon, SparklesIcon, CheckIcon } from './icons';
 import type { Employee, Post, CompanyBadge, UserBadge } from '../types';
 import { PostCard } from './FeedPage';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import BadgeDetailModal from './BadgeDetailModal';
+
+const PRESET_AVATARS = [
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&q=80'
+];
+
+const PRESET_BANNERS = [
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1618005198143-e5283b519a7f?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&h=300&q=80',
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&h=300&q=80'
+];
 
 interface ProfilePageProps {
     userId?: string;
@@ -704,7 +726,52 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         </div>
 
                         {isEditing ? (
-                            <div className="space-y-4">
+                            <div className="space-y-6">
+                                {/* Presets Gallery */}
+                                <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-2xl border dark:border-slate-800 space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest block">Banners de Capa Disponíveis</label>
+                                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                                            {PRESET_BANNERS.map((url, i) => (
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    onClick={() => setTempUserData(prev => ({ ...prev, coverUrl: url }))}
+                                                    className={`h-10 w-full rounded-lg overflow-hidden border-2 transition-all relative ${tempUserData.coverUrl === url ? 'border-brand-primary scale-95 shadow-md' : 'border-transparent opacity-80 hover:opacity-100'}`}
+                                                >
+                                                    <img src={url} className="w-full h-full object-cover" alt={`Banner ${i+1}`} />
+                                                    {tempUserData.coverUrl === url && (
+                                                        <div className="absolute inset-0 bg-brand-primary/20 flex items-center justify-center">
+                                                            <CheckIcon className="w-4 h-4 text-white filter drop-shadow-md" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 pt-2 border-t dark:border-slate-800">
+                                        <label className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest block">Avatares de Perfil Disponíveis</label>
+                                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                                            {PRESET_AVATARS.map((url, i) => (
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    onClick={() => setTempUserData(prev => ({ ...prev, avatarUrl: url }))}
+                                                    className={`h-10 w-10 rounded-full overflow-hidden border-2 transition-all relative ${tempUserData.avatarUrl === url ? 'border-brand-primary scale-95 shadow-md' : 'border-transparent opacity-80 hover:opacity-100'}`}
+                                                >
+                                                    <img src={url} className="w-full h-full object-cover" alt={`Avatar ${i+1}`} />
+                                                    {tempUserData.avatarUrl === url && (
+                                                        <div className="absolute inset-0 bg-brand-primary/20 flex items-center justify-center rounded-full">
+                                                            <CheckIcon className="w-4 h-4 text-white filter drop-shadow-md" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-sm font-medium text-brand-subtle-text">Nome</label>
