@@ -61,6 +61,9 @@ interface ProjectTask {
     created_at: string;
     assignee?: { full_name: string; avatar_url: string };
     subtasks?: ProjectSubtask[];
+    start_date?: string | null;
+    cover_url?: string | null;
+    timesheets?: ProjectTimesheet[];
 }
 
 interface ProjectSubtask {
@@ -101,7 +104,21 @@ const PALETTE_COLORS = [
     { hex: '#6B7280', name: 'Cinza Metálico' }
 ];
 
-const ProjectsPage: React.FC = () => {
+const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'hoje';
+    if (diffDays === 1) return 'ontem';
+    return `criado há ${diffDays} dias`;
+};
+
+interface ProjectsPageProps {
+    defaultTab?: 'kanban' | 'planning' | 'list' | 'calendar' | 'timesheet';
+}
+
+const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab }) => {
     const { currentUser } = useAuth();
     const { showToast } = useToast();
 
@@ -114,7 +131,13 @@ const ProjectsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     // Visualizações e Filtros
-    const [activeTab, setActiveTab] = useState<'kanban' | 'list' | 'calendar' | 'timesheet'>('kanban');
+    const [activeTab, setActiveTab] = useState<'kanban' | 'planning' | 'list' | 'calendar' | 'timesheet'>('kanban');
+
+    useEffect(() => {
+        if (defaultTab) {
+            setActiveTab(defaultTab);
+        }
+    }, [defaultTab]);
     const [taskFilterSearch, setTaskFilterSearch] = useState('');
     const [taskFilterAssignee, setTaskFilterAssignee] = useState<string>('all');
     const [taskFilterPriority, setTaskFilterPriority] = useState<string>('all');
@@ -133,6 +156,8 @@ const ProjectsPage: React.FC = () => {
         description: '',
         priority: 0,
         due_date: '',
+        start_date: '',
+        cover_url: '',
         assigned_to: '',
         tags: [] as string[],
         newTagInput: ''
@@ -340,12 +365,18 @@ const ProjectsPage: React.FC = () => {
             // Buscar tarefas do projeto
             const { data: taskData, error: taskError } = await supabase
                 .from('project_tasks')
-                .select('*, assignee:profiles(full_name, avatar_url)')
+                .select('*, assignee:profiles(full_name, avatar_url), subtasks:project_subtasks(*), timesheets:project_timesheets(*)')
                 .eq('project_id', project.id)
                 .order('position', { ascending: true });
 
             if (taskError) throw taskError;
-            setTasks(taskData || []);
+            
+            const mappedTasks = (taskData || []).map((t: any) => ({
+                ...t,
+                subtasks: t.subtasks || [],
+                timesheets: t.timesheets || []
+            }));
+            setTasks(mappedTasks);
         } catch (e: any) {
             showToast('Erro ao carregar detalhes do projeto: ' + e.message, 'error');
         } finally {
@@ -440,6 +471,8 @@ const ProjectsPage: React.FC = () => {
             description: '',
             priority: 0,
             due_date: '',
+            start_date: '',
+            cover_url: '',
             assigned_to: '',
             tags: [],
             newTagInput: ''
@@ -457,6 +490,8 @@ const ProjectsPage: React.FC = () => {
             description: task.description || '',
             priority: task.priority,
             due_date: task.due_date ? task.due_date.split('T')[0] : '',
+            start_date: task.start_date ? task.start_date.split('T')[0] : '',
+            cover_url: task.cover_url || '',
             assigned_to: task.assigned_to || '',
             tags: task.tags || [],
             newTagInput: ''
@@ -501,6 +536,8 @@ const ProjectsPage: React.FC = () => {
                 description: taskForm.description,
                 priority: taskForm.priority,
                 due_date: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+                start_date: taskForm.start_date ? new Date(taskForm.start_date).toISOString() : null,
+                cover_url: taskForm.cover_url || null,
                 assigned_to: taskForm.assigned_to || null,
                 created_by: currentUser?.id,
                 tags: taskForm.tags
@@ -588,6 +625,15 @@ const ProjectsPage: React.FC = () => {
             if (data) {
                 setTaskSubtasks(prev => [...prev, data[0]]);
                 setNewSubtaskTitle('');
+                setTasks(prev => prev.map(t => {
+                    if (t.id === selectedTask.id) {
+                        return {
+                            ...t,
+                            subtasks: [...(t.subtasks || []), data[0]]
+                        };
+                    }
+                    return t;
+                }));
             }
         } catch (e: any) {
             showToast('Erro ao adicionar subtarefa: ' + e.message, 'error');
@@ -603,6 +649,15 @@ const ProjectsPage: React.FC = () => {
 
             if (error) throw error;
             setTaskSubtasks(prev => prev.map(s => s.id === subtask.id ? { ...s, is_completed: !s.is_completed } : s));
+            setTasks(prev => prev.map(t => {
+                if (t.id === subtask.task_id) {
+                    return {
+                        ...t,
+                        subtasks: (t.subtasks || []).map(s => s.id === subtask.id ? { ...s, is_completed: !s.is_completed } : s)
+                    };
+                }
+                return t;
+            }));
         } catch (e: any) {
             showToast('Erro ao atualizar subtarefa: ' + e.message, 'error');
         }
@@ -617,6 +672,15 @@ const ProjectsPage: React.FC = () => {
 
             if (error) throw error;
             setTaskSubtasks(prev => prev.filter(s => s.id !== id));
+            setTasks(prev => prev.map(t => {
+                if (t.id === selectedTask?.id) {
+                    return {
+                        ...t,
+                        subtasks: (t.subtasks || []).filter(s => s.id !== id)
+                    };
+                }
+                return t;
+            }));
         } catch (e: any) {
             showToast('Erro ao remover subtarefa: ' + e.message, 'error');
         }
@@ -709,6 +773,13 @@ const ProjectsPage: React.FC = () => {
 
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
+
+        // Verificar se há subtarefas pendentes no checklist
+        const incompleteSubtasks = task.subtasks?.filter(s => !s.is_completed) || [];
+        if (incompleteSubtasks.length > 0) {
+            showToast(`Bloqueio: Conclua todas as subtarefas do checklist (${incompleteSubtasks.length} pendentes) antes de transferir o projeto para outro setor.`, 'error');
+            return;
+        }
 
         const sourceStage = stages.find(s => s.id === task.stage_id);
 
@@ -933,7 +1004,14 @@ const ProjectsPage: React.FC = () => {
                                 className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'kanban' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                             >
                                 <ClipboardDocumentCheckIcon className="w-4 h-4" />
-                                Kanban
+                                Painel de Controle
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('planning')}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'planning' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <CalendarIcon className="w-4 h-4" />
+                                Planejamento
                             </button>
                             <button
                                 onClick={() => setActiveTab('list')}
@@ -999,11 +1077,178 @@ const ProjectsPage: React.FC = () => {
                             </div>
                         ) : (
                             <>
+                                {activeTab === 'planning' && (
+                                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/25 space-y-6">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b dark:border-slate-800 pb-4">
+                                            <div>
+                                                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest">
+                                                    Planejamento Semanal
+                                                </h3>
+                                                <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5">
+                                                    Visualize e gerencie a alocação de tarefas dos colaboradores
+                                                </p>
+                                            </div>
+
+                                            {/* Controles de Semana */}
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        const d = new Date(currentCalendarDate);
+                                                        d.setDate(d.getDate() - 7);
+                                                        setCurrentCalendarDate(d);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl transition-all"
+                                                >
+                                                    ← Semana Anterior
+                                                </button>
+                                                <span className="text-xs font-black text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-850 px-3 py-1.5 rounded-xl border dark:border-slate-800">
+                                                    {(() => {
+                                                        const startOfWeek = new Date(currentCalendarDate);
+                                                        const day = startOfWeek.getDay();
+                                                        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Monday
+                                                        startOfWeek.setDate(diff);
+                                                        
+                                                        const endOfWeek = new Date(startOfWeek);
+                                                        endOfWeek.setDate(startOfWeek.getDate() + 6);
+                                                        
+                                                        return `Semana: ${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
+                                                    })()}
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        const d = new Date(currentCalendarDate);
+                                                        d.setDate(d.getDate() + 7);
+                                                        setCurrentCalendarDate(d);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl transition-all"
+                                                >
+                                                    Próxima Semana →
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Grade Gantt */}
+                                        <div className="overflow-x-auto rounded-2xl border dark:border-slate-800">
+                                            <table className="w-full text-left border-collapse min-w-[800px]">
+                                                <thead>
+                                                    <tr className="border-b dark:border-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50/50 dark:bg-slate-900/50">
+                                                        <th className="px-4 py-4 w-64 border-r dark:border-slate-800">Colaborador</th>
+                                                        {(() => {
+                                                            const days = [];
+                                                            const start = new Date(currentCalendarDate);
+                                                            const day = start.getDay();
+                                                            const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+                                                            start.setDate(diff);
+                                                            
+                                                            for (let i = 0; i < 7; i++) {
+                                                                const current = new Date(start);
+                                                                current.setDate(start.getDate() + i);
+                                                                days.push(current);
+                                                            }
+                                                            
+                                                            const weekDayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                                                            return days.map((d, i) => (
+                                                                <th key={i} className="px-3 py-4 text-center border-r dark:border-slate-800 last:border-r-0">
+                                                                    <div className="font-bold text-slate-700 dark:text-slate-200">{weekDayNames[i]}</div>
+                                                                    <div className="text-[9px] text-slate-400 font-medium mt-0.5">{d.getDate()} / {d.getMonth() + 1}</div>
+                                                                </th>
+                                                            ));
+                                                        })()}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                                                    {employees.map(emp => {
+                                                        // Obter a data inicial da semana
+                                                        const start = new Date(currentCalendarDate);
+                                                        const day = start.getDay();
+                                                        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+                                                        start.setDate(diff);
+                                                        
+                                                        const days: Date[] = [];
+                                                        for (let i = 0; i < 7; i++) {
+                                                            const current = new Date(start);
+                                                            current.setDate(start.getDate() + i);
+                                                            days.push(current);
+                                                        }
+
+                                                        return (
+                                                            <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
+                                                                <td className="px-4 py-4 w-64 border-r dark:border-slate-800 flex items-center gap-3">
+                                                                    <img src={emp.avatarUrl} className="w-8 h-8 rounded-full object-cover" alt="" />
+                                                                    <div>
+                                                                        <div className="font-bold text-slate-800 dark:text-slate-200">{emp.name}</div>
+                                                                        <div className="text-[9px] text-slate-450 truncate max-w-[150px]">{emp.role}</div>
+                                                                    </div>
+                                                                </td>
+                                                                
+                                                                {days.map((d, i) => {
+                                                                    // Filtra tarefas ativas neste dia para o colaborador
+                                                                    const dayTasks = tasks.filter(task => {
+                                                                        if (task.assigned_to !== emp.id) return false;
+                                                                        
+                                                                        const dayTime = new Date(d);
+                                                                        dayTime.setHours(0,0,0,0);
+                                                                        
+                                                                        const taskStart = new Date(task.start_date || task.created_at);
+                                                                        taskStart.setHours(0,0,0,0);
+                                                                        
+                                                                        const taskEnd = task.due_date ? new Date(task.due_date) : taskStart;
+                                                                        taskEnd.setHours(0,0,0,0);
+                                                                        
+                                                                        return dayTime >= taskStart && dayTime <= taskEnd;
+                                                                    });
+
+                                                                    return (
+                                                                        <td key={i} className="p-2 border-r dark:border-slate-800 last:border-r-0 text-center min-h-[80px] align-top bg-slate-50/10 dark:bg-slate-950/5">
+                                                                            <div className="flex flex-col gap-1.5 h-full justify-start items-stretch">
+                                                                                {dayTasks.map(t => (
+                                                                                    <div
+                                                                                        key={t.id}
+                                                                                        onClick={() => openEditTaskModal(t)}
+                                                                                        style={{ borderLeft: `3px solid ${selectedProject?.color || '#10B981'}` }}
+                                                                                        className="text-left p-2 rounded-xl bg-white dark:bg-slate-850 border border-slate-100 dark:border-slate-800 text-[10px] font-bold shadow-sm cursor-pointer hover:shadow-md hover:bg-slate-50/50 dark:hover:bg-slate-750 transition-all select-none truncate"
+                                                                                        title={`${t.title} - Clique para ver/editar`}
+                                                                                    >
+                                                                                        <div className="truncate text-slate-750 dark:text-slate-200">{t.title}</div>
+                                                                                        <div className="flex items-center gap-1.5 mt-1 text-[8px] text-slate-400 font-medium">
+                                                                                            {t.priority > 0 && <StarIcon className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />}
+                                                                                            <span>{t.subtasks?.filter(s => s.is_completed).length || 0}/{t.subtasks?.length || 0} sub</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                                {dayTasks.length === 0 && (
+                                                                                    <span className="text-[10px] text-slate-300 dark:text-slate-700 italic block py-4">-</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* TAB 1: KANBAN BOARD */}
                                 {activeTab === 'kanban' && (
                                     <div className="flex gap-6 items-start overflow-x-auto pb-4 no-scrollbar">
                                         {stages.map(stage => {
                                             const stageTasks = filteredTasks.filter(t => t.stage_id === stage.id);
+                                            
+                                            // Calcula progresso da coluna
+                                            const totalSubtasks = stageTasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0);
+                                            const completedSubtasks = stageTasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.is_completed).length || 0), 0);
+                                            const columnProgress = totalSubtasks > 0 
+                                                ? Math.round((completedSubtasks / totalSubtasks) * 100) 
+                                                : (stageTasks.length > 0 
+                                                    ? Math.round((stageTasks.filter(t => {
+                                                        const stageName = stages.find(s => s.id === t.stage_id)?.name || '';
+                                                        return stageName === 'Concluído' || stageName === 'Done';
+                                                    }).length / stageTasks.length) * 100) 
+                                                    : 0);
                                             return (
                                                 <div
                                                     key={stage.id}
@@ -1012,7 +1257,7 @@ const ProjectsPage: React.FC = () => {
                                                     className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/30 dark:shadow-none min-h-[450px] flex flex-col flex-shrink-0 w-80"
                                                 >
                                                     {/* Header do Estágio */}
-                                                    <div className="flex justify-between items-center mb-1 pb-1 border-b dark:border-slate-800">
+                                                    <div className="flex justify-between items-center mb-1 pb-1">
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <h4 className="font-black text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider truncate" title={stage.name}>{stage.name}</h4>
                                                             {(currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || selectedProject?.manager_id === currentUser?.id) && (
@@ -1032,6 +1277,11 @@ const ProjectsPage: React.FC = () => {
                                                         <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-2 py-0.5 rounded-lg text-xs flex-shrink-0">
                                                             {stageTasks.length}
                                                         </span>
+                                                    </div>
+
+                                                    {/* Barra de Progresso do Estágio */}
+                                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mb-2">
+                                                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${columnProgress}%`, backgroundColor: selectedProject?.color || '#10B981' }}></div>
                                                     </div>
 
                                                     {/* Setor Responsável pelo Estágio */}
@@ -1055,6 +1305,14 @@ const ProjectsPage: React.FC = () => {
                                                                     onClick={() => openEditTaskModal(task)}
                                                                     className="bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-100 dark:border-slate-850 p-4 rounded-2xl cursor-grab active:cursor-grabbing transition-all duration-200 shadow-sm hover:shadow-md group relative"
                                                                 >
+                                                                    {task.cover_url && (
+                                                                        <img src={task.cover_url} className="w-full h-24 object-cover rounded-xl mb-3" alt="" />
+                                                                    )}
+
+                                                                    <span className="text-[9px] text-slate-400 font-semibold block mb-1">
+                                                                        {getRelativeTime(task.created_at)}
+                                                                    </span>
+
                                                                     <h5 className="font-bold text-slate-800 dark:text-slate-100 text-xs mb-2 leading-tight group-hover:text-brand-primary transition-colors">
                                                                         {task.title}
                                                                     </h5>
@@ -1070,6 +1328,27 @@ const ProjectsPage: React.FC = () => {
                                                                         </div>
                                                                     )}
 
+                                                                    {/* Checklist Inline do Odoo */}
+                                                                    {task.subtasks && task.subtasks.length > 0 && (
+                                                                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                                                                            {task.subtasks.map(sub => (
+                                                                                <label
+                                                                                    key={sub.id}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    className="flex items-center space-x-2 text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer hover:text-brand-primary"
+                                                                                >
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={sub.is_completed}
+                                                                                        onChange={() => handleToggleSubtask(sub)}
+                                                                                        className="rounded text-brand-primary focus:ring-emerald-500 w-3 h-3"
+                                                                                    />
+                                                                                    <span className={sub.is_completed ? 'line-through opacity-50' : ''}>{sub.title}</span>
+                                                                                </label>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+
                                                                     {/* Footer do Card */}
                                                                     <div className="flex items-center justify-between text-[10px] mt-2 pt-2 border-t dark:border-slate-800">
                                                                         {/* Data de Entrega */}
@@ -1081,6 +1360,29 @@ const ProjectsPage: React.FC = () => {
                                                                         </div>
 
                                                                         <div className="flex items-center gap-2">
+                                                                            {/* Apontamento de Horas */}
+                                                                            {(() => {
+                                                                                const hours = task.timesheets?.reduce((acc, curr) => acc + curr.hours, 0) || 0;
+                                                                                return hours > 0 ? (
+                                                                                    <div className="flex items-center gap-1 text-slate-400">
+                                                                                        <ClockIcon className="w-3.5 h-3.5" />
+                                                                                        <span className="font-bold text-[9px] bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded-lg">{hours}h</span>
+                                                                                    </div>
+                                                                                ) : null;
+                                                                            })()}
+
+                                                                            {/* Chatter Button */}
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    openEditTaskModal(task);
+                                                                                }}
+                                                                                className="p-1 text-slate-450 hover:text-brand-primary hover:bg-slate-100 dark:hover:bg-slate-850 rounded-lg transition-colors"
+                                                                                title="Clique para conversar"
+                                                                            >
+                                                                                <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
+                                                                            </button>
+
                                                                             {/* Estrela de Prioridade */}
                                                                             {task.priority > 0 && (
                                                                                 <StarIcon className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
@@ -1619,11 +1921,32 @@ const ProjectsPage: React.FC = () => {
                                     </div>
 
                                     <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Data de Início (Start Date)</label>
+                                        <input
+                                            type="date"
+                                            value={taskForm.start_date}
+                                            onChange={(e) => setTaskForm({ ...taskForm, start_date: e.target.value })}
+                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
+                                        />
+                                    </div>
+
+                                    <div>
                                         <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Prazo Limite (Due Date)</label>
                                         <input
                                             type="date"
                                             value={taskForm.due_date}
                                             onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                                            className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">URL da Imagem de Capa</label>
+                                        <input
+                                            type="text"
+                                            value={taskForm.cover_url}
+                                            onChange={(e) => setTaskForm({ ...taskForm, cover_url: e.target.value })}
+                                            placeholder="https://exemplo.com/imagem.png"
                                             className="w-full p-2.5 border rounded-xl outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white bg-white"
                                         />
                                     </div>

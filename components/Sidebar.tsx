@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false });
     const navRef = useRef<HTMLDivElement>(null);
 
-    const toggleMenu = (menu: 'rh' | 'ti' | 'portal') => {
+    const toggleMenu = (menu: 'rh' | 'ti' | 'portal' | 'projects') => {
         setOpenMenus(prev => {
             const newState = { ...prev, [menu]: !prev[menu] };
             // Se estamos abrindo o menu, vamos rolar para ele
@@ -152,7 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
     };
 
-    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
+    const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
@@ -245,7 +245,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
-                <NavItem page="projects" label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
+                <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
+                    <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
+                    <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />
+                </NavMenu>
 
                 <hr className="my-2 border-gray-100 dark:border-slate-800" />
 

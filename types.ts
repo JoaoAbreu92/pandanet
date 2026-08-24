@@ -42,7 +42,8 @@ export type Page =
   | 'kpi-dashboard'
   | 'job-manager'
   | 'manual-usuario'
-  | 'projects';
+  | 'projects'
+  | 'projects-planning';
 
 export type NotificationType = 'message' | 'ticket' | 'event' | 'mention' | 'like' | 'system';
 
@@ -281,6 +282,7 @@ export interface Employee {
   can_nudge?: boolean;
   nudge_cooldown?: number; // In seconds
   is_whatsapp_agent?: boolean;
+  is_manager?: boolean;
 }
 
 export interface AIMessage {

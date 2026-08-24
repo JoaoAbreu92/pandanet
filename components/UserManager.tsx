@@ -98,6 +98,7 @@ const UserFormModal: React.FC<{
         reports_to: user?.reports_to || '',
         sector_manager_id: user?.sector_manager_id || '',
         isAdmin: user?.isAdmin || false,
+        is_manager: user?.is_manager || false,
         avatarUrl: user?.avatarUrl || `https://i.pravatar.cc/150?u=${user?.email || Date.now()}`,
         birthDate: user?.birthDate || '1990-01-01',
         joinDate: user?.joinDate || new Date().toISOString().split('T')[0],
@@ -207,7 +208,55 @@ const UserFormModal: React.FC<{
                             </select>
                         </div>
 
-                        <div><label className="flex items-center space-x-2 mt-6 text-brand-text"><input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary" /><span>{t('users.admin')}</span></label></div>
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text">Gestor Direto (Hierarquia)</label>
+                            <select 
+                                name="reports_to"
+                                value={formData.reports_to || ''} 
+                                onChange={(e) => setFormData(p => ({ ...p, reports_to: e.target.value || '' }))} 
+                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                            >
+                                <option value="">Sem Gestor Direto</option>
+                                {users.filter(u => u.id !== user?.id).map(u => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-brand-subtle-text">Gestor do Setor (Hierarquia)</label>
+                            <select 
+                                name="sector_manager_id"
+                                value={formData.sector_manager_id || ''} 
+                                onChange={(e) => setFormData(p => ({ ...p, sector_manager_id: e.target.value || '' }))} 
+                                className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text"
+                            >
+                                <option value="">Sem Gestor de Setor</option>
+                                {users.filter(u => u.id !== user?.id).map(u => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-6">
+                            <label className="flex items-center space-x-2 text-brand-text cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    name="is_manager" 
+                                    checked={formData.is_manager} 
+                                    onChange={handleChange} 
+                                    className="rounded text-brand-primary focus:ring-emerald-500" 
+                                />
+                                <span className="text-sm font-medium">Gestor do Setor (Esta pessoa é gestora)</span>
+                            </label>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-6">
+                            <label className="flex items-center space-x-2 text-brand-text cursor-pointer">
+                                <input type="checkbox" name="isAdmin" checked={formData.isAdmin} onChange={handleChange} className="rounded text-brand-primary focus:ring-emerald-500" />
+                                <span className="text-sm font-medium">{t('users.admin')}</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="border-t pt-6">
@@ -460,34 +509,6 @@ const UserFormModal: React.FC<{
                                         <input type="text" placeholder="Ex: Comercial" value={formData.team} onChange={(e) => setFormData(p => ({ ...p, team: e.target.value }))} className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all" />
                                     </div>
 
-                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Gestor Direto (Hierarquia)</label>
-                                        <select 
-                                            value={formData.reports_to || ''} 
-                                            onChange={(e) => setFormData(p => ({ ...p, reports_to: e.target.value || undefined }))} 
-                                            className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                                        >
-                                            <option value="">Nenhum</option>
-                                            {users.filter(u => u.id !== user?.id).map(u => (
-                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Gestor do Setor</label>
-                                        <select 
-                                            value={formData.sector_manager_id || ''} 
-                                            onChange={(e) => setFormData(p => ({ ...p, sector_manager_id: e.target.value || undefined }))} 
-                                            className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                                        >
-                                            <option value="">Nenhum</option>
-                                            {users.filter(u => u.id !== user?.id).map(u => (
-                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
                                     <div className="sm:col-span-2 p-3 bg-white/50 rounded-xl border border-dashed border-slate-200">
                                         <p className="text-[10px] text-gray-500 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
                                         <div className="flex flex-wrap gap-2">
@@ -600,7 +621,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_whatspanda_permissions: userData.whatspanda_permissions || {},
                     p_email_permissions: userData.email_permissions || {},
                     p_reports_to: userData.reports_to || null,
-                    p_sector_manager_id: userData.sector_manager_id || null
+                    p_sector_manager_id: userData.sector_manager_id || null,
+                    p_is_manager: !!userData.is_manager,
+                    p_clear_reports_to: !userData.reports_to,
+                    p_clear_sector_manager: !userData.sector_manager_id
                 });
 
                 // Manual password update if field is provided
@@ -647,7 +671,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                         p_nudge_cooldown: parseInt(String((userData as any).nudge_cooldown)) || 30,
                         p_is_whatsapp_agent: !!(userData as any).is_whatsapp_agent,
                         p_whatspanda_permissions: (userData as any).whatspanda_permissions || {},
-                        p_email_permissions: (userData as any).email_permissions || {}
+                        p_email_permissions: (userData as any).email_permissions || {},
+                        p_reports_to: userData.reports_to || null,
+                        p_sector_manager_id: userData.sector_manager_id || null,
+                        p_is_manager: !!userData.is_manager
                     });
 
                     if (error) {

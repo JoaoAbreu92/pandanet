@@ -667,7 +667,8 @@ const AppContent: React.FC = () => {
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
-            case 'projects': return canAccess('viewProjects') ? <ProjectsPage /> : null;
+            case 'projects': return canAccess('viewProjects') ? <ProjectsPage defaultTab="kanban" /> : null;
+            case 'projects-planning': return canAccess('viewProjects') ? <ProjectsPage defaultTab="planning" /> : null;
             case 'whatspanda': return null;
 
             case 'email': return <EmailPage currentUser={currentUser} pageContext={pageContext} />;
