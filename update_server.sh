@@ -37,7 +37,12 @@ else
     echo "⚠️ Aviso: Algumas correções de banco podem ter falhado (verifique os logs acima)."
 fi
 
-# 6. Atualizar e reiniciar processos do PM2
+# 6. Atualizar Frontend (Build React/Vite)
+echo "📦 Construindo Frontend..."
+npm install
+npm run build
+
+# 7. Atualizar e reiniciar processos do PM2
 echo "🔄 Reiniciando processos PM2..."
 pm2 restart all --update-env
 
