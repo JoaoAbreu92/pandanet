@@ -455,27 +455,24 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
             console.log(`[email-server] Appending to Sent folder: ${sentFolder}`);
 
             // Construct MIME message for appending
-            // Ideally we'd use the raw message from nodemailer, but info.messageId isn't the raw.
-            // We'll reconstruct a simple version or just text.
-            // For a robust implementation, we should use a composer lib, but let's try a simple text append first.
-            // Better: Nodemailer can return the raw stream if we ask, or we just append the text.
-            // Actually, ImapFlow `append` takes a string or buffer.
+            // Use nodemailer lib's built-in MailComposer for robust formatting
+            const MailComposer = require('nodemailer/lib/mail-composer');
+            const mail = new MailComposer({
+                from: config.smtp_user,
+                to: payload.to,
+                cc: payload.cc,
+                bcc: payload.bcc,
+                replyTo: payload.replyTo,
+                subject: payload.subject,
+                text: payload.text,
+                html: payload.html,
+                attachments: payload.attachments || []
+            });
 
-            // Re-using nodemailer to build raw (but not send) is tricky without a stream.
-            // We'll construct a basic MIME string manually for the Append.
-            const mimeMessage = [
-                `From: ${config.smtp_user}`,
-                `To: ${payload.to}`,
-                payload.cc ? `Cc: ${payload.cc}` : '',
-                `Subject: ${payload.subject}`,
-                `Date: ${new Date().toUTCString()}`,
-                `MIME-Version: 1.0`,
-                `Content-Type: text/html; charset=utf-8`,
-                '',
-                payload.html || payload.text || ' '
-            ].filter(line => line !== null && line !== undefined).join('\r\n');
+            const mimeMessageBuffer = await mail.compile().build();
+            const mimeMessageStr = mimeMessageBuffer.toString('utf8');
 
-            await client.append(sentFolder, mimeMessage, ['\\Seen']);
+            await client.append(sentFolder, mimeMessageStr, ['\\Seen']);
         } catch (imapErr) {
             console.error('[email-server] Failed to append to Sent:', imapErr);
             // Non-blocking error for the user, but logged.
@@ -528,17 +525,20 @@ app.post('/api/email/save-draft', authMiddleware, async (req, res) => {
 
         if (draftBox) draftFolder = draftBox.path;
 
-        const mimeMessage = [
-            `To: ${payload.to}`,
-            `Subject: ${payload.subject}`,
-            `Date: ${new Date().toUTCString()}`,
-            `MIME-Version: 1.0`,
-            `Content-Type: text/html; charset=utf-8`,
-            '',
-            payload.html || payload.text || ' '
-        ].filter(line => line !== null && line !== undefined).join('\r\n');
+        const MailComposer = require('nodemailer/lib/mail-composer');
+        const mail = new MailComposer({
+            from: config.imap_user || config.smtp_user,
+            to: payload.to,
+            subject: payload.subject,
+            text: payload.text,
+            html: payload.html,
+            attachments: payload.attachments || []
+        });
 
-        await client.append(draftFolder, mimeMessage, ['\\Draft']);
+        const mimeMessageBuffer = await mail.compile().build();
+        const mimeMessageStr = mimeMessageBuffer.toString('utf8');
+
+        await client.append(draftFolder, mimeMessageStr, ['\\Draft']);
         return res.json({ success: true, folder: draftFolder });
     } catch (err) {
         console.error('[email-server] Save Draft Error:', err.message);

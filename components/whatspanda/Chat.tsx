@@ -452,7 +452,7 @@ const Chat: React.FC = () => {
 
       {/* Info Sidebar (Right) */}
       {selectedConversation && (
-        <div className={`w-full sm:w-[320px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 ${showContactSidebar ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full shadow-2xl xl:translate-x-0 xl:static'} xl:block z-30`}>
+        <div className={`w-full sm:w-[320px] bg-white dark:bg-slate-900/40 backdrop-blur-xl border-l border-slate-200 dark:border-white/5 flex flex-col transition-all duration-500 fixed right-0 h-full shadow-2xl xl:relative xl:shadow-none ${showContactSidebar ? 'translate-x-0' : 'translate-x-full xl:translate-x-0'} z-30`}>
           {/* Contact Header Component / Modal Wrapper Alternative */}
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center xl:hidden">
             <span className="font-bold text-slate-700">Detalhes</span>

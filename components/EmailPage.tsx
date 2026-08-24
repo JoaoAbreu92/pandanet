@@ -47,6 +47,7 @@ interface EmailSettings {
 
 interface EmailMessage {
     uid: string;
+    messageId?: string;
     seq: string;
     from: string;
     to: string;
@@ -159,6 +160,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [toTags, setToTags] = useState<string[]>([]);
     const [ccTags, setCcTags] = useState<string[]>([]);
     const [bccTags, setBccTags] = useState<string[]>([]);
+    const [showDetails, setShowDetails] = useState(false);
     const [composeReplyTo, setComposeReplyTo] = useState('');
     const [composeSubject, setComposeSubject] = useState('');
     const [composeBody, setComposeBody] = useState('');
@@ -950,7 +952,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     return (
         <div className="flex bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl h-[calc(100vh-6rem)] rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500">
             {/* --- Left Sidebar (Folders) --- */}
-            <div className={`w-64 bg-gray-50/50 dark:bg-transparent border-r border-gray-100 dark:border-white/5 flex flex-col transition-all duration-500 ${(sidebarOpen && !(view === 'read' && isFullScreen)) ? '' : '-ml-64 md:ml-0'} ${(view === 'read' && isFullScreen) ? 'md:-ml-64' : ''}`}>
+            <div className={`w-64 bg-white dark:bg-slate-900 md:bg-gray-50/50 md:dark:bg-transparent border-r border-gray-100 dark:border-white/5 flex flex-col transition-all duration-500 absolute z-30 h-full md:relative ${sidebarOpen && !(view === 'read' && isFullScreen) ? 'translate-x-0 ml-0' : '-translate-x-full md:translate-x-0 -ml-64 md:ml-0'} ${(view === 'read' && isFullScreen) ? 'md:-ml-64' : ''}`}>
                 <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
                     <h2 className="font-bold text-gray-900 dark:text-white tracking-tight uppercase text-sm opacity-80">PandaMail</h2>
                     <button onClick={() => setView('settings')} className="text-gray-400 hover:text-brand-primary">
@@ -1290,7 +1292,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             </button>
                             <button onClick={() => {
                                 setView('compose');
-                                setComposeTo(selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from);
+                                const from = selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from;
+                                setToTags([from]);
+                                setCcTags([]);
+                                setBccTags([]);
                                 setComposeSubject('Re: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 transition-all">
@@ -1299,9 +1304,10 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                             <button onClick={() => {
                                 setView('compose');
                                 const from = selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from;
-                                const ccs = selectedEmail.to; // Simplification
-                                setComposeTo(from);
-                                setComposeCc(ccs);
+                                const ccs = (selectedEmail.to || '').split(',').map(e => e.match(/<(.+)>/)?.[1] || e.trim()).filter(e => e && e !== settings.imap_user);
+                                setToTags([from]);
+                                setCcTags(ccs);
+                                setBccTags([]);
                                 setComposeSubject('Re: ' + selectedEmail.subject);
                                 setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 transition-all">
@@ -1330,17 +1336,34 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
                         {/* Metadata */}
                         <div className="p-6 pb-2">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold">
-                                    {selectedEmail.from.charAt(0).toUpperCase()}
+                            <div className="flex flex-col mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold">
+                                        {selectedEmail.from.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-900 dark:text-white tracking-tight">{selectedEmail.from}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                            Para: <span className="truncate max-w-[200px]">{selectedEmail.to || 'mim'}</span>
+                                            <button onClick={() => setShowDetails(!showDetails)} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors rounded text-[10px] font-bold uppercase cursor-pointer">
+                                                {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full">
+                                        {new Date(selectedEmail.date).toLocaleString()}
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="font-bold text-gray-900 dark:text-white tracking-tight">{selectedEmail.from}</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Para: {selectedEmail.to || 'mim'}</div>
-                                </div>
-                                <div className="ml-auto text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/5 py-1 px-3 rounded-full">
-                                    {new Date(selectedEmail.date).toLocaleString()}
-                                </div>
+
+                                {showDetails && (
+                                    <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-white/5 text-xs text-gray-600 dark:text-gray-300 space-y-2 relative overflow-hidden break-words">
+                                        <div><strong>De:</strong> {selectedEmail.from}</div>
+                                        <div><strong>Para:</strong> {selectedEmail.to || '-'}</div>
+                                        <div><strong>Data:</strong> {new Date(selectedEmail.date).toString()}</div>
+                                        <div><strong>Assunto:</strong> {selectedEmail.subject}</div>
+                                        {selectedEmail.messageId && <div><strong>Mensagem-ID:</strong> {selectedEmail.messageId}</div>}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
