@@ -206,41 +206,41 @@ router.post('/sync/:companyId/:connectionId', authMiddleware, async (req, res) =
     try {
         console.log(`[SYNC-API] Requisição recebida. Empresa: ${companyId}, Conexão: ${connectionId}`);
 
-        // Verificar se os parâmetros são válidos
         if (!companyId || !connectionId) {
             return res.status(400).json({ error: 'Parâmetros companyId e connectionId são obrigatórios' });
         }
 
-        const instanceName = `conn_${connectionId}`;
-        
-        // Verificar conexão no banco
+        // Verificar conexão no banco garantindo que pertence à empresa (Multi-tenancy check)
         const { data: settings, error } = await supabase
             .from('whatsapp_settings')
-            .select('id')
+            .select('id, instance_name, company_id')
             .eq('id', connectionId)
+            .eq('company_id', companyId) // CRITICAL: Security re-check
             .maybeSingle();
         
         if (error) {
-            console.error('[SYNC-API] Erro ao buscar settings:', error.message);
-            return res.status(500).json({ error: 'Erro interno ao validar conexão' });
+            console.error('[SYNC-API] Erro ao validar conexão:', error.message);
+            return res.status(500).json({ error: 'Erro interno ao validar permissão de conexão', details: error.message });
         }
 
         if (!settings) {
-            return res.status(404).json({ error: 'Conexão não encontrada no banco de dados' });
+            console.warn(`[SYNC-API] Tentativa de sincronizar conexão ${connectionId} que não pertence à empresa ${companyId}`);
+            return res.status(403).json({ error: 'Você não tem permissão para sincronizar esta conexão ou ela não existe.' });
         }
 
-        // Disparar sincronização em background (não aguardamos o fim para responder à UI)
+        const instanceName = settings.instance_name || `conn_${connectionId}`;
+        
+        // Disparar sincronização em background
         syncEvolutionData(instanceName, companyId, connectionId).catch(err => {
-            console.error(`[SYNC-API] Erro disparando sync em background:`, err.message);
+            console.error(`[SYNC-API] Erro em background para ${instanceName}:`, err.message);
         });
         
-        res.json({ status: 'success', message: 'Sincronização iniciada em segundo plano' });
+        res.json({ status: 'success', message: 'Sincronização iniciada com sucesso em segundo plano' });
     } catch (err) {
-        console.error('[SYNC-API] Erro fatal no handler:', err.message);
+        console.error('[SYNC-API] Erro fatal:', err);
         res.status(500).json({ 
-            error: 'Internal server error during sync request',
-            details: err.message,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            error: 'Erro interno ao processar sincronização',
+            details: err.message
         });
     }
 });

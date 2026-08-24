@@ -88,17 +88,45 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '' }) => {
         if (!companyId) return;
         setSyncing(true);
         try {
-            const { data: settings } = await supabase.from('whatsapp_settings').select('id').eq('company_id', companyId).limit(1).single();
+            // Buscar a primeira conexão válida conectada para esta empresa
+            const { data: settings, error: settingsError } = await supabase
+                .from('whatsapp_settings')
+                .select('id')
+                .eq('company_id', companyId)
+                .eq('is_connected', true)
+                .limit(1)
+                .maybeSingle();
+
+            if (settingsError) throw settingsError;
+
             if (settings?.id) {
                 const { data: sessionData } = await supabase.auth.getSession();
                 const token = sessionData?.session?.access_token;
                 if (token) {
-                    await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { 
+                    const response = await fetch(`/api/whatsapp/sync/${companyId}/${settings.id}`, { 
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` }
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
                     });
+                    
+                    const result = await response.json();
+                    if (response.ok) {
+                        alert('Sincronização iniciada! Os contatos aparecerão em breve.');
+                    } else {
+                        alert(`Erro ao sincronizar: ${result.error || result.details || 'Erro desconhecido'}`);
+                    }
                 }
+            } else {
+                alert('Nenhuma conexão ativa encontrada para sincronizar. Por favor, conecte um WhatsApp primeiro em "Canais".');
             }
+        } catch (error: any) {
+            console.error('[SYNC] Erro:', error);
+            alert(`Erro na solicitação de sincronização: ${error.message}`);
+        } finally {
+            setSyncing(false);
+        }
             setTimeout(() => {
                 fetchContacts();
                 setSyncing(false);
