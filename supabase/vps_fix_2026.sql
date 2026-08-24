@@ -32,7 +32,6 @@ ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS keyword_transfers JSONB D
 -- 3. Tabela form_submissions (Solicitação de Reembolso e Anexos no RH)
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS attachment_url TEXT;
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS attachment_name TEXT;
-ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS reason TEXT;
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS sector_manager VARCHAR(255);
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS employee_manager VARCHAR(255);
 
@@ -44,5 +43,28 @@ ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS whatsapp_message_id VARCH
 -- Criar índice para evitar duplicidade de mensagens
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_wa_id ON whatsapp_messages(whatsapp_message_id);
 
+-- 5. CORREÇÃO DE POLÍTICA RLS (Row Level Security) - RESOLVER ERRO DE TRANSFERÊNCIA DE ATENDIMENTOS
+-- Garante que atendentes possam transferir conversas para outros atendentes/setores sem violação de RLS
+DROP POLICY IF EXISTS "Users can update conversations" ON whatsapp_conversations;
+DROP POLICY IF EXISTS "Users see conversations from their department or assigned to them" ON whatsapp_conversations;
+DROP POLICY IF EXISTS "Allow company users to update conversations" ON whatsapp_conversations;
+
+CREATE POLICY "Users can view conversations"
+  ON whatsapp_conversations
+  FOR SELECT
+  USING (
+    company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
+CREATE POLICY "Users can update conversations"
+  ON whatsapp_conversations
+  FOR UPDATE
+  USING (
+    company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
+  )
+  WITH CHECK (
+    company_id = (SELECT company_id FROM profiles WHERE id = auth.uid())
+  );
+
 -- Confirmação
-SELECT 'Atualização de tabelas e colunas concluída com sucesso!' AS resultado;
+SELECT 'Atualização de tabelas, colunas e permissões RLS concluída com sucesso!' AS resultado;

@@ -179,14 +179,23 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
     };
 
     const handleSave = async () => {
-        if (!name.trim() || !phone.trim()) return;
-        const companyId = currentUser?.company_id;
-        
+        const companyId = currentUser?.company_id || profile?.company_id;
+        if (!name.trim() || !phone.trim()) {
+            alert('Por favor, preencha o Nome e o Telefone.');
+            return;
+        }
+        if (!companyId) {
+            alert('Erro: Empresa não identificada. Faça login novamente.');
+            return;
+        }
+
+        const cleanPhone = phone.replace(/\D/g, '');
+
         const contactData: any = {
-            name,
-            phone,
-            email,
-            notes,
+            name: name.trim(),
+            phone: cleanPhone || phone.trim(),
+            email: email.trim() || null,
+            notes: notes.trim() || null,
             tags: selectedTags,
             queue_id: selectedQueue || null,
             is_blocked: isBlocked,
@@ -197,16 +206,24 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
             updated_at: new Date().toISOString()
         };
 
-        let res;
-        if (editingContact) {
-            res = await supabase.from('whatsapp_contacts').update(contactData).eq('id', editingContact.id);
-        } else {
-            res = await supabase.from('whatsapp_contacts').insert({ ...contactData, company_id: companyId });
-        }
+        try {
+            let res;
+            if (editingContact) {
+                res = await supabase.from('whatsapp_contacts').update(contactData).eq('id', editingContact.id);
+            } else {
+                res = await supabase.from('whatsapp_contacts').insert({ ...contactData, company_id: companyId });
+            }
 
-        if (!res.error) {
-            fetchContacts();
-            setIsModalOpen(false);
+            if (res.error) {
+                console.error('Erro ao salvar contato:', res.error);
+                alert(`Erro ao salvar contato: ${res.error.message}`);
+            } else {
+                fetchContacts();
+                setIsModalOpen(false);
+            }
+        } catch (err: any) {
+            console.error('Exceção em handleSave:', err);
+            alert(`Erro ao salvar contato: ${err.message || err}`);
         }
     };
 
