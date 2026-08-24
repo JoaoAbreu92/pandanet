@@ -3,7 +3,7 @@ import Card from './Card';
 import TicketForm from './TicketForm';
 import TicketDetail from './TicketDetail';
 import type { Ticket, TicketStatus, Employee } from '../types';
-import { XCircleIcon } from './icons';
+import { XCircleIcon, TrashIcon } from './icons';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -220,6 +220,26 @@ const TicketPage: React.FC = () => {
         }
     };
 
+    const handleDeleteTicket = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('Tem certeza que deseja excluir este chamado permanentemente do histórico?')) return;
+        
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            
+            setTickets(prev => prev.filter(t => t.id !== id));
+            console.log('Chamado excluído com sucesso');
+        } catch (error: any) {
+            console.error('Error deleting ticket:', error);
+            alert('Erro ao excluir chamado: ' + error.message);
+        }
+    };
+
     const getStatusColor = (status: TicketStatus) => {
         switch (status) {
             case 'Aberto': return 'bg-green-100 text-green-800';
@@ -296,6 +316,7 @@ const TicketPage: React.FC = () => {
                                     <th scope="col" className="px-6 py-3">Status</th>
                                     <th scope="col" className="px-6 py-3">Prioridade</th>
                                     <th scope="col" className="px-6 py-3">Data</th>
+                                    {currentUser?.isCompanyAdmin && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -320,6 +341,17 @@ const TicketPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4">{ticket.priority}</td>
                                         <td className="px-6 py-4">{ticket.createdAt}</td>
+                                        {currentUser?.isCompanyAdmin && (
+                                            <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => handleDeleteTicket(ticket.id, e)}
+                                                    className="text-red-600 hover:text-red-900 p-1"
+                                                    title="Excluir Permanentemente"
+                                                >
+                                                    <TrashIcon className="w-5 h-5" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>

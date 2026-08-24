@@ -391,7 +391,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                             <th scope="col" className="px-6 py-3">Tipo</th>
                                             <th scope="col" className="px-6 py-3 whitespace-nowrap">Data de Envio</th>
                                             <th scope="col" className="px-6 py-3">Status</th>
-                                            {isTIUser && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
+                                            {(isTIUser || isAdmin) && <th scope="col" className="px-6 py-3 text-right">Ações</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -438,7 +438,7 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sub.status)}`}>{sub.status}</span>
                                                     )}
                                                 </td>
-                                                {isTIUser && (
+                                                {(isTIUser || isAdmin) && (
                                                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex justify-end space-x-2">
                                                             {activeTab === 'active' && sub.status !== 'Finalizado' && (
