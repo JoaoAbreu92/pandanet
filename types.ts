@@ -243,8 +243,10 @@ export interface Employee {
   password?: string; // Não deve ser armazenado no estado do frontend em um app real
   role: string;
   team: string;
-  sectorManager?: string; // Gestor do Setor
-  employeeManager?: string; // Gerente do Funcionário
+  sectorManager?: string; // Gestor do Setor (nome ou ID legado)
+  employeeManager?: string; // Gerente do Funcionário (nome ou ID legado)
+  reports_to?: string; // ID do Gestor Direto (UUID)
+  sector_manager_id?: string; // ID do Gestor do Setor (UUID)
   avatarUrl: string;
   coverUrl?: string;
   joinDate: string; // YYYY-MM-DD

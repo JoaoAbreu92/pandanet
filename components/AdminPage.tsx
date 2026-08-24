@@ -11,6 +11,7 @@ import { SupabaseGenericManager } from './SupabaseGenericManager';
 import HRManager from './HRManager';
 import GeneralSettings from './GeneralSettings';
 import PollManager from './PollManager';
+import { OrgFlowEditor } from './OrgFlowEditor';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Department } from '../types';
@@ -24,6 +25,7 @@ interface AdminPageProps {
 }
 
 const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate }) => {
+    const { profile } = useAuth();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [activeCategory, setActiveCategory] = useState('Conteúdo');
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -57,6 +59,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     bio: p.bio,
                     sectorManager: p.sector_manager,
                     employeeManager: p.employee_manager,
+                    reports_to: p.reports_to,
+                    sector_manager_id: p.sector_manager_id,
                     coverUrl: p.cover_url
                 }));
                 setEmployees(mappedEmployees);
@@ -74,14 +78,9 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     }, [company?.id]);
 
     const handleSetData = async (key: keyof Company['data'], value: any) => {
-        // List of keys that now have dedicated tables
         const dedicatedTables: string[] = ['events', 'banners', 'marketplaceItems', 'announcements', 'tiRequests', 'recognitions', 'wellnessItems', 'kbArticles'];
 
         if (dedicatedTables.includes(key)) {
-            // If it's a dedicated table, we don't update company.data via JSONB anymore
-            // The managers themselves now handle their own persistence.
-            // We just update the local state to keep UI snappy if needed, 
-            // but the source of truth is the dedicated table.
             console.log(`Key ${key} matches a dedicated table. Persistence is handled by the manager.`);
             return;
         }
@@ -133,7 +132,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
 
         { id: 'users', label: 'Usuários', category: 'Pessoas' },
         { id: 'departments', label: 'Departamentos', category: 'Pessoas' },
-        { id: 'teams', label: 'Equipes / Organograma', category: 'Pessoas' },
+        { id: 'teams', label: 'Equipes', category: 'Pessoas' },
+        { id: 'org-flow', label: 'Organograma (Fluxo)', category: 'Pessoas' },
         { id: 'training', label: 'Treinamentos', category: 'Pessoas' },
         { id: 'jobs', label: 'Gestão de Vagas', category: 'Pessoas', featureId: 'jobs' },
         { id: 'hr', label: 'Gestão RH', category: 'Pessoas' },
@@ -160,10 +160,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
         // Permissões granulares para não-Super Admins
-        if (useAuth().profile?.role !== 'Super Admin') {
-            const permissions = useAuth().profile?.permissions;
-            if (tab.id === 'users' && !permissions?.viewEmployeeDetails && !useAuth().profile?.isAdmin) return false;
-            if (tab.id === 'forms' && !permissions?.viewVacationRequests && !useAuth().profile?.isAdmin) return false;
+        if (profile?.role !== 'Super Admin') {
+            const permissions = profile?.permissions;
+            if (tab.id === 'users' && !permissions?.viewEmployeeDetails && !profile?.isAdmin) return false;
+            if (tab.id === 'forms' && !permissions?.viewVacationRequests && !profile?.isAdmin) return false;
         }
 
         return true;
@@ -179,10 +179,14 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 return <DepartmentManager companyId={company.id!} />;
             case 'teams':
                 return <TeamManager users={employees} setUsers={setEmployees} onNavigate={onNavigate} />;
+            case 'org-flow':
+                return <OrgFlowEditor 
+                    employees={employees} 
+                    onUpdateEmployees={setEmployees}
+                />;
             case 'forms':
                 return <FormSubmissionsManager />;
             case 'marketplace':
-                // MarketplaceManager should also be refactored eventually, but leaving as is for now if it works.
                 return <MarketplaceManager />;
             case 'events':
                 return <EventsManager employees={employees} />;
@@ -216,7 +220,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;
             case 'status':
-                // Check if services table exists, otherwise fallback or skip
                 return <SupabaseGenericManager<ServiceStatusItem>
                     title="Status de Serviços"
                     tableName="services"
@@ -348,7 +351,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 />;
             case 'hr':
                 return <HRManager />;
-
             case 'crm_settings':
                 return <SupabaseGenericManager<any>
                     title="Configurações CRM / Vendas"
@@ -362,7 +364,6 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.name}</p><p className="text-xs">{i.url}</p></div>}
                 />;
-
             default:
                 return null;
         }
@@ -382,7 +383,11 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                                 const firstTabOfCat = allTabs.find(t => t.category === cat);
                                 if (firstTabOfCat) setActiveTab(firstTabOfCat.id);
                             }}
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${activeCategory === cat ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                                activeCategory === cat 
+                                ? 'bg-brand-primary text-white' 
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
                         >
                             {cat}
                         </button>
@@ -395,10 +400,11 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`${activeTab === tab.id
-                                    ? 'border-brand-primary text-brand-primary'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all`}
+                                className={`${
+                                    activeTab === tab.id
+                                        ? 'border-brand-primary text-brand-primary'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all`}
                             >
                                 {tab.label}
                             </button>

@@ -68,9 +68,10 @@ const PermissionToggle: React.FC<{
 const UserFormModal: React.FC<{
     user: Partial<Employee> | null;
     departments: Department[];
+    users: Employee[];
     onClose: () => void;
     onSave: (user: Omit<Employee, 'id'> | Employee) => void;
-}> = ({ user, departments, onClose, onSave }) => {
+}> = ({ user, departments, users, onClose, onSave }) => {
     const { t } = useLanguage();
     const { profile } = useAuth();
     const [channels, setChannels] = useState<any[]>([]);
@@ -94,6 +95,8 @@ const UserFormModal: React.FC<{
         team: user?.team || '',
         sectorManager: user?.sectorManager || '',
         employeeManager: user?.employeeManager || '',
+        reports_to: user?.reports_to || '',
+        sector_manager_id: user?.sector_manager_id || '',
         isAdmin: user?.isAdmin || false,
         avatarUrl: user?.avatarUrl || `https://i.pravatar.cc/150?u=${user?.email || Date.now()}`,
         birthDate: user?.birthDate || '1990-01-01',
@@ -449,6 +452,40 @@ const UserFormModal: React.FC<{
                                         />
                                         <p className="text-[9px] text-slate-400 italic px-1 leading-tight">Máximo de contas que este usuário pode cadastrar.</p>
                                     </div>
+
+                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Equipe / Setor</label>
+                                        <input type="text" placeholder="Ex: Comercial" value={formData.team} onChange={(e) => setFormData(p => ({ ...p, team: e.target.value }))} className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all" />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Gestor Direto (Hierarquia)</label>
+                                        <select 
+                                            value={formData.reports_to || ''} 
+                                            onChange={(e) => setFormData(p => ({ ...p, reports_to: e.target.value || undefined }))} 
+                                            className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                        >
+                                            <option value="">Nenhum</option>
+                                            {users.filter(u => u.id !== user?.id).map(u => (
+                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase px-1">Gestor do Setor</label>
+                                        <select 
+                                            value={formData.sector_manager_id || ''} 
+                                            onChange={(e) => setFormData(p => ({ ...p, sector_manager_id: e.target.value || undefined }))} 
+                                            className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                        >
+                                            <option value="">Nenhum</option>
+                                            {users.filter(u => u.id !== editingUser?.id).map(u => (
+                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
                                     <div className="sm:col-span-2 p-3 bg-white/50 rounded-xl border border-dashed border-slate-200">
                                         <p className="text-[10px] text-gray-500 leading-tight mb-2">Contas específicas que este usuário pode acessar:</p>
                                         <div className="flex flex-wrap gap-2">
@@ -559,7 +596,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     p_nudge_cooldown: parseInt(String(userData.nudge_cooldown)) || 30,
                     p_is_whatsapp_agent: !!userData.is_whatsapp_agent,
                     p_whatspanda_permissions: userData.whatspanda_permissions || {},
-                    p_email_permissions: userData.email_permissions || {}
+                    p_email_permissions: userData.email_permissions || {},
+                    p_reports_to: userData.reports_to || null,
+                    p_sector_manager_id: userData.sector_manager_id || null
                 });
 
                 // Manual password update if field is provided
