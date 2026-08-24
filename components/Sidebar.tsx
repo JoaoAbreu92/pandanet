@@ -104,17 +104,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <Logo showText={isOpen} />
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
-                <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
-                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
+                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
+                <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
+                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
+                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
 
                 <hr className="my-2 border-gray-100 dark:border-gray-700" />
 
                 <NavMenu label="Interativo" icon={StarIcon} menuKey="portal" permission={true}>
-                    <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
                     <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" featureId="wall" />
                     <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
-                    <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                     <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
                     <NavItem page="kpi-dashboard" label="Métricas Grupo" icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
                 </NavMenu>
