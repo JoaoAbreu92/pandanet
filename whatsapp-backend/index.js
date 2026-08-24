@@ -1058,7 +1058,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     encoding: true
                 },
                 audioMessage: {
-                    audio: audioSource
+                    audio: audioSource,
+                    mimetype: 'audio/ogg; codecs=opus',
+                    ptt: true
                 }
             } : {
                 number: phoneNumber,
