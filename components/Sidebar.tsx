@@ -20,7 +20,10 @@ import {
     PlusIcon,
     NewspaperIcon,
     BuildingOfficeIcon,
-    StarIcon
+    StarIcon,
+    FaceSmileIcon,
+    LifebuoyIcon,
+    UserGroupIcon
 } from './icons';
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
@@ -112,17 +115,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
                 <hr className="my-2 border-gray-100 dark:border-gray-700" />
 
-                <NavMenu label="Interativo" icon={StarIcon} menuKey="portal" permission={true}>
-                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" featureId="wall" />
+                <NavMenu label="Interativo" icon={SparklesIcon} menuKey="portal" permission={true}>
+                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
                     <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
                     <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
                     <NavItem page="kpi-dashboard" label="Métricas Grupo" icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" />
                 </NavMenu>
 
-                <NavMenu label="RH & Gestão" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
+                <NavMenu label="RH & Gestão" icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
                     <NavItem page="directory" label="Funcionários" icon={UsersIcon} permission="viewDirectory" />
-                    <NavItem page="org-chart" label="Organograma" icon={UsersIcon} permission="viewOrgChart" />
-                    <NavItem page="meu-rh" label="Portal Meu RH" icon={UsersIcon} permission="viewMeuRH" />
+                    <NavItem page="org-chart" label="Organograma" icon={ArrowPathIcon} permission="viewOrgChart" />
+                    <NavItem page="meu-rh" label="Portal Meu RH" icon={BuildingOfficeIcon} permission="viewMeuRH" />
                     <NavItem page="jobs" label="Portal de Vagas" icon={RocketLaunchIcon} permission="viewJobs" />
                     <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
                     <NavItem page="surveys" label="Pesquisas Internas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
@@ -133,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
                 </NavMenu>
 
-                <NavMenu label="T.I. & Suporte" icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
+                <NavMenu label="T.I. & Suporte" icon={LifebuoyIcon} menuKey="ti" permission={hasTiAccess}>
                     <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" />
                     <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
