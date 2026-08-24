@@ -25,11 +25,14 @@ const EmailNotifier: React.FC = () => {
 
     // Polling
     useEffect(() => {
-        if (!settings || !settings.imap_host || !settings.imap_user || !settings.imap_password) return;
+        if (!settings || !settings.imap_host || !settings.imap_user || !settings.imap_pass) return;
 
         const checkEmails = async () => {
+            const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
+                `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
+
             try {
-                const response = await fetch(`${import.meta.env.VITE_EMAIL_SERVER_URL}/api/email/fetch`, {
+                const response = await fetch(`${EMAIL_SERVER_URL}/fetch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

@@ -80,6 +80,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [view, setView] = useState<'inbox' | 'compose' | 'settings' | 'read'>('inbox');
     const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true); // For responsive toggle
+    const [isFullScreen, setIsFullScreen] = useState(false); // New Full Screen Mode
 
     // --- State: Data ---
     const [settings, setSettings] = useState<EmailSettings>({
@@ -382,6 +383,28 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         });
     };
 
+    const markAllAsRead = async () => {
+        const unreadEmails = emails.filter(e => !(e.flags || []).includes('\\Seen'));
+        if (unreadEmails.length === 0) return;
+
+        // Optimistic UI Update
+        setEmails(prev => prev.map(e => ({ ...e, flags: [...(e.flags || []), '\\Seen'] })));
+        setUnseenCount(0);
+
+        // Call Server for each or batch if supported. The /flags API supports multiple UIDs.
+        await callEmailServer('flags', {
+            config: settings,
+            uids: unreadEmails.map(e => e.uid),
+            operation: 'add',
+            flags: ['\\Seen'],
+            path: currentFolder
+        });
+
+        // Invalidate cache
+        const cacheKey = `${currentUser.id}_${currentFolder}_${page}`;
+        delete emailCache[cacheKey];
+    };
+
     const createFolder = async () => {
         const folderName = prompt('Nome da nova pasta:');
         if (!folderName) return;
@@ -590,9 +613,6 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const sendEmail = async () => {
         setLoading(true);
         try {
-            // Append Signature
-            const fullBody = `${composeBody}<br/><br/>--<br/>${settings.signature || ''}`;
-
             const { data, error } = await callEmailServer('send', {
                 config: settings,
                 payload: {
@@ -601,8 +621,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     bcc: composeBcc,
                     replyTo: composeReplyTo,
                     subject: composeSubject,
-                    text: composeBody,
-                    html: fullBody
+                    text: composeBody.replace(/<[^>]*>?/gm, ''), // Plain text version
+                    html: composeBody
                 }
             });
 
@@ -725,7 +745,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     return (
         <div className="flex bg-white h-[calc(100vh-6rem)] rounded-xl shadow-lg overflow-hidden border border-gray-200">
             {/* --- Left Sidebar (Folders) --- */}
-            <div className={`w-64 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${sidebarOpen ? '' : '-ml-64 md:ml-0'}`}>
+            <div className={`w-64 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${(sidebarOpen && !(view === 'read' && isFullScreen)) ? '' : '-ml-64 md:ml-0'} ${(view === 'read' && isFullScreen) ? 'md:-ml-64' : ''}`}>
                 <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                     <h2 className="font-bold text-gray-700">PandaMail</h2>
                     <button onClick={() => setView('settings')} className="text-gray-400 hover:text-brand-primary">
@@ -734,7 +754,12 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                    <button onClick={() => { setView('compose'); setComposeTo(''); setComposeSubject(''); setComposeBody(''); }} className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg font-medium shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-2 mb-4">
+                    <button onClick={() => {
+                        setView('compose');
+                        setComposeTo('');
+                        setComposeSubject('');
+                        setComposeBody(`<br/><br/>${settings.signature || ''}`);
+                    }} className="w-full bg-brand-primary text-white py-2 px-4 rounded-lg font-medium shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-2 mb-4">
                         <PencilSquareIcon className="w-5 h-5" />
                         {t('email.write')}
                     </button>
@@ -818,7 +843,18 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             {/* --- Middle: Email List --- */}
             {(view === 'inbox' || view === 'read') && (
-                <div className={`flex flex-col min-w-0 md:max-w-md border-r border-gray-200 relative ${view === 'read' ? 'hidden md:flex' : 'flex-1 md:flex-none md:w-80'}`}>
+                <div className={`flex flex-col min-w-0 md:max-w-md border-r border-gray-200 relative ${(view === 'read' && isFullScreen) ? 'hidden' : view === 'read' ? 'hidden md:flex' : 'flex-1 md:flex-none md:w-80'}`}>
+                    {/* Toolbar for List */}
+                    <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
+                        <h2 className="font-bold text-gray-700 truncate">{getFolderName(currentFolder)}</h2>
+                        <button
+                            onClick={markAllAsRead}
+                            className="text-[10px] font-bold text-brand-primary hover:underline uppercase tracking-tighter"
+                            title="Marcar todos como lidos"
+                        >
+                            Lidos
+                        </button>
+                    </div>
                     {/* ... Search ... */}
 
                     {/* List */}
@@ -983,14 +1019,15 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     <div className="flex-1 flex flex-col h-full overflow-hidden">
                         {/* Toolbar */}
                         <div className="p-2 border-b border-gray-200 flex flex-wrap gap-2 items-center bg-gray-50">
-                            <button onClick={() => setView('inbox')} className="md:hidden p-2 text-gray-600">
+                            <button onClick={() => setView('inbox')} className={`${isFullScreen ? 'flex' : 'md:hidden'} p-2 text-gray-600 hover:bg-gray-200 rounded-full transition-colors`}>
                                 <ChevronLeftIcon className="w-5 h-5" />
+                                {isFullScreen && <span className="text-xs font-bold ml-1">Voltar</span>}
                             </button>
                             <button onClick={() => {
                                 setView('compose');
                                 setComposeTo(selectedEmail.from.match(/<(.+)>/)?.[1] || selectedEmail.from);
                                 setComposeSubject('Re: ' + selectedEmail.subject);
-                                setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
+                                setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
                                 <ArrowUturnLeftIcon className="w-4 h-4" /> {t('email.reply')}
                             </button>
@@ -1001,14 +1038,14 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 setComposeTo(from);
                                 setComposeCc(ccs);
                                 setComposeSubject('Re: ' + selectedEmail.subject);
-                                setComposeBody(`<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
+                                setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 5px;">Em ${new Date(selectedEmail.date).toLocaleString()}, ${selectedEmail.from} escreveu:<br/>${selectedEmail.html || selectedEmail.text}</blockquote>`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
                                 <UsersIcon className="w-4 h-4" /> {t('email.reply_all')}
                             </button>
                             <button onClick={() => {
                                 setView('compose');
                                 setComposeSubject('Fwd: ' + selectedEmail.subject);
-                                setComposeBody(`<br/><br/>---------- Forwarded message ---------<br/>From: ${selectedEmail.from}<br/>Date: ${new Date(selectedEmail.date).toLocaleString()}<br/>Subject: ${selectedEmail.subject}<br/><br/>${selectedEmail.html || selectedEmail.text}`);
+                                setComposeBody(`<br/><br/>${settings.signature || ''}<br/><br/>---------- Forwarded message ---------<br/>From: ${selectedEmail.from}<br/>Date: ${new Date(selectedEmail.date).toLocaleString()}<br/>Subject: ${selectedEmail.subject}<br/><br/>${selectedEmail.html || selectedEmail.text}`);
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
                                 <ArrowRightOnRectangleIcon className="w-4 h-4" /> {t('email.forward')}
                             </button>
@@ -1248,6 +1285,20 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                                     <input type="checkbox" checked={settings.smtp_ssl} onChange={e => setSettings(s => ({ ...s, smtp_ssl: e.target.checked }))} />
                                                     <label className="text-sm">{t('email.use_ssl')}</label>
                                                 </div>
+                                            </div>
+
+                                            <h3 className="font-semibold text-gray-700 mb-4 mt-6">Preferências de Visualização</h3>
+                                            <div className="bg-white p-4 rounded border border-gray-200 flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-700">Abrir e-mail em tela cheia</div>
+                                                    <div className="text-xs text-gray-500">Esconde a lista de e-mails ao abrir uma mensagem.</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setIsFullScreen(!isFullScreen)}
+                                                    className={`w-12 h-6 rounded-full transition-colors relative ${isFullScreen ? 'bg-brand-primary' : 'bg-gray-300'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isFullScreen ? 'left-7' : 'left-1'}`} />
+                                                </button>
                                             </div>
                                         </div>
 
