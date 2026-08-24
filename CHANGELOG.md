@@ -4,6 +4,37 @@ Documento de registro de todas as alterações notáveis feitas no projeto Panda
 
 ---
 
+Versão 1.1.8 beta
+20/06/2026
+🗞️ Nota de Atualização - PandaNet v1.1.8 Beta
+Esta atualização traz a consolidação de todas as correções e melhorias da versão 1.1.6 Beta, juntamente com o novo sistema de Elos Dinâmicos de RPG Universal, suporte a molduras de elo personalizadas em PNG e recálculo retroativo de XP e Níveis para colaboradores.
+
+🚀 O que há de novo?
+
+🛡️ Elos Dinâmicos de RPG & Níveis Universais
+- **Elo Universal no Header**: O anel metálico e o nível do colaborador agora aparecem em todos os lugares do ecossistema onde a foto do perfil é exibida, incluindo o canto superior direito do cabeçalho principal (`Header.tsx`).
+- **Níveis Dinâmicos e Customizados**: O painel administrativo agora suporta a personalização completa dos elos. O administrador pode renomear os elos, configurar metas de XP progressivas e adicionar novos níveis acima do limite padrão (10 níveis iniciais).
+- **Molduras Personalizadas em PNG**: Suporte para carregar imagens PNG transparentes que servirão de moldura (anel de elo) ao redor da foto de perfil. O sistema redimensiona inteligentemente a foto interna para emoldurar o avatar perfeitamente. Fallback estético com gradientes CSS modernos para 10 níveis distintos.
+
+⚙️ Recálculo Retroativo de XP e Consistência de Dados
+- **XP Cumulativo Realtime**: O XP dos usuários agora é calculado de forma cumulativa com base na soma dos selos válidos conquistados.
+- **Sincronização Retroativa**: Se o administrador alterar a pontuação de XP de um selo, deletar ou revogar uma concessão, o sistema executa automaticamente a rotina `recalculateAllUsersXPAndLevels()`, atualizando o XP acumulado e o nível de todos os colaboradores retroativamente de forma matemática e consistente.
+
+📅 Cores no Calendário & Mini-calendário (v1.1.6 Beta)
+- **Categorização Visual**: Cada tipo de evento possui uma cor de destaque no calendário para evitar confusões (Visitas e Reuniões em amarelo, Treinamentos e Projetos em azul, Reservas e Aluguéis em verde, Social e outros em laranja).
+- **Mini-calendário da Home**: O mini-calendário exibe pontinhos coloridos refletindo as mesmas categorias do calendário principal.
+
+💼 Módulo Comercial, Espaços e Upload de Fotos (v1.1.6 Beta)
+- **Rebatismo de Módulos**: O menu de agendamentos agora se chama "Comercial", onde as agendas internas continuam como "Agendamentos" e os eventos foram rebatizados para "Espaços".
+- **Upload de Fotos**: Adicionado suporte para upload de até 7 fotos tanto em agendamentos quanto em espaços, exibidos em carrossel interativo.
+- **Painel SaaS**: Novos toggles no painel admin para ativação ou desativação dinâmica desses recursos por empresa.
+
+📅 Novas Telas de Agenda e Reservas (v1.1.6 Beta)
+- **Agenda Unificada**: Sub-abas exclusivas para Visitas (com fluxo de Considerações e Observações pós-evento), Reuniões e Treinamentos (online/presencial).
+- **Reservas de Recursos**: Gerenciamento e locação de salas de reunião (com seleção de acessórios como TV e projetor) e veículos corporativos.
+
+---
+
 Versão 1.1.6 beta
 19/06/2026
 🗞️ Nota de Atualização - PandaNet v1.1.6 Beta
