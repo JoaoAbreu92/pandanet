@@ -535,7 +535,6 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         company_id: companyId, 
                         phone, 
                         name: g.subject || g.name || 'Grupo Sem Nome', 
-                        is_group: true,
                         updated_at: new Date().toISOString() 
                     });
                 }
@@ -543,34 +542,46 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
         } catch(e) { console.error(`[SYNC] Erro busca grupos:`, e.message); }
 
         if (contactsToUpsert.length > 0) {
-            console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas (contatos/grupos)...`);
+            console.log(`[SYNC] Salvando ${contactsToUpsert.length} entradas em whatsapp_contacts...`);
             const { error: errC } = await supabase
                 .from('whatsapp_contacts')
                 .upsert(contactsToUpsert, { onConflict: 'company_id,phone' });
             if (errC) console.error('[SYNC] Erro upsert contatos:', errC.message);
 
             // --- GARANTIA DE CONVERSA PARA GRUPOS ---
-            // Criar conversa para todos os grupos novos, permitindo que apareçam na aba "Grupos"
-            const groupEntries = contactsToUpsert.filter(c => c.is_group);
+            // Criar conversa apenas se for grupo e se a coluna is_group for suportada
+            const groupJids = Array.from(processedJids).filter(jid => jid.includes('@g.us') || (typeof jid === 'string' && jid.length > 15)); 
+            
+            // Aqui vamos usar a lista original de contatos buscados para pegar o nome
+            const groupEntries = contactsToUpsert.filter(c => {
+                // Heurística básica se o nome/telefone indica grupo (geralmente JIDs de grupo são longos)
+                return c.phone && (c.phone.length > 15 || c.phone.includes('-'));
+            });
+
             if (groupEntries.length > 0) {
+                console.log(`[SYNC] Garantindo ${groupEntries.length} conversas de grupo em whatsapp_conversations...`);
                 for (const group of groupEntries) {
-                    const { data: existing } = await supabase
-                        .from('whatsapp_conversations')
-                        .select('id')
-                        .eq('company_id', companyId)
-                        .eq('contact_phone', group.phone)
-                        .maybeSingle();
-                    
-                    if (!existing) {
-                        await supabase.from('whatsapp_conversations').insert({
-                            company_id: companyId,
-                            contact_phone: group.phone,
-                            contact_name: group.name,
-                            is_group: true,
-                            status: 'pendente',
-                            connection_id: connectionId,
-                            unread_count: 0
-                        });
+                    try {
+                        const { data: existing } = await supabase
+                            .from('whatsapp_conversations')
+                            .select('id')
+                            .eq('company_id', companyId)
+                            .eq('contact_phone', group.phone)
+                            .maybeSingle();
+                        
+                        if (!existing) {
+                            await supabase.from('whatsapp_conversations').insert({
+                                company_id: companyId,
+                                contact_phone: group.phone,
+                                contact_name: group.name,
+                                is_group: true,
+                                status: 'pendente',
+                                connection_id: connectionId,
+                                unread_count: 0
+                            });
+                        }
+                    } catch (errConv) {
+                        console.error(`[SYNC-GROUP] Erro ao criar conversa para ${group.phone}:`, errConv.message);
                     }
                 }
             }
