@@ -218,6 +218,7 @@ export interface WhatsAppPermissions {
   can_transfer: boolean; // New: Can transfer conversations
   can_see_all_departments: boolean; // New: Can see conversations from all departments
   can_manage_tags: boolean; // New: Can manage tags
+  allowed_connections?: string[]; // IDs of Allowed connections
 }
 
 export interface Employee {
@@ -637,6 +638,7 @@ export interface WhatsAppConversation {
   status: 'aberto' | 'pendente' | 'fechado';
   assigned_to?: string; // profile_id
   department_id?: string;
+  connection_id?: string; // connection ID for Multi-channel
   last_message_at: string;
   unread_count: number;
 }
@@ -671,6 +673,8 @@ export interface WhatsAppSettings {
   rejection_message?: string;
   is_connected: boolean;
   qr_code?: string;
+  channel_type?: 'whatsapp' | 'telegram' | 'instagram' | 'messenger';
+  api_token?: string;
 }
 
 export interface WhatsAppQueue {
@@ -723,6 +727,10 @@ export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
   department?: {
     id: string;
     name: string;
+  };
+  channel?: {
+    channel_type?: 'whatsapp' | 'telegram' | 'instagram' | 'messenger';
+    connection_name?: string;
   };
   tags?: WhatsAppConversationTag[];
   notes_count?: number;

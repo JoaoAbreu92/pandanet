@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
-import { Employee, WhatsAppQueue, WhatsAppPermissions } from '../../../types';
+import { Employee, WhatsAppQueue, WhatsAppPermissions, WhatsAppSettings } from '../../../types';
 import { useAuth } from '../../../components/AuthContext';
 import { Plus, Edit2, Trash2, X, Check, User, Shield, MessageSquare } from 'lucide-react';
 
@@ -25,6 +25,7 @@ const UsersTab: React.FC = () => {
     const [agents, setAgents] = useState<WhatsAppAgent[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
     const [queues, setQueues] = useState<WhatsAppQueue[]>([]);
+    const [channels, setChannels] = useState<WhatsAppSettings[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAgent, setEditingAgent] = useState<WhatsAppAgent | null>(null);
@@ -62,7 +63,13 @@ const UsersTab: React.FC = () => {
             .select('*')
             .eq('company_id', profile.company_id);
 
-        if (queuesData) setQueues(queuesData);
+        // Fetch Channels
+        const { data: channelsData } = await supabase
+            .from('whatsapp_settings')
+            .select('*')
+            .eq('company_id', profile.company_id);
+
+        if (channelsData) setChannels(channelsData);
 
         if (employees) {
             const mappedEmployees: Employee[] = employees.map(e => ({
@@ -264,6 +271,38 @@ const UsersTab: React.FC = () => {
                                     ))}
                                 </select>
                              </div>
+
+                            {/* Allowed Channels */}
+                            <div>
+                                <h4 className="text-sm font-medium text-gray-900 mb-3 block">Canais Permitidos</h4>
+                                <div className="space-y-2 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    {channels.length === 0 ? (
+                                        <p className="text-sm text-gray-500">Nenhum canal configurado.</p>
+                                    ) : (
+                                        channels.map((channel) => (
+                                            <div key={channel.id} className="flex items-center">
+                                                <input
+                                                    id={`channel-${channel.id}`}
+                                                    type="checkbox"
+                                                    checked={permissions.allowed_connections?.includes(channel.id) || false}
+                                                    onChange={(e) => {
+                                                        const current = permissions.allowed_connections || [];
+                                                        if (e.target.checked) {
+                                                            setPermissions({ ...permissions, allowed_connections: [...current, channel.id] });
+                                                        } else {
+                                                            setPermissions({ ...permissions, allowed_connections: current.filter(id => id !== channel.id) });
+                                                        }
+                                                    }}
+                                                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                />
+                                                <label htmlFor={`channel-${channel.id}`} className="ml-2 text-sm text-gray-700 font-medium">
+                                                    {channel.connection_name} <span className="text-gray-500 font-normal capitalize">({channel.channel_type || 'whatsapp'})</span>
+                                                </label>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
 
                             {/* Permissions Toggles */}
                              <div>

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { WhatsAppContact, WhatsAppQueue } from '../../types';
-import { Search, MessageCircle, User, ArrowRight } from 'lucide-react';
+import { WhatsAppContact, WhatsAppQueue, WhatsAppSettings } from '../../types';
+import { useAuth } from '../AuthContext';
+import { Search, MessageCircle, User, ArrowRight, Smartphone, Send, Instagram } from 'lucide-react';
 
 const NewTicket: React.FC = () => {
+    const { profile } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
     const [queues, setQueues] = useState<WhatsAppQueue[]>([]);
+    const [channels, setChannels] = useState<WhatsAppSettings[]>([]);
     const [selectedContact, setSelectedContact] = useState<WhatsAppContact | null>(null);
     const [selectedQueue, setSelectedQueue] = useState('');
+    const [selectedChannel, setSelectedChannel] = useState('');
     const [initialMessage, setInitialMessage] = useState('');
     
     // Simulating navigation to chat
@@ -24,7 +28,37 @@ const NewTicket: React.FC = () => {
 
     useEffect(() => {
         fetchQueues();
-    }, []);
+        fetchChannels();
+    }, [profile]);
+
+    const fetchChannels = async () => {
+        if (!profile?.company_id) return;
+
+        const { data } = await supabase
+            .from('whatsapp_settings')
+            .select('*')
+            .eq('company_id', profile.company_id);
+
+        if (data) {
+            // Filter by allowed connections if profile has permissions set
+            const permissions = profile.whatspanda_permissions as any;
+            const allowedIds = permissions?.allowed_connections || [];
+
+            // If the user is an admin or we don't have constraints, maybe show all?
+            // "listar apenas aqueles que o atendente possui em allowed_connections"
+            const isAdmin = profile.isAdmin || profile.isCompanyAdmin || profile.role === 'Super Admin';
+
+            let userChannels = data;
+            if (!isAdmin && allowedIds.length > 0) {
+                userChannels = data.filter(c => allowedIds.includes(c.id));
+            }
+
+            setChannels(userChannels);
+            if (userChannels.length > 0) {
+                setSelectedChannel(userChannels[0].id);
+            }
+        }
+    };
 
     const fetchQueues = async () => {
         const { data } = await supabase.from('whatsapp_queues').select('*').eq('is_active', true);
@@ -43,8 +77,12 @@ const NewTicket: React.FC = () => {
 
     const handleStartConversation = async () => {
         if (!selectedContact) return;
+        if (!selectedChannel) {
+            alert('Por favor, selecione um canal de envio.');
+            return;
+        }
 
-        // 1. Check if conversation exists (open or closed)
+        // 1. Check if conversation exists (open or closed) for THIS channel
         const { data: existingConv } = await supabase
             .from('whatsapp_conversations')
             .select('*')
@@ -58,12 +96,13 @@ const NewTicket: React.FC = () => {
             const { data: newConv, error } = await supabase
                 .from('whatsapp_conversations')
                 .insert({
-                    company_id: '15d38706-59a6-43b8-9366-2371904d90ce', // Hardcoded for MVP
+                    company_id: profile?.company_id || '15d38706-59a6-43b8-9366-2371904d90ce',
                     contact_phone: selectedContact.phone,
                     contact_name: selectedContact.name,
                     status: 'aberto',
                     unread_count: 0,
                     last_message_at: new Date().toISOString(),
+                    connection_id: selectedChannel
                     // department_id: selectedQueue // If we map queue to department or add queue_id to conversation
                 })
                 .select()
@@ -164,6 +203,22 @@ const NewTicket: React.FC = () => {
                                     Trocar
                                 </button>
                             </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Canal de Envio</label>
+                                    <select
+                                        value={selectedChannel}
+                                        onChange={(e) => setSelectedChannel(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 bg-white"
+                                    >
+                                        {channels.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.connection_name} ({c.channel_type || 'whatsapp'})
+                                            </option>
+                                        ))}
+                                        {channels.length === 0 && <option value="">Nenhum canal disponível</option>}
+                                    </select>
+                                </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Fila de Atendimento (Opcional)</label>
