@@ -2743,7 +2743,7 @@ async function processScheduledCampaigns() {
                 continue;
             }
 
-            const instanceName = connection.connection_name || `conn_${connection.id}`;
+            const instanceName = `conn_${connection.id}`;
 
             // 4. Selecionar template aleatoriamente
             const templates = [
