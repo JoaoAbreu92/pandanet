@@ -119,6 +119,17 @@ const EmailPage: React.FC = () => {
         setContextMenu(null);
     };
 
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSignatureImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const filteredEmails = emails.filter(email => {
         if (activeTab === 'favorites') return email.isStarred;
         // In a real app, you'd filter by folder/folderId. For mock, just show inbox/sent/etc.
@@ -317,15 +328,27 @@ const EmailPage: React.FC = () => {
                                                     className="w-full h-24 p-3 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50 resize-none mb-2"
                                                     placeholder="Digite sua assinatura aqui..."
                                                 />
-                                                <label className="text-xs font-bold text-gray-400 uppercase">URL da Imagem da Assinatura</label>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={signatureImage}
-                                                        onChange={(e) => setSignatureImage(e.target.value)}
-                                                        className="flex-1 p-2 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50"
-                                                        placeholder="https://exemplo.com/logo.png"
-                                                    />
+                                                <label className="text-xs font-bold text-gray-400 uppercase">Imagem da Assinatura</label>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={signatureImage}
+                                                            onChange={(e) => setSignatureImage(e.target.value)}
+                                                            className="flex-1 p-2 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50"
+                                                            placeholder="Cole a URL ou suba um arquivo..."
+                                                        />
+                                                        <label className="cursor-pointer bg-white border border-gray-100 px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-brand-primary hover:border-brand-primary transition-all flex items-center gap-2 shadow-sm">
+                                                            <PlusIcon className="w-4 h-4" />
+                                                            Upload
+                                                            <input
+                                                                type="file"
+                                                                className="hidden"
+                                                                accept="image/*"
+                                                                onChange={handleImageUpload}
+                                                            />
+                                                        </label>
+                                                    </div>
                                                 </div>
                                                 {signatureImage && (
                                                     <div className="mt-2 p-2 border border-gray-100 rounded-lg bg-white inline-block">
