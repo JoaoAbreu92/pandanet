@@ -24,6 +24,24 @@ RETURNS UUID AS $$
   SELECT company_id FROM public.profiles WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE;
 
+-- Function to check if current user is super admin
+CREATE OR REPLACE FUNCTION is_super_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'Super Admin'
+  ) OR (
+    auth.jwt() ->> 'email' = 'ti@grupopixel.com.br'
+  );
+END;
+$$;
+
 --------------------------------------------------------------------------------
 -- 1. CORE INFRASTRUCTURE (Plans, Companies, Profiles)
 --------------------------------------------------------------------------------
@@ -666,6 +684,45 @@ CREATE POLICY company_view_policy ON public.companies FOR SELECT USING (id = pub
 
 DROP POLICY IF EXISTS company_all_policy ON public.companies;
 CREATE POLICY company_all_policy ON public.companies FOR ALL USING (id = public.get_user_company_id() OR public.is_super_admin()) WITH CHECK (id = public.get_user_company_id() OR public.is_super_admin());
+
+-- EMAIL SETTINGS: Secure RLS policies
+DROP POLICY IF EXISTS tenant_isolation_policy ON public.email_settings;
+DROP POLICY IF EXISTS email_settings_select_policy ON public.email_settings;
+DROP POLICY IF EXISTS email_settings_all_policy ON public.email_settings;
+
+CREATE POLICY email_settings_select_policy ON public.email_settings
+FOR SELECT
+USING (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+    OR EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND (
+            (email_permissions->>'can_view_all_accounts')::boolean = TRUE
+            AND company_id = email_settings.company_id
+        )
+    )
+    OR EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND COALESCE(email_permissions->'allowed_accounts', '[]'::jsonb) ? email_settings.id::text
+    )
+);
+
+CREATE POLICY email_settings_all_policy ON public.email_settings
+FOR ALL
+USING (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+)
+WITH CHECK (
+    user_id = auth.uid()
+    OR public.is_super_admin()
+);
+
+-- Drop UNIQUE constraint on user_id in email_settings to support multiple accounts
+ALTER TABLE public.email_settings DROP CONSTRAINT IF EXISTS email_settings_user_id_key;
 
 --------------------------------------------------------------------------------
 -- 10. RPC FUNCTIONS
