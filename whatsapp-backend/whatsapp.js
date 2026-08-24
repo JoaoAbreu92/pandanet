@@ -53,10 +53,12 @@ async function connectToWhatsApp(companyId) {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            console.log('QR Code received. Please scan!');
+            console.log('[QR CODE] QR Code received. Please scan!');
+            console.log('[QR CODE] Saving to DB for company:', companyId);
             qrcode.generate(qr, { small: true });
             // Save QR status to DB
             await updateCompanySettings(companyId, { qr_code: qr, is_connected: false });
+            console.log('[QR CODE] QR Code saved to DB successfully');
         }
 
         if (connection === 'close') {
@@ -284,6 +286,7 @@ async function updateCompanySettings(companyId, updates) {
             .from('whatsapp_settings')
             .update(updates)
             .eq('company_id', companyId);
+        console.log(`[updateCompanySettings] Updated settings for company ${companyId}:`, updates);
     }
 }
 
