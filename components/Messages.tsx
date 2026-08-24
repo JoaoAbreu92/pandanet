@@ -973,7 +973,8 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                     company_id: currentUser.company_id,
                     is_group: false,
                     last_message: 'Conversa iniciada',
-                    last_message_at: new Date().toISOString()
+                    last_message_at: new Date().toISOString(),
+                    created_by: currentUser.id
                 })
                 .select()
                 .single();

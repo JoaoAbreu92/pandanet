@@ -52,10 +52,19 @@ const Channels: React.FC = () => {
 
         // Fallback Polling (3 seconds) to ensure QR gets loaded if Realtime fails
         let pollingInterval: NodeJS.Timeout;
+        let pollingAttempts = 0;
 
         if (view === 'qr' && currentId && !isConnected) {
             addDebugLog(`Iniciando polling para conexão: ${currentId}`, 'info');
             pollingInterval = setInterval(async () => {
+                pollingAttempts++;
+                if (pollingAttempts > 15) {
+                    addDebugLog('Timeout: O QR Code demorou muito para ser gerado. O backend Evolution API pode estar fora do ar.', 'error');
+                    setShowDebug(true);
+                    clearInterval(pollingInterval);
+                    return;
+                }
+
                 const { data, error } = await supabase
                     .from('whatsapp_settings')
                     .select('qr_code, is_connected')
@@ -73,6 +82,7 @@ const Channels: React.FC = () => {
                         addDebugLog('Conexão detectada via polling!', 'success');
                         setIsConnected(true);
                         setTimeout(() => setView('list'), 2000);
+                        clearInterval(pollingInterval);
                     }
                 }
             }, 3000);
@@ -152,11 +162,13 @@ const Channels: React.FC = () => {
                 addDebugLog('API retornou SUCESSO. Aguardando QR no Banco...', 'success');
             } else {
                 addDebugLog(`API retornou ERRO (${res.status}): ${JSON.stringify(jsonResp)}`, 'error');
+                setShowDebug(true); // Auto-open debug panel on error
             }
 
             console.log('[startSession] Status:', res.status, 'Response:', jsonResp);
         } catch (error: any) {
             addDebugLog(`Erro de Rede/Fetch: ${error.message}`, 'error');
+            setShowDebug(true); // Auto-open debug panel on fetch error
             console.error('[startSession] Network/Fetch Error:', error);
         }
     };
