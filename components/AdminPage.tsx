@@ -15,9 +15,10 @@ interface AdminPageProps {
     company: Company;
     setCompany: (company: Company) => void;
     plan: Plan;
+    customFeatures?: Record<string, boolean>;
 }
 
-const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
+const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
 
     const handleSetData = (key: keyof Company['data'], value: any) => {
@@ -35,21 +36,25 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan }) => {
     };
 
     const tabs = [
-        { id: 'dashboard', label: 'Conteúdo' },
+        { id: 'dashboard', label: 'Conteúdo', featureId: 'feed' },
         { id: 'users', label: 'Usuários' },
         { id: 'teams', label: 'Equipes' },
         { id: 'forms', label: 'Formulários' },
-        { id: 'marketplace', label: 'Marketplace' },
-        { id: 'events', label: 'Eventos' },
+        { id: 'marketplace', label: 'Marketplace', featureId: 'marketplace' },
+        { id: 'events', label: 'Eventos', featureId: 'events' },
         { id: 'training', label: 'Treinamentos' },
-        { id: 'kb', label: 'Base de Con.' },
+        { id: 'kb', label: 'Base de Con.', featureId: 'kb' },
         { id: 'status', label: 'Status TI' },
         { id: 'infosec', label: 'Segurança' },
-        { id: 'policies', label: 'Políticas' },
+        { id: 'policies', label: 'Políticas', featureId: 'policies' },
         { id: 'polls', label: 'Enquetes' },
-        { id: 'bem-estar', label: 'Bem Estar' },
+        { id: 'bem-estar', label: 'Bem Estar', featureId: 'wellness' },
         { id: 'settings', label: 'Geral' },
-    ];
+    ].filter(tab => {
+        if (!tab.featureId) return true;
+        if (!customFeatures) return true;
+        return customFeatures[tab.featureId] !== false;
+    });
 
     const renderContent = () => {
         switch (activeTab) {

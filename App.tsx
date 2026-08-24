@@ -302,7 +302,28 @@ const AppContent: React.FC = () => {
         if (!currentUser || !companyData) return null;
 
         const canAccess = (permission: keyof EmployeePermissions) => {
-            return !!currentUser?.permissions[permission];
+            // 1. Check if user has explicit permission
+            if (!currentUser?.permissions[permission]) return false;
+
+            // 2. Check if feature is disabled for the company
+            const featureMap: Record<string, string> = {
+                'viewMessages': 'messages',
+                'viewCalendar': 'calendar',
+                'useMarketplace': 'marketplace',
+                'viewBenefits': 'benefits',
+                'viewWellbeing': 'wellness',
+                'openTickets': 'tickets',
+                'viewKnowledgeBase': 'kb',
+                'viewPolicies': 'policies',
+                'viewRecognition': 'wall'
+            };
+
+            const featureId = featureMap[permission];
+            if (featureId && currentCompany?.custom_features && currentCompany.custom_features[featureId] === false) {
+                return false;
+            }
+
+            return true;
         };
 
         switch (currentPage) {
@@ -323,7 +344,7 @@ const AppContent: React.FC = () => {
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
             case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
-            case 'admin': return (currentUser.role === 'Super Admin' && currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
+            case 'admin': return (currentUser.isAdmin || currentUser.is_company_admin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={currentCompany.custom_features} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;
@@ -395,7 +416,7 @@ const AppContent: React.FC = () => {
     }
 
     // Fallback: Repair Profile
-    if (session && !currentUser && !loading) {
+    if (session && (!currentUser || !currentUser.company_id) && !loading) {
         const handleRepairProfile = async () => {
             if (!session.user.email) return;
             const userEmail = session.user.email.toLowerCase();

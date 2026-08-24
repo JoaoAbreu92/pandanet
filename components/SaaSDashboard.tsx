@@ -269,6 +269,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                         const { error: updateError } = await supabase.from('profiles')
                             .update({
                                 role: 'admin',
+                                is_admin: true,
+                                is_company_admin: true,
                                 company_id: data[0].id,
                             })
                             .ilike('email', formData.responsibleEmail.trim()); // ilike for case insensitive

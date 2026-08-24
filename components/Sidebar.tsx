@@ -32,17 +32,22 @@ interface SidebarProps {
     companyName: string;
     companyLogo?: string;
     isImpersonating: boolean;
+    customFeatures?: Record<string, boolean>;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, customFeatures }) => {
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false });
 
     const toggleMenu = (menu: 'rh' | 'ti') => {
         setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
     };
 
-    const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof Employee['permissions'] | true }> = ({ page, label, icon: Icon, permission }) => {
+    const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof Employee['permissions'] | true; featureId?: string }> = ({ page, label, icon: Icon, permission, featureId }) => {
         if (permission !== true && !currentUser.permissions[permission]) {
+            return null;
+        }
+        // Check if feature is disabled by company custom_features
+        if (featureId && customFeatures && customFeatures[featureId] === false) {
             return null;
         }
         return (
@@ -95,34 +100,34 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
-                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} />
-                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" />
-                <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" />
-                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" />
-                <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" />
-                <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} />
+                <NavItem page="feed" label={t('sidebar.feed')} icon={NewspaperIcon} permission={true} featureId="feed" />
+                <NavItem page="messages" label={t('sidebar.messages')} icon={ChatBubbleLeftRightIcon} permission="viewMessages" featureId="messages" />
+                <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
+                <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
+                <NavItem page="bem-estar" label={t('sidebar.wellbeing')} icon={HeartIcon} permission="viewWellbeing" featureId="wellness" />
+                <NavItem page="events" label="Eventos" icon={CalendarDaysIcon} permission={true} featureId="events" />
 
                 <hr className="my-4 border-gray-200 dark:border-gray-700" />
 
                 <NavMenu label="RH" icon={UsersIcon} menuKey="rh" permission={hasRhAccess}>
                     <NavItem page="directory" label={t('sidebar.directory')} icon={UsersIcon} permission="viewDirectory" />
                     <NavItem page="forms" label={t('sidebar.forms')} icon={DocumentTextIcon} permission="viewForms" />
-                    <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" />
+                    <NavItem page="benefits" label={t('sidebar.benefits')} icon={HeartIcon} permission="viewBenefits" featureId="benefits" />
                     <NavItem page="onboarding" label={t('sidebar.onboarding')} icon={RocketLaunchIcon} permission="viewOnboarding" />
-                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" />
+                    <NavItem page="recognition" label={t('sidebar.recognition')} icon={SparklesIcon} permission="viewRecognition" featureId="wall" />
                     <NavItem page="documentos" label={t('sidebar.documents')} icon={FolderIcon} permission="viewDocuments" />
                     {/* New RH Menus */}
                     <NavItem page="training" label={t('sidebar.training') || 'Treinamentos'} icon={RocketLaunchIcon} permission="viewTraining" />
                     <NavItem page="surveys" label="Pesquisas" icon={ChatBubbleLeftRightIcon} permission="viewSurveys" />
-                    <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" />
+                    <NavItem page="policies" label={t('policies.title')} icon={ShieldCheckIcon} permission="viewPolicies" featureId="policies" />
                 </NavMenu>
 
                 <NavMenu label="T.I." icon={Cog6ToothIcon} menuKey="ti" permission={hasTiAccess}>
                     <NavItem page="ti-dashboard" label={t('sidebar.ti_dashboard')} icon={Cog6ToothIcon} permission="viewTiDashboard" />
-                    <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" />
+                    <NavItem page="tickets" label={t('sidebar.my_tickets')} icon={TicketIcon} permission="openTickets" featureId="tickets" />
                     <NavItem page="ti-requests" label={t('sidebar.request_equipment')} icon={PlusIcon} permission="openTiRequests" />
                     {/* New TI Menus */}
-                    <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" />
+                    <NavItem page="knowledge-base" label={t('kb.title')} icon={QuestionMarkCircleIcon} permission="viewKnowledgeBase" featureId="kb" />
                     <NavItem page="service-status" label={t('status.title')} icon={ArrowPathIcon} permission="viewServiceStatus" />
                     <NavItem page="infosec" label="Segurança da Info." icon={ShieldCheckIcon} permission="viewInfoSec" />
                 </NavMenu>
@@ -141,7 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     </button>
                 )}
 
-                {(currentUser.isAdmin && isImpersonating) && (
+                {(currentUser.isAdmin || currentUser.is_company_admin) && (
                     <button
                         type="button"
                         onClick={() => onNavigate('admin')}
