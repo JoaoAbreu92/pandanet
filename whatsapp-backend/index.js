@@ -189,7 +189,9 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 
 // ============================================
 // WEBHOOKS DA EVOLUTION API E SYNC
-// ====================async function syncEvolutionData(instanceName, companyId, connectionId) {
+// ============================================
+
+async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
         console.log(`[SYNC] [Empresa: ${companyId}] Iniciando sincronização para ${instanceName}...`);
         
