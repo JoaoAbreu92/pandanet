@@ -57,7 +57,13 @@ const SchedulingPage: React.FC = () => {
             startTime: '09:00',
             endTime: '18:00'
         },
-        is_active: true
+        is_active: true,
+        has_capacity_limit: false,
+        capacity_limit: 0,
+        show_capacity_to_guest: true,
+        has_lunch_break: false,
+        lunch_start_time: '12:00',
+        lunch_end_time: '13:00'
     });
 
     // Template Form
@@ -160,7 +166,13 @@ const SchedulingPage: React.FC = () => {
                 price: eventForm.is_paid ? Number(eventForm.price) : 0,
                 requirements: eventForm.requirements,
                 availability: eventForm.availability,
-                is_active: eventForm.is_active
+                is_active: eventForm.is_active,
+                has_capacity_limit: eventForm.has_capacity_limit,
+                capacity_limit: Number(eventForm.capacity_limit),
+                show_capacity_to_guest: eventForm.show_capacity_to_guest,
+                has_lunch_break: eventForm.has_lunch_break,
+                lunch_start_time: eventForm.lunch_start_time,
+                lunch_end_time: eventForm.lunch_end_time
             };
 
             let error;
@@ -182,12 +194,17 @@ const SchedulingPage: React.FC = () => {
             setShowEventModal(false);
             setEditingEvent(null);
             fetchEventTypes();
-            // Reset form
             setEventForm({
                 name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
                 requirements: { phone: true, cnpj: false, company_name: false },
                 availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
-                is_active: true
+                is_active: true,
+                has_capacity_limit: false,
+                capacity_limit: 0,
+                show_capacity_to_guest: true,
+                has_lunch_break: false,
+                lunch_start_time: '12:00',
+                lunch_end_time: '13:00'
             });
         } catch (err: any) {
             alert('Erro ao salvar tipo de evento: ' + err.message);
@@ -215,7 +232,13 @@ const SchedulingPage: React.FC = () => {
                 startTime: event.availability?.startTime ?? '09:00',
                 endTime: event.availability?.endTime ?? '18:00'
             },
-            is_active: event.is_active
+            is_active: event.is_active,
+            has_capacity_limit: event.has_capacity_limit ?? false,
+            capacity_limit: event.capacity_limit ?? 0,
+            show_capacity_to_guest: event.show_capacity_to_guest ?? true,
+            has_lunch_break: event.has_lunch_break ?? false,
+            lunch_start_time: event.lunch_start_time ?? '12:00',
+            lunch_end_time: event.lunch_end_time ?? '13:00'
         });
         setShowEventModal(true);
     };
@@ -488,7 +511,13 @@ const SchedulingPage: React.FC = () => {
                                     name: '', slug: '', description: '', duration: 30, is_paid: false, price: 0,
                                     requirements: { phone: true, cnpj: false, company_name: false },
                                     availability: { days: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '18:00' },
-                                    is_active: true
+                                    is_active: true,
+                                    has_capacity_limit: false,
+                                    capacity_limit: 0,
+                                    show_capacity_to_guest: true,
+                                    has_lunch_break: false,
+                                    lunch_start_time: '12:00',
+                                    lunch_end_time: '13:00'
                                 });
                                 setShowEventModal(true);
                             }}
@@ -609,6 +638,13 @@ const SchedulingPage: React.FC = () => {
                                                     {event.requirements?.company_name && <span className="bg-white dark:bg-slate-900 border px-1.5 py-0.5 rounded">Empresa</span>}
                                                 </div>
                                             </div>
+
+                                            {event.has_capacity_limit && (
+                                                <div className="mt-3 text-xs font-bold text-slate-700 dark:text-slate-300 bg-brand-primary/5 border border-brand-primary/10 rounded-xl p-2.5 flex items-center justify-between">
+                                                    <span>Vagas preenchidas:</span>
+                                                    <span className="text-brand-primary font-extrabold">{bookings.filter(b => b.event_type_id === event.id && b.status !== 'rejected' && b.status !== 'cancelled').length} / {event.capacity_limit}</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
@@ -998,6 +1034,78 @@ const SchedulingPage: React.FC = () => {
                                         <option value="true">Sim (Disponível)</option>
                                         <option value="false">Não (Pausado)</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            {/* Horários de Almoço */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.has_lunch_break}
+                                            onChange={e => setEventForm({ ...eventForm, has_lunch_break: e.target.checked })}
+                                            className="rounded text-brand-primary focus:ring-brand-primary mr-2" 
+                                        />
+                                        Pausa de Almoço?
+                                    </label>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Início do Almoço</label>
+                                    <input 
+                                        type="time" 
+                                        disabled={!eventForm.has_lunch_break}
+                                        value={eventForm.lunch_start_time}
+                                        onChange={e => setEventForm({ ...eventForm, lunch_start_time: e.target.value })}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-brand-primary disabled:opacity-50"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Fim do Almoço</label>
+                                    <input 
+                                        type="time" 
+                                        disabled={!eventForm.has_lunch_break}
+                                        value={eventForm.lunch_end_time}
+                                        onChange={e => setEventForm({ ...eventForm, lunch_end_time: e.target.value })}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-brand-primary disabled:opacity-50"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Controle de Capacidade (Vagas) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={eventForm.has_capacity_limit}
+                                            onChange={e => setEventForm({ ...eventForm, has_capacity_limit: e.target.checked })}
+                                            className="rounded text-brand-primary focus:ring-brand-primary mr-2" 
+                                        />
+                                        Limite de Vagas?
+                                    </label>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Limite de Pessoas</label>
+                                    <input 
+                                        type="number" 
+                                        disabled={!eventForm.has_capacity_limit}
+                                        value={eventForm.capacity_limit}
+                                        onChange={e => setEventForm({ ...eventForm, capacity_limit: Number(e.target.value) })}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-brand-primary disabled:opacity-50"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase block cursor-pointer select-none pt-2 sm:pt-4">
+                                        <input 
+                                            type="checkbox" 
+                                            disabled={!eventForm.has_capacity_limit}
+                                            checked={eventForm.show_capacity_to_guest}
+                                            onChange={e => setEventForm({ ...eventForm, show_capacity_to_guest: e.target.checked })}
+                                            className="rounded text-brand-primary focus:ring-brand-primary mr-2 disabled:opacity-50" 
+                                        />
+                                        Exibir vagas ao convidado
+                                    </label>
                                 </div>
                             </div>
 

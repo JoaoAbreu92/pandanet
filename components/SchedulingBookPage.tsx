@@ -66,14 +66,13 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             setEventType(data);
             setHostProfile(data.profiles);
             
-            // Buscar reservas futuras para verificar ocupação de horários
+            // Buscar todas as reservas ativas para verificar ocupação de horários e limite de capacidade
             const { data: bookingsData } = await supabase
                 .from('scheduling_bookings')
                 .select('*')
                 .eq('event_type_id', eventTypeId)
                 .neq('status', 'rejected')
-                .neq('status', 'cancelled')
-                .gte('booking_date', new Date().toISOString().split('T')[0]);
+                .neq('status', 'cancelled');
 
             setExistingBookings(bookingsData || []);
         } catch (err: any) {
@@ -125,7 +124,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         return allowedDays.includes(dayOfWeek);
     };
 
-    // Generate time slots based on start/end hour and duration
+    // Generate time slots based on start/end hour and duration, respecting lunch breaks
     const generateTimeSlots = () => {
         if (!eventType || !selectedDate) return [];
         
@@ -133,28 +132,42 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         const endTime = eventType.availability?.endTime || '18:00';
         const duration = eventType.duration || 30; // minutes
 
-        const slots = [];
-        let [startHours, startMins] = startTime.split(':').map(Number);
-        const [endHours, endMins] = endTime.split(':').map(Number);
+        const slots: string[] = [];
+        const periods: { start: string; end: string }[] = [];
 
-        let currentMins = startHours * 60 + startMins;
-        const limitMins = endHours * 60 + endMins;
+        if (eventType.has_lunch_break && eventType.lunch_start_time && eventType.lunch_end_time) {
+            periods.push({ start: startTime, end: eventType.lunch_start_time });
+            periods.push({ start: eventType.lunch_end_time, end: endTime });
+        } else {
+            periods.push({ start: startTime, end: endTime });
+        }
 
-        while (currentMins + duration <= limitMins) {
-            const h = Math.floor(currentMins / 60);
-            const m = currentMins % 60;
-            const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            
-            // Check if slot is already booked on selectedDate
-            const isTaken = existingBookings.some(
-                b => b.booking_date === selectedDate && b.booking_time === timeStr
-            );
+        for (const period of periods) {
+            let [startHours, startMins] = period.start.split(':').map(Number);
+            let [endHours, endMins] = period.end.split(':').map(Number);
 
-            if (!isTaken) {
-                slots.push(timeStr);
+            if (isNaN(startHours) || isNaN(startMins)) { startHours = 9; startMins = 0; }
+            if (isNaN(endHours) || isNaN(endMins)) { endHours = 18; endMins = 0; }
+
+            let currentMins = startHours * 60 + startMins;
+            const limitMins = endHours * 60 + endMins;
+
+            while (currentMins + duration <= limitMins) {
+                const h = Math.floor(currentMins / 60);
+                const m = currentMins % 60;
+                const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                
+                // Check if slot is already booked on selectedDate
+                const isTaken = existingBookings.some(
+                    b => b.booking_date === selectedDate && b.booking_time === timeStr
+                );
+
+                if (!isTaken) {
+                    slots.push(timeStr);
+                }
+                
+                currentMins += duration;
             }
-            
-            currentMins += duration;
         }
 
         return slots;
@@ -194,6 +207,26 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         if (!eventType) return;
         setLoading(true);
         try {
+            // Verificar limite de capacidade atualizado antes de confirmar
+            if (eventType.has_capacity_limit) {
+                const { data: latestBookings, error: countErr } = await supabase
+                    .from('scheduling_bookings')
+                    .select('id')
+                    .eq('event_type_id', eventType.id)
+                    .neq('status', 'rejected')
+                    .neq('status', 'cancelled');
+                
+                if (countErr) throw countErr;
+                
+                const currentCount = latestBookings?.length || 0;
+                if (currentCount >= eventType.capacity_limit) {
+                    alert('Desculpe, todas as vagas para esta agenda foram preenchidas recentemente. Não é possível realizar mais reservas.');
+                    setStep('datetime');
+                    fetchEventDetails();
+                    return;
+                }
+            }
+
             const payload = {
                 company_id: eventType.company_id,
                 event_type_id: eventType.id,
@@ -267,6 +300,11 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
 
+    const totalBookingsCount = existingBookings.filter(
+        b => b.status !== 'rejected' && b.status !== 'cancelled'
+    ).length;
+    const spotsLeft = eventType.has_capacity_limit ? Math.max(0, eventType.capacity_limit - totalBookingsCount) : 999999;
+
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-4xl w-full overflow-hidden flex flex-col md:flex-row min-h-[600px] animate-in fade-in zoom-in-95 duration-300">
             {/* Left Sidebar: Host & Event Info */}
@@ -300,6 +338,12 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                                 R$ {eventType.price.toFixed(2)}
                             </div>
                         )}
+                        {eventType.has_capacity_limit && eventType.show_capacity_to_guest && (
+                            <div className="mt-2 text-xs font-bold text-slate-700 dark:text-slate-350 bg-brand-primary/5 border border-brand-primary/10 rounded-xl p-2.5 flex items-center justify-between">
+                                <span>Vagas restantes:</span>
+                                <span className="text-brand-primary font-black">{spotsLeft} / {eventType.capacity_limit}</span>
+                            </div>
+                        )}
                         <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed pt-2">
                             {eventType.description || 'Sem descrição adicional.'}
                         </p>
@@ -317,8 +361,19 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
             <div className="flex-1 p-6 md:p-8 flex flex-col justify-between bg-white dark:bg-slate-900">
                 {/* Step 1: Select Date & Time */}
                 {step === 'datetime' && (
-                    <div className="space-y-6 flex-1 flex flex-col">
-                        <div className="flex items-center justify-between">
+                    eventType.has_capacity_limit && spotsLeft <= 0 ? (
+                        <div className="flex-1 flex flex-col justify-center items-center text-center p-8 bg-slate-50 dark:bg-slate-950/20 border border-dashed rounded-3xl border-slate-200 dark:border-slate-800 my-auto min-h-[400px]">
+                            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/20 rounded-full flex items-center justify-center text-amber-500 mb-4 animate-pulse">
+                                <ExclamationTriangleIcon className="w-8 h-8" />
+                            </div>
+                            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg">Sem Vagas Disponíveis</h3>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mt-2 font-medium">
+                                Esta agenda atingiu o limite máximo de participantes e não está aceitando novas reservas no momento.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 flex-1 flex flex-col">
+                            <div className="flex items-center justify-between">
                             <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Selecione Data e Horário</h3>
                             <div className="flex gap-1">
                                 <button onClick={handlePrevMonth} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400">
@@ -411,6 +466,7 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
                             </button>
                         </div>
                     </div>
+                    )
                 )}
 
                 {/* Step 2: Guest Details Form */}

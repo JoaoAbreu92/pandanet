@@ -14,6 +14,12 @@ CREATE TABLE IF NOT EXISTS public.scheduling_event_types (
     requirements JSONB DEFAULT '{"phone": true, "cnpj": false, "company_name": false}'::jsonb,
     availability JSONB DEFAULT '{"days": [1, 2, 3, 4, 5], "startTime": "09:00", "endTime": "18:00"}'::jsonb,
     is_active BOOLEAN DEFAULT TRUE,
+    has_capacity_limit BOOLEAN DEFAULT FALSE,
+    capacity_limit INTEGER DEFAULT 0,
+    show_capacity_to_guest BOOLEAN DEFAULT TRUE,
+    has_lunch_break BOOLEAN DEFAULT FALSE,
+    lunch_start_time TEXT DEFAULT '12:00',
+    lunch_end_time TEXT DEFAULT '13:00',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     CONSTRAINT unique_owner_slug UNIQUE (owner_id, slug)
 );

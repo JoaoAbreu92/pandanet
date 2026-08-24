@@ -865,6 +865,12 @@ export interface SchedulingEventType {
     endTime: string; // "18:00"
   };
   is_active: boolean;
+  has_capacity_limit: boolean;
+  capacity_limit: number;
+  show_capacity_to_guest: boolean;
+  has_lunch_break: boolean;
+  lunch_start_time?: string;
+  lunch_end_time?: string;
   created_at?: string;
   profiles?: {
     full_name?: string;
