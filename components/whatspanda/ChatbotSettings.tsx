@@ -160,6 +160,12 @@ const ChatbotSettings: React.FC = () => {
             is_active: false
         }).select().single();
 
+        if (error) {
+            console.error('Erro ao criar fluxo:', error);
+            alert('Erro ao criar fluxo: ' + error.message);
+            return;
+        }
+
         if (data) {
             setFlows([...flows, data]);
             setSelectedFlow(data);
@@ -172,20 +178,33 @@ const ChatbotSettings: React.FC = () => {
         if (!companyId) return;
 
         if (!flow.is_active) {
-            await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+            const { error: deactivateErr } = await supabase.from('whatsapp_chatbot_flows').update({ is_active: false }).eq('company_id', companyId);
+            if (deactivateErr) {
+                console.error('Erro ao desativar outros fluxos:', deactivateErr);
+                alert('Erro ao desativar outros fluxos: ' + deactivateErr.message);
+                return;
+            }
         }
 
         const { error } = await supabase.from('whatsapp_chatbot_flows')
             .update({ is_active: !flow.is_active })
             .eq('id', flow.id);
 
-        if (!error) fetchData();
+        if (error) {
+            console.error('Erro ao alternar status do fluxo:', error);
+            alert('Erro ao alterar status do fluxo: ' + error.message);
+        } else {
+            fetchData();
+        }
     };
 
     const handleDeleteFlow = async (flowId: string) => {
         if (!window.confirm('Tem certeza que deseja excluir este fluxo e todos os seus passos?')) return;
         const { error } = await supabase.from('whatsapp_chatbot_flows').delete().eq('id', flowId);
-        if (!error) {
+        if (error) {
+            console.error('Erro ao excluir fluxo:', error);
+            alert('Erro ao excluir fluxo: ' + error.message);
+        } else {
             setFlows(flows.filter(f => f.id !== flowId));
             if (selectedFlow?.id === flowId) {
                 setSelectedFlow(null);
@@ -209,6 +228,12 @@ const ChatbotSettings: React.FC = () => {
             sort_order: nextSortOrder
         }).select().single();
 
+        if (error) {
+            console.error('Erro ao adicionar etapa:', error);
+            alert('Erro ao adicionar etapa: ' + error.message);
+            return;
+        }
+
         if (data) setNodes([...nodes, data]);
     };
 
@@ -228,17 +253,18 @@ const ChatbotSettings: React.FC = () => {
         
         try {
             for (const node of dirtyNodes) {
-                await supabase
+                const { error } = await supabase
                     .from('whatsapp_chatbot_nodes')
                     .update({ content: node.content, sort_order: node.sort_order })
                     .eq('id', node.id);
+                if (error) throw error;
             }
             setDirtyNodeIds(new Set());
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (err) {
+        } catch (err: any) {
             console.error('Erro ao salvar fluxo:', err);
-            alert('Erro ao salvar fluxo. Tente novamente.');
+            alert('Erro ao salvar fluxo: ' + (err.message || err));
         } finally {
             setIsSavingFlow(false);
         }
@@ -248,9 +274,14 @@ const ChatbotSettings: React.FC = () => {
         const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
         setLoading(true);
-        await supabase.from('whatsapp_settings').update({ gemini_api_key: geminiKey }).eq('company_id', companyId);
+        const { error } = await supabase.from('whatsapp_settings').update({ gemini_api_key: geminiKey }).eq('company_id', companyId);
         setLoading(false);
-        alert('Configuração salva!');
+        if (error) {
+            console.error('Erro ao salvar Gemini API Key:', error);
+            alert('Erro ao salvar Gemini API Key: ' + error.message);
+        } else {
+            alert('Configuração salva!');
+        }
     };
 
     const handleSaveSignature = async () => {
@@ -268,7 +299,10 @@ const ChatbotSettings: React.FC = () => {
 
     const handleDeleteNode = async (nodeId: string) => {
         const { error } = await supabase.from('whatsapp_chatbot_nodes').delete().eq('id', nodeId);
-        if (!error) {
+        if (error) {
+            console.error('Erro ao excluir etapa:', error);
+            alert('Erro ao excluir etapa: ' + error.message);
+        } else {
             setNodes(nodes.filter(n => n.id !== nodeId));
             setDirtyNodeIds(prev => {
                 const next = new Set(prev);

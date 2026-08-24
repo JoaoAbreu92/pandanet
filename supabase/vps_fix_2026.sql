@@ -908,10 +908,42 @@ ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS last_away_mes
 NOTIFY pgrst, 'reload schema';
 
 -- ==========================================
--- 15. CHATBOT NODES SORT ORDER (DRAG-AND-DROP)
--- Permite reordenação visual dos passos do chatbot
+-- 15. CHATBOT TABLES & POLICIES
 -- ==========================================
-ALTER TABLE public.whatsapp_chatbot_nodes ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+CREATE TABLE IF NOT EXISTS public.whatsapp_chatbot_flows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.whatsapp_chatbot_nodes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    flow_id UUID REFERENCES public.whatsapp_chatbot_flows(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    content JSONB DEFAULT '{}'::jsonb,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.whatsapp_chatbot_flows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_chatbot_nodes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all for authenticated" ON public.whatsapp_chatbot_flows;
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_chatbot_flows;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON public.whatsapp_chatbot_nodes;
+DROP POLICY IF EXISTS "tenant_isolation_policy" ON public.whatsapp_chatbot_nodes;
+
+CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_chatbot_flows
+    FOR ALL TO authenticated
+    USING (company_id = public.get_user_company_id() OR public.is_admin_in_profile())
+    WITH CHECK (company_id = public.get_user_company_id() OR public.is_admin_in_profile());
+
+CREATE POLICY "tenant_isolation_policy" ON public.whatsapp_chatbot_nodes
+    FOR ALL TO authenticated
+    USING (flow_id IN (SELECT id FROM public.whatsapp_chatbot_flows WHERE company_id = public.get_user_company_id() OR public.is_admin_in_profile()))
+    WITH CHECK (flow_id IN (SELECT id FROM public.whatsapp_chatbot_flows WHERE company_id = public.get_user_company_id() OR public.is_admin_in_profile()));
 
 -- Inicializar sort_order para nós existentes (usando id como tiebreaker pois não há created_at)
 UPDATE public.whatsapp_chatbot_nodes n
@@ -924,5 +956,6 @@ WHERE n.id = sub.id AND n.sort_order = 0;
 
 -- Final Force Schema Cache Reload
 NOTIFY pgrst, 'reload schema';
+
 
 
