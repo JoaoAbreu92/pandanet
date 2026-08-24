@@ -212,6 +212,9 @@ export interface WhatsAppPermissions {
   can_send_messages: boolean;
   can_send_media: boolean;
   can_manage_settings: boolean;
+  can_transfer: boolean; // New: Can transfer conversations
+  can_see_all_departments: boolean; // New: Can see conversations from all departments
+  can_manage_tags: boolean; // New: Can manage tags
 }
 
 export interface Employee {
@@ -681,4 +684,40 @@ export interface WhatsAppTag {
   color: string;
   is_active: boolean;
   created_at: string;
+}
+
+export interface WhatsAppContactNote {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  company_id: string;
+  note_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WhatsAppConversationTag {
+  id: string;
+  conversation_id: string;
+  tag_id: string;
+  user_id?: string | null;
+  department_id?: string | null;
+  company_id: string;
+  created_at: string;
+  created_by?: string | null;
+  tag?: WhatsAppTag; // Populated via join
+}
+
+export interface WhatsAppConversationWithDetails extends WhatsAppConversation {
+  assigned_user?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  department?: {
+    id: string;
+    name: string;
+  };
+  tags?: WhatsAppConversationTag[];
+  notes_count?: number;
 }

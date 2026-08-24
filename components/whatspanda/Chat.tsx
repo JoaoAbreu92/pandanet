@@ -3,7 +3,8 @@ import { supabase } from '../../supabaseClient';
 import { 
   WhatsAppConversation, 
   WhatsAppMessage, 
-  WhatsAppSettings 
+  WhatsAppSettings,
+  WhatsAppConversationWithDetails
 } from '../../types';
 import { 
   MessageCircle, 
@@ -15,10 +16,14 @@ import {
   CheckCheck,
   User,
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  Info,
+  UserPlus
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
+import TransferModal from './TransferModal';
+import ContactSidebar from './ContactSidebar';
 
 const Chat: React.FC = () => {
   const { profile } = useAuth();
@@ -34,8 +39,8 @@ const Chat: React.FC = () => {
 
   const canSendMedia = isAdmin || !!permissions.can_send_media;
   const canSendMessagesResult = isAdmin || !!permissions.can_send_messages;
-  const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversation | null>(null);
+  const [conversations, setConversations] = useState<WhatsAppConversationWithDetails[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversationWithDetails | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
@@ -43,6 +48,9 @@ const Chat: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [user] = useState({ id: 'current-user-id' }); // Mock for now, replace with actual auth
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showContactSidebar, setShowContactSidebar] = useState(false);
+  const canTransfer = isAdmin || profile?.whatspanda_permissions?.can_transfer;
 
   useEffect(() => {
     fetchSettings();
@@ -95,10 +103,14 @@ const Chat: React.FC = () => {
   const fetchConversations = async () => {
     const { data } = await supabase
       .from('whatsapp_conversations')
-      .select('*')
+      .select(`
+        *,
+        assigned_user:profiles!assigned_to(id, full_name, avatar_url),
+        department:departments(id, name)
+      `)
       .order('last_message_at', { ascending: false });
     
-    if (data) setConversations(data);
+    if (data) setConversations(data as WhatsAppConversationWithDetails[]);
     setLoading(false);
   };
 
@@ -244,15 +256,37 @@ const Chat: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-semibold text-gray-900 truncate">{selectedConversation.contact_name}</h3>
-                  <p className="text-xs text-gray-500 truncate">{selectedConversation.contact_phone}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-gray-500 truncate">{selectedConversation.contact_phone}</p>
+                    {selectedConversation.assigned_user && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                        {selectedConversation.assigned_user.full_name}
+                      </span>
+                    )}
+                    {selectedConversation.department && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                        {selectedConversation.department.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                  <Phone className="w-5 h-5" />
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                  <MoreVertical className="w-5 h-5" />
+                {canTransfer && (
+                  <button
+                    onClick={() => setShowTransferModal(true)}
+                    className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+                    title="Transferir Atendimento"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowContactSidebar(!showContactSidebar)}
+                  className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+                  title="Informações do Contato"
+                >
+                  <Info className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -352,6 +386,31 @@ const Chat: React.FC = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransferModal && selectedConversation && (
+        <TransferModal
+          conversationId={selectedConversation.id}
+          currentAssignedTo={selectedConversation.assigned_to}
+          currentDepartmentId={selectedConversation.department_id}
+          onClose={() => setShowTransferModal(false)}
+          onTransferComplete={() => {
+            setShowTransferModal(false);
+            fetchConversations();
+            if (selectedConversation) {
+              fetchMessages(selectedConversation.id);
+            }
+          }}
+        />
+      )}
+
+      {/* Contact Sidebar */}
+      {showContactSidebar && selectedConversation && (
+        <ContactSidebar
+          conversation={selectedConversation}
+          onClose={() => setShowContactSidebar(false)}
+        />
       )}
     </div>
   );
