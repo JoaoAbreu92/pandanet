@@ -32,20 +32,18 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
         fetchSystemLogo();
     }, []);
 
-    return (
-        <div className={`flex flex-col items-center p-2 bg-white rounded-lg shadow-sm border border-gray-100 ${className}`}>
+    <div className={`flex flex-col items-center justify-center ${className}`}>
             <img
                 src={(companyLogo && companyLogo !== '/logo.png') ? companyLogo : (systemLogo || defaultLogo)}
                 alt="Logo"
-                className="h-20 w-auto object-contain transition-all duration-300"
+                className="max-h-full w-auto object-contain transition-all duration-300"
             />
             {showText && (
-                <span className="text-[10px] text-gray-500 font-bold tracking-wider mt-1 uppercase">
+                <span className="text-[10px] text-gray-500 font-bold tracking-wider mt-1 uppercase whitespace-nowrap">
                     v{SYSTEM_VERSION}
                 </span>
             )}
         </div>
-    );
 };
 
 export default Logo;
