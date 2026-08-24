@@ -80,7 +80,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         { id: 'synth', name: 'Original (Bip)', path: null },
         { id: 'custom1', name: 'Toque 1', path: '/sounds/custom1.mp3' },
         { id: 'custom2', name: 'Toque 2', path: '/sounds/custom2.mp3' },
-        { id: 'custom3', name: 'Toque 3', path: '/sounds/custom3.mp3' },
         { id: 'custom4', name: 'Toque 4', path: '/sounds/custom4.mp3' },
         { id: 'custom5', name: 'Toque 5', path: '/sounds/custom5.mp3' },
         { id: 'custom6', name: 'Toque 6', path: '/sounds/custom6.mp3' },

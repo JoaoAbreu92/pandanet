@@ -442,9 +442,11 @@ const AppContent: React.FC = () => {
 
     const handleImpersonateUserStart = (targetEmployee: Employee) => {
         setGhostData(true, targetEmployee); // Auditoria profunda de usuário
+        setIsImpersonating(true);
+        localStorage.setItem('pixel_is_impersonating', 'true');
         alert(`Entrando em Modo Auditoria: Agora você vê a intranet como ${targetEmployee.name}. Nenhuma ação sua será registrada.`);
-        // Reload page context to ensure everything reflects the new user
-        window.scrollTo(0, 0);
+        // Force full reload to ensure useAuth and App's useEffect initialize completely as the new user context
+        setTimeout(() => window.location.reload(), 100);
     };
 
     const handleImpersonateEnd = () => {

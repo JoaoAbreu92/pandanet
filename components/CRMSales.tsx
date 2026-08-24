@@ -196,7 +196,7 @@ const CRMSales: React.FC<{
                     {activeTab !== 'payments' && (
                         <button
                             onClick={() => {
-                                if (['proposals', 'estimates', 'invoices', 'subscriptions', 'items'].includes(activeTab)) {
+                                if (['proposals', 'estimates', 'invoices', 'subscriptions', 'items', 'contracts'].includes(activeTab)) {
                                     // Remove trailing 's' for simple type names
                                     const type = activeTab.endsWith('s') ? activeTab.slice(0, -1) : activeTab;
                                     onNewRequest?.(type);

@@ -331,6 +331,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
     const fetchRecognitions = async () => {
         try {
+            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
+            if (!profile?.company_id) return;
+
             const { data, error } = await supabase
                 .from('recognitions')
                 .select(`
@@ -338,6 +341,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     from_profile:from_id(full_name, avatar_url),
                     to_profile:to_id(full_name, avatar_url)
                 `)
+                .eq('company_id', profile.company_id)
                 .order('created_at', { ascending: false })
                 .limit(10);
 

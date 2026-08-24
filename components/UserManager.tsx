@@ -340,37 +340,37 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 }
 
                 // Since we don't have auth.uid yet, we generate a UUID for the profile
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .insert([{
-                        full_name: userData.name,
-                        email: userData.email,
-                        role: userData.role,
-                        team: userData.team,
-                        company_id: targetCompanyId,
-                        is_admin: userData.isAdmin,
-                        is_company_admin: userData.isAdmin,
-                        permissions: userData.permissions,
-                        avatar_url: userData.avatarUrl,
-                        join_date: userData.joinDate,
-                        birth_date: userData.birthDate,
-                        department_id: (userData as any).department_id || null,
-                        rg: (userData as any).rg || null,
-                        cpf: (userData as any).cpf || null,
-                        emergency_contact_name: (userData as any).emergency_contact_name || null,
-                        emergency_contact_phone: (userData as any).emergency_contact_phone || null,
-                        health_insurance: (userData as any).health_insurance || null,
-                        blood_type: (userData as any).blood_type || null,
-                        marital_status: (userData as any).marital_status || null,
-                        education_level: (userData as any).education_level || null,
-                        status: 'active'
-                    }])
-                    .select();
+                try {
+                    const { data, error } = await supabase.rpc('create_user_admin', {
+                        p_email: userData.email,
+                        p_password: (userData as any).password || 'PandaNet123',
+                        p_full_name: userData.name,
+                        p_role: userData.role,
+                        p_team: userData.team,
+                        p_company_id: targetCompanyId,
+                        p_is_admin: userData.isAdmin,
+                        p_is_company_admin: userData.isAdmin,
+                        p_permissions: userData.permissions,
+                        p_avatar_url: userData.avatarUrl || null,
+                        p_join_date: userData.joinDate,
+                        p_department_id: (userData as any).department_id || null,
+                        p_rg: (userData as any).rg || null,
+                        p_cpf: (userData as any).cpf || null
+                    });
 
-                if (error) throw error;
-                if (data) {
-                    const newUser = { ...userData, id: data[0].id } as Employee;
-                    setUsers([newUser, ...users]);
+                    if (error) {
+                        console.error("RPC Error:", error);
+                        throw error;
+                    }
+
+                    if (data) {
+                        const newUser = { ...userData, id: data } as Employee;
+                        setUsers([newUser, ...users]);
+                        alert(`Usuário criado com sucesso!\nSenha temporária: ${(userData as any).password || 'PandaNet123'}`);
+                    }
+                } catch (rpcErr: any) {
+                    console.error("Falha ao criar usuário via RPC:", rpcErr);
+                    throw new Error("Falha ao criar usuário. Verifique se a função `create_user_admin` existe no banco." + rpcErr.message);
                 }
             }
         } catch (err: any) {

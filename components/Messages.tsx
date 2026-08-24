@@ -1304,12 +1304,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
                 {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && masterAdminId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-150 duration-500" />
-                        {masterAdminProfile && (
-                            <div className="flex items-center gap-2 mb-2">
-                                <img src={masterAdminProfile.avatarUrl} alt={masterAdminProfile.name} className="w-7 h-7 rounded-full border-2 border-red-300" />
-                                <span className="text-xs font-semibold text-red-700">{masterAdminProfile.name}</span>
-                            </div>
-                        )}
+                        {/* Avatar/Name hidden per user request */}
                         <button 
                             onClick={async () => {
                                 const closedConv = conversations.find(c => !c.isGroup && c.participantId === masterAdminId && c.is_closed);
