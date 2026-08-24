@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { mockCompanies } from './mockData';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition } from './types';
 
 import Layout from './components/Layout';
@@ -36,8 +35,6 @@ import PoliciesPage from './components/PoliciesPage';
 import KnowledgeBasePage from './components/KnowledgeBasePage';
 import StatusPage from './components/StatusPage';
 import InfoSecPage from './components/InfoSecPage';
-import { fetchAnnouncements } from './services/geminiService';
-
 
 const AppContent: React.FC = () => {
     const { session, profile, loading } = useAuth();
@@ -45,10 +42,12 @@ const AppContent: React.FC = () => {
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
-    // Initialize currentUser as null, waiting for AuthContext
     const [currentUser, setCurrentUser] = useState<Employee | null>(null);
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
+
+    // Loading & Error States
     const [companyLoading, setCompanyLoading] = useState(false);
+    const [initError, setInitError] = useState<string | null>(null);
 
     const [theme, setTheme] = useState<'light'>('light');
 
@@ -80,60 +79,63 @@ const AppContent: React.FC = () => {
         setNotifications([]);
     };
 
+    // Robust Initialization Logic
     useEffect(() => {
         const loadInitialData = async () => {
             if (profile) {
+                const userEmail = profile.email.toLowerCase();
                 setCurrentUser(profile);
                 setCompanyLoading(true);
+                setInitError(null);
 
                 try {
-                    console.log("Loading company for profile:", profile.email, "CompanyID:", profile.company_id);
-                    if (profile.company_id) {
-                        const { data: company, error } = await supabase
-                            .from('companies')
-                            .select('*, plan:plans(*)')
-                            .eq('id', profile.company_id)
-                            .single();
+                    console.log("Iniciando carregamento para:", userEmail);
+                    let targetCompanyId = profile.company_id;
 
-                        if (error) console.error("Error fetching company by ID:", error);
-
-                        if (!error && company) {
-                            const mappedCompany = company as unknown as Company;
-                            console.log("Company loaded by ID:", mappedCompany.name);
-                            setCurrentCompany(mappedCompany);
-                            setCompanyData(mappedCompany.data || {
-                                employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
-                                formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
-                                events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
-                            });
-                            setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
-                        }
-                    } else if (profile.email === 'ti@acrilight.com.br') {
-                        // Fallback for Master Admin if profile is not linked yet
-                        console.log("Master Admin fallback company search...");
-                        const { data: company, error } = await supabase
+                    // Fallback para Master Admin sem ID de empresa
+                    if (!targetCompanyId && userEmail === 'ti@acrilight.com.br') {
+                        console.log("Master Admin sem company_id. Buscando domínio grupopixel.com.br...");
+                        const { data: companyByDomain } = await supabase
                             .from('companies')
-                            .select('*, plan:plans(*)')
+                            .select('id')
                             .eq('domain', 'grupopixel.com.br')
                             .single();
+                        if (companyByDomain) targetCompanyId = companyByDomain.id;
+                    }
 
-                        if (error) console.error("Error fetching Master company:", error);
+                    if (targetCompanyId) {
+                        const { data: company, error } = await supabase
+                            .from('companies')
+                            .select('*, plan:plans(*)')
+                            .eq('id', targetCompanyId)
+                            .single();
+
+                        if (error) throw error;
 
                         if (company) {
                             const mappedCompany = company as unknown as Company;
-                            console.log("Master company loaded:", mappedCompany.name);
                             setCurrentCompany(mappedCompany);
-                            const defaultData = {
+
+                            const defaultData: AppData = {
                                 employees: [], announcements: [], banners: [], conversations: [], tickets: [], marketplaceItems: [],
                                 formSubmissions: [], tiRequests: [], documents: [], benefits: [], polls: [], feedPosts: [],
                                 events: [], trainings: [], kbArticles: [], services: [], securityAlerts: [], recognitions: [], wellnessItems: []
                             };
-                            setCompanyData(mappedCompany.data || defaultData as any);
-                            setCompanySettings(mappedCompany.settings || { companyName: 'Grupo Pixel' });
+
+                            setCompanyData(mappedCompany.data || defaultData);
+                            setCompanySettings(mappedCompany.settings || { companyName: mappedCompany.name });
+                            console.log("Empresa carregada com sucesso:", mappedCompany.name);
+                        } else {
+                            throw new Error("Dados da empresa não encontrados.");
                         }
+                    } else if (userEmail === 'ti@acrilight.com.br') {
+                        throw new Error("Empresa Grupo Pixel (Master) não localizada no sistema.");
+                    } else {
+                        console.log("Usuário sem empresa vinculada. Aguardando RepairProfile.");
                     }
-                } catch (err) {
-                    console.error("Error loading initial data:", err);
+                } catch (err: any) {
+                    console.error("Erro crítico de inicialização:", err);
+                    setInitError(err.message || "Falha ao sincronizar com o servidor.");
                 } finally {
                     setCompanyLoading(false);
                 }
@@ -148,36 +150,17 @@ const AppContent: React.FC = () => {
         loadInitialData();
     }, [profile]);
 
-    // Cleanup or additional side effects when session changes can be handled here if needed.
-
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        // State updates handled by AuthProvider and useEffect above
+        window.location.reload();
     };
 
     const handleImpersonateStart = (company: Company) => {
-        const freshCompany = companies.find(c => c.domain === company.domain);
-        if (!freshCompany) return;
-
-        const superAdminUser: Employee = {
-            id: '0',
-            name: 'Super Admin',
-            email: 'super@admin.com',
-            role: 'Administrador da Plataforma',
-            team: 'Admin',
-            avatarUrl: 'https://i.pravatar.cc/150?u=superadmin',
-            joinDate: new Date().toISOString(),
-            birthDate: new Date().toISOString(),
-            isAdmin: true,
-            permissions: { ...freshCompany.plan.features },
-            following: []
-        };
-
-        setImpersonatedCompany(freshCompany);
-        setCurrentCompany(freshCompany);
-        setCompanyData(freshCompany.data);
-        setCompanySettings(freshCompany.settings);
-        setCurrentUser(superAdminUser);
+        // Simple impersonation for super admins
+        setImpersonatedCompany(company);
+        setCurrentCompany(company);
+        setCompanyData(company.data || { employees: [] } as any);
+        setCompanySettings(company.settings || { companyName: company.name });
         setIsImpersonating(true);
         setAuthStage('logged_in');
     };
@@ -185,14 +168,8 @@ const AppContent: React.FC = () => {
     const handleImpersonateEnd = () => {
         setIsImpersonating(false);
         setImpersonatedCompany(null);
-        // Revert to real user
-        if (profile) {
-            setCurrentUser(profile);
-            setCurrentCompany(mockCompanies[0]);
-            setCompanyData(mockCompanies[0].data);
-            setCompanySettings(mockCompanies[0].settings);
-        }
-        setAuthStage('logged_in');
+        // Force refresh to reload real user data
+        window.location.reload();
     };
 
     const handleNavigate = useCallback((page: Page, context?: any) => {
@@ -214,170 +191,53 @@ const AppContent: React.FC = () => {
         setCurrentCompany(updatedCompany);
         setCompanyData(updatedCompany.data);
         setCompanySettings(updatedCompany.settings);
-        setCompanies(companies.map(c => c.domain === updatedCompany.domain ? updatedCompany : c));
+        setCompanies(prev => prev.map(c => c.domain === updatedCompany.domain ? updatedCompany : c));
     };
 
     const handleUpdateFeedPosts = (newPosts: Post[]) => {
-        if (companyData && newPosts.length > companyData.feedPosts.length) {
-            const latestPost = newPosts[0];
-            if (currentUser && latestPost.mentions.includes(currentUser.id) && latestPost.authorId !== currentUser.id) {
-                const newNotification: Notification = {
-                    id: Date.now().toString(),
-                    type: 'mention',
-                    title: 'Você foi mencionado',
-                    description: `${latestPost.authorName} mencionou você em uma publicação.`,
-                    timestamp: 'Agora',
-                    isRead: false,
-                    linkTo: 'feed',
-                    avatarUrl: latestPost.authorAvatar
-                };
-                setNotifications(prev => [newNotification, ...prev]);
-            }
-        }
         if (companyData) setCompanyData({ ...companyData, feedPosts: newPosts });
     };
 
     const handleUpdateTickets = (newTickets: Ticket[]) => {
-        if (companyData) {
-            setCompanyData({ ...companyData, tickets: newTickets });
-        }
+        if (companyData) setCompanyData({ ...companyData, tickets: newTickets });
     };
 
     const handleUpdateConversations = (newConversations: Conversation[]) => {
-        const oldUnreadCount = companyData?.conversations.reduce((acc, c) => acc + c.unreadCount, 0) || 0;
-        const newUnreadCount = newConversations.reduce((acc, c) => acc + c.unreadCount, 0);
-
-        if (newUnreadCount > oldUnreadCount) {
-            const changedConv = newConversations.find(c => {
-                const oldConv = companyData?.conversations.find(oc => oc.id === c.id);
-                return c.unreadCount > (oldConv?.unreadCount || 0);
-            });
-
-            if (changedConv) {
-                const newNotification: Notification = {
-                    id: Date.now().toString(),
-                    type: 'message',
-                    title: 'Nova Mensagem',
-                    description: `Você recebeu uma mensagem de ${changedConv.participantName}`,
-                    timestamp: 'Agora',
-                    isRead: false,
-                    linkTo: 'messages',
-                    avatarUrl: changedConv.participantAvatarUrl
-                };
-                setNotifications(prev => [newNotification, ...prev]);
-            }
-        }
-
         if (companyData) setCompanyData({ ...companyData, conversations: newConversations });
-    };
-
-    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-
-    const handleAddEvent = (newEvent: CalendarEvent) => {
-        setCalendarEvents(prev => [...prev, newEvent]);
-        if (currentUser && newEvent.attendees.some(a => a.id === currentUser.id)) {
-            const newNotification: Notification = {
-                id: Date.now().toString(),
-                type: 'event',
-                title: 'Convite de Evento',
-                description: `Você foi adicionado ao evento: ${newEvent.title}`,
-                timestamp: 'Agora',
-                isRead: false,
-                linkTo: 'calendar',
-                actionLabel: 'Ver Calendário'
-            };
-            setNotifications(prev => [newNotification, ...prev]);
-        }
     };
 
     const handleJoinEvent = (eventId: number) => {
         if (!companyData || !currentUser) return;
-
         const updatedEvents = companyData.events.map(event => {
             if (event.id === eventId) {
                 const isAttending = event.attendees.includes(currentUser.id);
                 const newAttendees = isAttending
                     ? event.attendees.filter(id => id !== currentUser.id)
                     : [...event.attendees, currentUser.id];
-                const newDeclined = (event.declined || []).filter(d => d.userId !== currentUser.id);
-                return { ...event, attendees: newAttendees, declined: newDeclined };
+                return { ...event, attendees: newAttendees };
             }
             return event;
         });
-
         setCompanyData({ ...companyData, events: updatedEvents });
     };
 
     const handleDeclineEvent = (eventId: number, reason: string) => {
         if (!companyData || !currentUser) return;
-
         const updatedEvents = companyData.events.map(event => {
             if (event.id === eventId) {
                 const newAttendees = event.attendees.filter(id => id !== currentUser.id);
-                const currentDeclined = event.declined || [];
-                const newDeclined = [...currentDeclined.filter(d => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
+                const newDeclined = [...(event.declined || []).filter(d => d.userId !== currentUser.id), { userId: currentUser.id, reason }];
                 return { ...event, attendees: newAttendees, declined: newDeclined };
             }
             return event;
         });
-
         setCompanyData({ ...companyData, events: updatedEvents });
     };
 
     const handleAddRecognition = (rec: Recognition) => {
         if (!companyData) return;
-        const updatedRecognitions = [rec, ...(companyData.recognitions || [])];
-        setCompanyData({ ...companyData, recognitions: updatedRecognitions });
-
-        // Notify the receiver if possible (simple local notification check)
-        const receiver = companyData.employees.find(e => e.name === rec.to);
-        if (receiver && currentUser) {
-            const newNotification: Notification = {
-                id: Date.now().toString(),
-                type: 'message', // reusing message icon for simplicity or add 'recognition' type
-                title: 'Você recebeu um reconhecimento!',
-                description: `${currentUser.name} te reconheceu por: ${rec.value}`,
-                timestamp: 'Agora',
-                isRead: false,
-                linkTo: 'recognition',
-                avatarUrl: currentUser.avatarUrl
-            };
-            // Note: This only sets notification for CURRENT user in this state-based mock. 
-            // In real Supabase, we'd insert into notifications table.
-            // For now, if I'm recognizing myself (test) it shows up. 
-            // If I recognize others, they won't see it unless we persist to DB.
-        }
+        setCompanyData({ ...companyData, recognitions: [rec, ...(companyData.recognitions || [])] });
     };
-
-    useEffect(() => {
-        if (companyData && currentUser) {
-            const pendingInvites = companyData.events.filter(event =>
-                (event.invitees || []).includes(currentUser.id) &&
-                !event.attendees.includes(currentUser.id) &&
-                !(event.declined || []).some(d => d.userId === currentUser.id)
-            );
-
-            if (pendingInvites.length > 0) {
-                const inviteNotification: Notification = {
-                    id: 'event-invites',
-                    type: 'event',
-                    title: 'Convocações Pendentes',
-                    description: `Você tem ${pendingInvites.length} evento(s) com presença obrigatória pendente.`,
-                    timestamp: 'Agora',
-                    isRead: false,
-                    linkTo: 'events',
-                    actionLabel: 'Ver Eventos'
-                };
-
-                setNotifications(prev => {
-                    if (prev.length > 0 && prev[0].id === 'event-invites' && prev[0].description === inviteNotification.description) return prev;
-                    return [inviteNotification, ...prev.filter(n => n.id !== 'event-invites')];
-                });
-            } else {
-                setNotifications(prev => prev.filter(n => n.id !== 'event-invites'));
-            }
-        }
-    }, [companyData?.events, currentUser?.id]);
 
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
@@ -403,8 +263,8 @@ const AppContent: React.FC = () => {
             case 'ti-dashboard': return canAccess('viewTiDashboard') ? <TIPage onNavigate={handleNavigate} /> : null;
             case 'ti-requests': return canAccess('openTiRequests') ? <TIRequestsPage submissions={companyData.tiRequests} setSubmissions={(s) => setCompanyData({ ...companyData, tiRequests: s })} currentUser={currentUser} /> : null;
             case 'profile': return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={(p) => setCompanyData({ ...companyData, feedPosts: p })} allEmployees={companyData.employees} />;
-            case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Acesso negado. Esta área é restrita.</p>;
-            case 'admin': return currentUser.role === 'Super Admin' ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado. Apenas o Master TI tem acesso a esta área.</p>;
+            case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
+            case 'admin': return currentUser.role === 'Super Admin' ? <AdminPage company={currentCompany!} setCompany={handleSetCompanyForAdmin} plan={currentCompany!.plan} /> : <p className="p-8 text-center text-red-600">Acesso negado.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;
@@ -417,25 +277,47 @@ const AppContent: React.FC = () => {
         }
     };
 
+    // Global UI Blocks
     if (loading || companyLoading) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Iniciando Pixel Intranet...</p>
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col space-y-4">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+                    <p className="text-gray-600 font-medium font-brand">Iniciando Pixel Intranet...</p>
+                </div>
             </div>
-        </div>;
+        );
+    }
+
+    if (initError) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Ops! Algo deu errado</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed">{initError}</p>
+                    <div className="space-y-3">
+                        <button onClick={() => window.location.reload()} className="w-full px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all shadow-md">Tentar Novamente</button>
+                        <button onClick={handleLogout} className="w-full px-6 py-3 text-gray-500 font-medium hover:text-gray-700 transition-colors">Sair da Conta</button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (!session) {
         return <LoginPage />;
     }
 
-    if (authStage === 'logged_in' && currentUser && companyData && currentCompany && companySettings) {
+    // Success Block
+    if (currentUser && companyData && currentCompany && companySettings) {
         return (
             <Layout
                 currentUser={currentUser}
-                currentCompany={currentCompany || {} as Company}
-                companySettings={companySettings || {}}
+                currentCompany={currentCompany}
+                companySettings={companySettings}
                 isImpersonating={isImpersonating}
                 impersonatedCompanyName={impersonatedCompany?.name}
                 onNavigate={handleNavigate}
@@ -453,75 +335,62 @@ const AppContent: React.FC = () => {
         );
     }
 
+    // Fallback: Repair Profile
     if (session && !currentUser && !loading) {
         const handleRepairProfile = async () => {
             if (!session.user.email) return;
+            const userEmail = session.user.email.toLowerCase();
+            const isMaster = userEmail === 'ti@acrilight.com.br';
+            const domain = isMaster ? 'grupopixel.com.br' : userEmail.split('@')[1];
 
-            // 1. Find Company
-            const isMaster = session.user.email.toLowerCase() === 'ti@acrilight.com.br';
-            const domain = isMaster ? 'grupopixel.com.br' : session.user.email.split('@')[1];
+            try {
+                const { data: cos } = await supabase.from('companies').select('id, responsible_email').eq('domain', domain);
+                if (cos && cos.length > 0) {
+                    const companyId = cos[0].id;
+                    const isResp = (cos[0].responsible_email || '').toLowerCase() === userEmail;
 
-            const { data: companies } = await supabase.from('companies')
-                .select('id, responsible_email')
-                .eq('domain', domain);
+                    await supabase.from('profiles').upsert({
+                        id: session.user.id,
+                        full_name: session.user.user_metadata?.full_name || userEmail.split('@')[0],
+                        email: userEmail,
+                        company_id: companyId,
+                        role: isMaster ? 'Super Admin' : (isResp ? 'admin' : 'employee'),
+                        is_admin: isMaster || isResp,
+                        is_company_admin: isMaster || isResp
+                    }, { onConflict: 'id' });
 
-            if (companies && companies.length > 0) {
-                const companyId = companies[0].id;
-                const isResp = (companies[0].responsible_email || '').toLowerCase() === session.user.email.toLowerCase();
-                const isMaster = session.user.email.toLowerCase() === 'ti@acrilight.com.br';
-
-                // 2. Insert or Update Profile (Upsert)
-                const { error } = await supabase.from('profiles').upsert({
-                    id: session.user.id,
-                    full_name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
-                    email: session.user.email,
-                    company_id: companyId,
-                    role: isMaster ? 'Super Admin' : (isResp ? 'admin' : 'employee'),
-                    is_admin: isMaster || isResp,
-                    is_company_admin: isMaster || isResp
-                }, { onConflict: 'id' });
-
-                if (error) {
-                    alert("Erro ao recuperar perfil: " + error.message);
-                } else {
-                    alert("Perfil recuperado! A página será recarregada.");
                     window.location.reload();
+                } else {
+                    alert("Domínio " + domain + " não autorizado.");
                 }
-            } else {
-                alert("Não encontramos uma empresa para o domínio " + domain + ". Entre em contato com o suporte.");
+            } catch (e: any) {
+                alert("Erro: " + e.message);
             }
         };
 
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-50 space-y-4 p-4 text-center">
-                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center border border-emerald-100">
+                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Finalizar Cadastro</h2>
-                    <p className="text-gray-600 mb-6">
-                        Detectamos que sua conta existe, mas está incompleta. Clique abaixo para finalizar a configuração.
-                    </p>
-                    <button
-                        onClick={handleRepairProfile}
-                        className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors mb-4"
-                    >
-                        Concluir Configuração
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full px-4 py-2 text-gray-600 font-medium hover:text-gray-800 transition-colors"
-                    >
-                        Voltar ao Login
-                    </button>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3">Quase lá!</h2>
+                    <p className="text-gray-600 mb-8 leading-relaxed">Configuramos sua conta automaticamente. Clique abaixo para finalizar seu acesso.</p>
+                    <button onClick={handleRepairProfile} className="w-full px-6 py-3 bg-brand-primary text-white font-semibold rounded-xl hover:bg-emerald-600 transition-all shadow-md mb-4">Finalizar Acesso</button>
+                    <button onClick={handleLogout} className="w-full px-6 py-3 text-gray-400 font-medium hover:text-gray-600 transition-colors">Voltar ao Login</button>
                 </div>
             </div>
         );
     }
 
-    return <div className="flex items-center justify-center h-screen">Carregando Pixel Intranet...</div>;
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+                <p className="text-gray-600 font-medium">Sincronizando portal...</p>
+            </div>
+        </div>
+    );
 };
 
 const App: React.FC = () => {
