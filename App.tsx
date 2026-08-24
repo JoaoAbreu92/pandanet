@@ -42,7 +42,7 @@ import JobsPage from './components/JobsPage.tsx';
 import EmployeePortal from './components/EmployeePortal.tsx';
 import OrgChartPage from './components/OrgChartPage.tsx';
 import KPIDashboard from './components/KPIDashboard.tsx';
-import EmailPage from './components/EmailPage';
+
 
 const AppContent: React.FC = () => {
     const { session, profile, loading, signOut } = useAuth();
@@ -190,7 +190,7 @@ const AppContent: React.FC = () => {
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'email', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
+        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail'].includes(saved)) {
             return saved as Page;
         }
         return 'home';
@@ -533,7 +533,7 @@ const AppContent: React.FC = () => {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} />;
             case 'feed': return <FeedPage currentUser={currentUser} allEmployees={companyData.employees} posts={companyData.feedPosts} setPosts={handleUpdateFeedPosts} onNavigate={handleNavigate} />;
             case 'messages': return <Messages initialConversationId={pageContext?.conversationId} />;
-            case 'email': return <EmailPage onNavigate={handleNavigate} />;
+
             case 'tickets': return <TicketPage />;
             case 'calendar': return <CalendarPage events={companyData.events} currentUser={currentUser} />;
             case 'directory': return <DirectoryPage onNavigate={handleNavigate} employees={companyData.employees} />;
