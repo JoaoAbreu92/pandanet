@@ -181,6 +181,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
         } else if (type === 'config' && company) {
             // Carrega recursos da empresa se existirem, caso contrário usa o padrão
             setFeaturesState(company.custom_features || company.plan?.features || {});
+        } else if (type === 'newUpdate') {
+            setFormData({ version: SYSTEM_VERSION, description: '' });
         } else if (type === 'users' && company) {
             // Fetch users for this company
             fetchCompanyUsers(company.id!);
