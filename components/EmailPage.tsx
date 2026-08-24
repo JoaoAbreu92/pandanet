@@ -22,7 +22,7 @@ import {
     UserPlusIcon,
     ArrowUturnLeftIcon,
     ArrowRightOnRectangleIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon, XMarkIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 
 // --- Types ---
@@ -126,6 +126,9 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [composeTo, setComposeTo] = useState('');
     const [composeCc, setComposeCc] = useState('');
     const [composeBcc, setComposeBcc] = useState('');
+    const [toTags, setToTags] = useState<string[]>([]);
+    const [ccTags, setCcTags] = useState<string[]>([]);
+    const [bccTags, setBccTags] = useState<string[]>([]);
     const [composeReplyTo, setComposeReplyTo] = useState('');
     const [composeSubject, setComposeSubject] = useState('');
     const [composeBody, setComposeBody] = useState('');
@@ -284,28 +287,19 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                 };
             });
 
-            // Update cache
-            const cacheKey = `${currentUser.id}_${folder}_${page}`;
-            if (emailCache[cacheKey]) {
-                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => {
-                    if (e.uid !== uid) return e;
-                    const flags = e.flags || [];
-                    return {
-                        ...e,
-                        text: data.text,
-                        html: data.html, 
-                        attachments: data.attachments,
-                        flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen'] 
-                    };
-                });
-            }
-
             // Background update Seen flag on server if not seen
             const email = emails.find(e => e.uid === uid);
             if (email && !(email.flags || []).includes('\\Seen')) {
                 toggleFlag(email, '\\Seen', true);
+            } else if (email) {
+                // If it was already seen, still ensure cache is fresh
+                const cacheKey = `${currentUser.id}_${folder}_${page}`;
+                if (emailCache[cacheKey]) {
+                    emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e =>
+                        e.uid === uid ? { ...e, flags: [...(e.flags || []), '\\Seen'], text: data.text, html: data.html } : e
+                    );
+                }
             }
-
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
             setBodyError(err.message || "Falha ao carregar conteúdo do e-mail.");
@@ -610,20 +604,46 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
         if (savedImapUser) fetchEmails();
     }, [page, pageSize, currentFolder]);
 
+    const handleAddRecipientTag = (type: 'to' | 'cc' | 'bcc', value: string) => {
+        const email = value.trim().replace(/[,;]$/, ''); // Remove trailing comma or semicolon
+        if (!email || !email.includes('@')) return;
+        if (type === 'to') {
+            if (!toTags.includes(email)) setToTags([...toTags, email]);
+            setComposeTo('');
+        } else if (type === 'cc') {
+            if (!ccTags.includes(email)) setCcTags([...ccTags, email]);
+            setComposeCc('');
+        } else if (type === 'bcc') {
+            if (!bccTags.includes(email)) setBccTags([...bccTags, email]);
+            setComposeBcc('');
+        }
+    };
+
+    const removeRecipientTag = (type: 'to' | 'cc' | 'bcc', email: string) => {
+        if (type === 'to') setToTags(toTags.filter(t => t !== email));
+        else if (type === 'cc') setCcTags(ccTags.filter(t => t !== email));
+        else if (type === 'bcc') setBccTags(bccTags.filter(t => t !== email));
+    };
+
     const sendEmail = async () => {
         setLoading(true);
         try {
+            const finalTo = toTags.join(', ');
+            const finalCc = ccTags.join(', ');
+            const finalBcc = bccTags.join(', ');
+
             const { data, error } = await callEmailServer('send', {
                 config: settings,
                 payload: {
-                    to: composeTo,
-                    cc: composeCc,
-                    bcc: composeBcc,
+                    to: finalTo,
+                    cc: finalCc,
+                    bcc: finalBcc,
                     replyTo: composeReplyTo,
                     subject: composeSubject,
                     text: composeBody.replace(/<[^>]*>?/gm, ''), // Plain text version
                     html: composeBody
-                }
+                },
+                user_id: currentUser.id
             });
 
 
@@ -837,6 +857,22 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 {tag.label}
                             </button>
                         ))}
+
+                        <div className="mt-8 border-t pt-4">
+                            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex justify-between items-center">
+                                Contatos
+                                <button onClick={() => setShowContactsModal(true)} className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-brand-primary" title="Gerenciar Contatos">
+                                    <UsersIcon className="w-3 h-3" />
+                                </button>
+                            </h3>
+                            <button
+                                onClick={() => setShowContactsModal(true)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >
+                                <UsersIcon className="w-4 h-4 text-emerald-500" />
+                                <span className="font-medium">Meus Contatos</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1060,7 +1096,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 alert('Movido para Spam');
                                 setView('inbox');
                             }} className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium text-gray-700">
-                                <ExclamationTriangleIcon className="w-4 h-4" /> Spam
+                                <ExclamationTriangleIcon, XMarkIcon className="w-4 h-4" /> Spam
                             </button>
                             <button onClick={() => {
                                 toggleFlag(selectedEmail, '\\Seen', false);
@@ -1095,7 +1131,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                 </div>
                             ) : bodyError ? (
                                 <div className="flex flex-col items-center justify-center h-40 text-red-500 text-center">
-                                    <ExclamationTriangleIcon className="w-8 h-8 mb-2" />
+                                        <ExclamationTriangleIcon, XMarkIcon className="w-8 h-8 mb-2" />
                                     <span className="text-sm font-medium">{bodyError}</span>
                                     <button
                                         onClick={() => fetchEmailBody(selectedEmail.uid, currentFolder)}
@@ -1156,13 +1192,53 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     <div className="flex-1 flex flex-col h-full bg-white">
                         <div className="p-6 flex-1 flex flex-col space-y-4">
                                     <div className="space-y-2">
-                                        <div className="flex gap-2 items-center">
-                                            <input 
-                                                className="flex-1 border-b border-gray-200 py-2 bg-transparent focus:outline-none focus:border-brand-primary placeholder-gray-400"
-                                        placeholder="Para:"
-                                                value={composeTo}
-                                        onChange={e => setComposeTo(e.target.value)}
-                                    />
+                                        <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-2">
+                                            {toTags.map(tag => (
+                                                <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-brand-primary/10 text-brand-primary rounded text-sm group">
+                                                    {tag}
+                                                    <button onClick={() => removeRecipientTag('to', tag)} className="hover:text-red-500">
+                                                        <XMarkIcon className="w-3 h-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            <div className="relative flex-1 min-w-[150px]">
+                                                <input 
+                                                    className="w-full bg-transparent focus:outline-none placeholder-gray-400"
+                                                    placeholder={toTags.length === 0 ? "Para:" : ""}
+                                                    value={composeTo}
+                                                    onChange={e => setComposeTo(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' || e.key === ',') {
+                                                            e.preventDefault();
+                                                            handleAddRecipientTag('to', composeTo);
+                                                        } else if (e.key === 'Backspace' && !composeTo && toTags.length > 0) {
+                                                            removeRecipientTag('to', toTags[toTags.length - 1]);
+                                                        }
+                                                    }}
+                                                />
+                                                {composeTo && (
+                                                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                                                        {contacts.filter(c => c.email.toLowerCase().includes(composeTo.toLowerCase()) || c.name.toLowerCase().includes(composeTo.toLowerCase())).slice(0, 5).map(c => (
+                                                            <button
+                                                                key={c.id}
+                                                                onClick={() => handleAddRecipientTag('to', c.email)}
+                                                                className="w-full text-left px-4 py-2 hover:bg-gray-50 flex flex-col border-b border-gray-100 last:border-0"
+                                                            >
+                                                                <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                                                                <span className="text-xs text-gray-500">{c.email}</span>
+                                                            </button>
+                                                        ))}
+                                                        {!toTags.includes(composeTo) && composeTo.includes('@') && (
+                                                            <button
+                                                                onClick={() => handleAddRecipientTag('to', composeTo)}
+                                                                className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-brand-primary text-xs font-bold"
+                                                            >
+                                                                Adicionar "{composeTo}"
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <button onClick={() => setShowContactsModal(true)} className="text-gray-400 hover:text-brand-primary" title="Contatos">
                                                 <UsersIcon className="w-5 h-5" />
                                             </button>
@@ -1171,22 +1247,60 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                             </button>
                                         </div>
                                         {showCc && (
-                                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-2 rounded">
+                                            <div className="space-y-2 bg-gray-50 p-2 rounded">
+                                                {/* CC */}
+                                                <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                    <span className="text-xs text-gray-400 min-w-[30px]">CC:</span>
+                                                    {ccTags.map(tag => (
+                                                        <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                            {tag}
+                                                            <button onClick={() => removeRecipientTag('cc', tag)} className="hover:text-red-500">
+                                                                <XMarkIcon className="w-3 h-3" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                    <input
+                                                        className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                        value={composeCc}
+                                                        onChange={e => setComposeCc(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' || e.key === ',') {
+                                                                e.preventDefault();
+                                                                handleAddRecipientTag('cc', composeCc);
+                                                            } else if (e.key === 'Backspace' && !composeCc && ccTags.length > 0) {
+                                                                removeRecipientTag('cc', ccTags[ccTags.length - 1]);
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                                {/* BCC */}
+                                                <div className="flex flex-wrap gap-2 items-center border-b border-gray-200 py-1">
+                                                    <span className="text-xs text-gray-400 min-w-[30px]">CCO:</span>
+                                                    {bccTags.map(tag => (
+                                                        <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-[11px]">
+                                                            {tag}
+                                                            <button onClick={() => removeRecipientTag('bcc', tag)} className="hover:text-red-500">
+                                                                <XMarkIcon className="w-3 h-3" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                    <input
+                                                        className="flex-1 min-w-[100px] bg-transparent focus:outline-none text-sm"
+                                                        value={composeBcc}
+                                                        onChange={e => setComposeBcc(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' || e.key === ',') {
+                                                                e.preventDefault();
+                                                                handleAddRecipientTag('bcc', composeBcc);
+                                                            } else if (e.key === 'Backspace' && !composeBcc && bccTags.length > 0) {
+                                                                removeRecipientTag('bcc', bccTags[bccTags.length - 1]);
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
                                                 <input
-                                                    className="border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
-                                                    placeholder="CC:"
-                                                    value={composeCc}
-                                                    onChange={e => setComposeCc(e.target.value)}
-                                                />
-                                                <input
-                                                    className="border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
-                                                    placeholder="CCO:"
-                                                    value={composeBcc}
-                                                    onChange={e => setComposeBcc(e.target.value)}
-                                                />
-                                                <input
-                                                    className="col-span-2 border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
-                                                    placeholder="Reply-To (Optional):"
+                                                    className="w-full border-b border-gray-200 py-1 bg-transparent focus:outline-none text-sm"
+                                                    placeholder="Reply-To (Opcional):"
                                                     value={composeReplyTo}
                                                     onChange={e => setComposeReplyTo(e.target.value)}
                                                 />
@@ -1411,7 +1525,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => {
-                                                    setComposeTo(prev => prev ? `${prev}, ${contact.email}` : contact.email);
+                                                    handleAddRecipientTag('to', contact.email);
                                                     setShowContactsModal(false);
                                                 }}
                                                 className="text-brand-primary hover:underline text-xs font-bold"
