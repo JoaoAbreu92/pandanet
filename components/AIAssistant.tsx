@@ -14,6 +14,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [messageLimit, setMessageLimit] = useState(50);
+    const [hasMoreMessages, setHasMoreMessages] = useState(false);
+    const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+    const previousScrollHeight = useRef<number>(0);
+    const shouldScrollToBottom = useRef<boolean>(true);
 
     // Only render if User has an API key AND the Company has AI allowed.
     const hasAIEnabled = isAIEnabled && currentUser.ai_api_key;
@@ -173,10 +179,26 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
     };
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (shouldScrollToBottom.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            // Restore scroll position after prepending items
+            if (scrollContainerRef.current && previousScrollHeight.current > 0) {
+                const heightDiff = scrollContainerRef.current.scrollHeight - previousScrollHeight.current;
+                scrollContainerRef.current.scrollTop = heightDiff;
+                previousScrollHeight.current = 0; // reset
+            }
+        }
     }, [messages, isOpen]);
 
-    const fetchMessages = async () => {
+    useEffect(() => {
+        if (isOpen) {
+            shouldScrollToBottom.current = true;
+            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+        }
+    }, [isOpen]);
+
+    const fetchMessages = async (limit = messageLimit) => {
         try {
             let query = supabase
                 .from('ai_messages')
@@ -189,20 +211,46 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                 query = query.is('agent_id', null);
             }
 
-            const { data, error } = await query.order('created_at', { ascending: true });
+            const { data, error } = await query
+                .order('created_at', { ascending: false })
+                .limit(limit + 1);
             
             if (error) {
                 console.error("Supabase Error (fetchMessages):", error);
                 throw error;
             }
-            if (data) setMessages(data);
+            if (data) {
+                const hasMore = data.length > limit;
+                setHasMoreMessages(hasMore);
+                const messagesToShow = hasMore ? data.slice(0, limit) : data;
+                setMessages(messagesToShow.reverse());
+            }
         } catch (err: any) {
             console.error("Error fetching AI messages:", err);
         }
     };
 
+    const loadOlderMessages = async () => {
+        if (isLoadingOlder || !hasMoreMessages) return;
+        setIsLoadingOlder(true);
+        shouldScrollToBottom.current = false;
+        
+        if (scrollContainerRef.current) {
+            previousScrollHeight.current = scrollContainerRef.current.scrollHeight;
+        }
+
+        const newLimit = messageLimit + 50;
+        setMessageLimit(newLimit);
+        await fetchMessages(newLimit);
+        setIsLoadingOlder(false);
+    };
+
     useEffect(() => {
-        if (hasAIEnabled) fetchMessages();
+        if (hasAIEnabled) {
+            shouldScrollToBottom.current = true;
+            setMessageLimit(50);
+            fetchMessages(50);
+        }
     }, [currentAgent]);
 
     const handleSend = async () => {
@@ -213,6 +261,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
         setIsLoading(true);
 
         // Optimistic update
+        shouldScrollToBottom.current = true;
+        
         const newUserMsg: AIMessage = {
             id: Date.now().toString(),
             user_id: currentUser.id,
@@ -432,7 +482,21 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div 
+                ref={scrollContainerRef}
+                onScroll={(e) => {
+                    const target = e.target as HTMLDivElement;
+                    if (target.scrollTop === 0 && hasMoreMessages) {
+                        loadOlderMessages();
+                    }
+                }}
+                className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
+            >
+                {isLoadingOlder && (
+                    <div className="flex justify-center py-2">
+                        <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-emerald-500 animate-spin"></div>
+                    </div>
+                )}
                 {messages.length === 0 && (
                     <div className="text-center text-slate-500 dark:text-slate-400 mt-10 space-y-3">
                         <SparklesIcon className="w-12 h-12 mx-auto text-emerald-300 dark:text-emerald-600/50" />
