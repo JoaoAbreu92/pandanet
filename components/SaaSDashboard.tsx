@@ -36,7 +36,9 @@ import {
     RocketLaunchIcon,
     HeartIcon,
     SparklesIcon,
-    NewspaperIcon
+    NewspaperIcon,
+    PlayIcon,
+    PlayCircleIcon
 } from './icons';
 import { PlusIcon as HeroPlusIcon, UserGroupIcon as HeroUserGroupIcon, BuildingOfficeIcon as HeroBuildingOfficeIcon, BanknotesIcon as HeroBanknotesIcon, Cog6ToothIcon, CalendarDaysIcon as HeroCalendarDaysIcon, ChartPieIcon as HeroChartPieIcon, CloudIcon as HeroCloudIcon, NoSymbolIcon as HeroNoSymbolIcon, PencilIcon as HeroPencilIcon, TrashIcon as HeroTrashIcon, AdjustmentsHorizontalIcon as HeroAdjustmentsHorizontalIcon, MagnifyingGlassIcon as HeroMagnifyingGlassIcon, XMarkIcon as HeroXMarkIcon, CheckCircleIcon as HeroCheckCircleIcon } from '@heroicons/react/24/outline';
 import { useToast } from './ToastContext';
@@ -46,6 +48,7 @@ interface SaaSDashboardProps {
 }
 
 type TabType = 'dashboard' | 'companies' | 'plans' | 'settings';
+type ModalType = 'createCompany' | 'edit' | 'delete' | 'disable' | 'stats' | 'addMonth' | 'config' | 'createPlan' | 'editPlan' | 'deletePlan' | 'users' | 'newUpdate' | 'newVideo';
 
 // ... Helper Components moved to top ...
 const CheckCircle = () => (<div className="w-4 h-4 rounded-full border border-green-500 flex items-center justify-center mx-auto"><div className="w-2 h-2 bg-green-500 rounded-full"></div></div>);
@@ -76,6 +79,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
     const [usageStats, setUsageStats] = useState<any>(null);
     const [statsLoading, setStatsLoading] = useState(false);
+    const [manualVideos, setManualVideos] = useState<any[]>([]);
+    const [videoLoading, setVideoLoading] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
@@ -89,65 +94,53 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     // --- Buscar Dados ---
     const fetchData = async () => {
         setLoading(true);
+        console.log("[SaaS] Buscando dados gerais...");
         try {
             // Fetch Plans
             const { data: plansData, error: plansError } = await supabase.from('plans').select('*');
             if (plansError) console.error('Error fetching plans', plansError);
             else {
-                // Map raw DB snake_case to CamelCase interface
                 const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
                     ...p,
                     userLimit: p.user_limit,
-                    // price is likely 'price' in DB as well, keeping it if it exists, else defaulting
                     price: p.price
                 }));
                 setLocalPlans(mappedPlans);
             }
 
             // Fetch Companies
-            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)'); // Join plan
+            const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)');
             if (companiesError) console.error('Error fetching companies', companiesError);
             else {
-                // Buscar contagem de usuários para cada empresa se possível
-                // Idealmente faríamos um join com count de profiles, mas por agora pegamos apenas as empresas
                 setLocalCompanies(companiesData as unknown as Company[] || []);
             }
-            // Fetch System Updates
-            const { data: updatesData, error: updatesError } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
-            if (updatesError) console.error('Error fetching updates', updatesError);
-            else setSystemUpdates(updatesData || []);
-            // Fetch System Logo
-            console.log("[SaaS] Buscando logomarca do sistema...");
-            const { data: logoData, error: logoErr } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'main_logo')
-                .maybeSingle();
 
-            if (logoErr) console.error("[SaaS] Erro ao buscar logo:", logoErr);
-            if (logoData?.value) {
-                console.log("[SaaS] Logo encontrada no banco:", logoData.value);
-                setSystemLogo(logoData.value);
-            } else {
-                console.log("[SaaS] Nenhuma logo customizada encontrada no banco.");
+            // Fetch Manual Videos
+            const { data: videosData } = await supabase.from('manual_videos').select('*').order('created_at', { ascending: false });
+            if (videosData) setManualVideos(videosData);
+
+            // Fetch Updates
+            const { data: updatesData } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
+            if (updatesData) setSystemUpdates(updatesData);
+
+            // Fetch System Settings (Logo & Duration)
+            const { data: settingsData } = await supabase
+                .from('system_settings')
+                .select('key, value');
+
+            if (settingsData) {
+                const logo = settingsData.find(s => s.key === 'main_logo')?.value;
+                if (logo) setSystemLogo(logo);
+
+                const duration = settingsData.find(s => s.key === 'update_notification_duration')?.value;
+                if (duration) setUpdateDuration(parseInt(duration) || 15);
+
+                const unit = settingsData.find(s => s.key === 'update_notification_unit')?.value;
+                if (unit) setUpdateDurationUnit(unit as any || 'hours');
             }
 
-            // Fetch System Update Duration
-            const { data: durationData } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'update_notification_duration')
-                .maybeSingle();
-            if (durationData?.value) setUpdateDuration(parseInt(durationData.value) || 15);
-
-            const { data: unitData } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'update_notification_unit')
-                .maybeSingle();
-            if (unitData?.value) setUpdateDurationUnit(unitData.value as any || 'hours');
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
         } finally {
             setLoading(false);
         }
@@ -577,6 +570,39 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
     };
 
 
+    const handleDeleteVideo = async (id: string) => {
+        if (!confirm('Deseja excluir este vídeo?')) return;
+        try {
+            const { error } = await supabase.from('manual_videos').delete().eq('id', id);
+            if (error) throw error;
+            showToast('Vídeo excluído com sucesso!', 'success');
+            setManualVideos(vids => vids.filter(v => v.id !== id));
+        } catch (error) {
+            console.error('Error deleting video:', error);
+            showToast('Erro ao excluir vídeo', 'error');
+        }
+    };
+
+    const submitVideoForm = async () => {
+        try {
+            const { error } = await supabase.from('manual_videos').insert([{
+                title: formData.title,
+                url: formData.url,
+                thumbnail: formData.thumbnail,
+                duration: formData.duration,
+                category: formData.category,
+                description: formData.description
+            }]);
+            if (error) throw error;
+            showToast('Vídeo cadastrado!', 'success');
+            closeModal();
+            fetchData();
+        } catch (error) {
+            console.error('Error saving video:', error);
+            showToast('Erro ao salvar vídeo', 'error');
+        }
+    };
+
     // --- Handlers Genéricos ---
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev: any) => ({ ...prev, [field]: value }));
@@ -848,7 +874,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* LOGO CONFIGURATION */}
                             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
                                 <div className="flex items-center gap-2 mb-6">
@@ -920,6 +946,45 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                                             {isSavingSettings ? 'SALVANDO...' : 'SALVAR CONFIGURAÇÕES'}
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* VIDEO TUTORIALS MANAGEMENT */}
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-2">
+                                        <PlayIcon className="w-5 h-5 text-emerald-500" />
+                                        <h3 className="text-lg font-bold text-gray-700 dark:text-white">Vídeos do Manual</h3>
+                                    </div>
+                                    <button
+                                        onClick={() => openModal('newVideo')}
+                                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 uppercase"
+                                    >
+                                        + Novo Vídeo
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                                    {manualVideos.length === 0 ? (
+                                        <p className="text-sm text-gray-400 italic">Nenhum vídeo cadastrado.</p>
+                                    ) : (
+                                            manualVideos.map(vid => (
+                                                <div key={vid.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700 group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-8 bg-black rounded flex items-center justify-center overflow-hidden">
+                                                            {vid.thumbnail && <img src={vid.thumbnail} className="w-full h-full object-cover opacity-60" />}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-gray-800 dark:text-white line-clamp-1">{vid.title}</p>
+                                                            <p className="text-[10px] text-gray-400 uppercase">{vid.category} • {vid.duration}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteVideo(vid.id)} className="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))
+                                    )}
                                 </div>
                             </div>
 
@@ -1196,6 +1261,81 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [] }) => {
                     <div className="p-6 border-t flex justify-end gap-2">
                         <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
                         <button onClick={submitUpdateForm} className="px-6 py-2 bg-red-600 text-white rounded font-bold text-xs uppercase shadow-md">Publicar</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* New Video Modal */}
+            {modalOpen.newVideo && (
+                <Modal onClose={closeModal} title="Novo Vídeo Tutorial" width="max-w-2xl">
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título do Vídeo</label>
+                            <input
+                                type="text"
+                                placeholder="Ex: Como gerar relatórios financeiro"
+                                value={formData.title || ''}
+                                onChange={(e) => handleInputChange('title', e.target.value)}
+                                className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL (Embed YouTube)</label>
+                                <input
+                                    type="text"
+                                    placeholder="https://www.youtube.com/embed/..."
+                                    value={formData.url || ''}
+                                    onChange={(e) => handleInputChange('url', e.target.value)}
+                                    className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ex: Financeiro"
+                                    value={formData.category || ''}
+                                    onChange={(e) => handleInputChange('category', e.target.value)}
+                                    className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Duração</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ex: 05:30"
+                                    value={formData.duration || ''}
+                                    onChange={(e) => handleInputChange('duration', e.target.value)}
+                                    className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Thumbnail (URL Imagem)</label>
+                                <input
+                                    type="text"
+                                    placeholder="https://..."
+                                    value={formData.thumbnail || ''}
+                                    onChange={(e) => handleInputChange('thumbnail', e.target.value)}
+                                    className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                            <textarea
+                                placeholder="Breve resumo do conteúdo..."
+                                value={formData.description || ''}
+                                onChange={(e) => handleInputChange('description', e.target.value)}
+                                className="w-full p-3 border rounded text-sm outline-none focus:border-emerald-500 h-24 resize-none"
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div className="p-6 border-t flex justify-end gap-2">
+                        <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
+                        <button onClick={submitVideoForm} className="px-6 py-2 bg-emerald-600 text-white rounded font-bold text-xs uppercase shadow-md">Salvar Vídeo</button>
                     </div>
                 </Modal>
             )}

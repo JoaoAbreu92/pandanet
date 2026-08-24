@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { 
     PlayIcon, 
@@ -10,71 +10,61 @@ import {
     CalendarDaysIcon,
     ArrowPathIcon,
     StarIcon,
-    QuestionMarkCircleIcon
+    QuestionMarkCircleIcon,
+    PlayCircleIcon
 } from './icons';
 import type { ManualVideo, ManualCategory, UpdatePatch } from '../types';
 
-const categories: ManualCategory[] = [
-    { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' },
-    { id: 'university', title: 'Universidade Panda', description: 'Implante o ERP de forma guiada.', icon: 'AcademicCapIcon', type: 'video' },
-    { id: 'ecosystem', title: 'Ecossistema Digital', description: 'Portal com soluções complementares.', icon: 'StarIcon', type: 'info' },
-    { id: 'certs', title: 'Certificações', description: 'Capacitação gratuita no sistema.', icon: 'BookOpenIcon', type: 'video' },
-    { id: 'academy', title: 'Panda Academy', description: 'Cursos, palestras e entrevistas.', icon: 'LightBulbIcon', type: 'video' },
-    { id: 'guide', title: 'Guia do Usuário', description: 'Manual completo com treinamentos.', icon: 'QuestionMarkCircleIcon', type: 'info' },
-];
-
-const videos: ManualVideo[] = [
-    { 
-        id: '1', 
-        title: 'Pedidos de compra sem geração de contas a receber', 
-        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', 
-        thumbnail: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=400&h=225&fit=crop', 
-        duration: '09:34', 
-        category: 'Financeiro',
-        description: 'Aprenda como gerenciar pedidos de compra de forma eficiente.'
-    },
-    { 
-        id: '2', 
-        title: 'Propostas e pedidos de venda sem geração de contas a receber', 
-        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', 
-        thumbnail: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=400&h=225&fit=crop', 
-        duration: '11:18', 
-        category: 'Vendas',
-        description: 'Fluxo simplificado para pedidos de venda.'
-    },
-    { 
-        id: '3', 
-        title: 'Gerar parcelas considerando data de entrega do item', 
-        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', 
-        thumbnail: 'https://images.unsplash.com/photo-1454165833772-d99628a5ffef?q=80&w=400&h=225&fit=crop', 
-        duration: '14:45', 
-        category: 'Financeiro',
-        description: 'Configuração avançada de parcelamento.'
-    },
-];
-
-const patches: UpdatePatch[] = [
-    {
-        id: 'p1',
-        version: 'v1.2.4',
-        date: '05 FEV 2026',
-        title: 'Melhorias no Módulo Financeiro',
-        description: 'Esta atualização traz correções importantes no fluxo de caixa e novos relatórios.',
-        changes: ['Novo relatório de DRE', 'Correção no cálculo de juros', 'Melhoria na performance de busca']
-    },
-    {
-        id: 'p2',
-        version: 'v1.2.3',
-        date: '28 JAN 2026',
-        title: 'Integração com API de Logística',
-        description: 'Agora é possível rastrear pedidos diretamente pelo painel principal.',
-        changes: ['Integração com Correios e Jadlog', 'Notificações push de entrega']
-    }
-];
+import { supabase } from '../supabaseClient';
 
 const ManualPage: React.FC = () => {
-    const [selectedVideo, setSelectedVideo] = useState<ManualVideo | null>(videos[0]);
+    const [categories, setCategories] = useState<ManualCategory[]>([
+        { id: 'roadmap', title: 'Roadmap do sistema', description: 'Veja as novidades que vêm por aí.', icon: 'RocketLaunchIcon', type: 'info' },
+        { id: 'university', title: 'Universidade Panda', description: 'Implante o ERP de forma guiada.', icon: 'AcademicCapIcon', type: 'video' },
+        { id: 'ecosystem', title: 'Ecossistema Digital', description: 'Portal com soluções complementares.', icon: 'StarIcon', type: 'info' },
+        { id: 'certs', title: 'Certificações', description: 'Capacitação gratuita no sistema.', icon: 'BookOpenIcon', type: 'video' },
+        { id: 'academy', title: 'Panda Academy', description: 'Cursos, palestras e entrevistas.', icon: 'LightBulbIcon', type: 'video' },
+        { id: 'guide', title: 'Guia do Usuário', description: 'Manual completo com treinamentos.', icon: 'QuestionMarkCircleIcon', type: 'info' },
+    ]);
+    const [videos, setVideos] = useState<ManualVideo[]>([]);
+    const [patches, setPatches] = useState<UpdatePatch[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedVideo, setSelectedVideo] = useState<ManualVideo | null>(null);
     const [activeTab, setActiveTab] = useState<'videos' | 'updates'>('videos');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch Videos
+                const { data: vData } = await supabase.from('manual_videos').select('*').order('created_at', { ascending: false });
+                if (vData) {
+                    setVideos(vData);
+                    if (vData.length > 0) setSelectedVideo(vData[0]);
+                }
+
+                // Fetch Patches (System Updates)
+                const { data: pData } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
+                if (pData) {
+                    const mappedPatches: UpdatePatch[] = pData.map((p: any) => ({
+                        id: p.id,
+                        version: p.version,
+                        date: new Date(p.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+                        title: `Atualização ${p.version}`,
+                        description: p.description,
+                        changes: p.description.split('\n').filter((l: string) => l.trim() !== '')
+                    }));
+                    setPatches(mappedPatches);
+                }
+            } catch (error) {
+                console.error('Error fetching manual data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     const renderIcon = (iconName: string) => {
         const icons: any = { RocketLaunchIcon, AcademicCapIcon, StarIcon, BookOpenIcon, LightBulbIcon, QuestionMarkCircleIcon };
@@ -135,7 +125,12 @@ const ManualPage: React.FC = () => {
                         </button>
                     </div>
 
-                    {activeTab === 'videos' ? (
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
+                            <ArrowPathIcon className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+                            <p className="text-gray-500 font-medium">Carregando conteúdos...</p>
+                        </div>
+                    ) : activeTab === 'videos' ? (
                         <Card title={selectedVideo?.title || "Destaque"}>
                             {selectedVideo && (
                                 <div className="space-y-6">
@@ -164,6 +159,12 @@ const ManualPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                                {!selectedVideo && (
+                                    <div className="text-center py-10">
+                                        <PlayCircleIcon className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                                        <p className="text-gray-400">Nenhum vídeo tutorial disponível ainda.</p>
+                                    </div>
+                                )}
                         </Card>
                     ) : (
                         <div className="space-y-4">
@@ -192,6 +193,11 @@ const ManualPage: React.FC = () => {
                                     </div>
                                 </Card>
                             ))}
+                                    {patches.length === 0 && (
+                                        <div className="bg-white p-8 rounded-2xl text-center border border-dashed border-gray-200">
+                                            <p className="text-gray-400">Nenhuma nota de atualização registrada.</p>
+                                        </div>
+                                    )}
                         </div>
                     )}
                 </div>
@@ -200,6 +206,11 @@ const ManualPage: React.FC = () => {
                 <div className="space-y-4">
                     <h2 className="text-lg font-bold text-gray-800 px-2">Novos Vídeos</h2>
                     <div className="space-y-4">
+                        {videos.length === 0 && (
+                            <div className="p-6 bg-white rounded-2xl border border-dashed border-gray-100 text-center">
+                                <p className="text-xs text-gray-400">Em breve novos vídeos.</p>
+                            </div>
+                        )}
                         {videos.map((video) => (
                             <button
                                 key={video.id}
