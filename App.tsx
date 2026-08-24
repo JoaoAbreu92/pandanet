@@ -394,6 +394,37 @@ const AppContent: React.FC = () => {
     }
 
     if (session && !currentUser && !loading) {
+        const handleRepairProfile = async () => {
+            if (!session.user.email) return;
+
+            // 1. Find Company
+            const domain = session.user.email.split('@')[1];
+            const { data: companies } = await supabase.from('companies').select('id, responsible_email').ilike('domain', domain);
+
+            if (companies && companies.length > 0) {
+                const companyId = companies[0].id;
+                const isResp = (companies[0].responsible_email || '').toLowerCase() === session.user.email.toLowerCase();
+
+                // 2. Insert Profile
+                const { error } = await supabase.from('profiles').insert({
+                    id: session.user.id,
+                    full_name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+                    email: session.user.email,
+                    company_id: companyId,
+                    role: isResp ? 'admin' : 'employee'
+                });
+
+                if (error) {
+                    alert("Erro ao recuperar perfil: " + error.message);
+                } else {
+                    alert("Perfil recuperado! A página será recarregada.");
+                    window.location.reload();
+                }
+            } else {
+                alert("Não encontramos uma empresa para o domínio " + domain + ". Entre em contato com o suporte.");
+            }
+        };
+
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-gray-50 space-y-4 p-4 text-center">
                 <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
@@ -402,13 +433,19 @@ const AppContent: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Erro de Perfil</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">Finalizar Cadastro</h2>
                     <p className="text-gray-600 mb-6">
-                        Não foi possível carregar seu perfil de usuário. Isso pode ocorrer se sua conta não estiver totalmente configurada.
+                        Detectamos que sua conta existe, mas está incompleta. Clique abaixo para finalizar a configuração.
                     </p>
                     <button
+                        onClick={handleRepairProfile}
+                        className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors mb-4"
+                    >
+                        Concluir Configuração
+                    </button>
+                    <button
                         onClick={handleLogout}
-                        className="w-full px-4 py-2 bg-brand-primary text-white font-medium rounded-lg hover:bg-brand-secondary transition-colors"
+                        className="w-full px-4 py-2 text-gray-600 font-medium hover:text-gray-800 transition-colors"
                     >
                         Voltar ao Login
                     </button>
