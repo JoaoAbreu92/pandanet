@@ -27,6 +27,13 @@ As reações por emoji foram aprimoradas e unificadas em todas as áreas de comu
 🖼️ Feed Social: Hover Refinado
 - Removido o efeito de "salto" (transform) ao passar o mouse sobre os cards do feed social. O comportamento agora é mais sutil, com apenas um sombreamento elegante, evitando distorção visual.
 
+📝 Notas Pessoais: Seu Bloco de Notas Privado
+Um novo menu exclusivo para cada colaborador, pensado para guardar informações importantes de forma segura e organizada:
+- Bloco de Notas Digital: Escreva livremente senhas, observações, lembretes e qualquer anotação pessoal diretamente na plataforma.
+- Separado por Abas: Organize suas notas em seções independentes para manter tudo categorizado.
+- Privacidade Garantida: Cada usuário acessa apenas as próprias notas.
+- Modo Auditoria: O Master Admin em Modo Fantasma também tem acesso às notas durante processos de auditoria.
+
 Nota: Esta é uma versão Beta em evolução contínua. Se encontrar qualquer comportamento inesperado, por favor, reporte à equipe técnica.
 
 PandaNet - Sua comunicação, sua segurança. 🐼🚀
