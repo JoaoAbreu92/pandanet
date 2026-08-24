@@ -139,7 +139,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId }) => {
 
         const now = Date.now();
         const lastNudge = nudgeCooldowns[selectedConversationId] || 0;
-        if (now - lastNudge < 5 * 60 * 1000) return;
+        // DISABLED FOR TESTING: if (now - lastNudge < 5 * 60 * 1000) return;
 
         try {
             const compId = currentUser?.company_id;
