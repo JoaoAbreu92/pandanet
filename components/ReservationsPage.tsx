@@ -245,7 +245,7 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
     const selectedItem = items.find(i => i.id === selectedItemId);
 
     return (
-        <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 text-slate-800 dark:text-white">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 text-slate-800 dark:text-white">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">

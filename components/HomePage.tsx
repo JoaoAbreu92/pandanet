@@ -854,6 +854,79 @@ interface RecentBadgeAward {
     } | null;
 }
 
+const PendingTrainingsWidget: React.FC<{ currentUser: Employee; onNavigate: (page: string) => void }> = ({ currentUser, onNavigate }) => {
+    const [pendingTrainings, setPendingTrainings] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPendingTrainings = async () => {
+            if (!currentUser?.company_id) return;
+            try {
+                // Fetch trainings where user is a participant
+                const { data: trainings, error: trainError } = await supabase
+                    .from('training_modules')
+                    .select('*')
+                    .eq('company_id', currentUser.company_id);
+
+                if (trainError) throw trainError;
+
+                // Fetch user submissions
+                const { data: submissions, error: subError } = await supabase
+                    .from('training_submissions')
+                    .select('training_id')
+                    .eq('employee_id', currentUser.id);
+
+                if (subError) throw subError;
+
+                if (trainings) {
+                    const completedIds = new Set(submissions?.map(s => s.training_id) || []);
+                    const pending = trainings.filter(t => 
+                        t.participants && 
+                        t.participants.includes(currentUser.id) && 
+                        !completedIds.has(t.id)
+                    );
+                    setPendingTrainings(pending);
+                }
+            } catch (err) {
+                console.error('Error fetching pending trainings for home:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPendingTrainings();
+    }, [currentUser?.id, currentUser?.company_id]);
+
+    if (loading || pendingTrainings.length === 0) return null;
+
+    return (
+        <Card title="🎓 Treinamentos Pendentes" className="border border-brand-primary/10">
+            <div className="space-y-3">
+                {pendingTrainings.map(t => (
+                    <div 
+                        key={t.id} 
+                        onClick={() => onNavigate('training')}
+                        className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border dark:border-slate-800 cursor-pointer transition-all flex justify-between items-center group"
+                    >
+                        <div className="min-w-0 flex-1 pr-2">
+                            <span className="text-[9px] font-bold text-brand-primary dark:text-emerald-400 uppercase tracking-widest block mb-0.5">{t.category || 'Geral'}</span>
+                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-brand-primary transition-colors">{t.title}</h5>
+                            {t.end_date && (
+                                <p className="text-[10px] text-red-500 font-bold mt-1">
+                                    Prazo: {new Date(t.end_date).toLocaleDateString('pt-BR')}
+                                </p>
+                            )}
+                        </div>
+                        <span className="text-[10px] shrink-0 font-bold bg-brand-primary/10 text-brand-primary dark:text-emerald-400 px-2.5 py-1 rounded-full">
+                            {t.duration || '0 min'}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+};
+
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser }) => {
     const [recentAwards, setRecentAwards] = useState<RecentBadgeAward[]>([]);
 
@@ -1009,6 +1082,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                 {/* Right Sidebar */}
                 <div className="space-y-8">
                     <QuickLinks onNavigate={onNavigate} currentUser={currentUser} />
+                    <PendingTrainingsWidget currentUser={currentUser} onNavigate={onNavigate} />
                     <MiniCalendar onNavigate={onNavigate} currentUser={currentUser} employees={employees} />
                     <CompanyPoll />
                     <Birthdays employees={employees} />

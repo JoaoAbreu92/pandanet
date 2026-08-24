@@ -97,12 +97,11 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                 .from('training_submissions')
                 .select(`
                     id,
-                    user_id,
+                    employee_id,
                     score,
-                    completed,
                     answers,
-                    created_at,
-                    profiles:user_id (
+                    completed_at,
+                    profiles:employee_id (
                         full_name
                     )
                 `)
@@ -112,11 +111,11 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
             if (data) {
                 setSubmissions(data.map((s: any) => ({
                     id: s.id,
-                    user_id: s.user_id,
+                    user_id: s.employee_id,
                     score: s.score,
-                    completed: s.completed,
+                    completed: true,
                     answers: s.answers || [],
-                    created_at: s.created_at,
+                    created_at: s.completed_at,
                     profile: {
                         full_name: s.profiles?.full_name || 'Desconhecido'
                     }
@@ -299,6 +298,7 @@ const TrainingAdminManager: React.FC<TrainingAdminManagerProps> = ({ employees }
                 // Insert notifications
                 const notifications = participants.map(userId => ({
                     user_id: userId,
+                    company_id: employees[0]?.company_id,
                     type: 'event',
                     title: 'Novo Treinamento Convocado',
                     description: `Você foi convocado para o treinamento: "${title}". Conclua até ${endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'o prazo estabelecido'}.`,

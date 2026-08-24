@@ -14,10 +14,12 @@ interface SupabaseGenericManagerProps<T> {
     fields: {
         key: string;
         label: string;
-        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list';
+        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list' | 'checkbox';
         options?: string[];
         dbColumn?: string; // If mapping is different
         optional?: boolean;
+        excludeFromDb?: boolean;
+        condition?: (formData: any) => boolean;
     }[];
     renderItem: (item: T) => React.ReactNode;
     newItemTemplate: Partial<T>;
@@ -83,7 +85,19 @@ export function SupabaseGenericManager<T extends { id: string }>({
     const handleOpenModal = (item?: T) => {
         if (item) {
             setEditingItem(item);
-            setFormData({ ...item });
+            const initialData = { ...item } as any;
+            fields.forEach(f => {
+                if (f.type === 'checkbox' && f.excludeFromDb) {
+                    // Check if any conditional field depending on this key has a value in item
+                    const dependentFields = fields.filter(other => other.condition);
+                    const hasValue = dependentFields.some(other => {
+                        const val = (item as any)[other.key];
+                        return val !== undefined && val !== null && val !== '' && val !== '#';
+                    });
+                    initialData[f.key] = hasValue;
+                }
+            });
+            setFormData(initialData);
         } else {
             setEditingItem(null);
             setFormData({ ...newItemTemplate });
@@ -113,8 +127,15 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
             // Handle updates/inserts
             for (const field of fields) {
+                if (field.excludeFromDb) continue;
+
                 const key = field.key;
                 const dbCol = field.dbColumn || key;
+
+                if (field.condition && !field.condition(formData)) {
+                    payload[dbCol] = null;
+                    continue;
+                }
 
                 if (field.type === 'file' && files[key]) {
                     const file = files[key];
@@ -218,76 +239,93 @@ export function SupabaseGenericManager<T extends { id: string }>({
                             <button onClick={() => setIsModalOpen(false)} disabled={isProcessing}><XMarkIcon className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-5">
-                            {fields.map(field => (
-                                <div key={field.key}>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
-                                    {field.type === 'select' ? (
-                                        <select
-                                            className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
-                                            value={formData[field.key] || ''}
-                                            onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required={!field.optional}
-                                        >
-                                            <option value="">Selecione...</option>
-                                            {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
-                                    ) : field.type === 'textarea' ? (
-                                        <textarea
-                                            className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
-                                            rows={4}
-                                            value={Array.isArray(formData[field.key]) ? formData[field.key].join('\n') : (formData[field.key] || '')}
-                                            onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required={!field.optional}
-                                        />
-                                    ) : field.type === 'file' ? (
-                                        <div className="mt-1">
-                                            <div className="flex items-center space-x-4">
-                                                {formData[field.key] && formData[field.key].startsWith('http') && (
-                                                    <div className="w-16 h-16 rounded border overflow-hidden flex-shrink-0">
-                                                        <img src={getCleanImageUrl(formData[field.key])} alt="Preview" className="w-full h-full object-cover" />
-                                                    </div>
-                                                )}
+                            {fields.map(field => {
+                                if (field.condition && !field.condition(formData)) {
+                                    return null;
+                                }
+                                return (
+                                    <div key={field.key}>
+                                        {field.type !== 'checkbox' && (
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+                                        )}
+                                        {field.type === 'select' ? (
+                                            <select
+                                                className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
+                                                value={formData[field.key] || ''}
+                                                onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                required={!field.optional}
+                                            >
+                                                <option value="">Selecione...</option>
+                                                {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                        ) : field.type === 'checkbox' ? (
+                                            <label className="flex items-center space-x-2 cursor-pointer mt-1">
                                                 <input
-                                                    type="file"
-                                                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer"
-                                                    onChange={(e) => handleFileChange(e, field.key)}
+                                                    type="checkbox"
+                                                    className="rounded text-brand-primary focus:ring-brand-primary h-5 w-5"
+                                                    checked={!!formData[field.key]}
+                                                    onChange={e => setFormData({ ...formData, [field.key]: e.target.checked })}
                                                 />
-                                            </div>
-                                            {files[field.key] && <p className="text-xs text-emerald-600 mt-2 font-medium">Arquivo selecionado: {files[field.key].name}</p>}
-                                        </div>
-                                    ) : field.type === 'user_list' ? (
-                                        <div className="mt-1 border rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50 space-y-2">
-                                            {users.map(u => (
-                                                <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded transition-colors cursor-pointer border border-transparent hover:border-gray-200">
+                                                <span className="text-sm font-medium text-gray-700">{field.label}</span>
+                                            </label>
+                                        ) : field.type === 'textarea' ? (
+                                            <textarea
+                                                className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
+                                                rows={4}
+                                                value={Array.isArray(formData[field.key]) ? formData[field.key].join('\n') : (formData[field.key] || '')}
+                                                onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                required={!field.optional}
+                                            />
+                                        ) : field.type === 'file' ? (
+                                            <div className="mt-1">
+                                                <div className="flex items-center space-x-4">
+                                                    {formData[field.key] && formData[field.key].startsWith('http') && (
+                                                        <div className="w-16 h-16 rounded border overflow-hidden flex-shrink-0">
+                                                            <img src={getCleanImageUrl(formData[field.key])} alt="Preview" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
                                                     <input
-                                                        type="checkbox"
-                                                        className="rounded text-brand-primary focus:ring-brand-primary"
-                                                        checked={(formData[field.key] || []).includes(u.id)}
-                                                        onChange={(e) => {
-                                                            const current = formData[field.key] || [];
-                                                            const updated = e.target.checked
-                                                                ? [...current, u.id]
-                                                                : current.filter((id: string) => id !== u.id);
-                                                            setFormData({ ...formData, [field.key]: updated });
-                                                        }}
+                                                        type="file"
+                                                        className="w-full text-sm text-gray-550 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer"
+                                                        onChange={(e) => handleFileChange(e, field.key)}
                                                     />
-                                                    <div className="flex items-center space-x-2">
-                                                        <img src={u.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
-                                                        <span className="text-sm font-medium text-gray-700">{u.name}</span>
-                                                    </div>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <input
-                                            className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
-                                            value={formData[field.key] || ''}
-                                            onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                                            required={!field.optional}
-                                        />
-                                    )}
-                                </div>
-                            ))}
+                                                </div>
+                                                {files[field.key] && <p className="text-xs text-emerald-600 mt-2 font-medium">Arquivo selecionado: {files[field.key].name}</p>}
+                                            </div>
+                                        ) : field.type === 'user_list' ? (
+                                            <div className="mt-1 border rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50 space-y-2">
+                                                {users.map(u => (
+                                                    <label key={u.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded transition-colors cursor-pointer border border-transparent hover:border-gray-200">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded text-brand-primary focus:ring-brand-primary"
+                                                            checked={(formData[field.key] || []).includes(u.id)}
+                                                            onChange={(e) => {
+                                                                const current = formData[field.key] || [];
+                                                                const updated = e.target.checked
+                                                                    ? [...current, u.id]
+                                                                    : current.filter((id: string) => id !== u.id);
+                                                                setFormData({ ...formData, [field.key]: updated });
+                                                            }}
+                                                        />
+                                                        <div className="flex items-center space-x-2">
+                                                            <img src={u.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                                                            <span className="text-sm font-medium text-gray-700">{u.name}</span>
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all"
+                                                value={formData[field.key] || ''}
+                                                onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                required={!field.optional}
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
                             <div className="pt-4">
                                 <button
                                     type="submit"

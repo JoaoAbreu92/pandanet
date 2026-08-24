@@ -29,9 +29,36 @@ interface Submission {
     id: string;
     training_id: string;
     score: number;
-    completed: boolean;
+    employee_id: string;
+    completed_at?: string;
     answers: number[];
 }
+
+function getEmbedUrl(url: string): string {
+    if (!url) return '';
+    if (url.includes('youtube.com/watch?v=')) {
+        const id = url.split('watch?v=')[1]?.split('&')[0];
+        return `https://www.youtube.com/embed/${id}`;
+    }
+    if (url.includes('youtu.be/')) {
+        const id = url.split('youtu.be/')[1]?.split('?')[0];
+        return `https://www.youtube.com/embed/${id}`;
+    }
+    if (url.includes('youtube.com/shorts/')) {
+        const id = url.split('shorts/')[1]?.split('?')[0];
+        return `https://www.youtube.com/embed/${id}`;
+    }
+    if (url.includes('vimeo.com/')) {
+        const id = url.split('vimeo.com/')[1]?.split('?')[0];
+        return `https://player.vimeo.com/video/${id}`;
+    }
+    return url;
+}
+
+const isDirectVideoUrl = (url: string) => {
+    if (!url) return false;
+    return url.match(/\.(mp4|webm|ogg)$/i) || url.includes('/storage/v1/object/public/');
+};
 
 const TrainingPage: React.FC = () => {
     const { t } = useLanguage();
@@ -63,7 +90,7 @@ const TrainingPage: React.FC = () => {
             const { data: subData, error: subError } = await supabase
                 .from('training_submissions')
                 .select('*')
-                .eq('user_id', currentUser.id);
+                .eq('employee_id', currentUser.id);
 
             if (subError) throw subError;
 
@@ -101,6 +128,31 @@ const TrainingPage: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, [currentUser?.id, currentUser?.company_id]);
+
+    useEffect(() => {
+        const handleYTMessage = (event: MessageEvent) => {
+            if (!event.origin.includes('youtube.com')) return;
+            
+            try {
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                const isEnded = 
+                    (data.event === 'onStateChange' && data.info === 0) ||
+                    (data.event === 'infoDelivery' && data.info && data.info.playerState === 0);
+                
+                if (isEnded && selectedTraining && !getTrainingStatus(selectedTraining.id).completed) {
+                    console.log("[PandaNet] YouTube Video Ended. Triggering quiz automatically...");
+                    handleStartQuiz();
+                }
+            } catch (err) {
+                // Ignore parse errors from other message events
+            }
+        };
+
+        window.addEventListener('message', handleYTMessage);
+        return () => {
+            window.removeEventListener('message', handleYTMessage);
+        };
+    }, [selectedTraining, submissions]);
 
     const handleOpenTraining = (training: TrainingModule) => {
         setSelectedJob(training);
@@ -149,10 +201,10 @@ const TrainingPage: React.FC = () => {
                 .insert([{
                     company_id: currentUser.company_id,
                     training_id: selectedTraining.id,
-                    user_id: currentUser.id,
+                    employee_id: currentUser.id,
                     answers: quizAnswers,
                     score,
-                    completed: true
+                    completed_at: new Date().toISOString()
                 }]);
 
             if (error) throw error;
@@ -208,15 +260,26 @@ const TrainingPage: React.FC = () => {
                         {/* Video Player Column */}
                         <div className="lg:col-span-2 space-y-4">
                             {selectedTraining.videoUrl ? (
-                                <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border dark:border-white/5 shadow">
-                                    <iframe
-                                        src={selectedTraining.videoUrl.replace('watch?v=', 'embed/')}
-                                        title={selectedTraining.title}
-                                        className="w-full h-full border-0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                    ></iframe>
-                                </div>
+                                isDirectVideoUrl(selectedTraining.videoUrl) ? (
+                                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border dark:border-white/5 shadow">
+                                        <video
+                                            src={selectedTraining.videoUrl}
+                                            controls
+                                            onEnded={handleStartQuiz}
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border dark:border-white/5 shadow">
+                                        <iframe
+                                            src={getEmbedUrl(selectedTraining.videoUrl) + (getEmbedUrl(selectedTraining.videoUrl).includes('?') ? '&enablejsapi=1' : '?enablejsapi=1')}
+                                            title={selectedTraining.title}
+                                            className="w-full h-full border-0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        ></iframe>
+                                    </div>
+                                )
                             ) : (
                                 <div className="aspect-video w-full rounded-xl bg-gray-100 dark:bg-slate-900 flex flex-col items-center justify-center text-gray-400 border border-dashed">
                                     <PlayCircleIcon className="w-16 h-16 opacity-40 mb-2" />

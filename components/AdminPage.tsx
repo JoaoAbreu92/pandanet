@@ -424,14 +424,15 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     title="Itens de Bem-Estar"
                     tableName="wellness_items"
                     companyId={company.id}
-                    newItemTemplate={{ title: '', description: '', category: 'Saúde Mental', videoUrl: '', linkUrl: '', linkText: 'Saiba mais' }}
+                    newItemTemplate={{ title: '', description: '', category: 'Saúde Mental', showLink: true, videoUrl: '', linkUrl: '', linkText: 'Saiba mais' } as any}
                     fields={[
                         { key: 'title', label: 'Título' },
                         { key: 'description', label: 'Descrição', type: 'textarea' },
                         { key: 'category', label: 'Categoria', type: 'select', options: ['Saúde Mental', 'Atividade Física', 'Nutrição', 'Outro'] },
-                        { key: 'videoUrl', label: 'Vídeo (URL)', type: 'text', dbColumn: 'video_url', optional: true },
-                        { key: 'linkUrl', label: 'Link (URL)', type: 'text', dbColumn: 'link_url', optional: true },
-                        { key: 'linkText', label: 'Texto do Link', type: 'text', dbColumn: 'link_text', optional: true }
+                        { key: 'showLink', label: 'Habilitar Vídeo / Link de Saiba Mais', type: 'checkbox', excludeFromDb: true },
+                        { key: 'videoUrl', label: 'Vídeo (URL)', type: 'text', dbColumn: 'video_url', optional: true, condition: (data) => !!data.showLink },
+                        { key: 'linkUrl', label: 'Link (URL)', type: 'text', dbColumn: 'link_url', optional: true, condition: (data) => !!data.showLink },
+                        { key: 'linkText', label: 'Texto do Link', type: 'text', dbColumn: 'link_text', optional: true, condition: (data) => !!data.showLink }
                     ]}
                     renderItem={(i) => <div><p className="font-bold">{i.title}</p><p className="text-sm">{i.category}</p></div>}
                 />;
