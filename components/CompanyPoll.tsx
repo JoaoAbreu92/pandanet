@@ -69,7 +69,7 @@ const CompanyPoll: React.FC = () => {
 
   useEffect(() => {
     fetchLatestPoll();
-  }, [currentUser?.company_id]);
+  }, [currentUser?.company_id, currentUser?.id]);
 
   const handleVote = async () => {
     if (selectedOption !== null && poll && currentUser) {
