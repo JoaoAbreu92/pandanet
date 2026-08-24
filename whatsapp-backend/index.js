@@ -1029,10 +1029,20 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             }
 
-            // Para a Evolution API, enviar SEMPRE o Base64/DataURI diretamente no payload.
-            // Isso evita que a Evolution tente fazer fetch via HTTPS em URLs públicas da VPS que podem falhar com "certificate has expired".
-            const audioSource = audioDataUri;
-            const mediaSource = base64Data;
+            // Para a Evolution API, enviar a URL pública hospedada localmente no Supabase (via Kong)
+            // Isso evita consumo de banda externa e resolve problemas de certificados SSL expirados.
+            let finalMediaUrl = mediaUrl;
+            if (mediaUrl.startsWith('data:') && savedMediaUrl) {
+                finalMediaUrl = savedMediaUrl;
+            }
+
+            // Se for URL do Supabase da empresa, converter para o host interno do Docker para ser ultra-rápido e evitar SSL
+            if (finalMediaUrl && finalMediaUrl.includes('/storage/v1/object/public/')) {
+                finalMediaUrl = finalMediaUrl.replace('https://pandanet.grupopixel.com.br', 'http://supabase-kong:8000');
+            }
+
+            const audioSource = finalMediaUrl || audioDataUri;
+            const mediaSource = finalMediaUrl || base64Data;
 
             // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
@@ -2009,15 +2019,7 @@ async function importHistoricalMessages(conv, instanceName, startDate = null, en
                 url: `${evoUrl}/chat/findMessages/${instanceName}`, 
                 method: 'POST', 
                 body: JSON.stringify({ 
-                    where: { 
-                        key: { remoteJid },
-                        ...(startUnix && endUnix ? {
-                            messageTimestamp: {
-                                gte: startUnix,
-                                lte: endUnix
-                            }
-                        } : {})
-                    }, 
+                    key: { remoteJid },
                     limit: startDate ? 500 : 100 
                 }) 
             },
@@ -2025,7 +2027,7 @@ async function importHistoricalMessages(conv, instanceName, startDate = null, en
                 url: `${evoUrl}/chat/findMessages/${instanceName}`, 
                 method: 'POST', 
                 body: JSON.stringify({ 
-                    where: { remoteJid }, 
+                    remoteJid, 
                     limit: startDate ? 500 : 100 
                 }) 
             },
@@ -2033,7 +2035,8 @@ async function importHistoricalMessages(conv, instanceName, startDate = null, en
                 url: `${evoUrl}/chat/getMessages/${instanceName}`, 
                 method: 'POST', 
                 body: JSON.stringify({ 
-                    where: { key: { remoteJid } } 
+                    key: { remoteJid },
+                    limit: startDate ? 500 : 100
                 }) 
             },
         ];
