@@ -857,7 +857,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 if (!shouldProcess) {
                     const { data: isParticipant } = await supabase
                         .from('conversation_participants')
-                        .select('id')
+                        .select('user_id')
                         .eq('conversation_id', newMsg.conversation_id)
                         .eq('user_id', currentUser.id)
                         .maybeSingle();
