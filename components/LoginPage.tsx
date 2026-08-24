@@ -40,6 +40,7 @@ const LoginPage: React.FC = () => {
                 options: {
                     data: {
                         full_name: name,
+                        company_domain: domain,
                     }
                 }
             });
@@ -53,74 +54,12 @@ const LoginPage: React.FC = () => {
                 }
                 setError(msg);
             } else if (authData.user) {
-                // Logic moved to a safer async follow-up
-                setTimeout(async () => {
-                    const trimmedDomain = domain.trim().toLowerCase();
-                    const emailDomain = email.split('@')[1].toLowerCase();
-                    
-                    // Domain to use: prioritize manual input if it's not a common provider, otherwise use email domain
-                    const targetDomain = (trimmedDomain && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'].includes(trimmedDomain))
-                        ? trimmedDomain 
-                        : emailDomain;
-
-                    // 1. Try to find company
-                    let { data: companyData } = await supabase
-                        .from('companies')
-                        .select('id')
-                        .ilike('domain', targetDomain)
-                        .maybeSingle();
-
-                    let wasJustCreated = false;
-
-                    // 2. If not found, create it (matching user's requirement: first user creates company)
-                    if (!companyData && !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'].includes(targetDomain)) {
-                        const { data: newCompany, error: createError } = await supabase
-                            .from('companies')
-                            .insert({
-                                name: targetDomain.split('.')[0].charAt(0).toUpperCase() + targetDomain.split('.')[0].slice(1),
-                                domain: targetDomain,
-                                status: 'active',
-                                responsible_email: email
-                            })
-                            .select()
-                            .single();
-                        
-                        if (!createError) {
-                            companyData = newCompany;
-                            wasJustCreated = true;
-                        } else {
-                            console.error("Error auto-creating company:", createError);
-                        }
-                    }
-
-                    // 3. Update profile with company and status
-                    // ONLY the very first user who triggered the creation of the company becomes the admin
-                    const isFirstUser = wasJustCreated;
-                    const { error: updateError } = await supabase
-                        .from('profiles')
-                        .update({
-                            company_id: companyData?.id || null,
-                            status: isFirstUser ? 'active' : 'pending', // Criador da empresa ativo, colaboradores pendentes
-                            role: isFirstUser ? 'admin' : 'employee',
-                            is_company_admin: isFirstUser
-                        })
-                        .eq('id', authData.user!.id);
-
-                    if (updateError) console.error("Error updating profile with company/status:", updateError);
-
-                    setMessage(language === 'pt'
-                        ? (isFirstUser 
-                            ? 'Cadastro realizado com sucesso! Verifique seu email para confirmar e acessar a plataforma.'
-                            : 'Cadastro realizado! Verifique seu email para confirmar. Sua conta passará por aprovação do administrador.')
-                        : language === 'en'
-                            ? (isFirstUser
-                                ? 'Sign up successful! Please check your email to confirm and access the platform.'
-                                : 'Sign up successful! Please check your email to confirm. Your account will undergo approval.')
-                            : (isFirstUser
-                                ? '¡Registro exitoso! Verifique su correo para confirmar y acceder a la plataforma.'
-                                : '¡Registro exitoso! Verifique su correo para confirmar. Su cuenta pasará por aprobación.'));
-                    setIsSignUp(false); // Switch back to login for UX
-                }, 1500); // Wait for trigger + some buffer
+                setMessage(language === 'pt'
+                    ? 'Cadastro realizado com sucesso! Verifique seu email para confirmar e acessar a plataforma.'
+                    : language === 'en'
+                        ? 'Sign up successful! Please check your email to confirm and access the platform.'
+                        : '¡Registro exitoso! Verifique su correo para confirmar y acceder a la plataforma.');
+                setIsSignUp(false); // Switch back to login for UX
             }
         } else {
             // Login Logic
