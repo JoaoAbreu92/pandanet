@@ -22,7 +22,8 @@ import {
     UserPlusIcon,
     ArrowUturnLeftIcon,
     ArrowRightOnRectangleIcon,
-    ExclamationTriangleIcon, XMarkIcon
+    ExclamationTriangleIcon, XMarkIcon,
+    PaperClipIcon, ArrowDownTrayIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 
 // --- Types ---
@@ -139,6 +140,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const [showContactsModal, setShowContactsModal] = useState(false);
     const [newContactName, setNewContactName] = useState('');
     const [newContactEmail, setNewContactEmail] = useState('');
+    const [attachments, setAttachments] = useState<any[]>([]);
+    const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024; // 20MB
 
     // --- Refs ---
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -227,6 +230,34 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
     const EMAIL_SERVER_URL = (import.meta.env.VITE_EMAIL_SERVER_URL as string) ||
     // @ts-ignore
         `${(import.meta.env.VITE_SUPABASE_URL as string).replace(':8000', ':3001')}/api/email`;
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        const validFiles: any[] = [];
+
+        for (const file of files) {
+            if (file.size > MAX_ATTACHMENT_SIZE) {
+                alert(`O arquivo "${file.name}" excede o limite de 20MB e não será adicionado.`);
+                continue;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64Content = (event.target?.result as string).split(',')[1];
+                setAttachments(prev => [...prev, {
+                    filename: file.name,
+                    content: base64Content,
+                    contentType: file.type,
+                    size: file.size
+                }]);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const removeAttachment = (index: number) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
 
     const callEmailServer = async (action: string, body: any) => {
         const session = await supabase.auth.getSession();
@@ -641,12 +672,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                     replyTo: composeReplyTo,
                     subject: composeSubject,
                     text: composeBody.replace(/<[^>]*>?/gm, ''), // Plain text version
-                    html: composeBody
+                    html: composeBody,
+                    attachments: attachments // Send attachments
                 },
                 user_id: currentUser.id
             });
-
-
 
             if (error) throw error;
             if (data.error) throw new Error(data.error);
@@ -658,6 +688,11 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             setComposeReplyTo('');
             setComposeSubject('');
             setComposeBody('');
+            setAttachments([]); // Reset attachments
+            setToTags([]);
+            setCcTags([]);
+            setBccTags([]);
+            setView('inbox');
             setView('inbox');
         } catch (err: any) {
             alert('Erro ao enviar: ' + err.message);
@@ -1332,6 +1367,59 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                         />
                                     </div>
 
+                                    {/* --- Options and Attachments Section --- */}
+                                    <div className="bg-gray-800 text-gray-300 p-6 rounded-xl space-y-4 shadow-inner">
+                                        <div className="text-center">
+                                            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-100 mb-4">Opções e anexos</h3>
+                                            <div
+                                                className="border-2 border-dashed border-gray-600 rounded-xl p-8 flex flex-col items-center justify-center space-y-4 bg-gray-900/50 hover:bg-gray-900 transition-colors group cursor-pointer"
+                                                onClick={() => document.getElementById('file-upload')?.click()}
+                                            >
+                                                <input id="file-upload" type="file" multiple className="hidden" onChange={handleFileChange} />
+                                                <p className="text-xs text-gray-400">Tamanho máximo permitido do arquivo é 20 MB</p>
+                                                <button className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg border border-gray-600">
+                                                    <PaperClipIcon className="w-4 h-4" />
+                                                    Anexar um arquivo
+                                                </button>
+                                                <ArrowDownTrayIcon className="w-12 h-12 text-gray-700 group-hover:text-brand-primary group-hover:scale-110 transition-all opacity-50" />
+                                            </div>
+                                        </div>
+
+                                        {/* Attachment List */}
+                                        {attachments.length > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                                                {attachments.map((file, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-lg border border-gray-600 group">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="bg-brand-primary/20 p-2 rounded">
+                                                                <PaperClipIcon className="w-4 h-4 text-brand-primary" />
+                                                            </div>
+                                                            <div className="truncate">
+                                                                <div className="text-xs font-bold text-gray-100 truncate">{file.filename}</div>
+                                                                <div className="text-[10px] text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                                                            </div>
+                                                        </div>
+                                                        <button onClick={() => removeAttachment(idx)} className="p-1 hover:text-red-400 transition-colors">
+                                                            <XMarkIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Other options (Placeholders based on print) */}
+                                        <div className="space-y-3 pt-4 border-t border-gray-700 opacity-60 pointer-events-none">
+                                            {['Confirmação de recebimento', 'Recibo de entrega', 'Manter formatação'].map(label => (
+                                                <div key={label} className="flex items-center justify-between text-xs">
+                                                    <span>{label}</span>
+                                                    <div className="w-8 h-4 bg-gray-600 rounded-full relative">
+                                                        <div className="absolute left-1 top-1 w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div className="flex justify-between items-center pt-2">
                                         <span className="text-xs text-gray-400 ml-1">
                                             {settings.signature ? t('email.signature_warning') : t('email.no_signature')}
@@ -1485,55 +1573,80 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             )}
             {/* --- Contacts Modal --- */}
             {showContactsModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-700">{t('sidebar.directory')}</h3>
-                            <button onClick={() => setShowContactsModal(false)} className="text-gray-400 hover:text-gray-600">
-                                <span className="text-2xl">&times;</span>
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50/80">
+                            <div className="flex items-center gap-2">
+                                <UsersIcon className="w-5 h-5 text-brand-primary" />
+                                <h3 className="font-bold text-gray-800 text-lg">Diretório de Contatos</h3>
+                            </div>
+                            <button onClick={() => setShowContactsModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <XMarkIcon className="w-6 h-6 text-gray-500" />
                             </button>
                         </div>
-                        <div className="p-4 border-b bg-gray-50">
-                            <div className="flex gap-2">
-                                <input
-                                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-                                    placeholder="Nome (Opcional)"
-                                    value={newContactName}
-                                    onChange={e => setNewContactName(e.target.value)}
-                                />
-                                <input
-                                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-                                    placeholder="Email"
-                                    value={newContactEmail}
-                                    onChange={e => setNewContactEmail(e.target.value)}
-                                />
-                                <button onClick={addContact} disabled={!newContactEmail} className="bg-brand-primary text-white px-3 py-2 rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+
+                        {/* Add New Contact Form */}
+                        <div className="p-4 bg-emerald-50/50 border-b border-emerald-100">
+                            <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3">Novo Contato</h4>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <div className="flex-1">
+                                    <input
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                                        placeholder="Nome"
+                                        value={newContactName}
+                                        onChange={e => setNewContactName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                                        placeholder="Email"
+                                        value={newContactEmail}
+                                        onChange={e => setNewContactEmail(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    onClick={addContact}
+                                    disabled={!newContactEmail}
+                                    className="bg-brand-primary text-white p-2 rounded-lg hover:bg-emerald-600 disabled:opacity-50 shadow-md flex items-center justify-center min-w-[44px]"
+                                    title="Salvar Contato"
+                                >
                                     <UserPlusIcon className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+
+                        {/* Contacts List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
                             {contacts.length === 0 ? (
-                                <p className="text-center text-gray-500 text-sm">{t('email.no_tags')}</p>
+                                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                                    <UsersIcon className="w-12 h-12 mb-2 opacity-20" />
+                                    <p className="text-sm font-medium">Nenhum contato encontrado</p>
+                                </div>
                             ) : (
                                 contacts.map(contact => (
-                                    <div key={contact.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 group">
-                                        <div>
-                                            <div className="font-medium text-gray-800">{contact.name}</div>
-                                            <div className="text-xs text-gray-500">{contact.email}</div>
+                                    <div key={contact.id} className="flex items-center gap-3 p-3 hover:bg-emerald-50 rounded-xl border border-gray-100 hover:border-emerald-200 transition-all group">
+                                        <div className="w-10 h-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm">
+                                            {contact.name?.substring(0, 1).toUpperCase() || '?'}
                                         </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-gray-800 truncate">{contact.name}</div>
+                                            <div className="text-sm text-gray-500 truncate">{contact.email}</div>
+                                        </div>
+                                        <div className="flex gap-1">
                                             <button
                                                 onClick={() => {
                                                     handleAddRecipientTag('to', contact.email);
                                                     setShowContactsModal(false);
                                                 }}
-                                                className="text-brand-primary hover:underline text-xs font-bold"
+                                                className="bg-emerald-100 text-brand-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors flex items-center gap-1"
                                             >
-                                                Usar
+                                                <EnvelopeIcon className="w-3 h-3" />
+                                                Escrever
                                             </button>
-                                            <button onClick={() => deleteContact(contact.id)} className="text-red-500 hover:underline text-xs">
-                                                Excluir
+                                            <button onClick={() => deleteContact(contact.id)} className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                                <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>

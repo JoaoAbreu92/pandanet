@@ -6,7 +6,12 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 const jwt = require('jsonwebtoken');
-require('dotenv').config({ path: '/root/pandanet/.env', override: true });
+const path = require('path');
+require('dotenv').config(); // Load from server/ directory
+require('dotenv').config({ path: path.join(__dirname, '../.env'), override: true });
+require('dotenv').config({ path: path.join(__dirname, '../.env.local'), override: true });
+require('dotenv').config({ path: '/root/pandanet/.env', override: true }); // VPS path
+
 // Fallback: load Supabase env if JWT_SECRET not found yet
 if (!process.env.JWT_SECRET) {
     require('dotenv').config({ path: '/root/supabase/supabase/docker/.env', override: true });
@@ -41,14 +46,20 @@ app.use(express.json());
 function authMiddleware(req, res, next) {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.warn('[auth] Missing or invalid Authorization header');
         return res.status(401).json({ error: 'Missing or invalid Authorization header' });
     }
     const token = authHeader.split(' ')[1];
     try {
+        if (!JWT_SECRET) {
+            console.error('[auth] JWT_SECRET is undefined!');
+            return res.status(500).json({ error: 'Internal Auth Configuration Error' });
+        }
         jwt.verify(token, JWT_SECRET);
         next();
     } catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        console.error('[auth] Token verification failed:', err.message);
+        return res.status(401).json({ error: 'Invalid or expired token: ' + err.message });
     }
 }
 
@@ -410,7 +421,8 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
             replyTo: payload.replyTo,
             subject: payload.subject,
             text: payload.text,
-            html: payload.html
+            html: payload.html,
+            attachments: payload.attachments || [] // Add attachments support
         });
 
         // 2. Append to Sent Folder (IMAP)
