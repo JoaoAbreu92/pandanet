@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const { ImapFlow } = require('imapflow');
 const nodemailer = require('nodemailer');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
 const jwt = require('jsonwebtoken');
 require('dotenv').config({ path: '/root/pandanet/.env', override: true });
 // Fallback: load Supabase env if JWT_SECRET not found yet
@@ -18,6 +21,19 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+// --- Security Middlewares ---
+app.use(helmet()); // Basic security headers
+app.use(hpp());    // Prevent HTTP Parameter Pollution
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    message: { error: 'Muitas requisições deste IP. Tente novamente em 15 minutos.' }
+});
+
+app.use(limiter);
 app.use(cors());
 app.use(express.json());
 

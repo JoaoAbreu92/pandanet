@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const { connectToWhatsApp, sessions, updateCompanySettings } = require('./whatsapp');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
+const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -8,9 +12,39 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
 
-app.use(cors({ origin: '*' })); // Permitir qualquer origem para evitar problemas de CORS em dev/test
+// --- Security Middlewares ---
+app.use(helmet());
+app.use(hpp());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições. Tente em 15 minutos.' }
+});
+
+app.use(limiter);
+app.use(cors({ origin: '*' }));
 app.use(express.json());
+
+// --- JWT Auth Middleware ---
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    if (!JWT_SECRET) throw new Error('JWT_SECRET not configured');
+    jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -20,8 +54,8 @@ app.get('/', (req, res) => {
   res.send('WhatsPanda Backend Rodando 🐼 (Multi-Inquilino)');
 });
 
-// Endpoint para iniciar sessão manualmente (ex: nova empresa cadastrada)
-app.post('/sessions/:companyId/start/:connectionId', async (req, res) => {
+// Endpoint para iniciar sessão manualmente
+app.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;
   console.log(`[POST] /sessions/${companyId}/start/${connectionId} - Recebido`); // Log de entrada
   if (sessions.has(connectionId)) {
@@ -38,7 +72,7 @@ app.post('/sessions/:companyId/start/:connectionId', async (req, res) => {
 });
 
 // Endpoint para parar sessão
-app.post('/sessions/:companyId/stop/:connectionId', async (req, res) => {
+app.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;
   const sock = sessions.get(connectionId);
   if (sock) {
@@ -59,7 +93,7 @@ app.get('/sessions/:companyId/status/:connectionId', (req, res) => {
 });
 
 // Endpoint para listar TODAS as sessões ativas (SaaS Dashboard)
-app.get('/sessions/status/all', (req, res) => {
+app.get('/sessions/status/all', authMiddleware, (req, res) => {
   const activeSessions = Array.from(sessions.keys());
   res.json({ count: activeSessions.length, activeConnectionIds: activeSessions });
 });
