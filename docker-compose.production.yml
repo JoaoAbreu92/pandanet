@@ -85,7 +85,7 @@ services:
       - pandanet_network
       - supabase_default
     volumes:
-      - ./certbot/conf:/etc/letsencrypt:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
 
   # ============================================
