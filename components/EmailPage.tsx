@@ -253,25 +253,43 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
 
             // Mark as seen locally if needed
             setEmails(prev => prev.map(e => {
-                if (e.uid === uid && !e.flags.includes('\\Seen')) {
-                    // We don't call toggleFlag here to avoid another server call if fetch-body already does it or we want to wait
-                    return { ...e, flags: [...e.flags, '\\Seen'] };
+                const flags = e.flags || [];
+                if (e.uid === uid && !flags.includes('\\Seen')) {
+                    return { ...e, flags: [...flags, '\\Seen'] };
                 }
                 return e;
             }));
 
             // Update selected e-mail
-            setSelectedEmail(prev => prev && prev.uid === uid ? { ...prev, text: data.text, html: data.html, flags: prev.flags.includes('\\Seen') ? prev.flags : [...prev.flags, '\\Seen'] } : prev);
+            setSelectedEmail(prev => {
+                if (!prev || prev.uid !== uid) return prev;
+                const flags = prev.flags || [];
+                return {
+                    ...prev,
+                    text: data.text,
+                    html: data.html,
+                    flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen']
+                };
+            });
 
             // Update cache
             const cacheKey = `${currentUser.id}_${folder}_${page}`;
             if (emailCache[cacheKey]) {
-                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, flags: e.flags.includes('\\Seen') ? e.flags : [...e.flags, '\\Seen'] } : e);
+                emailCache[cacheKey].emails = emailCache[cacheKey].emails.map(e => {
+                    if (e.uid !== uid) return e;
+                    const flags = e.flags || [];
+                    return {
+                        ...e,
+                        text: data.text,
+                        html: data.html,
+                        flags: flags.includes('\\Seen') ? flags : [...flags, '\\Seen']
+                    };
+                });
             }
 
             // Background update Seen flag on server if not seen
             const email = emails.find(e => e.uid === uid);
-            if (email && !email.flags.includes('\\Seen')) {
+            if (email && !(email.flags || []).includes('\\Seen')) {
                 toggleFlag(email, '\\Seen', true);
             }
 
@@ -479,8 +497,8 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
             if (data.error) throw new Error(data.error);
 
             // Handle Response (Array or Object with total)
-            const emailList = Array.isArray(data) ? data : data.emails;
-            const total = Array.isArray(data) ? data.length : data.total;
+            const emailList = (Array.isArray(data) ? data : data.emails) || [];
+            const total = (Array.isArray(data) ? data.length : data.total) || 0;
             const unseen = data.unseen || 0;
 
             setTotalEmails(total);
@@ -787,7 +805,7 @@ const EmailPage: React.FC<{ currentUser: any }> = ({ currentUser }) => {
                                     <div className="text-xs text-gray-500 line-clamp-2">
                                         {email.text ? email.text.substring(0, 100) : 'Sem pré-visualização...'}
                                     </div>
-                                    {email.metadata?.tags && email.metadata.tags.length > 0 && (
+                                    {email.metadata?.tags && (email.metadata.tags || []).length > 0 && (
                                         <div className="flex gap-1 mt-2">
                                             {email.metadata.tags.map(t => (
                                                 <span key={t.label} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200" style={{ borderColor: t.color, color: t.color }}>
