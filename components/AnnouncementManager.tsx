@@ -149,7 +149,7 @@ const AnnouncementFormModal: React.FC<{
 };
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
-    const { currentUser } = useAuth();
+    const { profile: currentUser } = useAuth();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
