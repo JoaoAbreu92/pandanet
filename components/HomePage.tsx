@@ -1013,7 +1013,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                     <CompanyPoll />
                     <Birthdays employees={employees} />
                     <NewHires employees={employees} />
-                    <UpcomingEvents />
+                    <UpcomingEvents onNavigate={onNavigate} />
                 </div>
             </div>
         </div>
