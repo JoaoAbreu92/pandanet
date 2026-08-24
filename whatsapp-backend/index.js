@@ -304,12 +304,15 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
                         const name = c.name || c.pushName || c.notify || phone;
                         contactsMap[jid] = name;
                         
-                        // Upsert contact com empresa garantida
-                        await supabase.from('whatsapp_contacts').upsert({
+                        // Upsert contact com empresa garantida e atualização de campos
+                        const { error: upsertErr } = await supabase.from('whatsapp_contacts').upsert({
                             company_id: companyId,
                             phone: phone,
-                            name: name
-                        }, { onConflict: 'company_id,phone' }).catch(e => console.error('[SYNC] Erro upsert contato:', e.message));
+                            name: name,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'company_id,phone' });
+                        
+                        if (upsertErr) console.error('[SYNC] Erro upsert contato:', upsertErr.message);
                     }
                 }
             }
@@ -408,9 +411,9 @@ async function runChatbot(message, conversation, companyId, connectionId) {
                 const replyText = node.content?.text || "";
                 if (replyText) {
                     // Buscar settings para pegar a URL da Evolution
-                    const { data: settings } = await supabase.from('whatsapp_settings').select('instance_name').eq('id', connectionId).single();
                     if (settings) {
-                        await fetch(`${evoUrl}/message/sendText/${settings.instance_name}`, {
+                        const instanceName = `conn_${connectionId}`;
+                        await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
                             method: 'POST',
                             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -445,6 +448,19 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         
         const fromPhone = remoteJid.split('@')[0];
         const msgId = message.key?.id;
+
+        // 0. Verificar se o contato está bloqueado
+        const { data: contact } = await supabase
+            .from('whatsapp_contacts')
+            .select('is_blocked')
+            .eq('company_id', companyId)
+            .eq('phone', fromPhone)
+            .maybeSingle();
+
+        if (contact?.is_blocked) {
+            console.log(`[BOT] Mensagem ignorada: Contato ${fromPhone} está bloqueado.`);
+            return;
+        }
 
         // Verificar se mensagem já existe
         const { data: exists } = await supabase
