@@ -5,6 +5,7 @@ import { ImapFlow } from "npm:imapflow@1.0.141";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
 // Helper para verificar se o host existe (DNS)
@@ -109,11 +110,15 @@ Deno.serve(async (req) => {
 
     if (!action) throw new Error("Ação não informada.");
 
-    console.log(`[V32] Ação: ${action}`);
+    console.log(`[V34] Ação: ${action}`);
 
     if (action === 'test-connection') {
       if (!settings) throw new Error("Configurações ausentes.");
       const start = Date.now();
+
+      // Garantir que as portas sejam números (Evita erro de types no native Deno)
+      const smtpPort = Number(settings.smtp_port);
+      const imapPort = Number(settings.imap_port);
 
       // BREVO & MULTI-PASS DETECT
       // Se o usuário digitar "senha:chave", dividimos. Se não, usamos a mesma para ambos.
@@ -149,14 +154,14 @@ Deno.serve(async (req) => {
         if (!smtpHostOk.ok) throw new Error(`DNS SMTP: ${smtpHostOk.error}`);
 
         const useSmtpSsl = settings.smtp_ssl ?? (settings.smtp_port === 465);
-        const probe = useSmtpSsl ? await probeTls(settings.smtp_host, settings.smtp_port) : await testConnection(settings.smtp_host, settings.smtp_port);
+        const probe = useSmtpSsl ? await probeTls(settings.smtp_host, smtpPort) : await testConnection(settings.smtp_host, smtpPort);
 
         if (!probe.ok) {
           smtpResult = { status: 'rejected', reason: new Error(`SMTP Socket: ${probe.error}`) };
         } else {
           const transporter = nodemailer.createTransport({
             host: settings.smtp_host,
-            port: settings.smtp_port,
+            port: smtpPort,
             secure: useSmtpSsl,
             auth: { user: settings.user, pass: smtpPass }, // Usa smtpPass
             tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
@@ -175,15 +180,15 @@ Deno.serve(async (req) => {
       const imapHostOk = await verifyHost(settings.imap_host);
       if (!imapHostOk.ok) throw new Error(`DNS IMAP: ${imapHostOk.error}`);
 
-      const useImapSsl = settings.imap_ssl ?? (settings.imap_port === 993);
-      const imapProbe = useImapSsl ? await probeTls(settings.imap_host, settings.imap_port) : await testConnection(settings.imap_host, settings.imap_port);
+      const useImapSsl = settings.imap_ssl ?? (imapPort === 993);
+      const imapProbe = useImapSsl ? await probeTls(settings.imap_host, imapPort) : await testConnection(settings.imap_host, imapPort);
 
       if (!imapProbe.ok) {
         imapResult = { status: 'rejected', reason: new Error(`IMAP Socket: ${imapProbe.error}`) };
       } else {
         const client = new ImapFlow({
           host: settings.imap_host,
-          port: settings.imap_port,
+          port: imapPort,
           secure: useImapSsl,
           auth: { user: settings.user, pass: imapPass }, // Usa imapPass
           logger: false,
