@@ -11,13 +11,17 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
     MagnifyingGlassIcon,
+    ArrowPathIcon,
+    StarIcon,
+    Cog6ToothIcon,
+    Bars3Icon,
+    IdentificationIcon,
+    PaintBrushIcon,
     PlusIcon,
     XMarkIcon,
     PaperClipIcon,
     FaceSmileIcon,
-    EllipsisVerticalIcon,
-    ArrowPathIcon,
-    StarIcon
+    EllipsisVerticalIcon
 } from './icons';
 
 interface Email {
@@ -33,8 +37,23 @@ interface Email {
     date: string;
     isRead: boolean;
     isStarred: boolean;
+    tagId?: string;
     attachments?: { name: string; size: string; type: string }[];
 }
+
+interface Tag {
+    id: string;
+    label: string;
+    color: string;
+    bgColor: string;
+}
+
+const EMAIL_TAGS: Tag[] = [
+    { id: 'important', label: 'Importante', color: '#ef4444', bgColor: '#fee2e2' }, // Red
+    { id: 'work', label: 'Trabalho', color: '#3b82f6', bgColor: '#dbeafe' },      // Blue
+    { id: 'personal', label: 'Pessoal', color: '#10b981', bgColor: '#d1fae5' },   // Green
+    { id: 'urgent', label: 'Urgente', color: '#f59e0b', bgColor: '#fef3c7' },     // Amber
+];
 
 const MOCK_EMAILS: Email[] = [
     {
@@ -56,6 +75,7 @@ const MOCK_EMAILS: Email[] = [
         date: '09:12',
         isRead: true,
         isStarred: false,
+        tagId: 'work',
         attachments: [{ name: 'politica_rh_2024.pdf', size: '1.2 MB', type: 'pdf' }]
     },
     {
@@ -66,15 +86,46 @@ const MOCK_EMAILS: Email[] = [
         content: '<p>Olá,</p><p>Comunicamos que no próximo domingo realizaremos uma manutenção preventiva nos nossos servidores centrais.</p><p>O sistema poderá ficar instável entre 02:00 e 05:00.</p>',
         date: 'Ontem',
         isRead: true,
-        isStarred: false
+        isStarred: false,
+        tagId: 'important'
     }
 ];
 
 const EmailPage: React.FC = () => {
+    const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(MOCK_EMAILS[0]);
-    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'drafts' | 'trash'>('inbox');
+    const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'drafts' | 'trash' | 'favorites' | 'settings'>('inbox');
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [signature, setSignature] = useState('Atenciosamente,\nEquipe PandaNet');
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, emailId: string } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent, emailId: string) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, emailId });
+    };
+
+    const toggleStar = (emailId: string) => {
+        setEmails(prev => prev.map(email =>
+            email.id === emailId ? { ...email, isStarred: !email.isStarred } : email
+        ));
+    };
+
+    const setTag = (emailId: string, tagId?: string) => {
+        setEmails(prev => prev.map(email =>
+            email.id === emailId ? { ...email, tagId } : email
+        ));
+        setContextMenu(null);
+    };
+
+    const filteredEmails = emails.filter(email => {
+        if (activeTab === 'favorites') return email.isStarred;
+        // In a real app, you'd filter by folder/folderId. For mock, just show inbox/sent/etc.
+        return true;
+    }).filter(email =>
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-4">
@@ -127,6 +178,24 @@ const EmailPage: React.FC = () => {
                             <TrashIcon className="w-5 h-5" />
                             <span>Lixeira</span>
                         </button>
+
+                        <button
+                            onClick={() => setActiveTab('favorites')}
+                            className={`flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === 'favorites' ? 'bg-brand-primary/10 text-brand-primary font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <StarIcon className="w-5 h-5 text-amber-500" />
+                            <span>Favoritos</span>
+                        </button>
+
+                        <hr className="my-1 border-gray-100" />
+
+                        <button
+                            onClick={() => setActiveTab('settings')}
+                            className={`flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-brand-primary/10 text-brand-primary font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <Cog6ToothIcon className="w-5 h-5" />
+                            <span>Configurações</span>
+                        </button>
                     </Card>
 
                     <Card className="p-4 mt-auto">
@@ -165,43 +234,136 @@ const EmailPage: React.FC = () => {
 
                     <Card className="flex-1 overflow-y-auto no-scrollbar p-1">
                         <div className="divide-y divide-gray-100">
-                            {MOCK_EMAILS.map((email) => (
-                                <div 
-                                    key={email.id}
-                                    onClick={() => setSelectedEmail(email)}
-                                    className={`p-4 cursor-pointer transition-all hover:bg-gray-50 group border-l-4 ${selectedEmail?.id === email.id ? 'bg-emerald-50/50 border-brand-primary' : 'border-transparent'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className={`text-sm ${!email.isRead ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
-                                            {email.from.name}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 font-medium">
-                                            {email.date}
-                                        </span>
+                            {filteredEmails.map((email) => {
+                                const tag = EMAIL_TAGS.find(t => t.id === email.tagId);
+                                return (
+                                    <div
+                                        key={email.id}
+                                        onClick={() => setSelectedEmail(email)}
+                                        onContextMenu={(e) => handleContextMenu(e, email.id)}
+                                        className={`p-4 cursor-pointer transition-all hover:bg-gray-50 group border-l-4 ${selectedEmail?.id === email.id ? 'bg-emerald-50/50 border-brand-primary' : 'border-transparent'}`}
+                                        style={tag ? { backgroundColor: tag.bgColor + '40', borderLeftColor: tag.color } : {}}
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-sm ${!email.isRead ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                                    {email.from.name}
+                                                </span>
+                                                {tag && (
+                                                    <span
+                                                        className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+                                                        style={{ backgroundColor: tag.color, color: '#fff' }}
+                                                    >
+                                                        {tag.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                                {email.date}
+                                            </span>
+                                        </div>
+                                        <h3 className={`text-sm truncate mb-1 ${!email.isRead ? 'font-bold' : 'text-gray-700'}`}>
+                                            {email.subject}
+                                        </h3>
+                                        <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+                                            {email.preview}
+                                        </p>
+                                        <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }}>
+                                                {email.isStarred ? (
+                                                    <StarIcon className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                                ) : (
+                                                    <StarIcon className="w-4 h-4 text-gray-300 hover:text-amber-400" />
+                                                )}
+                                            </button>
+                                            {email.attachments && <PaperClipIcon className="w-4 h-4 text-gray-300" />}
+                                        </div>
                                     </div>
-                                    <h3 className={`text-sm truncate mb-1 ${!email.isRead ? 'font-bold' : 'text-gray-700'}`}>
-                                        {email.subject}
-                                    </h3>
-                                    <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
-                                        {email.preview}
-                                    </p>
-                                    <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {email.isStarred ? (
-                                            <StarIcon className="w-4 h-4 text-amber-400 fill-amber-400" />
-                                        ) : (
-                                            <StarIcon className="w-4 h-4 text-gray-300 hover:text-amber-400" />
-                                        )}
-                                        {email.attachments && <PaperClipIcon className="w-4 h-4 text-gray-300" />}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </Card>
                 </div>
 
-                {/* Coluna 3: Leitura */}
+                {/* Coluna 3: Leitura ou Configurações */}
                 <div className="flex-1 overflow-hidden">
-                    {selectedEmail ? (
+                    {activeTab === 'settings' ? (
+                        <Card className="h-full flex flex-col overflow-hidden bg-gray-50/10">
+                            <div className="p-8 space-y-8 overflow-y-auto no-scrollbar">
+                                <div className="flex items-center gap-4 mb-2">
+                                    <div className="p-3 bg-brand-primary/10 rounded-2xl text-brand-primary">
+                                        <Cog6ToothIcon className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-gray-900">Configurações</h2>
+                                        <p className="text-sm text-gray-400">Personalize sua experiência de e-mail</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Perfil e Identidade */}
+                                    <Card className="p-6 space-y-4">
+                                        <h3 className="font-bold flex items-center gap-2 text-gray-700">
+                                            <IdentificationIcon className="w-5 h-5 text-brand-primary" />
+                                            Identidade e Assinatura
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="text-xs font-bold text-gray-400 uppercase">Assinatura do E-mail</label>
+                                                <textarea
+                                                    value={signature}
+                                                    onChange={(e) => setSignature(e.target.value)}
+                                                    className="w-full h-32 p-3 text-sm border-gray-100 rounded-xl focus:ring-brand-primary bg-gray-50/50 resize-none"
+                                                    placeholder="Digite sua assinatura aqui..."
+                                                />
+                                                <p className="text-[10px] text-gray-400 italic">Esta assinatura será adicionada automaticamente ao final de novos e-mails.</p>
+                                            </div>
+                                        </div>
+                                    </Card>
+
+                                    {/* Marcadores e Tags */}
+                                    <Card className="p-6 space-y-4">
+                                        <h3 className="font-bold flex items-center gap-2 text-gray-700">
+                                            <PaintBrushIcon className="w-5 h-5 text-brand-primary" />
+                                            Gerenciar Marcadores
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {EMAIL_TAGS.map(tag => (
+                                                <div key={tag.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-50">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-4 h-4 rounded" style={{ backgroundColor: tag.color }} />
+                                                        <span className="text-sm font-medium">{tag.label}</span>
+                                                    </div>
+                                                    <button className="text-xs text-brand-primary font-bold hover:underline">Editar</button>
+                                                </div>
+                                            ))}
+                                            <button className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-xs font-bold text-gray-400 hover:border-brand-primary hover:text-brand-primary transition-all mt-2">
+                                                + Novo Marcador
+                                            </button>
+                                        </div>
+                                    </Card>
+
+                                    {/* Exibição */}
+                                    <Card className="p-6 space-y-4">
+                                        <h3 className="font-bold flex items-center gap-2 text-gray-700">
+                                            <Bars3Icon className="w-5 h-5 text-brand-primary" />
+                                            Preferências de Exibição
+                                        </h3>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-600">Mostrar visualização da mensagem</span>
+                                                <div className="w-10 h-5 bg-brand-primary rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute right-0.5 top-0.5" /></div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-600">Agrupar por conversas (Threads)</span>
+                                                <div className="w-10 h-5 bg-gray-200 rounded-full relative"><div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5" /></div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            </div>
+                        </Card>
+                    ) : selectedEmail ? (
                         <Card className="h-full flex flex-col overflow-hidden">
                             {/* Toolbar */}
                             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
@@ -299,6 +461,38 @@ const EmailPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Menu de Contexto */}
+            {contextMenu && (
+                <>
+                    <div className="fixed inset-0 z-[140]" onClick={() => setContextMenu(null)} />
+                    <div
+                        className="fixed z-[150] bg-white shadow-2xl rounded-xl border border-gray-100 p-2 min-w-[200px] animate-in fade-in zoom-in duration-200"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                    >
+                        <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 mb-1">
+                            Marcar como
+                        </div>
+                        {EMAIL_TAGS.map(tag => (
+                            <button
+                                key={tag.id}
+                                onClick={() => setTag(contextMenu.emailId, tag.id)}
+                                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all text-sm group"
+                            >
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                <span className="flex-1 text-left">{tag.label}</span>
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => setTag(contextMenu.emailId, undefined)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500 transition-all text-sm mt-1"
+                        >
+                            <TrashIcon className="w-4 h-4" />
+                            <span>Remover Marcação</span>
+                        </button>
+                    </div>
+                </>
+            )}
+
             {/* Modal de Composição */}
             {isComposeOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-end p-6 pointer-events-none">
@@ -321,6 +515,7 @@ const EmailPage: React.FC = () => {
                             <textarea 
                                 className="w-full h-full border-none focus:ring-0 resize-none text-sm placeholder:text-gray-300" 
                                 placeholder="Escreva sua mensagem aqui..."
+                                defaultValue={`\n\n\n--\n${signature}`}
                             />
                         </div>
                         <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">

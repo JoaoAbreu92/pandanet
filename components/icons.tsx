@@ -77,4 +77,6 @@ export {
   PencilSquareIcon,
   ExclamationCircleIcon,
   EllipsisVerticalIcon,
+  IdentificationIcon,
+  PaintBrushIcon,
 } from '@heroicons/react/24/outline';
