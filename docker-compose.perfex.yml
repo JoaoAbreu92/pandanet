@@ -16,7 +16,9 @@ services:
       - pandanet_network
 
   perfex-app:
-    image: php:8.2-apache
+    build:
+      context: .
+      dockerfile: Dockerfile.perfex
     container_name: perfex_app
     restart: always
     volumes:

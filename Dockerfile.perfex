@@ -1,0 +1,29 @@
+FROM php:8.2-apache
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libzip-dev \
+    libc-client-dev \
+    libkrb5-dev \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configurar e instalar extensões PHP
+RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+    mysqli \
+    pdo_mysql \
+    gd \
+    zip \
+    imap \
+    bcmath
+
+# Habilitar mod_rewrite do Apache (necessário para o Perfex)
+RUN a2enmod rewrite
+
+# Ajustar permissões para o Apache
+RUN chown -R www-data:www-data /var/www/html
