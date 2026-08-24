@@ -61,7 +61,13 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     employeeManager: p.employee_manager,
                     reports_to: p.reports_to,
                     sector_manager_id: p.sector_manager_id,
-                    coverUrl: p.cover_url
+                    coverUrl: p.cover_url,
+                    email_permissions: p.email_permissions,
+                    whatspanda_permissions: p.whatspanda_permissions,
+                    can_nudge: p.can_nudge,
+                    nudge_cooldown: p.nudge_cooldown,
+                    is_whatsapp_agent: p.is_whatsapp_agent,
+                    is_manager: p.is_manager
                 }));
                 setEmployees(mappedEmployees);
             }

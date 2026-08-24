@@ -69,9 +69,10 @@ const UserFormModal: React.FC<{
     user: Partial<Employee> | null;
     departments: Department[];
     users: Employee[];
+    plan: Plan;
     onClose: () => void;
     onSave: (user: Omit<Employee, 'id'> | Employee) => void;
-}> = ({ user, departments, users, onClose, onSave }) => {
+}> = ({ user, departments, users, plan, onClose, onSave }) => {
     const { t } = useLanguage();
     const { profile } = useAuth();
     const [channels, setChannels] = useState<any[]>([]);
@@ -86,6 +87,12 @@ const UserFormModal: React.FC<{
                 });
         }
     }, [profile?.company_id]);
+
+    const totalAllocatedOtherUsers = users
+        .filter(u => u.id !== user?.id)
+        .reduce((sum, u) => sum + (u.email_permissions?.account_limit || 0), 0);
+    const planEmailLimit = plan?.emailLimit || 1;
+    const remainingLimit = Math.max(0, planEmailLimit - totalAllocatedOtherUsers);
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -172,6 +179,14 @@ const UserFormModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validação de limite de e-mail de acordo com o plano
+        const newLimit = formData.email_permissions.account_limit || 0;
+        if (newLimit > remainingLimit) {
+            alert(`Erro: Você tentou definir um limite de ${newLimit} contas de e-mail para este usuário. Porém, restam apenas ${remainingLimit} contas de e-mail disponíveis para distribuição no plano atual da empresa (Limite total do plano: ${planEmailLimit} contas).`);
+            return;
+        }
+
         // Garante que o formData sobrescreva tudo do usuário anterior, mantendo o ID
         const finalData = { ...user, ...formData };
         onSave(finalData as Employee);
@@ -487,21 +502,29 @@ const UserFormModal: React.FC<{
                                         onChange={(n, c) => setFormData(p => ({ ...p, email_permissions: { ...p.email_permissions, [n]: c } }))} 
                                     />
                                     <div className="flex flex-col gap-1.5 p-3 bg-white/50 rounded-xl border border-slate-200">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase px-1">Limite de Contas de E-mail</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase px-1">
+                                            Limite de Contas de E-mail (Max: {planEmailLimit})
+                                        </label>
                                         <input 
                                             type="number" 
                                             placeholder="Ex: 2"
-                                            value={formData.email_permissions.account_limit || ''} 
-                                            onChange={(e) => setFormData(p => ({ 
-                                                ...p, 
-                                                email_permissions: { 
-                                                    ...p.email_permissions, 
-                                                    account_limit: parseInt(e.target.value) || 0 
-                                                } 
-                                            }))} 
+                                            min="0"
+                                            value={formData.email_permissions.account_limit || 0} 
+                                            onChange={(e) => {
+                                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                                setFormData(p => ({ 
+                                                    ...p, 
+                                                    email_permissions: { 
+                                                        ...p.email_permissions, 
+                                                        account_limit: val 
+                                                    } 
+                                                }));
+                                            }} 
                                             className="w-full bg-white border-slate-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" 
                                         />
-                                        <p className="text-[9px] text-slate-400 italic px-1 leading-tight">Máximo de contas que este usuário pode cadastrar.</p>
+                                        <p className="text-[9px] text-slate-400 italic px-1 leading-tight">
+                                            Máximo de contas que este usuário pode cadastrar. (Disponível no plano: {remainingLimit} livre(s)).
+                                        </p>
                                     </div>
 
                                     <div className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
@@ -1060,7 +1083,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     </table>
                 </div>
             </Card>
-            {isModalOpen && <UserFormModal user={editingUser} departments={departments} users={users} onClose={() => setModalOpen(false)} onSave={handleSave} />}
+            {isModalOpen && <UserFormModal user={editingUser} departments={departments} users={users} plan={plan} onClose={() => setModalOpen(false)} onSave={handleSave} />}
             
             {resetPasswordUser && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
