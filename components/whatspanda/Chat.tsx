@@ -83,7 +83,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: string} | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'aberto' | 'fechado'>('aberto');
+  const [activeTab, setActiveTab] = useState<'aguardando' | 'meus' | 'fechados'>('aguardando');
   const [useSignature, setUseSignature] = useState(false);
   const [signatureText, setSignatureText] = useState('');
   
@@ -112,6 +112,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
   const [forwardTargetSearch, setForwardTargetSearch] = useState('');
   const [forwardLoading, setForwardLoading] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferType, setTransferType] = useState<'agent' | 'queue'>('agent');
+  const [transferSearch, setTransferSearch] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
 
   const renderMessageText = (text: string) => {
     if (!text) return null;
@@ -294,6 +298,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const [connections, setConnections] = useState<any[]>([]);
   const [queues, setQueues] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
+  const [userQueues, setUserQueues] = useState<string[] | null>(null);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Canal access: list of {channel_id, can_send_messages, can_send_media, force_signature}
@@ -469,12 +474,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   const loadFiltersData = async () => {
     const companyId = currentUser?.company_id;
     if (!companyId) return;
-    const [{ data: deps }, { data: cols }] = await Promise.all([
+    const userId = activeProfile?.id || profile?.id;
+
+    const [{ data: deps }, { data: cols }, { data: userDeps }, { data: agentsData }] = await Promise.all([
       supabase.from('departments').select('id, name').eq('company_id', companyId),
-      supabase.from('whatsapp_kanban_columns').select('*').eq('company_id', companyId).order('order_index', { ascending: true })
+      supabase.from('whatsapp_kanban_columns').select('*').eq('company_id', companyId).order('order_index', { ascending: true }),
+      supabase.from('department_users').select('department_id').eq('company_id', companyId).eq('user_id', userId),
+      supabase.from('profiles').select('id, full_name').eq('company_id', companyId)
     ]);
     if (deps) setQueues(deps);
     if (cols) setKanbanColumns(cols);
+    if (userDeps) setUserQueues(userDeps.map(d => d.department_id));
+    if (agentsData) setAgents(agentsData);
   };
 
   // Update searchTerm if initialSearch changes
@@ -617,7 +628,18 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       }
     }
 
-    query = query.eq('status', activeTab);
+    if (activeTab === 'aguardando') {
+      query = query.eq('status', 'aberto').is('assigned_to', null);
+      if (!isAdmin && userQueues && userQueues.length > 0) {
+        query = query.or(`queue_id.in.(${userQueues.join(',')}),queue_id.is.null`);
+      } else if (!isAdmin && userQueues && userQueues.length === 0) {
+        query = query.is('queue_id', null);
+      }
+    } else if (activeTab === 'meus') {
+      query = query.eq('status', 'aberto').eq('assigned_to', userId);
+    } else if (activeTab === 'fechados') {
+      query = query.eq('status', 'fechado');
+    }
 
     // Pesquisa por nome ou telefone
     if (searchTerm) {
@@ -710,6 +732,31 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     } catch (err: any) {
       alert('Erro ao atualizar status: ' + err.message);
+    }
+  };
+
+  const handleTransfer = async (targetId: string, type: 'agent' | 'queue') => {
+    if (!selectedConversation || isGhostMode) return;
+    setTransferLoading(true);
+    try {
+      const updateData: any = type === 'agent'
+        ? { assigned_to: targetId }
+        : { queue_id: targetId, assigned_to: null };
+      
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update(updateData)
+        .eq('id', selectedConversation.id);
+
+      if (error) throw error;
+
+      setIsTransferModalOpen(false);
+      setTransferSearch('');
+      setTimeout(() => fetchConversations(), 300);
+    } catch (err: any) {
+      alert('Erro ao transferir: ' + err.message);
+    } finally {
+      setTransferLoading(false);
     }
   };
 
@@ -1227,7 +1274,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
           {/* Tabs */}
           <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
-            {(['aberto', 'fechado'] as const).map((tab) => (
+            {(['aguardando', 'meus', 'fechados'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1362,7 +1409,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               )}
             </div>
           )}
-          {isAdmin && activeTab === 'fechado' && (
+          {isAdmin && activeTab === 'fechados' && (
             <button
               onClick={async () => {
                   if (isGhostMode) return;
@@ -1568,6 +1615,14 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
               </div>
                     <div className="flex gap-2 items-center">
+                      {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && !isGhostMode && (
+                        <button
+                          onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
+                          className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
+                        >
+                          Aceitar
+                        </button>
+                      )}
                       <div className="h-8 w-px bg-slate-200 dark:bg-white/10 mx-1" />
                       <div className="flex gap-1.5">
                 {isAdmin && (
@@ -2033,6 +2088,28 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               </div>
             </div>
 
+            {/* Atribuição Section */}
+            <div className="border-t border-slate-100 dark:border-white/5 pt-6">
+              <h4 className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <UserPlus className="w-3.5 h-3.5" /> Atribuição
+              </h4>
+              <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-3 text-xs mb-3">
+                <p className="text-slate-400 mb-1">Atendente</p>
+                <p className="font-bold text-slate-700 dark:text-white">{selectedConversation.assigned_user?.full_name || 'Sem atendente'}</p>
+                <p className="text-slate-400 mt-2 mb-1">Setor</p>
+                <p className="font-bold text-slate-700 dark:text-white">{selectedConversation.queue?.name || 'Sem setor'}</p>
+              </div>
+              {!isGhostMode && (
+                <button
+                  onClick={() => { setIsTransferModalOpen(true); setTransferSearch(''); setTransferType('agent'); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 rounded-xl transition-colors border border-indigo-100 dark:border-indigo-500/20"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Transferir Atendimento
+                </button>
+              )}
+            </div>
+
             <button 
               onClick={() => handleUpdateStatus(selectedConversation.id, selectedConversation.status === 'fechado' ? 'aberto' : 'fechado')}
               className={`w-full flex items-center justify-center py-4 px-6 font-bold text-xs uppercase tracking-widest rounded-2xl transition-all duration-300 border ${
@@ -2076,6 +2153,100 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             </button>
           </div>
         </>
+      )}
+
+      {/* Transfer Modal */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Transferir Atendimento</h3>
+                <p className="text-xs text-slate-500 mt-1">Transfira para um atendente ou fila</p>
+              </div>
+              <button onClick={() => setIsTransferModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Tipo de Transferência */}
+            <div className="flex gap-2 p-4 bg-slate-50 dark:bg-white/5 border-b border-slate-100 dark:border-white/5">
+              <button
+                onClick={() => setTransferType('agent')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  transferType === 'agent'
+                    ? 'bg-indigo-500 text-white shadow-lg'
+                    : 'bg-white dark:bg-white/10 text-slate-500 hover:text-indigo-600'
+                }`}
+              >
+                Atendente
+              </button>
+              <button
+                onClick={() => setTransferType('queue')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  transferType === 'queue'
+                    ? 'bg-emerald-500 text-white shadow-lg'
+                    : 'bg-white dark:bg-white/10 text-slate-500 hover:text-emerald-600'
+                }`}
+              >
+                Fila / Setor
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-white/5">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={transferType === 'agent' ? 'Buscar atendente...' : 'Buscar setor...'}
+                  value={transferSearch}
+                  onChange={(e) => setTransferSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto p-2">
+              {(transferType === 'agent' ? agents : queues)
+                .filter(item =>
+                  (item.full_name || item.name || '').toLowerCase().includes(transferSearch.toLowerCase())
+                )
+                .map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleTransfer(item.id, transferType)}
+                    disabled={transferLoading}
+                    className="w-full flex items-center gap-4 p-3 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-2xl transition-all group"
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm ${
+                      transferType === 'agent' ? 'bg-indigo-500' : 'bg-emerald-500'
+                    }`}>
+                      {(item.full_name || item.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.full_name || item.name}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                        {transferType === 'agent' ? 'Atendente' : 'Setor'}
+                      </p>
+                    </div>
+                    <CornerUpRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                  </button>
+                ))
+              }
+              {(transferType === 'agent' ? agents : queues).filter(i =>
+                (i.full_name || i.name || '').toLowerCase().includes(transferSearch.toLowerCase())
+              ).length === 0 && (
+                <p className="text-center text-slate-400 text-sm py-6">Nenhum resultado encontrado</p>
+              )}
+            </div>
+
+            {transferLoading && (
+              <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center backdrop-blur-[1px]">
+                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Forward Message Modal */}
