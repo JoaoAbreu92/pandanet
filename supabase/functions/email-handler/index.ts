@@ -17,6 +17,15 @@ serve(async (req) => {
     try {
         const { action, config, payload } = await req.json();
 
+        console.log(`[EmailHandler] Action: ${action}`);
+        if (config) console.log(`[EmailHandler] Config Host: ${config.imap_host}:${config.imap_port} (User: ${config.imap_user})`);
+
+        // Helper to ensure number
+        const ensureNumber = (val: any) => {
+            const num = Number(val);
+            return isNaN(num) ? 0 : num;
+        };
+
         // 1. TEST CONNECTION (IMAP & SMTP)
         if (action === 'test') {
             const results = { imap: false, smtp: false, error: null };
@@ -25,7 +34,7 @@ serve(async (req) => {
             try {
                 const transporter = nodemailer.createTransport({
                     host: config.smtp_host,
-                    port: config.smtp_port,
+                    port: ensureNumber(config.smtp_port),
                     secure: config.smtp_ssl,
                     auth: {
                         user: config.smtp_user,
@@ -46,7 +55,7 @@ serve(async (req) => {
             try {
                 const client = new ImapFlow({
                     host: config.imap_host,
-                    port: config.imap_port,
+                    port: ensureNumber(config.imap_port),
                     secure: config.imap_ssl,
                     auth: {
                         user: config.imap_user,
@@ -74,7 +83,7 @@ serve(async (req) => {
         if (action === 'fetch') {
              const client = new ImapFlow({
                 host: config.imap_host,
-                port: config.imap_port,
+                 port: ensureNumber(config.imap_port),
                 secure: config.imap_ssl,
                 auth: {
                     user: config.imap_user,
@@ -86,31 +95,78 @@ serve(async (req) => {
                 logger: false
             });
 
-            await client.connect();
-            const lock = await client.getMailboxLock('INBOX');
-            const emails = [];
+
+            // Helper: Connect with Timeout
+            const connectWithTimeout = async (client: any, timeoutMs: number = 15000) => {
+                let timer: any;
+                const timeoutPromise = new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`Connection timed out after ${timeoutMs}ms`)), timeoutMs);
+                });
+
+                try {
+                    await Promise.race([
+                        client.connect(),
+                        timeoutPromise
+                    ]);
+                } finally {
+                    clearTimeout(timer);
+                }
+            };
 
             try {
-                // Fetch last 20 emails
-                for await (const message of client.fetch('1:*', { envelope: true, source: false }, { uid: true })) {
-                    emails.push({
-                        uid: message.uid,
-                        subject: message.envelope.subject,
-                        from: message.envelope.from[0]?.address,
-                        date: message.envelope.date,
-                        flags: message.flags
-                    });
-                }
-                // Sort by newest
-                emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                const recentEmails = emails.slice(0, 30); // Return last 30
+                console.log("[EmailHandler] Connecting to IMAP...");
+                await connectWithTimeout(client);
+                console.log("[EmailHandler] Connected.");
 
-                return new Response(JSON.stringify(recentEmails), {
+                // Acquire lock and select mailbox
+                const lock = await client.getMailboxLock('INBOX');
+                const emails = [];
+
+                try {
+                    // client.mailbox is populated after selection
+                    const status = client.mailbox;
+                    console.log(`[EmailHandler] Mailbox Status: ${status?.exists} messages`);
+
+                    if (!status || status.exists === 0) {
+                        return new Response(JSON.stringify([]), {
+                            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                        });
+                    }
+
+                    const total = status.exists;
+                    const fetchStart = Math.max(1, total - 19);
+                    const range = `${fetchStart}:*`;
+
+                    for await (const message of client.fetch(range, { envelope: true, source: false }, { uid: true })) {
+                        emails.push({
+                            uid: message.uid,
+                            messageId: message.envelope.messageId || `uid-${message.uid}`,
+                            subject: message.envelope.subject || '(Sem Assunto)',
+                            from: message.envelope.from && message.envelope.from[0] ? message.envelope.from[0]?.address : 'Desconhecido',
+                            date: message.envelope.date,
+                            flags: message.flags
+                        });
+                    }
+
+                    // Sort by newest
+                    emails.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                    return new Response(JSON.stringify(emails), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    });
+
+                } finally {
+                    if (lock) lock.release();
+                    await client.logout();
+                }
+
+            } catch (err: any) {
+                console.error("IMAP Connection/Fetch Error:", err);
+                // Return 200 with error field so frontend handles it gracefully
+                return new Response(JSON.stringify({ error: `IMAP Error: ${err.message}` }), {
+                    status: 200,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 });
-            } finally {
-                lock.release();
-                await client.logout();
             }
         }
 
