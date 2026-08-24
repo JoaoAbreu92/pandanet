@@ -203,9 +203,13 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
+    } catch (error: any) {
+        console.error("Global Error:", error);
+        return new Response(JSON.stringify({
+            error: `Global Handler Error: ${error.message}`,
+            stack: error.stack
+        }), {
+            status: 200, // Return 200 so frontend can read the error message
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
