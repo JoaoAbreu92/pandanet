@@ -1741,11 +1741,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    } catch (err) {
-      console.warn('Download via proxy falhou, tentando fallback direto:', err);
-      // Fallback: abre a URL limpa em nova aba (o navegador pode oferecer download)
-      const url = fixMediaUrl(rawUrl);
-      if (url) window.open(url, '_blank');
+    } catch (err: any) {
+      console.warn('Download via proxy falhou:', err);
+      alert('Não foi possível baixar o arquivo no momento. Verifique sua conexão e tente novamente.');
     }
   };
 
@@ -1787,9 +1785,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
-      let mimeType = 'audio/webm';
-      if (!MediaRecorder.isTypeSupported('audio/webm')) {
-        if (MediaRecorder.isTypeSupported('audio/ogg')) {
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+          mimeType = 'audio/ogg;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
           mimeType = 'audio/ogg';
         } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
           mimeType = 'audio/mp4';

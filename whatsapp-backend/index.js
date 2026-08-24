@@ -971,6 +971,21 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             const cleanUrl = mediaUrl.split('?')[0];
             const fileName = cleanUrl.split('/').pop() || 'file';
             
+            // Para envio de áudio, a Evolution API precisa da Data URI completa com MIME type (ex: data:audio/webm;base64,...)
+            // Se enviar apenas o base64 sem prefixo data:, o ffmpeg da Evolution não reconhece o container do webm e gera áudio mudo.
+            const audioDataUri = mediaUrl.startsWith('data:')
+                ? mediaUrl
+                : `data:${mediaType || 'audio/webm'};base64,${base64Data}`;
+
+            // Fazer upload do áudio para o Supabase Storage para salvar URL pública permanente
+            let savedMediaUrl = mediaUrl;
+            if (mediaUrl.startsWith('data:')) {
+                const uploadedUrl = await uploadMediaToSupabase(base64Data, isAudio ? 'audio' : 'document', conv.company_id, mediaType || 'audio/webm', isAudio ? `audio_${Date.now()}.webm` : 'file');
+                if (uploadedUrl) {
+                    savedMediaUrl = uploadedUrl;
+                }
+            }
+
             const body = isSticker ? {
                 number: phoneNumber,
                 stickerMessage: {
@@ -978,7 +993,6 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             } : isAudio ? {
                 // Formato correto da Evolution API v2 para sendWhatsAppAudio com encoding
-                // delay e encoding ficam dentro de "options", audio fica dentro de "audioMessage"
                 number: phoneNumber,
                 options: {
                     delay: 1200,
@@ -986,7 +1000,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                     encoding: true
                 },
                 audioMessage: {
-                    audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data
+                    audio: audioDataUri
                 }
             } : {
                 number: phoneNumber,
@@ -1021,12 +1035,12 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta ${endpoint} (${sendReq.status}):`, JSON.stringify(sendRes).substring(0, 500));
 
-            // Se falhou com o formato audioMessage, tenta com o formato legado (audio na raiz)
+            // Se falhou com o formato audioMessage, tenta com o formato legado
             if (isAudio && (!sendReq.ok || sendRes?.error)) {
-                console.warn('[SEND API] audioMessage falhou, tentando formato legado (audio na raiz)...');
+                console.warn('[SEND API] audioMessage falhou, tentando formato legado (audio com Data URI na raiz)...');
                 const legacyBody = {
                     number: phoneNumber,
-                    audio: base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data,
+                    audio: audioDataUri,
                     delay: 1200,
                     options: { encoding: true }
                 };
@@ -1092,7 +1106,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 company_id: conv.company_id,
                 conversation_id: conversationId,
                 message_text: message,
-                media_url: mediaUrl || undefined,
+                media_url: savedMediaUrl || mediaUrl || undefined,
                 media_type: mediaType || undefined,
                 is_from_customer: false,
                 sent_by: userId,
@@ -1225,59 +1239,87 @@ router.get('/debug-logs', (req, res) => {
 });
 
 // API: Proxy de Download de Mídia do Supabase Storage
-// Permite que o frontend baixe arquivos via rede Docker interna, evitando
-// problemas de CORS, nginx proxy ou permissão no navegador.
+// Usa a SDK do Supabase no Node.js para baixar arquivos diretamente dos buckets
+// garantindo suporte universal a downloads com Content-Disposition: attachment
 router.get('/media/proxy', authMiddleware, async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
 
     try {
-        let targetUrl = decodeURIComponent(url);
+        const rawUrl = decodeURIComponent(url);
+        console.log(`[MEDIA-PROXY] Requisição de download para: ${rawUrl}`);
 
-        // Redireciona para a rede interna do Docker para evitar NAT Loopback
-        const storageIdx = targetUrl.indexOf('/storage/v1/object/public/');
-        if (storageIdx !== -1 && internalSupabaseUrl) {
-            const storagePath = targetUrl.substring(storageIdx);
-            const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
-            targetUrl = `${base}${storagePath}`;
-            console.log(`[MEDIA-PROXY] Redirecionando para rede interna: ${targetUrl}`);
+        let fileBuffer = null;
+        let contentType = 'application/octet-stream';
+
+        const storageIdx = rawUrl.indexOf('/storage/v1/object/public/');
+
+        if (storageIdx !== -1) {
+            // Extrai o nome do bucket e a rota interna do arquivo
+            const relativePath = rawUrl.substring(storageIdx + '/storage/v1/object/public/'.length);
+            const pathParts = relativePath.split('/');
+            const bucket = pathParts[0];
+            const filePath = decodeURIComponent(pathParts.slice(1).join('/'));
+
+            console.log(`[MEDIA-PROXY] Baixando via Supabase SDK Client: bucket=${bucket}, path=${filePath}`);
+            const { data, error } = await supabase.storage.from(bucket).download(filePath);
+
+            if (!error && data) {
+                const arrayBuffer = await data.arrayBuffer();
+                fileBuffer = Buffer.from(arrayBuffer);
+                if (data.type) contentType = data.type;
+                console.log(`[MEDIA-PROXY] Supabase SDK download OK (${fileBuffer.length} bytes)`);
+            } else {
+                console.warn(`[MEDIA-PROXY] Supabase SDK falhou (${error?.message}). Tentando HTTP fetch fallback...`);
+            }
         }
 
-        // AbortController compatível com Node.js < 17.3 (sem AbortSignal.timeout)
-        const proxyController = new AbortController();
-        const proxyTimeout = setTimeout(() => proxyController.abort(), 30000);
+        // Fallback: se não for do Supabase ou a SDK falhar, faz HTTP fetch
+        if (!fileBuffer) {
+            let targetUrl = rawUrl;
+            if (storageIdx !== -1 && internalSupabaseUrl) {
+                const storagePath = rawUrl.substring(storageIdx);
+                const base = internalSupabaseUrl.endsWith('/') ? internalSupabaseUrl.slice(0, -1) : internalSupabaseUrl;
+                targetUrl = `${base}${storagePath}`;
+            }
 
-        let fetchRes;
-        try {
-            fetchRes = await fetch(targetUrl, { signal: proxyController.signal });
-        } finally {
-            clearTimeout(proxyTimeout);
+            const proxyController = new AbortController();
+            const proxyTimeout = setTimeout(() => proxyController.abort(), 30000);
+
+            let fetchRes;
+            try {
+                fetchRes = await fetch(targetUrl, { signal: proxyController.signal });
+                if (!fetchRes.ok && targetUrl !== rawUrl) {
+                    fetchRes = await fetch(rawUrl, { signal: proxyController.signal });
+                }
+            } finally {
+                clearTimeout(proxyTimeout);
+            }
+
+            if (!fetchRes || !fetchRes.ok) {
+                console.error(`[MEDIA-PROXY] HTTP fetch falhou (${fetchRes?.status}) para ${targetUrl}`);
+                return res.status(fetchRes ? fetchRes.status : 500).json({ error: `Falha ao buscar mídia no servidor (HTTP ${fetchRes?.status})` });
+            }
+
+            const arrayBuffer = await fetchRes.arrayBuffer();
+            fileBuffer = Buffer.from(arrayBuffer);
+            const fetchedType = fetchRes.headers.get('content-type');
+            if (fetchedType) contentType = fetchedType;
         }
-
-        if (!fetchRes.ok) {
-            console.error(`[MEDIA-PROXY] Supabase retornou ${fetchRes.status} para: ${targetUrl}`);
-            return res.status(fetchRes.status).json({ error: `Falha ao buscar mídia: HTTP ${fetchRes.status}` });
-        }
-
-        const contentType = fetchRes.headers.get('content-type') || 'application/octet-stream';
-        const contentLength = fetchRes.headers.get('content-length');
 
         // Extrai o nome do arquivo da URL original
-        const originalUrl = decodeURIComponent(url);
-        const filename = originalUrl.split('/').pop()?.split('?')[0] || 'download';
+        const filename = rawUrl.split('/').pop()?.split('?')[0] || 'documento';
         const safeFilename = encodeURIComponent(filename);
 
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
-        if (contentLength) res.setHeader('Content-Length', contentLength);
+        res.setHeader('Content-Length', fileBuffer.length);
         res.setHeader('Cache-Control', 'private, max-age=300');
 
-        // Stream direto para o cliente
-        const buffer = await fetchRes.arrayBuffer();
-        res.send(Buffer.from(buffer));
+        return res.send(fileBuffer);
     } catch (err) {
-        console.error('[MEDIA-PROXY] Erro:', err.message);
-        res.status(500).json({ error: `Erro ao baixar mídia: ${err.message}` });
+        console.error('[MEDIA-PROXY] Erro geral no proxy:', err.message);
+        return res.status(500).json({ error: `Erro ao baixar mídia: ${err.message}` });
     }
 });
 
