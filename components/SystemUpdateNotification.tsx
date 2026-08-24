@@ -74,7 +74,7 @@ const SystemUpdateNotification: React.FC = () => {
         setIsVisible(false);
     };
 
-    const getBase64ImageFromURL = (url: string): Promise<string> => {
+    const getBase64ImageFromURL = (url: string): Promise<{ data: string, width: number, height: number }> => {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.setAttribute('crossOrigin', 'anonymous');
@@ -85,11 +85,15 @@ const SystemUpdateNotification: React.FC = () => {
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0);
                 const dataURL = canvas.toDataURL('image/png');
-                resolve(dataURL);
+                resolve({ data: dataURL, width: img.width, height: img.height });
             };
             img.onerror = error => reject(error);
             img.src = url;
         });
+    };
+
+    const stripEmojis = (str: string) => {
+        return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1F170}-\u{1F251}]/gu, '');
     };
 
     const handleDownloadNota = async () => {
@@ -108,8 +112,11 @@ const SystemUpdateNotification: React.FC = () => {
 
             // 2. Adicionar Logo
             try {
-                const base64Logo = await getBase64ImageFromURL(logoUrl);
-                doc.addImage(base64Logo, 'PNG', 14, 10, 25, 25, undefined, 'FAST');
+                const { data: base64Logo, width, height } = await getBase64ImageFromURL(logoUrl);
+                const maxWidth = 30;
+                const aspectRatio = height / width;
+                const finalHeight = maxWidth * aspectRatio;
+                doc.addImage(base64Logo, 'PNG', 14, 10, maxWidth, finalHeight, undefined, 'FAST');
             } catch (e) {
                 console.warn('Erro ao carregar logo para o PDF da nota:', e);
             }
@@ -132,7 +139,8 @@ const SystemUpdateNotification: React.FC = () => {
             doc.setTextColor(55, 65, 81);
             doc.setFont('helvetica', 'normal');
 
-            const splitDescription = doc.splitTextToSize(latestUpdate.description, 170);
+            const cleanDescription = stripEmojis(latestUpdate.description);
+            const splitDescription = doc.splitTextToSize(cleanDescription, 170);
             doc.text(splitDescription, 14, 50);
 
             // 5. Rodapé

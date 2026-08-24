@@ -387,7 +387,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
         setModalOpen(true);
     };
 
-    const getBase64ImageFromURL = (url: string): Promise<string> => {
+    const getBase64ImageFromURL = (url: string): Promise<{ data: string, width: number, height: number }> => {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.setAttribute('crossOrigin', 'anonymous');
@@ -398,11 +398,15 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0);
                 const dataURL = canvas.toDataURL('image/png');
-                resolve(dataURL);
+                resolve({ data: dataURL, width: img.width, height: img.height });
             };
             img.onerror = error => reject(error);
             img.src = url;
         });
+    };
+
+    const stripEmojis = (str: string) => {
+        return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1F170}-\u{1F251}]/gu, '');
     };
 
     const generatePDFHistory = async (userId: string, userName: string) => {
@@ -432,8 +436,11 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             // 2. Adicionar Logo ao PDF
             if (logoUrl) {
                 try {
-                    const base64Logo = await getBase64ImageFromURL(logoUrl);
-                    doc.addImage(base64Logo, 'PNG', 14, 10, 30, 30, undefined, 'FAST');
+                    const { data: base64Logo, width, height } = await getBase64ImageFromURL(logoUrl);
+                    const maxWidth = 35;
+                    const aspectRatio = height / width;
+                    const finalHeight = maxWidth * aspectRatio;
+                    doc.addImage(base64Logo, 'PNG', 14, 10, maxWidth, finalHeight, undefined, 'FAST');
                 } catch (e) {
                     console.warn('Erro ao carregar logo para o PDF:', e);
                 }
@@ -492,7 +499,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             (doc as any).autoTable({
                 startY: 50,
                 head: [['Data/Hora', 'Remetente', 'Mensagem']],
-                body: tableData,
+                body: tableData.map(row => row.map(cell => stripEmojis(String(cell)))),
                 theme: 'striped',
                 headStyles: {
                     fillColor: [16, 185, 129],
