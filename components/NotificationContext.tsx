@@ -537,7 +537,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     console.log('[PandaNet] Canal FCM para Android criado.');
                 } catch (chErr: any) {
                     console.error('[PandaNet] Erro ao criar canal FCM:', chErr);
-                    alert('[PandaNet] Erro ao criar canal FCM: ' + chErr?.message);
+                    if (currentUser?.email === 'ti@grupopixel.com.br') {
+                        alert('[PandaNet Debug] Erro ao criar canal FCM: ' + chErr?.message);
+                    }
                 }
             }
 
@@ -547,7 +549,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             // On success, save token to profile in Supabase
             await PushNotifications.addListener('registration', async (token) => {
                 console.log('[PandaNet] Push registration success, token: ' + token.value);
-                alert('[PandaNet] Dispositivo registrado com sucesso no Firebase!');
+                if (currentUser?.email === 'ti@grupopixel.com.br') {
+                    alert('[PandaNet Debug] Dispositivo registrado com sucesso no Firebase!');
+                }
                 try {
                     const { error } = await supabase
                         .from('profiles')
@@ -555,17 +559,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         .eq('id', userId);
                     if (error) throw error;
                     console.log('[PandaNet] Push token successfully saved to profile.');
-                    alert('[PandaNet] Token push salvo com sucesso no seu perfil do banco.');
+                    if (currentUser?.email === 'ti@grupopixel.com.br') {
+                        alert('[PandaNet Debug] Token push salvo com sucesso no seu perfil do banco.');
+                    }
                 } catch (dbErr: any) {
                     console.error('[PandaNet] Error saving push token to profile:', dbErr);
-                    alert('[PandaNet] Erro ao registrar token push no banco: ' + dbErr?.message);
+                    if (currentUser?.email === 'ti@grupopixel.com.br') {
+                        alert('[PandaNet Debug] Erro ao registrar token push no banco: ' + dbErr?.message);
+                    }
                 }
             });
 
             // Handle registration errors
             await PushNotifications.addListener('registrationError', (error) => {
                 console.error('[PandaNet] Push registration error:', JSON.stringify(error));
-                alert('[PandaNet] Falha ao registrar notificações push no Firebase: ' + JSON.stringify(error));
+                if (currentUser?.email === 'ti@grupopixel.com.br') {
+                    alert('[PandaNet Debug] Falha ao registrar notificações push no Firebase: ' + JSON.stringify(error));
+                }
             });
 
             // Handle push notifications received when app is open (foreground)

@@ -85,12 +85,10 @@ app.use(express.json({ limit: '50mb' })); // Evolution API webhooks can be large
 // Fix URL for Docker internal network if localhost is provided
 // Base Supabase URL
 let internalSupabaseUrl = process.env.SUPABASE_URL || '';
-const isVPSEnv = process.env.IS_VPS || process.platform === 'linux';
-if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('127.0.0.1') || (isVPSEnv && internalSupabaseUrl.includes('77.37.43.60'))) {
+if (internalSupabaseUrl.includes('localhost') || internalSupabaseUrl.includes('127.0.0.1')) {
   internalSupabaseUrl = internalSupabaseUrl
     .replace('localhost', 'supabase-kong')
-    .replace('127.0.0.1', 'supabase-kong')
-    .replace('77.37.43.60', 'supabase-kong');
+    .replace('127.0.0.1', 'supabase-kong');
 }
 
 let publicSupabaseUrl = internalSupabaseUrl;
