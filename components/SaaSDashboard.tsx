@@ -145,6 +145,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
                     ...p,
                     userLimit: p.user_limit,
+                    whatsappLimit: p.whatsapp_limit || 1, // Novo mapeamento
                     price: p.price
                 }));
                 setLocalPlans(mappedPlans);
@@ -472,12 +473,17 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         } else if (type === 'edit' && company) {
             setFormData({ name: company.name, domain: company.domain, cnpj: company.cnpj || '' });
         } else if (type === 'createPlan') {
-            setFormData({ name: '', userLimit: '', price: '' });
+            setFormData({ name: '', userLimit: '', whatsappLimit: '1', price: '' });
             setFeaturesState({});
         } else if (type === 'editPlan' && planId) {
             const plan = localPlans.find(p => p.id === planId);
             if (plan) {
-                setFormData({ name: plan.name, userLimit: plan.userLimit.toString(), price: (plan.price || 0).toString() });
+                setFormData({ 
+                    name: plan.name, 
+                    userLimit: plan.userLimit.toString(), 
+                    whatsappLimit: (plan.whatsappLimit || 1).toString(),
+                    price: (plan.price || 0).toString() 
+                });
                 setFeaturesState((plan.features || {}) as Record<string, boolean>);
             }
         } else if (type === 'config' && company) {
@@ -806,6 +812,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         const planData = {
             name: formData.name,
             user_limit: parseInt(formData.userLimit) || 0,
+            whatsapp_limit: parseInt(formData.whatsappLimit) || 1, // Novo campo
             price: parseFloat(formData.price) || 0,
             features: featuresState
         };
@@ -1947,8 +1954,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 <input type="text" placeholder="Nome" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border rounded text-sm" />
                                 <div className="grid grid-cols-2 gap-3">
                                     <input type="number" placeholder="Max Usuários" value={formData.userLimit || ''} onChange={(e) => handleInputChange('userLimit', e.target.value)} className="w-full p-3 border rounded text-sm" />
-                                    <input type="number" placeholder="Valor (R$)" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border rounded text-sm" />
+                                    <input type="number" placeholder="Max Canais WhatsApp" value={formData.whatsappLimit || ''} onChange={(e) => handleInputChange('whatsappLimit', e.target.value)} className="w-full p-3 border rounded text-sm" />
                                 </div>
+                                <input type="number" placeholder="Valor (R$)" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border rounded text-sm" />
                             </div>
                         )}
                         <ConfigFeaturesList />

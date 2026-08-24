@@ -26,6 +26,7 @@ const Channels: React.FC = () => {
     // QR State
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [whatsappLimit, setWhatsappLimit] = useState<number>(1); // Novo: Limite do plano
 
     // Debug State
     const [showDebug, setShowDebug] = useState(false);
@@ -124,22 +125,39 @@ const Channels: React.FC = () => {
 
     const fetchSettings = async () => {
         setLoading(true);
-        const companyId = currentUser?.company_id;
+        const companyId = profile?.company_id || user?.user_metadata?.company_id;
         if (!companyId) {
             setLoading(false);
             return;
         }
 
+        // Fetch WhatsApp Settings
         const { data, error } = await supabase
             .from('whatsapp_settings')
             .select('*')
             .eq('company_id', companyId)
-            .eq('user_id', currentUser.id)
             .order('created_at', { ascending: true });
 
         if (!error && data) {
             setChannels(data as WhatsAppSettings[]);
         }
+
+        // Fetch Company Plan Limit
+        try {
+            const { data: companyData } = await supabase
+                .from('companies')
+                .select('plan:plans(whatsapp_limit)')
+                .eq('id', companyId)
+                .single();
+            
+            if (companyData?.plan) {
+                const plan = (companyData.plan as any);
+                setWhatsappLimit(plan.whatsapp_limit || 1);
+            }
+        } catch (e) {
+            console.error("Erro ao buscar limite do plano:", e);
+        }
+
         setLoading(false);
     };
 
@@ -286,6 +304,14 @@ const Channels: React.FC = () => {
         if (!connectionName) {
             alert('Por favor, preencha o Nome da Conexão.');
             return;
+        }
+
+        // Validação de Limite de Canais
+        if (!currentId) { // Criando nova conexão
+            if (channels.length >= whatsappLimit) {
+                alert(`Ops! Seu plano atual tem limite de ${whatsappLimit} canal(is). \n\nPara adicionar mais números, entre em contato com nosso time comercial para realizar um upgrade.`);
+                return;
+            }
         }
 
         const companyId = profile?.company_id || user?.user_metadata?.company_id;

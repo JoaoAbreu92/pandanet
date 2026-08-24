@@ -639,6 +639,7 @@ export interface Plan {
   id: string;
   name: string;
   userLimit: number;
+  whatsappLimit: number; // Novo campo
   features: PlanFeatures;
   price?: number; // Added to match migration
 }
@@ -675,6 +676,7 @@ export interface WhatsAppConversation {
   queue_id?: string | null;
   last_message_at: string;
   unread_count: number;
+  is_muted?: boolean; // Novo: silenciar notificações
 }
 
 export interface WhatsAppMessage {

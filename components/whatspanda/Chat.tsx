@@ -40,7 +40,8 @@ import {
   Menu,
   Edit2,
   RefreshCw,
-  Bell
+  Bell,
+  BellOff
 } from 'lucide-react';
 
 import { useAuth } from '../AuthContext';
@@ -98,6 +99,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     fetchSignature();
   }, [activeProfile?.id, profile?.id]);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, conversationId: string, isMuted: boolean } | null>(null);
   const [nudgeCooldowns, setNudgeCooldowns] = useState<{ [key: string]: number }>({});
   const [cooldownTimeouts, setCooldownTimeouts] = useState<{ [key: string]: number }>({});
 
@@ -422,7 +424,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
   useEffect(() => {
     if (type) {
-      setChatTypeFilter(type);
+      setChatTypeFilter(type as any);
+    } else {
+      setChatTypeFilter('all');
     }
   }, [type]);
 
@@ -497,6 +501,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     } else if (chatTypeFilter === 'private') {
       query = query.neq('is_group', true).not('contact_phone', 'ilike', '%@g.us%');
     }
+    // Se for 'all', não aplica filtro e mostra ambos
 
     const { data } = await query.order('last_message_at', { ascending: false });
     
@@ -504,6 +509,29 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setConversations(data as WhatsAppConversationWithDetails[]);
     }
     setLoading(false);
+  };
+
+  const handleMuteToggle = async (conversationId: string, currentMuteStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update({ is_muted: !currentMuteStatus })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      setConversations(prev => prev.map(c => 
+        c.id === conversationId ? { ...c, is_muted: !currentMuteStatus } : c
+      ));
+
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(prev => prev ? { ...prev, is_muted: !currentMuteStatus } : null);
+      }
+      
+      setContextMenu(null);
+    } catch (err: any) {
+      console.error('Erro ao silenciar:', err);
+    }
   };
 
   const handleUpdateStatus = async (conversationId: string, newStatus: 'aberto' | 'fechado' | 'pendente', assignToMe: boolean = false) => {
@@ -1104,6 +1132,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             <div
               key={conv.id}
               onClick={() => setSelectedConversation(conv)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu({ x: e.clientX, y: e.clientY, conversationId: conv.id, isMuted: !!conv.is_muted });
+              }}
               className={`p-3 rounded-2xl border cursor-pointer hover:shadow-lg transition-all duration-300 relative overflow-hidden group ${selectedConversation?.id === conv.id
                 ? 'bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/30 shadow-lg shadow-emerald-500/10'
                 : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 shadow-sm hover:border-emerald-300 dark:hover:bg-white/10'
@@ -1151,9 +1183,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     {conv.contact_name || conv.contact_phone}
                   </h3>
                 </div>
-                <span className={`text-[10px] font-medium uppercase tracking-widest whitespace-nowrap mt-1 ${selectedConversation?.id === conv.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                    {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {conv.is_muted && <BellOff className="w-3 h-3 text-slate-400" />}
+                  <span className={`text-[10px] font-medium uppercase tracking-widest whitespace-nowrap ${selectedConversation?.id === conv.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                      {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               </div>
               <div className="flex justify-between items-center mt-2 pl-10">
                 <div className="flex flex-col gap-1 min-w-0">
@@ -1698,6 +1733,34 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         </div>
       )}
       </>
+      )}
+
+      {/* Context Menu for Muting */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-[100]" onClick={() => setContextMenu(null)} />
+          <div 
+            className="fixed z-[101] bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+          >
+            <button 
+              onClick={() => handleMuteToggle(contextMenu.conversationId, contextMenu.isMuted)}
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors font-medium"
+            >
+              {contextMenu.isMuted ? (
+                <>
+                  <Bell className="w-4 h-4 text-emerald-500" />
+                  Ativar Notificações
+                </>
+              ) : (
+                <>
+                  <BellOff className="w-4 h-4 text-slate-400" />
+                  Silenciar Notificações
+                </>
+              )}
+            </button>
+          </div>
+        </>
       )}
 
     </div>
