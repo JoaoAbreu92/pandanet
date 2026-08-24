@@ -27,6 +27,14 @@ const Channels: React.FC = () => {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
+    // Limpar o estado da tela sempre que o usuário trocar de empresa no painel SaaS
+    useEffect(() => {
+        setView('list');
+        setCurrentId(null);
+        setQrCode(null);
+        setIsConnected(false);
+    }, [profile?.company_id, user?.user_metadata?.company_id]);
+
     useEffect(() => {
         const companyId = profile?.company_id || user?.user_metadata?.company_id;
         if (!companyId) return;

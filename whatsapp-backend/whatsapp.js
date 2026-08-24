@@ -126,6 +126,14 @@ async function connectToWhatsApp(companyId, connectionId) {
             }
         } else if (connection === 'open') {
             console.log('opened connection for connection', connectionId);
+
+            // CANCELAR O TIMER DE EXPIRAÇÃO DE QR CODE POIS CONECTOU COM SUCESSO!
+            if (sessions.has(connectionId + '_timer')) {
+                console.log(`[SUCCESS] Cancelando timer de timeout para a conexao ${connectionId}`);
+                clearTimeout(sessions.get(connectionId + '_timer'));
+                sessions.delete(connectionId + '_timer');
+            }
+
             await updateCompanySettings(connectionId, { is_connected: true, qr_code: null });
             sessions.set(connectionId, sock);
             // Reset reconnection attempts on successful connection
