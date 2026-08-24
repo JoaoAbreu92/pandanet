@@ -309,7 +309,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       setSelectedConversation(data as WhatsAppConversationWithDetails);
       if (data.status) setActiveTab(data.status as any);
       // If it's a group, ensure the filter allows it
-      if (data.contact_phone?.includes('@g.us')) {
+      if (data.is_group) {
         setChatTypeFilter('group');
       } else {
         setChatTypeFilter('private');
@@ -352,7 +352,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     if (chatTypeFilter === 'group') {
       query = query.eq('is_group', true);
     } else if (chatTypeFilter === 'private') {
-      query = query.eq('is_group', false);
+      query = query.or('is_group.eq.false,is_group.is.null');
     }
 
     // Logica de visibilidade:
@@ -1119,15 +1119,15 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     }`}
                   >
                     <div className="space-y-2">
-                      {(msg.media_type?.includes('image') || msg.media_type === 'sticker') ? (
-                        <div className={`relative group ${(msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) ? 'max-w-[160px] md:max-w-[200px]' : ''}`}>
+                      {(msg.media_type?.includes('image') || msg.media_type === 'sticker' || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(jpeg|jpg|gif|png|webp)$/i))) ? (
+                        <div className={`relative group inline-block`}>
                           <img 
                             src={msg.media_url || ''} 
                             alt="Mídia" 
-                            className={`rounded-xl h-auto cursor-pointer border border-white/10 shadow-sm ${
+                            className={`rounded-xl h-auto object-contain cursor-pointer border border-white/10 shadow-sm max-h-[250px] max-w-[200px] md:max-w-[300px] ${
                               (msg.media_type === 'sticker' || msg.media_url?.toLowerCase().endsWith('.gif')) 
-                              ? 'border-0 shadow-none' 
-                              : 'max-w-full'
+                              ? 'border-0 shadow-none bg-transparent' 
+                              : ''
                             }`}
                             onClick={() => window.open(msg.media_url || '_blank')} 
                           />
@@ -1203,7 +1203,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             </div>
 
             {/* Input Area */}
-            <div className="px-3 py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-[max(env(safe-area-inset-bottom),4px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
+            <div className="px-3 py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-3 md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
               
               {/* Sticker Picker UI */}
               {showStickerPicker && (
