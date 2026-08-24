@@ -321,6 +321,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     const { t } = useLanguage();
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Employee | null>(null);
+    const [resetPasswordUser, setResetPasswordUser] = useState<Employee | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
 
     const handleSave = async (userData: Omit<Employee, 'id'> | Employee) => {
         if (!profile?.company_id && profile?.role !== 'Super Admin') {
@@ -407,9 +410,39 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
             console.error("Erro ao salvar usuário:", err.message);
             alert("Erro ao salvar no banco: " + err.message);
         }
-
         setModalOpen(false);
         setEditingUser(null);
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetPasswordUser || !newPassword) return;
+        if (newPassword.length < 6) {
+            alert("A senha deve ter pelo menos 6 caracteres.");
+            return;
+        }
+
+        setIsResetting(true);
+        try {
+            const { data, error } = await supabase.rpc('admin_reset_user_password', {
+                p_user_id: resetPasswordUser.id,
+                p_new_password: newPassword
+            });
+
+            if (error) throw error;
+            
+            if (data?.success) {
+                alert("Senha resetada com sucesso!");
+                setResetPasswordUser(null);
+                setNewPassword('');
+            } else {
+                alert("Erro: " + (data?.error || "Falha desconhecida"));
+            }
+        } catch (err: any) {
+            console.error("Erro ao resetar senha:", err);
+            alert("Erro ao resetar senha: " + err.message);
+        } finally {
+            setIsResetting(false);
+        }
     };
 
     const handleEdit = (user: Employee) => {
@@ -730,6 +763,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                                     <td className="px-6 py-4">{user.team}</td>
                                     <td className="px-6 py-4">{user.isAdmin ? 'Sim' : 'Não'}</td>
                                     <td className="px-6 py-4 text-right space-x-1">
+                                        <button onClick={() => { setResetPasswordUser(user); setNewPassword(''); }} title="Resetar Senha" className="p-2 text-brand-subtle-text hover:text-amber-500"><ShieldCheckIcon className="w-5 h-5" /></button>
                                         <button onClick={() => handleEdit(user)} className="p-2 text-brand-subtle-text hover:text-brand-primary"><PencilIcon className="w-5 h-5" /></button>
                                         <button onClick={() => handleDelete(user.id, user.name)} className="p-2 text-brand-subtle-text hover:text-red-500"><TrashIcon className="w-5 h-5" /></button>
                                     </td>
@@ -740,6 +774,49 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 </div>
             </Card>
             {isModalOpen && <UserFormModal user={editingUser} departments={departments} onClose={() => setModalOpen(false)} onSave={handleSave} />}
+            
+            {resetPasswordUser && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative">
+                        <button onClick={() => setResetPasswordUser(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
+                        <h3 className="text-xl font-bold text-brand-text mb-2">Resetar Senha</h3>
+                        <p className="text-sm text-gray-500 mb-6 font-medium">Resetando senha para: <span className="text-brand-primary font-bold">{resetPasswordUser.name}</span></p>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 px-1">Nova Senha</label>
+                                <input 
+                                    type="password" 
+                                    value={newPassword} 
+                                    onChange={(e) => setNewPassword(e.target.value)} 
+                                    placeholder="Digite a nova senha..."
+                                    className="w-full bg-gray-50 border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-primary/20 transition-all font-medium" 
+                                />
+                            </div>
+                            
+                            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-4">
+                                <p className="text-xs text-amber-700 leading-relaxed font-medium">Atenção: Ao confirmar, a senha do usuário será alterada imediatamente.</p>
+                            </div>
+
+                            <div className="flex justify-end space-x-3 pt-2">
+                                <button 
+                                    onClick={() => setResetPasswordUser(null)} 
+                                    className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleResetPassword}
+                                    disabled={isResetting || !newPassword}
+                                    className="px-6 py-2.5 text-sm font-bold text-white bg-brand-primary rounded-xl hover:bg-emerald-600 disabled:opacity-50 shadow-sm transition-all"
+                                >
+                                    {isResetting ? 'Alterando...' : 'Confirmar Alteração'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

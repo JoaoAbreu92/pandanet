@@ -435,26 +435,60 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
 
 
 
+async function updateInstanceSettings(instanceName) {
+    try {
+        console.log(`[SETTINGS] Configurando instância ${instanceName}...`);
+        await fetch(`${evoUrl}/settings/set/${instanceName}`, {
+            method: 'POST',
+            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                reject_call: false,
+                groups_ignore: false,
+                always_online: true,
+                read_messages: false,
+                read_status: false,
+                sync_full_history: true // Importante para puxar mensagens do celular
+            })
+        });
+        console.log(`[SETTINGS] Configurações de ${instanceName} aplicadas.`);
+    } catch (e) {
+        console.error(`[SETTINGS] Erro ao aplicar configurações em ${instanceName}:`, e.message);
+    }
+}
+
 // API: Reparar Webhooks
 router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (req, res) => {
     const { companyId, connectionId } = req.params;
     const instanceName = `conn_${connectionId}`;
     const webhookUrl = `${backendWebhookBaseUrl}/webhook/evolution/${companyId}/${connectionId}`;
 
-    console.log(`[REPAIR] Atualizando webhook para ${instanceName} -> ${webhookUrl}`);
+    console.log(`[REPAIR] Atualizando webhook e settings para ${instanceName} -> ${webhookUrl}`);
 
     try {
+        // 1. Atualizar Webhook
         const repairReq = await fetch(`${evoUrl}/webhook/set/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 enabled: true,
                 url: webhookUrl,
-                events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE']
+                events: [
+                    'QRCODE_UPDATED', 
+                    'CONNECTION_UPDATE', 
+                    'MESSAGES_UPSERT', 
+                    'MESSAGES_UPDATE', 
+                    'MESSAGES_DELETE',
+                    'SEND_MESSAGE',
+                    'CALL'
+                ]
             })
         });
 
         const repairRes = await repairReq.json();
+        
+        // 2. Atualizar Settings da Instância
+        await updateInstanceSettings(instanceName);
+
         res.json({ status: 'success', detail: repairRes });
     } catch (error) {
         console.error('[REPAIR] Erro:', error.message);
@@ -473,6 +507,10 @@ app.use('/', router); // Manter fallback para as rotas antigas se necessário
 async function syncEvolutionData(instanceName, companyId, connectionId) {
     try {
         console.log(`[SYNC] Iniciando sincronização total para ${instanceName}...`);
+        
+        // Garantir settings corretos (ex: sync_full_history)
+        await updateInstanceSettings(instanceName);
+        
         const processedJids = new Set();
         const contactsToUpsert = [];
         
@@ -621,31 +659,33 @@ async function syncEvolutionData(instanceName, companyId, connectionId) {
             const batch = activeChats.slice(i, i + batchSize);
             await Promise.all(batch.map(async (chat) => {
                 const jid = chat.remoteJid || chat.jid || chat.id;
-                if (!jid) return;
+                if (!jid || jid.includes('@broadcast')) return; // Ignorar status/broadcast no histórico
+                
                 try {
-                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, { method: 'POST', headers, body: JSON.stringify({ where: { remoteJid: jid }, limit: 10 }) });
+                    // Aumentar o limite para buscar mais histórico (ex: 50 mensagens)
+                    const msgResp = await fetch(`${evoUrl}/chat/findMessages/${instanceName}`, { 
+                        method: 'POST', 
+                        headers, 
+                        body: JSON.stringify({ 
+                            where: { remoteJid: jid }, 
+                            limit: 50 
+                        }) 
+                    });
+
                     if (msgResp.ok) {
                         const messages = await msgResp.json();
                         const msgs = Array.isArray(messages) ? messages : (messages.messages || messages.data || []);
                         if (msgs.length > 0) {
-                            const phone = jid.split('@')[0];
-                            const { data: conv } = await supabase.from('whatsapp_conversations').select('id').eq('company_id', companyId).eq('contact_phone', phone).maybeSingle();
-                            if (conv) {
-                                const msgsToInsert = msgs.map(m => ({
-                                    company_id: companyId,
-                                    conversation_id: conv.id,
-                                    message_text: m.message?.conversation || m.message?.extendedTextMessage?.text || (m.pushName ? `[Mídia de ${m.pushName}]` : '[Mídia]'),
-                                    is_from_customer: !m.key?.fromMe,
-                                    whatsapp_message_id: m.key?.id,
-                                    created_at: new Date(m.messageTimestamp * 1000).toISOString()
-                                }));
-                                await supabase.from('whatsapp_messages').upsert(msgsToInsert, { onConflict: 'whatsapp_message_id' });
+                            console.log(`[SYNC-MSG] Processando ${msgs.length} mensagens para ${jid}...`);
+                            for (const m of msgs) {
+                                // Usar a função centralizada de processamento para garantir mídias, etc.
+                                await processInboundMessage(m, companyId, connectionId, true);
                             }
                         }
                     }
                 } catch(e) { console.error(`[SYNC-MSG] Erro jid ${jid}:`, e.message); }
             }));
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 800)); // Delay um pouco maior entre batches para evitar rate limit
         }
         console.log(`[SYNC] Concluído para ${instanceName}.`);
     } catch (err) {
@@ -770,35 +810,54 @@ async function runChatbot(message, conversation, companyId, connectionId) {
  * Baixa mídia da Evolution API (Base64)
  */
 async function downloadEvolutionMedia(instanceName, message, mediatype) {
-    try {
-        console.log(`[MEDIA] Baixando ${mediatype} da mensagem ${message.key.id}...`);
-        
-        const endpoint = mediatype === 'sticker' ? 'getBase64FromSticker' : 'getBase64FromMediaMessage';
-        
-        const resp = await fetch(`${evoUrl}/chat/${endpoint}/${instanceName}`, {
-            method: 'POST',
-            headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: message
-            })
-        });
+    let lastError = null;
+    const maxRetries = 2;
 
-        console.log(`[MEDIA] Resposta da Evolution API: ${resp.status} ${resp.statusText}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[MEDIA] [Tentativa ${attempt}] Baixando ${mediatype} da mensagem ${message.key.id}...`);
+            
+            const endpoint = mediatype === 'sticker' ? 'getBase64FromSticker' : 'getBase64FromMediaMessage';
+            
+            const resp = await fetch(`${evoUrl}/chat/${endpoint}/${instanceName}`, {
+                method: 'POST',
+                headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message
+                })
+            });
 
-        if (!resp.ok) {
-            const errLog = await resp.text();
-            console.error(`[MEDIA] Erro ao baixar (Status ${resp.status}):`, errLog);
-            return null;
+            if (!resp.ok) {
+                const errLog = await resp.text();
+                lastError = `Status ${resp.status}: ${errLog}`;
+                console.error(`[MEDIA] Erro no download (Tentativa ${attempt}):`, lastError);
+                if (resp.status === 404 || resp.status === 410) {
+                    console.warn(`[MEDIA] Mídia expirou na Evolution (404/410). Abortando tentativas.`);
+                    break; 
+                }
+                continue;
+            }
+
+            const data = await resp.json();
+            const base64 = typeof data === 'string' ? data : (data.base64 || data.data || null);
+            
+            if (base64 && base64.length > 50) {
+                console.log(`[MEDIA] Base64 extraído com sucesso (Tamanho: ${base64.length})`);
+                return base64;
+            } else {
+                console.warn(`[MEDIA] Base64 veio vazio ou pequeno demais (Atentativa ${attempt}).`);
+                lastError = "Base64 vazio";
+            }
+        } catch (e) {
+            lastError = e.message;
+            console.error(`[MEDIA] Erro no download (Tentativa ${attempt}):`, e.message);
         }
-
-        const data = await resp.json();
-        const base64 = typeof data === 'string' ? data : (data.base64 || data.data || null);
-        console.log(`[MEDIA] Base64 extraído com sucesso: ${base64 ? 'Sim' : 'Não'} (Tamanho: ${base64?.length || 0})`);
-        return base64;
-    } catch (e) {
-        console.error(`[MEDIA] Erro no download:`, e.message);
-        return null;
+        
+        if (attempt < maxRetries) await new Promise(r => setTimeout(r, 1000));
     }
+
+    console.error(`[MEDIA] FALHA FINAL após ${maxRetries} tentativas:`, lastError);
+    return null;
 }
 
 /**
