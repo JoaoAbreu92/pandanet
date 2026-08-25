@@ -727,7 +727,8 @@ export interface CompanySettings {
 }
 
 export interface PlanFeatures extends EmployeePermissions {
-  // Recursos futuros específicos do plano podem ser adicionados aqui
+    banners?: boolean;
+    [key: string]: boolean | string | number | undefined;
 }
 
 export interface Plan {
@@ -747,7 +748,7 @@ export interface Company {
   cnpj?: string; // Added
   plan_id?: string; // FK
   plan?: Plan;
-  custom_features?: Record<string, boolean>; // Overrides for plan features
+  custom_features?: Record<string, boolean | string>; // Overrides for plan features
   subscriptionEndDate?: string; // YYYY-MM-DD
   status?: 'active' | 'inactive' | 'expired';
   responsible_name?: string;
@@ -1017,4 +1018,4 @@ export interface SchedulingTemplate {
   is_default: boolean;
   created_at?: string;
 }
-
+

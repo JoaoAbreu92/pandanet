@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import { PencilIcon, XCircleIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { supabase, getSignedStorageUrl } from '../supabaseClient';
 // FIX: Correcting the import path for types.
 import type { CompanySettings } from '../types';
 

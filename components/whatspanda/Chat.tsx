@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../../supabaseClient';
+import { supabase, getSignedStorageUrl } from '../../supabaseClient';
 import {
   WhatsAppConversation,
   WhatsAppMessage,

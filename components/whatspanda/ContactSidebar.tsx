@@ -12,6 +12,7 @@ interface ContactSidebarProps {
 
 const ContactSidebar: React.FC<ContactSidebarProps> = ({ conversation, onClose }) => {
   const [showImageModal, setShowImageModal] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [disableBot, setDisableBot] = useState(false);
   const [loadingBotSetting, setLoadingBotSetting] = useState(false);
 
@@ -161,6 +162,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({ conversation, onClose }
                   <p className="text-xs text-green-700 font-medium">Mensagens não lidas</p>
                 </div>
               </div>
+        )}
           {/* Configuração de Robô */}
           <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 mt-4">
             <div className="space-y-0.5">

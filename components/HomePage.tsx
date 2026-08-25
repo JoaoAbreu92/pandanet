@@ -6,7 +6,7 @@ import RecognitionWall from './RecognitionWall';
 import CompanyPoll from './CompanyPoll';
 import QuickLinks from './QuickLinks';
 import MiniCalendar from './MiniCalendar';
-import { supabase } from '../supabaseClient';
+import { supabase, getSignedStorageUrl } from '../supabaseClient';
 import type { Employee, AppData } from '../types';
 import Card from './Card';
 import { GiftIcon, UserPlusIcon, VideoCameraIcon, BuildingStorefrontIcon, ClipboardDocumentCheckIcon, Cog6ToothIcon } from './icons';

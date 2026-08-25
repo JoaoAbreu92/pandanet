@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase, getSignedStorageUrl } from '../../supabaseClient';
 import { useAuth } from '../AuthContext';
 import {
   Plus, Calendar, Clock, Play, Pause, Trash2, Send,
@@ -21,6 +21,8 @@ interface Campaign {
   interval_seconds: number;
   status: 'pending' | 'running' | 'completed' | 'paused';
   created_at: string;
+last_sent_at?: string | null;
+media_type?: 'image' | 'video' | null;
 }
 
 interface TargetStats {

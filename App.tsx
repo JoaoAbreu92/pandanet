@@ -70,7 +70,7 @@ const AppContent: React.FC = () => {
     const getMergedFeatures = (company: Company | null) => {
         if (!company) return {};
         const planFeatures = company.plan?.features || {};
-        const customFeatures = company.custom_features || {};
+        const customFeatures: Record<string, any> = company.custom_features || {};
         const merged: Record<string, any> = {};
         
         if (company.plan) {
