@@ -464,7 +464,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         // Initial badge refresh
         if (accounts.length > 0) refreshAllAccountBadges();
 
-        const badgeInterval = setInterval(refreshAllAccountBadges, 60000); // Every minute
+        const badgeInterval = setInterval(refreshAllAccountBadges, 300000); // Every minute
         const activeAccountInterval = setInterval(() => {
             if (activeAccountId && view === 'inbox' && !loading) {
                 fetchEmails(false);
@@ -560,7 +560,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             // @ts-ignore
             if (pollingRef.current) clearInterval(pollingRef.current);
             // @ts-ignore - Bypass Deno vs Browser typing on setInterval
-            pollingRef.current = setInterval(() => fetchEmails(true), 120000);
+            pollingRef.current = setInterval(() => fetchEmails(true), 300000);
             fetchTags();    // Load tags once
             fetchContacts(); // Load contacts once
             fetchContactGroups(); // Load contact groups
@@ -1744,7 +1744,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // --- Render ---
 
     return (
-        <div className="flex bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl h-[calc(100vh-6rem)] rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500 relative">
+        <div className="flex flex-1 min-h-0 h-full bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500 relative">
             {/* --- Mobile Sidebar Overlay --- */}
             {sidebarOpen && (
                 <div 
@@ -2075,7 +2075,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             {/* --- Middle: Email List --- */}
             {(view === 'inbox' || view === 'read') && (
-                <div className={`flex flex-col min-w-0 border-r border-gray-200 relative ${
+                <div className={`flex flex-col h-full min-h-0 overflow-hidden min-w-0 border-r border-gray-200 relative ${
                     openMode === 'split' 
                         ? ((view === 'read' && isFullScreen) ? 'hidden' : view === 'read' ? 'hidden md:flex md:max-w-md md:w-80' : 'flex-1 md:flex-none md:w-80 md:max-w-md')
                         : 'flex-1'
@@ -2183,7 +2183,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     </div>
 
                     {/* List */}
-                    <div className="flex-1 overflow-y-auto bg-gray-50/30 dark:bg-transparent p-2 space-y-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-gray-50/30 dark:bg-transparent p-2 space-y-1">
                         {loading && emails.length === 0 ? (
                             <div className="p-10 text-center text-gray-400">
                                 <ArrowPathIcon className="w-8 h-8 mx-auto animate-spin mb-2" />

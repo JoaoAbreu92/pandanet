@@ -18,6 +18,9 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = express();
+
+app.set('trust proxy', 1);
+
 const PORT = 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -635,7 +638,7 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
         tls: { rejectUnauthorized: false },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
-        socketTimeout: 15000
+        socketTimeout: 60000
     };
 
     if (smtpUser && smtpPass) {
@@ -807,7 +810,7 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
         tls: { rejectUnauthorized: false },
         connectionTimeout: 15000,
         greetingTimeout: 15000,
-        socketTimeout: 15000
+        socketTimeout: 60000
     };
 
     if (smtpUser && smtpPass) {

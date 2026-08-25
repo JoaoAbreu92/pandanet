@@ -775,8 +775,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     }
 
                     // Encontrar o "outro" usuário (ou todos se for Ghost)
-                    const otherPart = participants?.find((p: any) => p.user_id !== currentUser.id) || participants?.[0];
-                    const otherUser = otherPart ? (otherPart.profiles as any) : null;
+                    const otherPart = participants?.find(
+    (p: any) => p.user_id !== currentUser.id && p.profiles
+);
+                    const otherUser = otherPart?.profiles ? (otherPart.profiles as any) : null;
 
                     // Se for ghost e não participo, mostro os nomes envolvidos
                     let displayName = '';
@@ -789,8 +791,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     }
 
                     const displayAvatar = conv.is_group
-                        ? `https://ui-avatars.com/api/?name=${displayName}&background=random`
-                        : (otherUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`);
+                        ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'Grupo')}&background=random`
+                        : (
+                            otherUser?.avatar_url ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'Usuário Excluído')}&background=random`
+                        );
 
                     // Buscar mensagens não lidas
                     const { count: unread } = await supabase
@@ -821,8 +826,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 }
             }));
 
-            // Filter out nulls
-            const filteredConversations = fullConversations.filter((c: any) => c !== null);
+            // Remove conversas órfãs (usuário excluído)
+            // Evita exibir "Usuário Desconhecido" na lista
+            const filteredConversations = fullConversations.filter(
+                (c: any) =>
+                    c !== null &&
+                    c.participantName &&
+                    c.participantName !== 'Usuário Desconhecido'
+            );
 
             console.log("Conversas filtradas e definidas no estado:", filteredConversations);
             setConversations(filteredConversations as Conversation[]);
@@ -977,7 +988,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 id: m.id, // UUID
                 sender: m.sender_id === currentUser.id ? 'me' : 'other',
                 senderName: (m.profiles as any)?.full_name || 'Usuário Excluído',
-                avatarUrl: (m.profiles as any)?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent((m.profiles as any)?.full_name || 'Usuario Excluido')}&background=random`,
+                avatarUrl: (
+                (m.profiles as any)?.avatar_url ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent((m.profiles as any)?.full_name || 'Usuario Excluido')}&background=random`
+            ),
                 text: m.text,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 reactions: m.reactions ? (m.reactions as any[]).map((r: any) => ({ emoji: r.emoji, user: r.user })) : [],

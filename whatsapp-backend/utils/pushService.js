@@ -86,7 +86,32 @@ async function sendPushNotification(token, title, body, data = {}) {
         }
         return response;
     } catch (error) {
+        if (
+        error.code === 'messaging/registration-token-not-registered' ||
+        error.message?.includes('NotRegistered')
+    ) {
+        console.warn('[FCM] Token inválido removido:', token.substring(0,15));
+
+        try {
+            const { createClient } = require('@supabase/supabase-js');
+
+            const supabase = createClient(
+                process.env.SUPABASE_URL,
+                process.env.SUPABASE_SERVICE_ROLE_KEY
+            );
+
+            await supabase
+                .from('profiles')
+                .update({ push_token: null })
+                .eq('push_token', token);
+
+        } catch (cleanupError) {
+            console.error('[FCM] Erro ao limpar token:', cleanupError.message);
+        }
+
+    } else {
         console.error('[FCM] Erro ao enviar notificação push via Firebase:', error.message);
+    }
         if (global.addDebugLog) {
             global.addDebugLog('FCM_SEND_ERROR', `Erro ao enviar push: ${error.message}`, { error: error.stack, message });
         }
