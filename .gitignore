@@ -44,3 +44,6 @@ scratch/
 test_*.mjs
 test_*.js
 *.txt
+
+# Supabase migrations devem ser versionadas
+!supabase/migrations/*.sql
