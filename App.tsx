@@ -292,11 +292,62 @@ const AppContent: React.FC = () => {
         setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
 
-    const [isImpersonating, setIsImpersonating] = useState(() => localStorage.getItem('pixel_is_impersonating') === 'true');
-    const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(() => {
-        const saved = localStorage.getItem('pixel_impersonated_company');
-        return saved ? JSON.parse(saved) : null;
-    });
+    // A UI de impersonacao nunca e autorizada apenas pelo localStorage.
+    // O Ghost validado pelo AuthContext e pelo perfil REAL e a fonte de verdade.
+    const [isImpersonating, setIsImpersonating] = useState(false);
+    const [impersonatedCompany, setImpersonatedCompany] = useState<Company | null>(null);
+
+    useEffect(() => {
+        if (!ghostAuditActive) {
+            setIsImpersonating(false);
+            setImpersonatedCompany(null);
+
+            localStorage.removeItem('pixel_is_impersonating');
+            localStorage.removeItem('pixel_impersonated_company');
+            return;
+        }
+
+        setIsImpersonating(true);
+
+        const saved =
+            localStorage.getItem('pixel_impersonated_company');
+
+        // Sem empresa persistida = auditoria direcionada a usuario.
+        if (!saved) {
+            setImpersonatedCompany(null);
+            return;
+        }
+
+        try {
+            const restored = JSON.parse(saved) as Company;
+
+            if (
+                !restored?.id
+                || restored.id !== impersonatedUser?.company_id
+            ) {
+                throw new Error(
+                    'Empresa persistida nao corresponde ao alvo Ghost'
+                );
+            }
+
+            setImpersonatedCompany(restored);
+
+        } catch (error) {
+            console.error(
+                '[Ghost Audit] Empresa alvo persistida recusada:',
+                error
+            );
+
+            setImpersonatedCompany(null);
+            localStorage.removeItem(
+                'pixel_impersonated_company'
+            );
+        }
+
+    }, [
+        ghostAuditActive,
+        impersonatedUser?.company_id
+    ]);
 
     const [currentPage, setCurrentPage] = useState<Page>(() => {
         const saved = localStorage.getItem('pixel_current_page');
@@ -654,6 +705,7 @@ const AppContent: React.FC = () => {
             isCompanyAdmin: true,
         };
         setGhostData(true, ghostUser); // Define currentUser como o admin desta empresa
+        setIsImpersonating(true);
         setImpersonatedCompany(company);
         localStorage.setItem('pixel_impersonated_company', JSON.stringify(company));
         localStorage.setItem('pixel_is_impersonating', 'true');

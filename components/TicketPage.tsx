@@ -302,7 +302,7 @@ const TicketPage: React.FC = () => {
             </div>
 
             <Card title={currentTab === 'active' ? "Central de Suporte (Chamados Ativos)" : "Histórico de Chamados"} headerAction={
-                !isGhostMode && (
+                (!isGhostMode || realProfile?.role === 'Super Admin') && (
                     <button
                         onClick={() => { console.log('Button CLICKED'); handleRepairForm(); }}
                         className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 relative z-50 cursor-pointer"

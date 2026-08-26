@@ -2712,7 +2712,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     )}
                     <div className="h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5 sm:mx-1 hidden sm:block" />
                     <div className="flex gap-0.5 sm:gap-1.5 items-center">
-                      {!isGhostMode && selectedConversation.status !== 'fechado' && (
+                      {(!isGhostMode || ghostSuperAdmin) && selectedConversation.status !== 'fechado' && (
                         <button
                           onClick={() => handleOpenCloseModal(selectedConversation.id)}
                           className="p-1 sm:p-2 rounded-full hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-500 transition-colors"
@@ -2722,7 +2722,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                         </button>
                       )}
                       {/* Botão Reabrir - aparece apenas quando fechado */}
-                      {!isGhostMode && selectedConversation.status === 'fechado' && (
+                      {(!isGhostMode || ghostSuperAdmin) && selectedConversation.status === 'fechado' && (
                         <button
                           onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto')}
                           className="px-2 sm:px-4 py-1 sm:py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1"

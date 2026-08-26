@@ -85,7 +85,8 @@ const Layout: React.FC<LayoutProps> = ({
         }
     };
 
-    const isMasterAdmin = realProfile?.email === 'ti@grupopixel.com.br';
+    const isMasterAdmin =
+        realProfile?.role === 'Super Admin';
 
     // Synchronize currentPage with NotificationContext
     const { setCurrentPage } = useNotifications();
@@ -111,10 +112,12 @@ const Layout: React.FC<LayoutProps> = ({
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
                     </span>
                     <span className="tracking-wide">
-                        <strong className="font-bold">MODO FANTASMA:</strong> {impersonatedUser ? (
-                            <>Você está auditando o perfil de <span className="underline decoration-purple-300 font-bold">{currentUser.name}</span> na empresa <span className="font-bold">{currentCompany.name}</span>.</>
+                        <strong className="font-bold">MODO FANTASMA:</strong> {impersonatedCompanyName ? (
+                            <>Auditoria da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName}</span> com autoridade de Super Admin.</>
+                        ) : impersonatedUser ? (
+                            <>Auditoria do usuário <span className="underline decoration-purple-300 font-bold">{impersonatedUser.name || currentUser.name}</span> na empresa <span className="font-bold">{currentCompany.name}</span> com autoridade de Super Admin.</>
                         ) : (
-                            <>Você está visualizando a intranet da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName || 'selecionada'}</span>. Modo de auditoria ativo. Evite executar ações operacionais enquanto estiver nesta visualização.</>
+                            <>Modo Ghost ativo. Alvo de auditoria não identificado.</>
                         )}
                     </span>
                 </div>
@@ -187,7 +190,14 @@ const Layout: React.FC<LayoutProps> = ({
                         onLogout={onLogout}
                         onNavigate={onNavigate}
                         isImpersonating={isImpersonating}
-                        impersonatedCompanyName={impersonatedCompanyName}
+                        impersonatedCompanyName={
+                            impersonatedCompanyName
+                            || (
+                                impersonatedUser
+                                    ? `${impersonatedUser.name || currentUser.name} • ${currentCompany.name}`
+                                    : undefined
+                            )
+                        }
                         onEndImpersonation={onEndImpersonation}
                         onToggleNotifications={() => setNotificationsOpen(!isNotificationsOpen)}
                         unreadNotificationsCount={notifications.filter(n => !n.isRead).length}

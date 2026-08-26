@@ -411,11 +411,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = async () => {
+        setIsGhostMode(false);
+        setImpersonatedUser(null);
         setRealProfile(null);
         setSession(null);
         setUser(null);
-        localStorage.removeItem('pixel_is_ghost_mode');
-        localStorage.removeItem('pixel_ghost_user_data');
+
+        clearGhostStorage();
+
         await supabase.auth.signOut();
     };
 

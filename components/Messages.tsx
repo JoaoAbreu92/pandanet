@@ -1939,14 +1939,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-2 md:p-4 bg-white/90 dark:bg-[#020617]/80 backdrop-blur-xl border-t border-gray-100 dark:border-white/5 z-10 relative pb-[max(env(safe-area-inset-bottom),8px)] md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)]">
-                            {isGhostMode ? (
+                            {(isGhostMode && realProfile?.role !== 'Super Admin') ? (
                                 <div className="bg-purple-50 p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
                                     <p className="text-xs md:text-sm font-bold text-purple-600 flex items-center justify-center gap-2">
                                         <LockClosedIcon className="w-5 h-5" />
                                         MODO AUDITORIA ATIVO
                                     </p>
                                     <p className="text-[10px] md:text-xs text-purple-500 mt-1">
-                                        Você não pode enviar mensagens ou reagir neste modo. O envio automático de leitura está bloqueado.
+                                        Modo Ghost sem autoridade operacional. O envio automático de leitura permanece bloqueado.
                                     </p>
                                 </div>
                             ) : (selectedConversation?.is_closed && isSupportConversation) ? (
