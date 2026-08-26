@@ -414,8 +414,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     }, [nudgeCooldowns]);
 
     const handleSendNudge = async () => {
-        if (isGhostMode) {
-            showToast("Modo Fantasma: Você não pode enviar nudges durante a auditoria.", "warning");
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) {
+            showToast(
+                "Modo Ghost sem autorização de Super Admin.",
+                "warning"
+            );
             return;
         }
         if (!selectedConversationId || !selectedConversation) return;
@@ -1075,8 +1081,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     // so the admin can still read history and re-open the conversation.
 
     const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
-        if (isGhostMode) {
-            showToast("Modo Fantasma: O envio de mensagens está desabilitado durante a auditoria.", "warning");
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) {
+            showToast(
+                "Modo Ghost sem autorização de Super Admin.",
+                "warning"
+            );
             return;
         }
         if (e) e.preventDefault();
@@ -1202,7 +1214,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const handleReact = async (messageId: string, emoji: string) => { // Alterado messageId para string
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
+
         const msg = messages.find(m => m.id === messageId);
         if (!msg) return;
 
@@ -1239,7 +1255,11 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const handleConfirmReceipt = async (msgId: string, visitId: string, creatorId: string) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
+
         try {
             const msg = messages.find(m => m.id === msgId);
             if (!msg) return;
@@ -1392,7 +1412,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const handleCloseConversation = async () => {
-        if (!selectedConversationId || isGhostMode) return;
+        if (
+            !selectedConversationId
+            || (
+                isGhostMode
+                && realProfile?.role !== 'Super Admin'
+            )
+        ) return;
         if (!window.confirm("Deseja encerrar este suporte? O chat será bloqueado para novas mensagens.")) return;
 
         try {
@@ -1415,8 +1441,14 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     };
 
     const handleDeleteMessage = async (messageId: string) => {
-        if (isGhostMode) {
-            showToast("Modo Fantasma: A exclusão de mensagens está desabilitada.", "warning");
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) {
+            showToast(
+                "Modo Ghost sem autorização de Super Admin.",
+                "warning"
+            );
             return;
         }
         if (!window.confirm("Deseja apagar esta mensagem? Ela sumirá para você agora e em 20 minutos para o destinatário.")) return;
@@ -1439,7 +1471,9 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        const isMasterAdmin = (realProfile?.email === 'ti@grupopixel.com.br' || realProfile?.id === masterAdminId) && isGhostMode;
+        const isMasterAdmin =
+            realProfile?.role === 'Super Admin'
+            && isGhostMode;
         if (!isMasterAdmin) {
             alert("Apenas o Administrador Master (em Modo Fantasma) tem permissão para apagar conversas permanentemente.");
             return;
@@ -1600,7 +1634,10 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                                                     <p className={`text-sm font-bold truncate ${selectedConversationId === conv.id ? 'text-brand-primary dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>{conv.participantName}</p>
                                                     <div className="flex items-center gap-1">
                                                         <p className="text-xs text-gray-400">{conv.lastMessageTimestamp}</p>
-                                                        {((realProfile?.email === 'ti@grupopixel.com.br' || realProfile?.id === masterAdminId) && isGhostMode) && (
+                                                        {(
+                                                    realProfile?.role === 'Super Admin'
+                                                    && isGhostMode
+                                                ) && (
                                                             <button
                                                                 onClick={(e) => handleDeleteConversation(conv.id, e)}
                                                                 className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-red-50"

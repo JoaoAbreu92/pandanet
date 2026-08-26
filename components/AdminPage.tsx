@@ -20,6 +20,7 @@ import ReservationsManager from './ReservationsManager';
 import TrainingAdminManager from './TrainingAdminManager';
 import JobsAdminManager from './JobsAdminManager';
 import SchedulingPage from './SchedulingPage';
+import StorageQuotaCard from './StorageQuotaCard';
 
 interface AdminPageProps {
     company: Company;
@@ -541,6 +542,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-brand-text">Painel do Administrador</h1>
+
+                        <div className="mt-5">
+                            <StorageQuotaCard />
+                        </div>
 
             <div className="space-y-4">
                 <div className="flex space-x-2 border-b border-gray-100 pb-2 overflow-x-auto no-scrollbar">

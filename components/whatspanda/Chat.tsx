@@ -66,17 +66,20 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private', initialConversationId }) => {
-  const { user, profile, currentUser, isGhostMode } = useAuth();
+  const { user, profile, currentUser, isGhostMode, realProfile } = useAuth();
   const activeProfile = currentUser || profile;
   const permissions = (activeProfile?.whatspanda_permissions as any) || {};
   const isAdmin = activeProfile?.isAdmin || activeProfile?.isCompanyAdmin || activeProfile?.role === 'Super Admin';
-  const canSendMessages = (isAdmin || permissions.can_send_messages !== false) && !isGhostMode;
+  const ghostSuperAdmin =
+    isGhostMode
+    && realProfile?.role === 'Super Admin';
+  const canSendMessages = (isAdmin || permissions.can_send_messages !== false) && (!isGhostMode || ghostSuperAdmin);
   // Actually, UsersTab set defaults.
   // Let's being strict:
   // const canSendMessages = isAdmin || !!permissions.can_send_messages;
 
-  const canSendMedia = (isAdmin || permissions.can_send_media !== false) && !isGhostMode;
-  const canSendMessagesResult = (isAdmin || permissions.can_send_messages !== false) && !isGhostMode;
+  const canSendMedia = (isAdmin || permissions.can_send_media !== false) && (!isGhostMode || ghostSuperAdmin);
+  const canSendMessagesResult = (isAdmin || permissions.can_send_messages !== false) && (!isGhostMode || ghostSuperAdmin);
   const [conversations, setConversations] = useState<WhatsAppConversationWithDetails[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<WhatsAppConversationWithDetails | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
@@ -277,7 +280,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   }, [nudgeCooldowns, activeProfile?.nudge_cooldown]);
 
   const handleSendNudge = async () => {
-    if (isGhostMode) return;
+    if (
+        isGhostMode
+        && realProfile?.role !== 'Super Admin'
+    ) return;
     if (!selectedConversation) return;
 
     const now = Date.now();
@@ -1128,8 +1134,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
     reasonId?: string | null,
     reasonName?: string | null
   ) => {
-    if (isGhostMode) {
-      alert('Modo Auditoria: Não é permitido alterar o status do atendimento.');
+    if (
+      isGhostMode
+      && realProfile?.role !== 'Super Admin'
+    ) {
+      alert('Modo Ghost sem autorização de Super Admin.');
       return;
     }
     try {
@@ -1139,8 +1148,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       // Aceitar Atendimento: sempre atribuir ao usuário logado e gerar protocolo se não existir
       let generatedProtocol: string | null = null;
       if (newStatus === 'aberto' && assignToMe) {
-        if (isGhostMode) {
-          alert('Modo Auditoria: Não é permitido aceitar atendimentos.');
+        if (
+          isGhostMode
+          && realProfile?.role !== 'Super Admin'
+        ) {
+          alert('Modo Ghost sem autorização de Super Admin.');
           return;
         }
         const userId = activeProfile?.id || profile?.id;
@@ -1245,7 +1257,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleTransfer = async (targetId: string, type: 'agent' | 'queue') => {
-    if (!selectedConversation || isGhostMode) return;
+    if (
+        !selectedConversation
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
     setTransferLoading(true);
     try {
       const senderName = activeProfile?.full_name || profile?.full_name || 'Atendente';
@@ -1407,7 +1425,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleMoveConversation = (conversationId: string, newColumnId: string | null) => {
-    if (isGhostMode) return;
+    if (
+        isGhostMode
+        && realProfile?.role !== 'Super Admin'
+    ) return;
     setConversations(prev => prev.map(conv =>
       conv.id === conversationId ? { ...conv, kanban_column_id: newColumnId } : conv
     ));
@@ -1494,7 +1515,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleToggleTag = async (tagId: string) => {
-    if (!selectedConversation || isGhostMode) return;
+    if (
+        !selectedConversation
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
 
     if (selectedConvTags.includes(tagId)) {
       // Remove
@@ -1594,7 +1621,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleSaveNotes = async () => {
-    if (!selectedConversation || isGhostMode) return;
+    if (
+        !selectedConversation
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
     setIsSavingNotes(true);
 
     const companyId = currentUser?.company_id;
@@ -1626,7 +1659,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleUpdateKanbanColumn = async (columnId: string | null) => {
-    if (!selectedConversation || isGhostMode) return;
+    if (
+        !selectedConversation
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
 
     const { error } = await supabase
       .from('whatsapp_conversations')
@@ -1789,7 +1828,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const startRecording = async () => {
-    if (isGhostMode) return;
+    if (
+        isGhostMode
+        && realProfile?.role !== 'Super Admin'
+    ) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -1916,7 +1958,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleSendReaction = async (targetMsg: WhatsAppMessage, emoji: string) => {
-    if (!selectedConversation || isGhostMode) return;
+    if (
+        !selectedConversation
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -1946,8 +1994,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleSendMessage = async (e?: React.FormEvent, type: 'text' | 'sticker' = 'text', content?: string) => {
-    if (isGhostMode) {
-      alert('Modo Auditoria: O envio de mensagens está desabilitado.');
+    if (
+      isGhostMode
+      && realProfile?.role !== 'Super Admin'
+    ) {
+      alert('Modo Ghost sem autorização de Super Admin.');
       return;
     }
     if (isSending) return; // Evita duplo envio concorrente no frontend
@@ -2068,7 +2119,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
   };
 
   const handleForward = async (targetConversationId: string) => {
-    if (!forwardingMessage || isGhostMode) return;
+    if (
+        !forwardingMessage
+        || (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        )
+    ) return;
     setForwardLoading(true);
 
     try {
@@ -2370,7 +2427,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               )}
             </div>
           )}
-          {isAdmin && !isGhostMode && (activeTab === 'aguardando' || activeTab === 'meus') && filteredConversations.length > 0 && (
+          {isAdmin && (!isGhostMode || ghostSuperAdmin) && (activeTab === 'aguardando' || activeTab === 'meus') && filteredConversations.length > 0 && (
             <button
               onClick={async () => {
                 if (!confirm(`Deseja fechar TODOS os ${filteredConversations.length} atendimentos visíveis?\n\nEles irão para a aba "Fechados".`)) return;
@@ -2405,7 +2462,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           {isAdmin && activeTab === 'fechados' && (
             <button
               onClick={async () => {
-                if (isGhostMode) return;
+                if (
+        isGhostMode
+        && realProfile?.role !== 'Super Admin'
+    ) return;
                 if (!confirm('Apagar permanentemente todos os atendimentos fechados?\n\nEsta ação não pode ser desfeita.')) return;
                 try {
                   const companyId = currentUser?.company_id;
@@ -2642,7 +2702,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     </div>
                   </div>
                   <div className="flex gap-1 sm:gap-2 items-center flex-shrink-0">
-                    {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && !isGhostMode && (
+                    {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && (!isGhostMode || ghostSuperAdmin) && (
                       <button
                         onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
                         className="px-2 sm:px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-500/20 transition-all whitespace-nowrap"
@@ -2691,7 +2751,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           <Download className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </button>
                       )}
-                      {!isGhostMode && (
+                      {(!isGhostMode || ghostSuperAdmin) && (
                         <button
                           onClick={() => {
                             setIsTransferModalOpen(true);
@@ -3099,7 +3159,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     </div>
                   )}
 
-                  {isGhostMode ? (
+                  {(isGhostMode && !ghostSuperAdmin) ? (
                     <div className="bg-purple-50 p-2 sm:p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-inner">
                       <p className="text-xs md:text-sm font-bold text-purple-600 flex items-center justify-center gap-2">
                         MODO AUDITORIA ATIVO
@@ -3432,7 +3492,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     <p className="text-slate-400 mt-2 mb-1">Setor</p>
                     <p className="font-bold text-slate-700 dark:text-white">{selectedConversation.queue?.name || 'Sem setor'}</p>
                   </div>
-                  {!isGhostMode && (
+                  {(!isGhostMode || ghostSuperAdmin) && (
                     <button
                       onClick={() => { setIsTransferModalOpen(true); setTransferSearch(''); setTransferType('agent'); }}
                       className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 rounded-xl transition-colors border border-indigo-100 dark:border-indigo-500/20"
@@ -3489,7 +3549,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </>
               )}
             </button>
-            {!isGhostMode && (
+            {(!isGhostMode || ghostSuperAdmin) && (
               <button
                 onClick={() => {
                   const targetConv = conversations.find(c => c.id === contextMenu.conversationId);
@@ -3506,7 +3566,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 Transferir Atendimento
               </button>
             )}
-            {!isGhostMode && (
+            {(!isGhostMode || ghostSuperAdmin) && (
               <button
                 onClick={async () => {
                   const targetConv = conversations.find(c => c.id === contextMenu.conversationId);

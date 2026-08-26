@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 
 const TicketPage: React.FC = () => {
-    const { currentUser, isGhostMode } = useAuth();
+    const { currentUser, isGhostMode, realProfile } = useAuth();
     const { addNotification } = useNotifications();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
@@ -118,7 +118,13 @@ const TicketPage: React.FC = () => {
     }, [currentUser?.company_id]);
 
     const handleCreateTicket = async (ticketData: any) => {
-        if (!currentUser || isGhostMode) return;
+        if (
+            !currentUser
+            || (
+                isGhostMode
+                && realProfile?.role !== 'Super Admin'
+            )
+        ) return;
         try {
             let mediaUrls: string[] = [];
 
@@ -182,7 +188,10 @@ const TicketPage: React.FC = () => {
     };
 
     const handleUpdateTicket = async (updatedTicket: Ticket) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         // Optimistic update for UI
         setTickets(tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t));
         setSelectedTicket(updatedTicket);
@@ -386,7 +395,10 @@ const TicketPage: React.FC = () => {
                             onClose={handleCloseDetail}
                             onUpdateTicket={handleUpdateTicket}
                             currentUser={currentUser}
-                            isGhostMode={isGhostMode}
+                            isGhostMode={
+                                isGhostMode
+                                && realProfile?.role !== 'Super Admin'
+                            }
                         />
                     </div>
                 </div>

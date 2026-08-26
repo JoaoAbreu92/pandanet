@@ -114,7 +114,7 @@ const Layout: React.FC<LayoutProps> = ({
                         <strong className="font-bold">MODO FANTASMA:</strong> {impersonatedUser ? (
                             <>Você está auditando o perfil de <span className="underline decoration-purple-300 font-bold">{currentUser.name}</span> na empresa <span className="font-bold">{currentCompany.name}</span>.</>
                         ) : (
-                            <>Você está visualizando a intranet da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName || 'selecionada'}</span>. Suas leituras e visualizações não deixarão rastros no sistema.</>
+                            <>Você está visualizando a intranet da empresa <span className="underline decoration-red-400 font-bold">{impersonatedCompanyName || 'selecionada'}</span>. Modo de auditoria ativo. Evite executar ações operacionais enquanto estiver nesta visualização.</>
                         )}
                     </span>
                 </div>

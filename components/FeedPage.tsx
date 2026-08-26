@@ -436,7 +436,11 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
 
 const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], events = [], recognitions = [], onAddRecognition, onNavigate }) => {
     const { addNotification } = useNotifications();
-    const { isGhostMode } = useAuth();
+    const { isGhostMode, realProfile } = useAuth();
+
+    const ghostSuperAdmin =
+        isGhostMode
+        && realProfile?.role === 'Super Admin';
     const [posts, setPosts] = useState<Post[]>([]);
     const [localRecognitions, setLocalRecognitions] = useState<Recognition[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
@@ -738,7 +742,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
     const handleCreatePost = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isGhostMode) {
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) {
             alert("Modo Fantasma: Publicações desativadas durante a auditoria.");
             return;
         }
@@ -815,7 +822,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleRecognitionSubmit = async (data: Omit<Recognition, 'id' | 'from' | 'fromAvatar'>) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
 
@@ -860,7 +870,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleToggleReaction = async (postId: string, emoji: string) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         setPosts(currentPosts => currentPosts.map(p => {
             if (p.id !== postId) return p;
             const existingIdx = p.reactions.findIndex(r => r.userId === currentUser.id);
@@ -889,7 +902,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleDeletePost = async (postId: string) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         if (!window.confirm(t('feed.delete_confirm'))) return;
 
         // Optimistic update
@@ -911,7 +927,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
 
     const handleSubmitComment = async (postId: string, text: string) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: currentUser.id, company_id: profile?.company_id, content: text });
@@ -1035,7 +1054,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
                 <div className="lg:col-span-8 space-y-6">
                     <Card title="" className="p-0 border-none shadow-sm overflow-visible">
-                        {isGhostMode ? (
+                        {(isGhostMode && !ghostSuperAdmin) ? (
                             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-6 rounded-2xl flex items-center justify-center space-x-3 shadow-md animate-pulse">
                                 <ShieldCheck className="w-8 h-8 text-amber-500" />
                                 <div className="text-center">
@@ -1133,7 +1152,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                         onSubmitComment={handleSubmitComment}
                                         onShare={() => { }}
                                         onDelete={handleDeletePost}
-                                        isGhostMode={isGhostMode}
+                                        isGhostMode={isGhostMode && !ghostSuperAdmin}
                                     />
                                 ))}
                             </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import type { Employee } from '../types';
+import { useAuth } from './AuthContext';
 
 interface PersonalTasksPageProps {
     currentUser: Employee;
@@ -31,6 +32,10 @@ interface Task {
 }
 
 const PersonalTasksPage: React.FC<PersonalTasksPageProps> = ({ currentUser, isGhostMode, pageContext }) => {
+
+    const { realProfile } = useAuth();
+
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -236,7 +241,10 @@ WITH CHECK (
 
     // Função síncrona que grava no Supabase
     const saveTaskToDb = async (taskToSave: Task) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
         try {
             const { error } = await supabase
                 .from('personal_tasks')

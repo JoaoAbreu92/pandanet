@@ -37,6 +37,7 @@ import {
 import type { Page, Employee, EmployeePermissions } from '../types';
 import { useLanguage } from './LanguageContext';
 import { useNotifications } from './NotificationContext';
+import { useAuth } from './AuthContext';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -52,7 +53,19 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, currentUser, companyName, companyLogo, isImpersonating, isMasterAdmin, customFeatures, pageContext }) => {
+
+    const {
+        realProfile,
+        isGhostMode
+    } = useAuth();
+
+
     const { notifications, moduleUnreadCounts } = useNotifications();
+
+    const ghostSuperAdmin =
+        isGhostMode
+        && realProfile?.role === 'Super Admin';
+
     const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({ rh: false, ti: false, portal: false, projects: false, social: false, agenda: false, newAgenda: false, reservations: false });
     const navRef = useRef<HTMLDivElement>(null);
 
@@ -122,10 +135,26 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     }, [currentPage]);
 
     const NavItem: React.FC<{ page: Page; label: string; icon: React.FC<any>; permission: keyof EmployeePermissions | true; featureId?: string; context?: any }> = ({ page, label, icon: Icon, permission, featureId, context }) => {
-        const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || (isImpersonating && isMasterAdmin);
-        let hasPermission = permission === true || (isImpersonating && isMasterAdmin) || (currentUser.permissions && (currentUser.permissions as any)[permission] === true);
+        const isAdmin =
+            ghostSuperAdmin
+            || currentUser.isAdmin
+            || currentUser.isCompanyAdmin
+            || currentUser.role === 'Super Admin'
+            || (isImpersonating && isMasterAdmin);
 
-        if (permission === 'viewWhatsPanda') {
+        let hasPermission =
+            ghostSuperAdmin
+            || permission === true
+            || (isImpersonating && isMasterAdmin)
+            || (
+                currentUser.permissions
+                && (currentUser.permissions as any)[permission] === true
+            );
+
+        if (
+            permission === 'viewWhatsPanda'
+            && !ghostSuperAdmin
+        ) {
             const hasWhatsPanda = !!currentUser.is_whatsapp_agent || 
                 (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
                 (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
@@ -148,7 +177,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         );
 
         // Se a feature não foi aprovada pelo SaaS, não exibir
-        if (featureId && customFeatures) {
+        if (
+            !ghostSuperAdmin
+            && featureId
+            && customFeatures
+        ) {
             const feat = customFeatures[featureId] as any;
             if (feat === false || feat === 'disabled') {
                 return null;
@@ -221,7 +254,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
-        if (featureId) {
+        if (
+            !ghostSuperAdmin
+            && featureId
+        ) {
             const feat = customFeatures ? (customFeatures[featureId] as any) : null;
             const isExplicitlyDisabled = feat === false || feat === 'disabled';
             if (isExplicitlyDisabled) {
@@ -322,21 +358,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 </NavMenu>
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavMenu label="Agenda" icon={CalendarIcon} menuKey="newAgenda" permission={!!currentUser.permissions?.viewAgenda} featureId="new_agenda">
+                <NavMenu label="Agenda" icon={CalendarIcon} menuKey="newAgenda" permission={ghostSuperAdmin || !!currentUser.permissions?.viewAgenda} featureId="new_agenda">
                     <NavItem page="agenda" label="Visitas" icon={UsersIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'visits' }} />
                     <NavItem page="agenda" label="Reuniões" icon={UserGroupIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'meetings' }} />
                     <NavItem page="agenda" label="Treinamentos" icon={PlayIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'trainings' }} />
                 </NavMenu>
                 <NavItem page="reservas" label="Reservas" icon={BuildingOfficeIcon} permission="viewReservations" featureId="reservations" />
                 <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
-                <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={!!currentUser.permissions.viewProjects} featureId="projects">
+                <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={ghostSuperAdmin || !!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
                     {hasSelectedProject && (
                         <>
-                            {(customFeatures?.projects as any) !== 'limited' && <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />}
+                            {(ghostSuperAdmin || (customFeatures?.projects as any) !== 'limited') && <NavItem page="projects-planning" label="Planejamento" icon={CalendarDaysIcon} permission="viewProjects" featureId="projects" />}
                             <NavItem page="projects-list" label="Lista" icon={ListBulletIcon} permission="viewProjects" featureId="projects" />
                             <NavItem page="projects-calendar" label="Calendário" icon={CalendarIcon} permission="viewProjects" featureId="projects" />
-                            {(customFeatures?.projects as any) !== 'limited' && <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />}
+                            {(ghostSuperAdmin || (customFeatures?.projects as any) !== 'limited') && <NavItem page="projects-metrics" label="Métricas" icon={ChartBarIcon} permission="viewProjects" featureId="projects" />}
                         </>
                     )}
                 </NavMenu>
@@ -371,7 +407,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
 
                 {/* SaaS Super Admin Button */}
-                {currentUser.role === 'Super Admin' && (
+                {realProfile?.role === 'Super Admin' && !isGhostMode && (
                     <>
                         <NavItem page="support-inbox" label={t('sidebar.support_master')} icon={LifebuoyIcon} permission={true} />
                         <button

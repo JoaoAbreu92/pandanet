@@ -227,6 +227,13 @@ const FloatingChatBox: React.FC<{
     }, []);
 
     const markAsRead = useCallback(async () => {
+        // Auditoria Ghost nao gera recibo/leitura passiva.
+        if (
+            localStorage.getItem('pixel_is_ghost_mode')
+            === 'true'
+        ) {
+            return;
+        }
         try {
             await supabase
                 .from('messages')

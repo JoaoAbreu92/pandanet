@@ -825,10 +825,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'> & { user_id?: string, company_id?: string }) => {
-        if (isGhostMode) {
-            console.log('[Ghost Mode] Bloqueando inserção de notificação');
-            return;
-        }
+        // Ghost nao gera notificacao de auditoria.
+        // Porem notificacoes normais decorrentes de uma acao
+        // explicita do Super Admin devem continuar funcionando.
         let targetUserId = notif.user_id;
         let targetCompanyId = notif.company_id;
 

@@ -61,8 +61,28 @@ import ReservationsPage from './components/ReservationsPage';
 
 
 const AppContent: React.FC = () => {
-    const { session, profile, currentUser, loading, signOut, isGhostMode, setGhostData, impersonatedUser } = useAuth();
+    const {
+        session,
+        profile,
+        currentUser,
+        realProfile,
+        loading,
+        signOut,
+        isGhostMode,
+        setGhostData,
+        impersonatedUser
+    } = useAuth();
     const { onlineUsers } = usePresence();
+
+    // Ghost Audit:
+    // somente o perfil REAL Super Admin possui autoridade.
+    const ghostAuditActive =
+        isGhostMode
+        && realProfile?.role === 'Super Admin';
+
+    const realSuperAdmin =
+        realProfile?.role === 'Super Admin';
+
 
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -91,7 +111,44 @@ const AppContent: React.FC = () => {
         }
         return merged;
     };
-    const mergedFeatures = getMergedFeatures(currentCompany);
+    const baseMergedFeatures =
+        getMergedFeatures(currentCompany);
+
+    const mergedFeatures: any =
+        ghostAuditActive
+            ? new Proxy(
+                baseMergedFeatures,
+                {
+                    get(target, prop) {
+                        if (
+                            typeof prop === 'symbol'
+                        ) {
+                            return Reflect.get(
+                                target,
+                                prop
+                            );
+                        }
+
+                        const value =
+                            Reflect.get(
+                                target,
+                                prop
+                            );
+
+                        if (
+                            value === false
+                            || value === 'disabled'
+                            || value === undefined
+                            || value === null
+                        ) {
+                            return true;
+                        }
+
+                        return value;
+                    }
+                }
+            )
+            : baseMergedFeatures;
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     // Loading & Error States
@@ -511,41 +568,234 @@ const AppContent: React.FC = () => {
     };
 
 
-    const handleImpersonateStart = (company: Company) => {
+
+    const authorizeGhostAudit = async (
+        companyId: string,
+        userId?: string | null
+    ): Promise<boolean> => {
+
+        if (
+            !realSuperAdmin
+            || isGhostMode
+        ) {
+            alert(
+                'Modo Ghost exclusivo do Super Admin.'
+            );
+            return false;
+        }
+
+        try {
+
+            const {
+                data,
+                error
+            } = await supabase.rpc(
+                'begin_ghost_audit',
+                {
+                    target_company_id:
+                        companyId,
+
+                    target_user_id:
+                        userId || null
+                }
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            if (
+                !data
+                || data.authorized !== true
+            ) {
+                throw new Error(
+                    'Autorização Ghost recusada.'
+                );
+            }
+
+            return true;
+
+        } catch (error: any) {
+
+            console.error(
+                '[Ghost Audit] Falha na autorização:',
+                error
+            );
+
+            alert(
+                error?.message
+                || 'Não foi possível iniciar o Modo Ghost.'
+            );
+
+            return false;
+        }
+    };
+
+
+    const handleImpersonateStart = async (company: Company) => {
+
+        if (
+            !company?.id
+            || !await authorizeGhostAudit(
+                company.id,
+                null
+            )
+        ) {
+            return;
+        }
+
+
         if (!currentUser) return;
         const ghostUser = {
             ...currentUser,
             company_id: company.id,
             role: 'Super Admin',
-            isCompanyAdmin: true
+            isAdmin: true,
+            isCompanyAdmin: true,
         };
         setGhostData(true, ghostUser); // Define currentUser como o admin desta empresa
         setImpersonatedCompany(company);
         localStorage.setItem('pixel_impersonated_company', JSON.stringify(company));
         localStorage.setItem('pixel_is_impersonating', 'true');
         localStorage.setItem('pixel_current_page', 'home');
-        alert(`Entrando em modo fantasma para a empresa: ${company.name}`);
+        alert(`Modo Ghost iniciado para a empresa ${company.name}. Auditoria silenciosa com autoridade de Super Admin.`);
         setTimeout(() => window.location.reload(), 100);
     };
 
-    const handleImpersonateUserStart = (targetEmployee: Employee) => {
-        setGhostData(true, targetEmployee); // Auditoria profunda de usuário
+    const handleImpersonateUserStart = async (targetEmployee: Employee) => {
+
+        const ghostCompanyId =
+            targetEmployee.company_id;
+
+        if (!ghostCompanyId) {
+            alert(
+                'Empresa do usuário não identificada.'
+            );
+            return;
+        }
+
+        if (
+            !await authorizeGhostAudit(
+                ghostCompanyId,
+                targetEmployee.id
+            )
+        ) {
+            return;
+        }
+
+
+        setGhostData(
+            true,
+            {
+                ...targetEmployee,
+                role: 'Super Admin',
+                isAdmin: true,
+                isCompanyAdmin: true,
+                        permissions: new Proxy(
+                    {
+                        ...(targetEmployee.permissions || {})
+                    } as any,
+                    {
+                        get() {
+                            // Ghost autorizado possui todas
+                            // as permissoes durante a auditoria.
+                            return true;
+                        }
+                    }
+                ) as any
+            }
+        ); // Auditoria profunda de usuário
         setIsImpersonating(true);
         localStorage.setItem('pixel_is_impersonating', 'true');
         localStorage.removeItem('pixel_impersonated_company');
         localStorage.setItem('pixel_current_page', 'home');
-        alert(`Entrando em Modo Auditoria: Agora você vê a intranet como ${targetEmployee.name}. Nenhuma ação sua será registrada.`);
+        alert(`Modo Ghost iniciado para ${targetEmployee.name}. Auditoria silenciosa com autoridade de Super Admin.`);
         // Force full reload to ensure useAuth and App's useEffect initialize completely as the new user context
         setTimeout(() => window.location.reload(), 100);
     };
 
-    const handleImpersonateEnd = () => {
-        setGhostData(false, null);
-        setIsImpersonating(false);
-        setImpersonatedCompany(null);
-        localStorage.removeItem('pixel_is_impersonating');
-        localStorage.removeItem('pixel_impersonated_company');
-        window.location.reload();
+    const handleImpersonateEnd = async () => {
+
+        try {
+
+            if (
+                isGhostMode
+                && realSuperAdmin
+            ) {
+
+                const ghostCompanyId =
+                    impersonatedCompany?.id
+                    || impersonatedUser?.company_id
+                    || currentUser?.company_id
+                    || null;
+
+                const ghostUserId =
+                    impersonatedCompany
+                        ? null
+                        : (
+                            impersonatedUser?.id
+                            || null
+                        );
+
+                if (ghostCompanyId) {
+
+                    const { error } =
+                        await supabase.rpc(
+                            'end_ghost_audit',
+                            {
+                                target_company_id:
+                                    ghostCompanyId,
+
+                                target_user_id:
+                                    ghostUserId
+                            }
+                        );
+
+                    if (error) {
+                        console.error(
+                            '[Ghost Audit] Falha ao registrar encerramento:',
+                            error
+                        );
+                    }
+
+                }
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                '[Ghost Audit] Erro ao finalizar auditoria:',
+                error
+            );
+
+        } finally {
+
+            setGhostData(
+                false,
+                null
+            );
+
+            setIsImpersonating(
+                false
+            );
+
+            setImpersonatedCompany(
+                null
+            );
+
+            localStorage.removeItem(
+                'pixel_is_impersonating'
+            );
+
+            localStorage.removeItem(
+                'pixel_impersonated_company'
+            );
+
+            window.location.reload();
+
+        }
+
     };
 
     const handleNavigate = useCallback((page: Page, context?: any) => {
@@ -772,6 +1022,14 @@ const AppContent: React.FC = () => {
     };
 
     const handleSetCompanyForAdmin = async (updatedCompany: Company) => {
+        if (
+            isGhostMode
+            && !ghostAuditActive
+        ) {
+            alert('Modo Ghost sem autorização de Super Admin.');
+            return;
+        }
+
         console.log("[App] Atualizando empresa:", updatedCompany);
         
         setCurrentCompany(updatedCompany);
@@ -868,6 +1126,8 @@ const AppContent: React.FC = () => {
 
 
     const canAccess = (permission: keyof EmployeePermissions) => {
+        if (ghostAuditActive) return true;
+
         if (!currentUser) return false;
         if (currentUser.role === 'Super Admin') return true;
 
@@ -944,7 +1204,22 @@ const AppContent: React.FC = () => {
             case 'profile-page':
                 const targetUserId = typeof pageContext === 'string' ? pageContext : (pageContext?.id || currentUser?.id);
                 return <ProfilePage userId={targetUserId} currentUser={currentUser} onUpdateUser={handleUpdateUser} feedPosts={companyData.feedPosts} setFeedPosts={handleUpdateFeedPosts} allEmployees={companyData.employees} isAIEnabled={mergedFeatures.ai_assistant !== false} />;
-            case 'saas-dashboard': return currentUser.role === 'Super Admin' ? <SaaSDashboard companies={companies} onImpersonate={handleImpersonateStart} /> : <p className="p-8 text-center text-red-600">Área restrita.</p>;
+            case 'saas-dashboard':
+                return (
+                    realSuperAdmin
+                    && !isGhostMode
+                )
+                    ? (
+                        <SaaSDashboard
+                            companies={companies}
+                            onImpersonate={handleImpersonateStart}
+                        />
+                    )
+                    : (
+                        <p className="p-8 text-center text-red-600">
+                            Área restrita.
+                        </p>
+                    );
             case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
@@ -970,7 +1245,13 @@ const AppContent: React.FC = () => {
             case 'scheduling': {
                 if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = mergedFeatures.scheduling as any;
-                if (schedulingFeat === false || schedulingFeat === 'disabled') {
+                if (
+                    !ghostAuditActive
+                    && (
+                        schedulingFeat === false
+                        || schedulingFeat === 'disabled'
+                    )
+                ) {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
                 return <SchedulingPage customFeatures={mergedFeatures} mode="appointments" />;
@@ -978,7 +1259,13 @@ const AppContent: React.FC = () => {
             case 'scheduling-events': {
                 if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = mergedFeatures.scheduling as any;
-                if (schedulingFeat === false || schedulingFeat === 'disabled') {
+                if (
+                    !ghostAuditActive
+                    && (
+                        schedulingFeat === false
+                        || schedulingFeat === 'disabled'
+                    )
+                ) {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agendamentos está desativado para a sua empresa.</div>;
                 }
                 return <SchedulingPage customFeatures={mergedFeatures} mode="events" />;
@@ -986,7 +1273,13 @@ const AppContent: React.FC = () => {
             case 'agenda': {
                 if (!canAccess('viewAgenda')) return null;
                 const agendaFeat = mergedFeatures.new_agenda as any;
-                if (agendaFeat === false || agendaFeat === 'disabled') {
+                if (
+                    !ghostAuditActive
+                    && (
+                        agendaFeat === false
+                        || agendaFeat === 'disabled'
+                    )
+                ) {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de agenda está desativado para a sua empresa.</div>;
                 }
                 return <AgendaPage initialTab={pageContext?.tab} initialDate={pageContext?.date} />;
@@ -994,7 +1287,13 @@ const AppContent: React.FC = () => {
             case 'reservas': {
                 if (!canAccess('viewReservations')) return null;
                 const reservationsFeat = mergedFeatures.reservations as any;
-                if (reservationsFeat === false || reservationsFeat === 'disabled') {
+                if (
+                    !ghostAuditActive
+                    && (
+                        reservationsFeat === false
+                        || reservationsFeat === 'disabled'
+                    )
+                ) {
                     return <div className="p-8 text-center text-red-600 font-extrabold">Acesso negado: O módulo de reservas está desativado para a sua empresa.</div>;
                 }
                 return <ReservationsPage initialTab={pageContext?.tab} />;

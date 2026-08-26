@@ -47,6 +47,7 @@ import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { useLanguage } from './LanguageContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { usePresence } from './PresenceContext';
 
 interface SaaSDashboardProps {
     companies?: Company[]; // Keep for compatibility but we will fetch internal state
@@ -77,7 +78,8 @@ const CompanyUserCount = ({ companyId }: { companyId: string }) => {
 };
 
 const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImpersonate }) => {
-    const { currentUser } = useAuth();
+    const { onlineUsers: presenceOnlineUsers } = usePresence();
+    const { currentUser, realProfile } = useAuth();
     const { showToast } = useToast();
     const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -90,6 +92,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
     const [usageStats, setUsageStats] = useState<any>(null);
     const [statsLoading, setStatsLoading] = useState(false);
+
+    const [
+        storageOverrideInput,
+        setStorageOverrideInput
+    ] = useState<string>('');
+
     const [manualVideos, setManualVideos] = useState<any[]>([]);
     const [videoLoading, setVideoLoading] = useState(false);
 
@@ -125,7 +133,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         tag: 'Destaque',
         image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&h=400&fit=crop'
     });
-    
+
     // NEW: Master Banner State
     const [masterBannerData, setMasterBannerData] = useState<any>({
         imageUrl: '',
@@ -148,6 +156,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     userLimit: p.user_limit,
                     whatsappLimit: p.whatsapp_limit || 1,
                     emailLimit: p.email_limit || 1,
+                    storageLimit: Number(
+                        p.storage_limit_gb || 10
+                    ),
                     price: p.price
                 }));
                 setLocalPlans(mappedPlans);
@@ -237,6 +248,33 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         }
     };
 
+    const validateSaasImageFile = (
+        file: File,
+        label: string
+    ) => {
+        const allowedTypes = new Set([
+            'image/png',
+            'image/jpeg',
+            'image/webp'
+        ]);
+
+        const maxBytes =
+            8 * 1024 * 1024;
+
+        if (!allowedTypes.has(file.type)) {
+            throw new Error(
+                `${label}: formato inválido. Use PNG, JPG ou WEBP.`
+            );
+        }
+
+        if (file.size <= 0 || file.size > maxBytes) {
+            throw new Error(
+                `${label}: arquivo deve possuir no máximo 8 MB.`
+            );
+        }
+    };
+
+
     const handleSaveGeneralSettings = async () => {
         setIsSavingSettings(true);
         console.log("[SaaS] Iniciando salvamento de configurações...");
@@ -250,6 +288,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
             // If a new logo file was selected, upload it first
             if (logoFile) {
+                validateSaasImageFile(
+                    logoFile,
+                    'Logo principal'
+                );
+
                 console.log("[SaaS] Novo arquivo de logo detectado. Fazendo upload...", logoFile.name);
                 const fileExt = logoFile.name.split('.').pop();
                 const fileName = `main_logo_${Date.now()}.${fileExt}`;
@@ -283,6 +326,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
             // Handle Panda IA Icon Upload
             if (iaIconFile) {
+                validateSaasImageFile(
+                    iaIconFile,
+                    'Ícone da Panda IA'
+                );
+
                 console.log("[SaaS] Novo ícone da IA detectado. Fazendo upload...", iaIconFile.name);
                 const fileExt = iaIconFile.name.split('.').pop();
                 const fileName = `panda_ia_icon_${Date.now()}.${fileExt}`;
@@ -305,6 +353,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             // Handle Master Banner Upload
             let currentBannerData = { ...masterBannerData };
             if (masterBannerFile) {
+                validateSaasImageFile(
+                    masterBannerFile,
+                    'Master Banner'
+                );
+
                 console.log("[SaaS] Novo Master Banner detectado. Fazendo upload...", masterBannerFile.name);
                 const fileExt = masterBannerFile.name.split('.').pop();
                 const fileName = `master_banner_${Date.now()}.${fileExt}`;
@@ -324,10 +377,15 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             updates.push({ key: 'master_banner', value: JSON.stringify(currentBannerData) });
 
             console.log("[SaaS] Executando UPSERT no banco:", updates);
-            const { error: upsertError, data: upsertData } = await supabase
-                .from('system_settings')
-                .upsert(updates, { onConflict: 'key' })
-                .select();
+            const {
+                error: upsertError,
+                data: upsertData
+            } = await supabase.rpc(
+                'save_system_settings_admin',
+                {
+                    p_updates: updates
+                }
+            );
 
             if (upsertError) {
                 console.error("[SaaS] Erro no upsert das configurações:", upsertError);
@@ -401,21 +459,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     // Estado para contagens
     const [totalUsers, setTotalUsers] = useState(0);
-    const [onlineUsers, setOnlineUsers] = useState(0);
 
     useEffect(() => {
         const fetchCounts = async () => {
-            // Count total users
-            const { count, error } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-            if (!error && count !== null) setTotalUsers(count);
+            const { count, error } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true });
 
-            // Fetch Online Users (simulated or based on status)
-            // For a "wow" effect we'll use a random number between 5-15% of total users + 2
-            const simulatedOnline = Math.max(1, Math.floor((count || 10) * (0.05 + Math.random() * 0.1)) + 2);
-            setOnlineUsers(simulatedOnline);
+            if (!error && count !== null) {
+                setTotalUsers(count);
+            }
         };
+
         fetchCounts();
     }, [localCompanies]);
+
+    // Supabase Realtime Presence - contagem real de sessoes presentes.
+    const onlineUsers = presenceOnlineUsers.size;
 
     // --- CHART DATA PREPARATION ---
     useEffect(() => {
@@ -432,23 +492,66 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             }));
             setPlanDistribution(pieData);
 
-            // 2. Growth (Real based on created_at)
-            const months = [t('month.0'), t('month.1'), t('month.2'), t('month.3'), t('month.4'), t('month.5'), t('month.6'), t('month.7'), t('month.8'), t('month.9'), t('month.10'), t('month.11')];
-            const currentMonth = new Date().getMonth();
+            // 2. Growth real baseado em created_at,
+            // considerando corretamente mês E ano.
+            const months = [
+                t('month.0'),
+                t('month.1'),
+                t('month.2'),
+                t('month.3'),
+                t('month.4'),
+                t('month.5'),
+                t('month.6'),
+                t('month.7'),
+                t('month.8'),
+                t('month.9'),
+                t('month.10'),
+                t('month.11')
+            ];
+
+            const now = new Date();
             const growth: any[] = [];
 
             for (let i = 5; i >= 0; i--) {
-                const targetMonth = (currentMonth - i + 12) % 12;
-                const countAtMonth = localCompanies.filter(c => {
-                    const createdAt = new Date(c.created_at || '');
-                    return createdAt.getMonth() <= targetMonth;
-                }).length;
+                const targetDate = new Date(
+                    now.getFullYear(),
+                    now.getMonth() - i,
+                    1
+                );
+
+                const periodEnd = new Date(
+                    targetDate.getFullYear(),
+                    targetDate.getMonth() + 1,
+                    1
+                );
+
+                const count =
+                    localCompanies.filter(c => {
+                        const createdAt =
+                            new Date(c.created_at || '');
+
+                        return (
+                            !Number.isNaN(
+                                createdAt.getTime()
+                            )
+                            && createdAt < periodEnd
+                        );
+                    }).length;
 
                 growth.push({
-                    name: months[targetMonth].substring(0, 3),
-                    empresas: countAtMonth
+                    name:
+                        months[
+                            targetDate.getMonth()
+                        ].substring(0, 3)
+                        + '/'
+                        + String(
+                            targetDate.getFullYear()
+                        ).slice(-2),
+
+                    empresas: count
                 });
             }
+
             setGrowthData(growth);
         }
     }, [localCompanies, totalCompanies]);
@@ -473,24 +576,31 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             const defaultPlan = localPlans.length > 0 ? localPlans[0].name : 'Standard';
             setFormData({ name: '', domain: '', cnpj: '', whatsapp: '', plan: defaultPlan, responsibleName: '', responsibleEmail: '' });
         } else if (type === 'edit' && company) {
-            setFormData({ 
-                name: company.name, 
-                domain: company.domain, 
+            setFormData({
+                name: company.name,
+                domain: company.domain,
                 cnpj: company.cnpj || '',
                 plan: company.plan?.name || ''
             });
         } else if (type === 'createPlan') {
-            setFormData({ name: '', userLimit: '', whatsappLimit: '1', price: '' });
+            setFormData({
+                    name: '',
+                    userLimit: '',
+                    whatsappLimit: '1',
+                    emailLimit: '1',
+                    storageLimit: '10',
+                    price: ''
+                });
             setFeaturesState({});
         } else if (type === 'editPlan' && planId) {
             const plan = localPlans.find(p => p.id === planId);
             if (plan) {
-                setFormData({ 
-                    name: plan.name, 
-                    userLimit: plan.userLimit.toString(), 
+                setFormData({
+                    name: plan.name,
+                    userLimit: plan.userLimit.toString(),
                     whatsappLimit: (plan.whatsappLimit || 1).toString(),
                     emailLimit: (plan.emailLimit || 1).toString(),
-                    price: (plan.price || 0).toString() 
+                    price: (plan.price || 0).toString()
                 });
                 setFeaturesState((plan.features || {}) as Record<string, any>);
             }
@@ -503,7 +613,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         } else if (type === 'users' && company) {
             // Fetch users for this company
             fetchCompanyUsers(company.id!);
-        } else if (type === 'stats' && company) {
+        } else if ((type === 'stats' || type === 'disk') && company) {
             fetchUsageStats(company.id!);
         }
     };
@@ -537,6 +647,42 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 }
             }
 
+
+            const {
+                data: quotaData,
+                error: quotaError
+            } = await supabase.rpc(
+                'get_company_storage_quota',
+                {
+                    p_company_id: companyId
+                }
+            );
+
+            if (
+                !quotaError
+                && quotaData
+            ) {
+
+                stats.storageQuota =
+                    quotaData;
+
+                setStorageOverrideInput(
+                    quotaData.override_limit_gb == null
+                        ? ''
+                        : String(
+                            quotaData.override_limit_gb
+                        )
+                );
+
+            } else if (quotaError) {
+
+                console.error(
+                    '[SaaS] Erro ao carregar quota de armazenamento:',
+                    quotaError
+                );
+
+            }
+
             setUsageStats(stats);
         } catch (e) {
             console.error("Error fetching stats", e);
@@ -544,6 +690,160 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             setStatsLoading(false);
         }
     };
+
+
+    const handleSaveStorageOverride = async () => {
+
+        if (!selectedCompany?.id) {
+            return;
+        }
+
+        const value = Number(
+            storageOverrideInput
+                .replace(',', '.')
+                .trim()
+        );
+
+        if (
+            !Number.isFinite(value)
+            || value <= 0
+        ) {
+            showToast(
+                'Informe um limite válido em GB.',
+                'error'
+            );
+            return;
+        }
+
+        try {
+
+            const {
+                data,
+                error
+            } = await supabase.rpc(
+                'set_company_storage_limit_admin',
+                {
+                    target_company_id:
+                        selectedCompany.id,
+
+                    p_override_limit_gb:
+                        value
+                }
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            if (
+                data
+                && data.success === false
+            ) {
+                throw new Error(
+                    data.error
+                    || 'Falha ao salvar limite.'
+                );
+            }
+
+            showToast(
+                `Limite personalizado definido em ${value} GB.`,
+                'success'
+            );
+
+            await fetchUsageStats(
+                selectedCompany.id
+            );
+
+        } catch (error: any) {
+
+            console.error(
+                '[SaaS] Erro ao alterar quota:',
+                error
+            );
+
+            showToast(
+                error?.message
+                || 'Não foi possível alterar o limite.',
+                'error'
+            );
+
+        }
+
+    };
+
+
+    const handleResetStorageOverride = async () => {
+
+        if (!selectedCompany?.id) {
+            return;
+        }
+
+        if (
+            !window.confirm(
+                'Voltar a utilizar o limite de armazenamento definido pelo plano?'
+            )
+        ) {
+            return;
+        }
+
+        try {
+
+            const {
+                data,
+                error
+            } = await supabase.rpc(
+                'set_company_storage_limit_admin',
+                {
+                    target_company_id:
+                        selectedCompany.id,
+
+                    p_override_limit_gb:
+                        null
+                }
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            if (
+                data
+                && data.success === false
+            ) {
+                throw new Error(
+                    data.error
+                    || 'Falha ao restaurar limite.'
+                );
+            }
+
+            setStorageOverrideInput('');
+
+            showToast(
+                'A empresa voltou a utilizar o limite do plano.',
+                'success'
+            );
+
+            await fetchUsageStats(
+                selectedCompany.id
+            );
+
+        } catch (error: any) {
+
+            console.error(
+                '[SaaS] Erro ao restaurar quota:',
+                error
+            );
+
+            showToast(
+                error?.message
+                || 'Não foi possível restaurar o limite.',
+                'error'
+            );
+
+        }
+
+    };
+
 
     const fetchCompanyUsers = async (companyId: string) => {
         const { data, error } = await supabase
@@ -576,53 +876,169 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     };
 
     const handleAddUserToCompany = async () => {
-        if (!selectedCompany || !selectedCompany.id) return;
-        if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
-            showToast('Preencha nome, email e senha.', 'error');
+        if (!selectedCompany?.id) return;
+
+        const name = newUserForm.name.trim();
+        const email = newUserForm.email.trim().toLowerCase();
+        const password = newUserForm.password;
+
+        if (!name || !email || !password) {
+            showToast('Preencha nome, e-mail e senha.', 'error');
+            return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showToast('Informe um e-mail válido.', 'error');
+            return;
+        }
+
+        if (password.length < 6) {
+            showToast('A senha deve ter pelo menos 6 caracteres.', 'error');
+            return;
+        }
+
+        const planLimit = selectedCompany.plan?.userLimit;
+
+        if (
+            typeof planLimit === 'number'
+            && planLimit > 0
+            && companyUsers.filter(u => (u as any).status === 'active').length >= planLimit
+        ) {
+            showToast(
+                `Limite de ${planLimit} usuários ativos atingido para este plano.`,
+                'error'
+            );
             return;
         }
 
         setIsSavingUser(true);
+
         try {
-            console.log("[SaaS] Adicionando usuário manualmente via RPC...");
-            const { data, error } = await supabase.rpc('create_admin_user_for_company_safe', {
-                p_company_id: selectedCompany.id,
-                p_admin_email: newUserForm.email,
-                p_admin_password: newUserForm.password,
-                p_admin_name: newUserForm.name
-            });
+            const { data, error } = await supabase.rpc(
+                'create_admin_user_for_company_safe',
+                {
+                    p_company_id: selectedCompany.id,
+                    p_admin_email: email,
+                    p_admin_password: password,
+                    p_admin_name: name
+                }
+            );
 
             if (error) throw error;
-            if (data && !data.success) throw new Error(data.error);
 
-            showToast('Usuário adicionado com sucesso!', 'success');
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Não foi possível criar o usuário.'
+                );
+            }
+
+            showToast(
+                'Administrador criado com sucesso!',
+                'success'
+            );
+
             setIsAddingUser(false);
-            setNewUserForm({ name: '', email: '', password: '' });
-            fetchCompanyUsers(selectedCompany.id); // Atualiza a lista
+
+            setNewUserForm({
+                name: '',
+                email: '',
+                password: ''
+            });
+
+            await fetchCompanyUsers(selectedCompany.id);
+
         } catch (err: any) {
-            console.error("Erro ao adicionar usuário:", err);
-            showToast('Erro: ' + (err.message || 'Falha ao criar usuário'), 'error');
+
+            console.error(
+                '[SaaS] Erro ao criar administrador:',
+                err
+            );
+
+            showToast(
+                err.message || 'Falha ao criar administrador.',
+                'error'
+            );
+
         } finally {
             setIsSavingUser(false);
         }
     };
 
-    const toggleCompanyAdmin = async (userId: string, currentStatus: boolean) => {
-        const { error } = await supabase
-            .from('profiles')
-            .update({ is_company_admin: !currentStatus })
-            .eq('id', userId);
+    const toggleCompanyAdmin = async (
+        userId: string,
+        currentStatus: boolean
+    ) => {
+        const nextStatus = !currentStatus;
 
-        if (error) {
-            alert("Erro ao atualizar permissão: " + error.message);
-        } else {
-            // Update local state
-            setCompanyUsers(prev => prev.map(u => u.id === userId ? { ...u, isCompanyAdmin: !currentStatus, is_company_admin: !currentStatus } : u));
+        if (currentStatus) {
+            const otherAdmins = companyUsers.filter(
+                u =>
+                    u.id !== userId
+                    && !!u.isCompanyAdmin
+                    && (u as any).status === 'active'
+            );
+
+            if (otherAdmins.length === 0) {
+                showToast(
+                    'A empresa precisa manter pelo menos um Administrador da Empresa.',
+                    'error'
+                );
+                return;
+            }
+        }
+
+        try {
+            const { data, error } = await supabase.rpc(
+                'set_company_admin_safe',
+                {
+                    target_user_id: userId,
+                    new_status: nextStatus
+                }
+            );
+
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Não foi possível alterar o administrador.'
+                );
+            }
+
+            setCompanyUsers(prev =>
+                prev.map(u =>
+                    u.id === userId
+                        ? {
+                            ...u,
+                            isCompanyAdmin: nextStatus,
+                            is_company_admin: nextStatus
+                        }
+                        : u
+                )
+            );
+
+            showToast(
+                nextStatus
+                    ? 'Usuário promovido a Administrador da Empresa.'
+                    : 'Privilégio de Administrador da Empresa removido.',
+                'success'
+            );
+
+        } catch (err: any) {
+
+            console.error(
+                '[SaaS] Erro ao alterar Company Admin:',
+                err
+            );
+
+            showToast(
+                err.message || 'Falha ao alterar privilégio.',
+                'error'
+            );
         }
     };
 
     const handleDeleteUser = async (userId: string, userEmail: string, userName: string) => {
-        if (currentUser?.role !== 'Super Admin' && currentUser?.email !== 'ti@grupopixel.com.br') {
+        if (currentUser?.role !== 'Super Admin') {
             showToast('Apenas administradores master podem excluir usuários.', 'error');
             return;
         }
@@ -634,7 +1050,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
         try {
             console.log(`[SaaS] Excluindo usuário permanentemente: ${userId}`);
-            const { error } = await supabase.rpc('delete_user_admin', { target_user_id: userId });
+            const { data, error } = await supabase.rpc(
+                'delete_user_admin_safe',
+                { target_user_id: userId }
+            );
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Não foi possível excluir o usuário.'
+                );
+            }
 
             if (error) throw error;
 
@@ -673,12 +1098,20 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         if (!confirm('Tem certeza que deseja rejeitar este acesso?')) return;
         setIsValidating(userId);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ status: 'rejected' })
-                .eq('id', userId);
+            const { data, error } = await supabase.rpc(
+                'reject_user_admin',
+                {
+                    target_user_id: userId
+                }
+            );
 
             if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao rejeitar acesso'
+                );
+            }
             showToast('Acesso rejeitado.', 'info');
             fetchData();
         } catch (error: any) {
@@ -700,25 +1133,68 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     // 1. EXCLUIR
     const handleDeleteCompany = async () => {
-        if (selectedCompany) {
-            const { error } = await supabase.from('companies').delete().eq('id', selectedCompany.id);
-            if (error) {
-                alert('Erro ao excluir empresa: ' + error.message);
-            } else {
-                fetchData();
-                closeModal();
+        if (!selectedCompany?.id) return;
+
+        try {
+            const { data, error } = await supabase.rpc(
+                'delete_company_admin',
+                { target_company_id: selectedCompany.id }
+            );
+
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(data.error || 'Não foi possível excluir a empresa.');
             }
+
+            showToast('Empresa excluída com segurança.', 'success');
+            await fetchData();
+            closeModal();
+        } catch (err: any) {
+            console.error('[SaaS] Erro ao excluir empresa:', err);
+            showToast(
+                err.message || 'Não foi possível excluir a empresa.',
+                'error'
+            );
         }
     };
     const handleDeletePlan = async () => {
-        if (selectedPlanId) {
-            const { error } = await supabase.from('plans').delete().eq('id', selectedPlanId);
-            if (error) {
-                alert('Erro ao excluir plano: ' + error.message);
-            } else {
-                fetchData();
-                closeModal();
+        if (!selectedPlanId) return;
+
+        try {
+            const { data, error } = await supabase.rpc(
+                'delete_plan_admin',
+                {
+                    target_plan_id: selectedPlanId
+                }
+            );
+
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao excluir plano.'
+                );
             }
+
+            showToast(
+                'Plano excluído com sucesso!',
+                'success'
+            );
+
+            await fetchData();
+            closeModal();
+
+        } catch (error: any) {
+            console.error(
+                '[SaaS] Erro ao excluir plano:',
+                error
+            );
+
+            showToast(
+                error.message || 'Não foi possível excluir o plano.',
+                'error'
+            );
         }
     };
 
@@ -760,119 +1236,368 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             showToast('Empresa e Administrador criados com sucesso!', 'success');
             fetchData();
         } else if (modalOpen.edit && selectedCompany) {
-            const selectedPlan = localPlans.find(p => p.name === formData.plan); // Find plan by name
+            const selectedPlan = localPlans.find(
+                p => p.name === formData.plan
+            );
 
-            const { error } = await supabase.from('companies')
-                .update({
-                    name: formData.name,
-                    domain: formData.domain,
-                    cnpj: formData.cnpj || null, // Ensure null if empty
-                    plan_id: selectedPlan?.id,
-                    settings: { ...(selectedCompany.settings || {}), companyName: formData.name }
-                })
-                .eq('id', selectedCompany.id);
+            const name = String(formData.name || '').trim();
+            const domain = String(formData.domain || '')
+                .trim()
+                .toLowerCase();
 
-            if (error) {
-                showToast('Erro ao atualizar empresa: ' + error.message, 'error');
-                console.error("Update error:", error);
-            } else {
-                showToast('Empresa atualizada com sucesso!', 'success');
-                fetchData();
+            if (!name || !domain) {
+                showToast(
+                    'Informe nome e domínio da empresa.',
+                    'error'
+                );
+                return;
             }
+
+            if (!selectedPlan?.id) {
+                showToast(
+                    'Selecione um plano válido.',
+                    'error'
+                );
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.rpc(
+                    'update_company_admin',
+                    {
+                        target_company_id: selectedCompany.id,
+                        p_name: name,
+                        p_domain: domain,
+                        p_cnpj: formData.cnpj || null,
+                        p_plan_id: selectedPlan.id
+                    }
+                );
+
+                if (error) throw error;
+
+                if (data && data.success === false) {
+                    throw new Error(
+                        data.error || 'Falha ao atualizar empresa.'
+                    );
+                }
+
+                showToast(
+                    'Empresa atualizada com sucesso!',
+                    'success'
+                );
+
+                await fetchData();
+                closeModal();
+
+            } catch (error: any) {
+                console.error(
+                    '[SaaS] Erro ao atualizar empresa:',
+                    error
+                );
+
+                showToast(
+                    'Erro ao atualizar empresa: '
+                    + (error.message || 'Falha desconhecida'),
+                    'error'
+                );
+            }
+
+            return;
         }
+
         closeModal();
     };
 
     // 3. DESATIVAR
     const handleDisableCompany = async () => {
-        if (selectedCompany) {
-            const { error } = await supabase
-                .from('companies')
-                .update({ status: 'inactive' })
-                .eq('id', selectedCompany.id);
+        if (!selectedCompany?.id) return;
 
-            if (error) {
-                showToast('Erro ao desativar empresa: ' + error.message, 'error');
-            } else {
-                showToast('Empresa desativada com sucesso!', 'success');
-                fetchData();
-                closeModal();
+        const nextStatus =
+            selectedCompany.status === 'inactive'
+                ? 'active'
+                : 'inactive';
+
+        try {
+            const { data, error } = await supabase.rpc(
+                'set_company_status_admin',
+                {
+                    target_company_id: selectedCompany.id,
+                    new_status: nextStatus
+                }
+            );
+
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao alterar status.'
+                );
             }
+
+            showToast(
+                nextStatus === 'inactive'
+                    ? 'Empresa desativada com sucesso!'
+                    : 'Empresa reativada com sucesso!',
+                'success'
+            );
+
+            await fetchData();
+            closeModal();
+
+        } catch (error: any) {
+            console.error(
+                '[SaaS] Erro ao alterar status:',
+                error
+            );
+
+            showToast(
+                'Erro ao alterar status: '
+                + (error.message || 'Falha desconhecida'),
+                'error'
+            );
         }
     };
 
     // 4. ADICIONAR MÊS
     const handleAddMonth = async () => {
-        if (selectedCompany) {
-            const currentEnd = selectedCompany.subscriptionEndDate ? new Date(selectedCompany.subscriptionEndDate) : new Date();
-            const baseDate = currentEnd < new Date() ? new Date() : currentEnd;
-            const newDate = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        if (!selectedCompany?.id) return;
 
-            const { error } = await supabase
-                .from('companies')
-                .update({ subscription_end_date: newDate.toISOString() })
-                .eq('id', selectedCompany.id);
+        try {
+            const { data, error } = await supabase.rpc(
+                'extend_company_subscription_admin',
+                {
+                    target_company_id: selectedCompany.id,
+                    days_to_add: 30
+                }
+            );
 
-            if (error) {
-                showToast('Erro ao adicionar mês: ' + error.message, 'error');
-            } else {
-                fetchData();
-                showToast('30 dias adicionados com sucesso!', 'success');
-                closeModal(); // Close modal after success
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao adicionar período.'
+                );
             }
+
+            showToast(
+                '30 dias adicionados com sucesso!',
+                'success'
+            );
+
+            await fetchData();
+            closeModal();
+
+        } catch (error: any) {
+            console.error(
+                '[SaaS] Erro ao adicionar período:',
+                error
+            );
+
+            showToast(
+                'Erro ao adicionar 30 dias: '
+                + (error.message || 'Falha desconhecida'),
+                'error'
+            );
         }
     };
 
 
     // 5. ATUALIZAR CONFIGURAÇÃO (Recursos do Menu)
     const handleSaveConfig = async () => {
-        if (!selectedCompany) return;
+        if (!selectedCompany?.id) return;
 
-        const { error } = await supabase
-            .from('companies')
-            .update({ custom_features: featuresState })
-            .eq('id', selectedCompany.id);
+        try {
+            const { data, error } = await supabase.rpc(
+                'update_company_features_admin',
+                {
+                    target_company_id: selectedCompany.id,
+                    new_features: featuresState
+                }
+            );
 
-        if (error) {
-            showToast('Erro ao salvar configurações do menu: ' + error.message, 'error');
-        } else {
-            showToast('Configurações do menu salvas com sucesso!', 'success');
-            fetchData();
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao atualizar módulos.'
+                );
+            }
+
+            showToast(
+                data?.changed === false
+                    ? 'Nenhuma alteração nos módulos.'
+                    : 'Módulos atualizados com sucesso!',
+                'success'
+            );
+
+            await fetchData();
             closeModal();
+
+        } catch (error: any) {
+            console.error(
+                '[SaaS] Erro ao atualizar módulos:',
+                error
+            );
+
+            showToast(
+                'Erro ao salvar módulos: '
+                + (error.message || 'Falha desconhecida'),
+                'error'
+            );
         }
     };
 
     // 6. PLANOS (Criar/Editar)
     const submitPlanForm = async () => {
-        const planData = {
-            name: formData.name,
-            user_limit: parseInt(formData.userLimit) || 0,
-            whatsapp_limit: parseInt(formData.whatsappLimit) || 1,
-            email_limit: parseInt(formData.emailLimit) || 1,
-            price: parseFloat(formData.price) || 0,
-            features: featuresState
-        };
+        const name = String(formData.name || '').trim();
+        const userLimit = parseInt(formData.userLimit);
+        const whatsappLimit = parseInt(formData.whatsappLimit || '0');
+        const emailLimit = parseInt(formData.emailLimit || '0');
+        const price = parseFloat(formData.price || '0');
 
-        if (modalOpen.createPlan) {
-            const { error } = await supabase.from('plans').insert([planData]);
-            if (error) {
-                showToast('Erro ao criar plano: ' + error.message, 'error');
-                console.error("Create plan error:", error);
-            } else {
-                showToast('Plano criado com sucesso!', 'success');
-                fetchData();
-            }
-        } else if (modalOpen.editPlan && selectedPlanId) {
-            const { error } = await supabase.from('plans').update(planData).eq('id', selectedPlanId);
-            if (error) {
-                showToast('Erro ao atualizar plano: ' + error.message, 'error');
-                console.error("Update plan error:", error);
-            } else {
-                showToast('Plano atualizado com sucesso!', 'success');
-                fetchData();
-            }
+        const storageLimit = parseFloat(
+            String(
+                formData.storageLimit || '10'
+            ).replace(',', '.')
+        );
+
+        if (!name) {
+            showToast('Informe o nome do plano.', 'error');
+            return;
         }
-        closeModal();
+
+        if (!Number.isFinite(userLimit) || userLimit < 1) {
+            showToast(
+                'O limite de usuários deve ser maior que zero.',
+                'error'
+            );
+            return;
+        }
+
+        if (
+            !Number.isFinite(storageLimit)
+            || storageLimit <= 0
+        ) {
+            showToast(
+                'O limite de armazenamento deve ser maior que zero.',
+                'error'
+            );
+            return;
+        }
+
+        try {
+            let data: any;
+            let error: any;
+
+            if (modalOpen.createPlan) {
+                const result = await supabase.rpc(
+                    'create_plan_admin',
+                    {
+                        p_name: name,
+                        p_user_limit: userLimit,
+                        p_whatsapp_limit: Number.isFinite(whatsappLimit) ? whatsappLimit : 0,
+                        p_email_limit: Number.isFinite(emailLimit) ? emailLimit : 0,
+                        p_price: Number.isFinite(price) ? price : 0,
+                        p_features: featuresState
+                    }
+                );
+
+                data = result.data;
+                error = result.error;
+
+            } else if (
+                modalOpen.editPlan
+                && selectedPlanId
+            ) {
+                const result = await supabase.rpc(
+                    'update_plan_admin',
+                    {
+                        target_plan_id: selectedPlanId,
+                        p_name: name,
+                        p_user_limit: userLimit,
+                        p_whatsapp_limit: Number.isFinite(whatsappLimit) ? whatsappLimit : 0,
+                        p_email_limit: Number.isFinite(emailLimit) ? emailLimit : 0,
+                        p_price: Number.isFinite(price) ? price : 0,
+                        p_features: featuresState
+                    }
+                );
+
+                data = result.data;
+                error = result.error;
+
+            } else {
+                return;
+            }
+
+            if (error) throw error;
+
+            if (data && data.success === false) {
+                throw new Error(
+                    data.error || 'Falha ao salvar plano.'
+                );
+            }
+
+            const quotaPlanId =
+                modalOpen.createPlan
+                    ? data?.plan_id
+                    : selectedPlanId;
+
+            if (!quotaPlanId) {
+                throw new Error(
+                    'Não foi possível identificar o plano.'
+                );
+            }
+
+            const {
+                data: storageResult,
+                error: storageError
+            } = await supabase.rpc(
+                'set_plan_storage_limit_admin',
+                {
+                    target_plan_id:
+                        quotaPlanId,
+
+                    p_storage_limit_gb:
+                        storageLimit
+                }
+            );
+
+            if (storageError) {
+                throw storageError;
+            }
+
+            if (
+                storageResult
+                && storageResult.success === false
+            ) {
+                throw new Error(
+                    storageResult.error
+                    || 'Falha ao configurar armazenamento.'
+                );
+            }
+
+            showToast(
+                modalOpen.createPlan
+                    ? 'Plano criado com sucesso!'
+                    : 'Plano atualizado com sucesso!',
+                'success'
+            );
+
+            await fetchData();
+            closeModal();
+
+        } catch (error: any) {
+            console.error(
+                '[SaaS] Erro ao salvar plano:',
+                error
+            );
+
+            showToast(
+                'Erro ao salvar plano: '
+                + (error.message || 'Falha desconhecida'),
+                'error'
+            );
+        }
     };
 
     const submitUpdateForm = async () => {
@@ -880,11 +1605,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             alert('Preencha os campos obrigatórios');
             return;
         }
-        const { error } = await supabase.from('system_updates').insert([{
-            version: formData.version,
-            description: formData.description,
-            active: true
-        }]);
+        const { error } = await supabase.rpc(
+            'publish_system_update_admin',
+            {
+                p_version: formData.version,
+                p_description: formData.description,
+                p_pdf_url: formData.pdf_url || null
+            }
+        );
         if (error) {
             showToast('Erro ao publicar atualização: ' + error.message, 'error');
         } else {
@@ -898,7 +1626,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const handleDeleteVideo = async (id: string) => {
         if (!confirm('Deseja excluir este vídeo?')) return;
         try {
-            const { error } = await supabase.from('manual_videos').delete().eq('id', id);
+            const { error } = await supabase.rpc(
+                'delete_manual_video_admin',
+                {
+                    target_video_id: id
+                }
+            );
             if (error) throw error;
             showToast('Vídeo excluído com sucesso!', 'success');
             setManualVideos(vids => vids.filter(v => v.id !== id));
@@ -910,14 +1643,19 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     const submitVideoForm = async () => {
         try {
-            const { error } = await supabase.from('manual_videos').insert([{
-                title: formData.title,
-                url: formData.url,
-                thumbnail: formData.thumbnail,
-                duration: formData.duration,
-                category: formData.category,
-                description: formData.description
-            }]);
+            const { error } = await supabase.rpc(
+                'create_manual_video_admin',
+                {
+                    p_payload: {
+                        title: formData.title,
+                        url: formData.url,
+                        thumbnail: formData.thumbnail,
+                        duration: formData.duration,
+                        category: formData.category,
+                        description: formData.description
+                    }
+                }
+            );
             if (error) throw error;
             showToast('Vídeo cadastrado!', 'success');
             closeModal();
@@ -945,7 +1683,21 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 }));
 
             if (announcementsToInsert.length > 0) {
-                const { error } = await supabase.from('announcements').insert(announcementsToInsert);
+                const { data, error } = await supabase.rpc(
+                    'broadcast_saas_announcement_admin',
+                    {
+                        p_title: formData.title.trim(),
+                        p_summary: formData.content.trim(),
+                        p_category: formData.category || 'Notícias da Empresa',
+                        target_company_ids: null
+                    }
+                );
+
+                if (data && data.success === false) {
+                    throw new Error(
+                        data.error || 'Falha ao enviar aviso.'
+                    );
+                }
                 if (error) throw error;
                 showToast(`Aviso enviado para ${announcementsToInsert.length} empresas!`, 'success');
                 closeModal();
@@ -1015,7 +1767,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             let valStr = 'disabled';
             if (currentValue === true || currentValue === 'complete') valStr = 'complete';
             else if (currentValue === 'limited') valStr = 'limited';
-            
+
             return (
                 <div className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg transition-colors col-span-full md:col-span-1 border border-dashed border-gray-100 dark:border-gray-800 my-1">
                     <div className="flex items-center gap-3">
@@ -1026,9 +1778,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         value={valStr}
                         onChange={(e) => {
                             const val = e.target.value;
-                            setFeaturesState(prev => ({ 
-                                ...prev, 
-                                [id]: val === 'complete' ? true : (val === 'disabled' ? false : 'limited') 
+                            setFeaturesState(prev => ({
+                                ...prev,
+                                [id]: val === 'complete' ? true : (val === 'disabled' ? false : 'limited')
                             }));
                         }}
                         className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand-primary font-bold text-slate-700 dark:text-slate-200"
@@ -1056,12 +1808,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Toggle label="Módulo CRM" id="crm" icon={BuildingOfficeIcon} />
                 <Toggle label="Marketplace" id="marketplace" icon={BuildingStorefrontIcon} />
                 <Toggle label="Eventos" id="events" icon={CalendarDaysIcon} />
-                
+
                 <SelectLevelToggle label="Comercial" id="scheduling" icon={CalendarDaysIcon} />
                 <Toggle label="Agenda (Visitas/Reuniões/Treinamentos)" id="new_agenda" icon={CalendarDaysIcon} />
                 <Toggle label="Reservas (Salas/Veículos)" id="reservations" icon={BuildingOfficeIcon} />
                 <SelectLevelToggle label="Gestão de Projetos" id="projects" icon={ClipboardDocumentCheckIcon} />
-                
+
                 <Toggle label="Métricas (KPIs)" id="kpis" icon={ChartBarIcon} />
                 <Toggle label="WhatsPanda (CRM)" id="whatspanda" icon={ChatBubbleLeftRightIcon} />
                 <Toggle label="Assistente IA (Panda)" id="ai_assistant" icon={SparklesIcon} />
@@ -1111,14 +1863,64 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             <div className="p-8 flex-1">
                 {/* DASHBOARD */}
                 {activeTab === 'dashboard' && (
-                    <div className="space-y-6 animate-fadeIn">
+                    <div className="space-y-7 animate-fadeIn">
+
+                        {/* Executive SaaS Header */}
+                        <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-blue-500/[0.05] pointer-events-none" />
+
+                            <div className="relative p-6 lg:p-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-14 h-14 shrink-0 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shadow-sm">
+                                        <ChartBarIcon className="w-7 h-7 text-emerald-600" />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                                                Central SaaS
+                                            </h2>
+
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                Status não monitorado
+                                            </span>
+                                        </div>
+
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-2xl">
+                                            Visão executiva da operação do PandaNet, empresas, usuários, presença e distribuição dos planos.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <div className="px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700">
+                                        <p className="text-[9px] uppercase tracking-[0.14em] font-black text-slate-400">
+                                            Empresas
+                                        </p>
+                                        <p className="text-lg font-black text-slate-800 dark:text-white">
+                                            {totalCompanies}
+                                        </p>
+                                    </div>
+
+                                    <div className="px-4 py-2.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
+                                        <p className="text-[9px] uppercase tracking-[0.14em] font-black text-emerald-500">
+                                            Online agora
+                                        </p>
+                                        <p className="text-lg font-black text-emerald-600">
+                                            {onlineUsers}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col items-center text-center justify-center min-h-[160px]">
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-slate-200/70 dark:border-slate-800 flex flex-col items-center text-center justify-center min-h-[160px]">
                                 <p className="text-sm text-gray-500 font-medium">{t('dashboard.system_version')}</p>
                                 <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">
                                     {SYSTEM_VERSION}
                                 </h2>
-                                <p className="text-xs text-green-500 mt-1 font-semibold">Sistema Atualizado</p>
+                                <p className="text-xs text-green-500 mt-1 font-semibold">Sem verificação automática</p>
                             </div>
                             <MetricCardSimple title={t('dashboard.registered_companies')} value={totalCompanies} icon={BuildingOfficeIcon} />
                             <MetricCardSimple title={t('dashboard.active_companies')} value={activeCompaniesCount} icon={CheckCircleIcon} />
@@ -1131,10 +1933,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         </div>
 
                         {/* CHARTS SECTION */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             {/* Growth Chart */}
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('dashboard.company_growth')}</h3>
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-slate-200/70 dark:border-slate-800">
+                                <h3 className="text-base font-black tracking-tight text-slate-800 dark:text-white mb-1">{t('dashboard.company_growth')}</h3>
                                 <div className="h-64 w-full">
                                     <ResponsiveContainer width="100%" height={250}>
                                         <AreaChart data={growthData}>
@@ -1155,8 +1957,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             </div>
 
                             {/* Plans Distribution */}
-                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t('dashboard.plan_distribution')}</h3>
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-slate-200/70 dark:border-slate-800">
+                                <h3 className="text-base font-black tracking-tight text-slate-800 dark:text-white mb-1">{t('dashboard.plan_distribution')}</h3>
                                 <div className="h-64 w-full flex items-center justify-center">
                                     <ResponsiveContainer width="100%" height={250}>
                                         <PieChart>
@@ -1183,7 +1985,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         </div>
 
                         {/* WhatsApp Status Widget */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-slate-200/70 dark:border-slate-800">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                     <HeroChatBubbleLeftRightIcon className="w-6 h-6 text-green-500" />
@@ -1240,11 +2042,11 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 onClick={() => openModal('createCompany')}
                                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase tracking-wide flex items-center gap-2 transition-colors"
                             >
-                                <PlusIcon className="w-4 h-4" /> {t('dashboard.add_company')}
+                                <PlusIcon className="w-4 h-4" /> Novo Plano
                             </button>
                         </div>
 
-                        <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/70 dark:border-slate-800 overflow-visible">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead>
@@ -1259,13 +2061,24 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </thead>
                                     <tbody className="text-xs divide-y divide-gray-5 dark:divide-gray-700/50">
                                         {filteredCompanies.map((comp, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                            <tr key={idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
                                                 <td className="px-6 py-4 font-medium text-gray-700 dark:text-gray-300">{comp.name}</td>
                                                 <td className="px-6 py-4">
                                                     {comp.status === 'inactive' ? (
-                                                        <XMarkIcon className="w-5 h-5 text-red-500" />
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/30 dark:border-red-900/50 font-bold">
+                                                            <XMarkIcon className="w-3.5 h-3.5" />
+                                                            Inativa
+                                                        </span>
+                                                    ) : comp.status === 'expired' ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/30 dark:border-amber-900/50 font-bold">
+                                                            <CalendarDaysIcon className="w-3.5 h-3.5" />
+                                                            Vencida
+                                                        </span>
                                                     ) : (
-                                                        <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/50 font-bold">
+                                                            <CheckCircleIcon className="w-3.5 h-3.5" />
+                                                            Ativa
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500 font-bold">
@@ -1273,26 +2086,175 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                     <CompanyUserCount companyId={comp.id} />
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500">{comp.subscriptionEndDate ? new Date(comp.subscriptionEndDate).toLocaleDateString() : '-'}</td>
-                                                <td className="px-6 py-4 text-gray-500">{comp.plan?.name || 'Standard'}</td>
+                                                <td className="px-6 py-4 text-gray-500">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/50 font-bold">
+                                                        {comp.plan?.name || 'Sem plano'}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
-                                                        {currentUser?.email === 'ti@grupopixel.com.br' && onImpersonate && (
+
+                                                        {/* Acesso Fantasma */}
+                                                        {realProfile?.role === 'Super Admin' && onImpersonate && (
                                                             <ActionButton
                                                                 icon={Ghost}
-                                                                color="text-gray-900 dark:text-gray-100 hover:text-purple-600"
-                                                                title="Acesso Fantasma (Invisível)"
+                                                                color="text-slate-800 dark:text-slate-100 hover:text-purple-600"
+                                                                title="Acesso Fantasma"
                                                                 onClick={() => onImpersonate(comp)}
                                                             />
                                                         )}
-                                                        <ActionButton icon={BanknotesIcon} color="text-green-600" title={t('dashboard.invoices')} onClick={() => openModal('invoices', comp)} />
-                                                        <ActionButton icon={CalendarDaysIcon} color="text-blue-500" title={t('dashboard.add_month')} onClick={() => openModal('addMonth', comp)} />
-                                                        <ActionButton icon={ChartPieIcon} color="text-purple-500" title={t('dashboard.stats')} onClick={() => openModal('stats', comp)} />
-                                                        <ActionButton icon={CloudIcon} color="text-gray-500" title={t('dashboard.disk')} onClick={() => openModal('disk', comp)} />
-                                                        <ActionButton icon={NoSymbolIcon} color="text-orange-500" title={t('dashboard.disable')} onClick={() => openModal('disable', comp)} />
-                                                        <ActionButton icon={UserGroupIcon} color="text-teal-500" title={t('dashboard.users')} onClick={() => openModal('users', comp)} />
-                                                        <ActionButton icon={AdjustmentsHorizontalIcon} color="text-indigo-500" title={t('dashboard.config')} onClick={() => openModal('config', comp)} />
-                                                        <ActionButton icon={PencilIcon} color="text-amber-500" title={t('dashboard.edit')} onClick={() => openModal('edit', comp)} />
-                                                        <ActionButton icon={TrashIcon} color="text-red-500" title={t('dashboard.delete')} onClick={() => openModal('delete', comp)} />
+
+                                                        {/* Faturamento */}
+                                                        <ActionButton
+                                                            icon={BanknotesIcon}
+                                                            color="text-emerald-600"
+                                                            title="Faturamento / Mensalidades"
+                                                            onClick={() => openModal('invoices', comp)}
+                                                        />
+
+                                                        {/* Adicionar período */}
+                                                        <ActionButton
+                                                            icon={CalendarDaysIcon}
+                                                            color="text-blue-500"
+                                                            title={t('dashboard.add_month')}
+                                                            onClick={() => openModal('addMonth', comp)}
+                                                        />
+
+                                                        {/* Estatísticas */}
+                                                        <ActionButton
+                                                            icon={ChartPieIcon}
+                                                            color="text-purple-500"
+                                                            title={t('dashboard.stats')}
+                                                            onClick={() => openModal('stats', comp)}
+                                                        />
+
+                                                        {/* Armazenamento */}
+                                                        <ActionButton
+                                                            icon={CloudIcon}
+                                                            color="text-slate-500"
+                                                            title="Uso de Disco / Armazenamento"
+                                                            onClick={() => openModal('disk', comp)}
+                                                        />
+
+                                                        {/* Mais ações */}
+                                                        <details className="relative group/actions">
+                                                            <summary
+                                                                title="Mais ações"
+                                                                className="list-none cursor-pointer w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all select-none"
+                                                            >
+                                                                <span className="text-xl leading-none tracking-widest -mt-1">•••</span>
+                                                            </summary>
+
+                                                            <div className="absolute right-0 top-11 z-[80] w-[320px] p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl">
+                                                                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                                                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                                                                        Gerenciar empresa
+                                                                    </p>
+                                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5 truncate">
+                                                                        {comp.name}
+                                                                    </p>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 gap-0.5">
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            openModal('disable', comp);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
+                                                                    >
+                                                                        <span className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center">
+                                                                            <NoSymbolIcon className="w-4 h-4 text-orange-500" />
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className="font-bold">
+                                                                                {comp.status === 'inactive'
+                                                                                    ? 'Reativar Empresa'
+                                                                                    : 'Desativar Empresa'}
+                                                                            </p>
+                                                                            <p className="text-[10px] text-slate-400">
+                                                                                {comp.status === 'inactive'
+                                                                                    ? 'Restaura o acesso da empresa'
+                                                                                    : 'Bloqueia o acesso sem apagar dados'}
+                                                                            </p>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            openModal('users', comp);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-colors"
+                                                                    >
+                                                                        <span className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
+                                                                            <UserGroupIcon className="w-4 h-4 text-teal-500" />
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className="font-bold">Usuários da Empresa</p>
+                                                                            <p className="text-[10px] text-slate-400">Usuários, administradores e permissões</p>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            openModal('config', comp);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-colors"
+                                                                    >
+                                                                        <span className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center">
+                                                                            <AdjustmentsHorizontalIcon className="w-4 h-4 text-indigo-500" />
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className="font-bold">Configurar Módulos</p>
+                                                                            <p className="text-[10px] text-slate-400">Recursos e menus liberados</p>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            openModal('edit', comp);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors"
+                                                                    >
+                                                                        <span className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+                                                                            <PencilIcon className="w-4 h-4 text-amber-500" />
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className="font-bold">Editar Empresa</p>
+                                                                            <p className="text-[10px] text-slate-400">Cadastro, domínio, CNPJ e plano</p>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            openModal('delete', comp);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                                                    >
+                                                                        <span className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center">
+                                                                            <TrashIcon className="w-4 h-4 text-red-500" />
+                                                                        </span>
+                                                                        <div>
+                                                                            <p className="font-bold">Excluir Empresa</p>
+                                                                            <p className="text-[10px] text-red-400">Somente empresas sem dados vinculados</p>
+                                                                        </div>
+                                                                    </button>
+
+                                                                </div>
+                                                            </div>
+                                                        </details>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1540,23 +2502,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Exibir Banner?</span>
                                                 <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="sr-only peer" 
-                                                        checked={masterBannerData.isActive} 
-                                                        onChange={(e) => setMasterBannerData({ ...masterBannerData, isActive: e.target.checked })} 
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={masterBannerData.isActive}
+                                                        onChange={(e) => setMasterBannerData({ ...masterBannerData, isActive: e.target.checked })}
                                                     />
                                                     <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
                                                 </label>
                                             </div>
                                         </div>
                                         <p className="text-xs text-gray-500">Este banner aparecerá no topo da tela inicial de <strong>todas as empresas</strong>. Use para Master Class, Ofertas da Matriz, etc.</p>
-                                        
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL de Redirecionamento (Link)</label>
                                                 <input type="text" placeholder="Ex: https://grupopixel.com.br/oferta" value={masterBannerData.link} onChange={(e) => setMasterBannerData({ ...masterBannerData, link: e.target.value })} className="w-full p-2 border rounded text-sm bg-white dark:bg-gray-700 outline-none" />
-                                                
+
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mt-4 mb-2">Imagem do Banner</label>
                                                 <div className="flex items-center gap-4">
                                                     <label className="flex-1 text-center px-3 py-2 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-white rounded text-xs font-bold cursor-pointer transition-all uppercase border border-dashed border-gray-300 dark:border-gray-500">
@@ -1566,7 +2528,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 </div>
                                                 <p className="text-[10px] text-gray-400 mt-1 italic">Recomendado: 1200x300px (Banner horizontal largo).</p>
                                             </div>
-                                            
+
                                             <div className="flex items-center justify-center bg-black/5 dark:bg-black/20 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-2 min-h-[120px]">
                                                 {masterBannerFile ? (
                                                     <img src={URL.createObjectURL(masterBannerFile)} className="max-w-full max-h-[100px] object-contain rounded" alt="Preview Novo" />
@@ -1920,13 +2882,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                         : '0.00'} MB
                                                 </span>
                                         </div>
-                                            <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100 dark:border-gray-800">
-                                                <span className="text-gray-500">Status do Servidor</span>
-                                                <span className="text-green-500 font-bold flex items-center gap-1">
-                                                    <CheckCircleIcon className="w-3 h-3" />
-                                                    ONLINE / ESTÁVEL
-                                                </span>
-                                        </div>
+
                                     </div>
                                 </div>
                             </div>
@@ -1941,9 +2897,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             )}
 
             {modalOpen.addMonth && selectedCompany && (
-                <Modal onClose={closeModal} title="Confirmar Adição" width="max-w-md">
+                <Modal onClose={closeModal} title="Adicionar 30 dias" width="max-w-md">
                     <div className="p-6">
-                        <p className="text-gray-600 mb-6">Adicionar 1 mês extra ao vencimento de <strong>{selectedCompany.name}</strong>?</p>
+                        <p className="text-gray-600 mb-6">Adicionar <strong>30 dias</strong> ao vencimento de <strong>{selectedCompany.name}</strong>?</p>
                         <div className="flex justify-end gap-2">
                             <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
                             <button onClick={handleAddMonth} className="px-6 py-2 bg-blue-600 text-white rounded text-xs font-bold uppercase">Confirmar</button>
@@ -1955,7 +2911,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             {modalOpen.delete && selectedCompany && (
                 <Modal onClose={closeModal} title="Confirmar Exclusão" width="max-w-md">
                     <div className="p-6">
-                        <p className="text-gray-600 mb-6">Tem certeza que deseja <strong className="text-red-600">excluir permanentemente</strong> a empresa <strong>{selectedCompany.name}</strong>?</p>
+                        <p className="text-gray-600 mb-3">
+                            Tem certeza que deseja <strong className="text-red-600">excluir permanentemente</strong> a empresa <strong>{selectedCompany.name}</strong>?
+                        </p>
+                        <p className="text-xs text-red-500 mb-6">
+                            Por segurança, empresas que possuam usuários ou qualquer dado vinculado não podem ser excluídas. Para empresas em uso, utilize Desativar.
+                        </p>
                         <div className="flex justify-end gap-2">
                             <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
                             <button onClick={handleDeleteCompany} className="px-6 py-2 bg-red-600 text-white rounded text-xs font-bold uppercase">Excluir</button>
@@ -1965,134 +2926,473 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
             )}
 
             {modalOpen.disable && selectedCompany && (
-                <Modal onClose={closeModal} title="Desativar Empresa" width="max-w-md">
+                <Modal
+                    onClose={closeModal}
+                    title={
+                        selectedCompany.status === 'inactive'
+                            ? 'Reativar Empresa'
+                            : 'Desativar Empresa'
+                    }
+                    width="max-w-md"
+                >
                     <div className="p-6">
-                        <p className="text-gray-600 mb-6">Deseja desativar o acesso de <strong>{selectedCompany.name}</strong>?</p>
+                        <p className="text-gray-600 mb-2">
+                            {selectedCompany.status === 'inactive'
+                                ? <>Deseja reativar o acesso de <strong>{selectedCompany.name}</strong>?</>
+                                : <>Deseja desativar o acesso de <strong>{selectedCompany.name}</strong>?</>}
+                        </p>
+
+                        <p className="text-xs text-gray-400 mb-6">
+                            {selectedCompany.status === 'inactive'
+                                ? 'A empresa voltará a acessar os recursos permitidos pelo plano.'
+                                : 'Os dados serão preservados. Esta ação não exclui a empresa nem seus usuários.'}
+                        </p>
+
                         <div className="flex justify-end gap-2">
-                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Cancelar</button>
-                            <button onClick={handleDisableCompany} className="px-6 py-2 bg-orange-500 text-white rounded text-xs font-bold uppercase">Desativar</button>
+                            <button
+                                onClick={closeModal}
+                                className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase"
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                onClick={handleDisableCompany}
+                                className={
+                                    selectedCompany.status === 'inactive'
+                                        ? 'px-6 py-2 bg-emerald-600 text-white rounded text-xs font-bold uppercase'
+                                        : 'px-6 py-2 bg-orange-500 text-white rounded text-xs font-bold uppercase'
+                                }
+                            >
+                                {selectedCompany.status === 'inactive'
+                                    ? 'Reativar'
+                                    : 'Desativar'}
+                            </button>
                         </div>
                     </div>
                 </Modal>
             )}
-
             {modalOpen.invoices && selectedCompany && (
-                <Modal onClose={closeModal} title={`Mensalidades & Faturamento: ${selectedCompany.name}`} width="max-w-xl">
+                <Modal
+                    onClose={closeModal}
+                    title={`Mensalidades & Faturamento: ${selectedCompany.name}`}
+                    width="max-w-xl"
+                >
                     <div className="p-6 space-y-6">
-                        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                            <div>
-                                <p className="text-xs text-gray-400 dark:text-gray-450 font-bold uppercase">Plano Atual</p>
-                                <h4 className="text-base font-black text-gray-800 dark:text-white">{selectedCompany.plan?.name || 'Standard'}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-400 font-bold uppercase">
+                                    Plano Atual
+                                </p>
+                                <h4 className="text-base font-black text-gray-800 dark:text-white mt-1">
+                                    {selectedCompany.plan?.name || 'Sem plano'}
+                                </h4>
                             </div>
-                            <div className="text-right">
-                                <p className="text-xs text-gray-400 dark:text-gray-450 font-bold uppercase">Valor Mensal</p>
-                                <h4 className="text-lg font-black text-brand-primary">
-                                    {(selectedCompany.plan?.price || 299).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-400 font-bold uppercase">
+                                    Valor Mensal
+                                </p>
+                                <h4 className="text-base font-black text-brand-primary mt-1">
+                                    {typeof selectedCompany.plan?.price === 'number'
+                                        ? selectedCompany.plan.price.toLocaleString('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL'
+                                        })
+                                        : 'Não informado'}
+                                </h4>
+                            </div>
+
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-400 font-bold uppercase">
+                                    Validade
+                                </p>
+                                <h4 className="text-base font-black text-gray-800 dark:text-white mt-1">
+                                    {selectedCompany.subscriptionEndDate
+                                        ? new Date(selectedCompany.subscriptionEndDate).toLocaleDateString('pt-BR')
+                                        : 'Não definida'}
+                                </h4>
+                            </div>
+
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-400 font-bold uppercase">
+                                    Status
+                                </p>
+                                <h4 className="text-base font-black text-gray-800 dark:text-white mt-1">
+                                    {selectedCompany.status || 'Não informado'}
                                 </h4>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b pb-1">Faturas da Conta</h4>
-                            
-                            {/* Fatura Atual Pendente */}
-                            <div className="flex items-center justify-between p-4 bg-yellow-50/50 dark:bg-yellow-955/10 border border-yellow-100 dark:border-yellow-900/30 rounded-xl">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-gray-800 dark:text-white">Mensalidade Mês Atual</span>
-                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 uppercase">Pendente</span>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-0.5">Vencimento: {new Date(new Date().getTime() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                                        {(selectedCompany.plan?.price || 299).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </span>
-                                    <button 
-                                        onClick={async () => {
-                                            await handleAddMonth();
-                                            showToast("Pagamento registrado com sucesso! 30 dias foram adicionados à validade da empresa.", "success");
-                                        }}
-                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold uppercase transition-all active:scale-95 shadow-sm"
-                                    >
-                                        Baixar
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Faturas Históricas */}
-                            <div className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-700/10 border border-gray-100 dark:border-gray-700 rounded-xl">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-gray-600 dark:text-gray-400">Mensalidade Mês Anterior</span>
-                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 uppercase">Paga</span>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-0.5">Pago em: {new Date(new Date().getTime() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
-                                </div>
-                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">
-                                    {(selectedCompany.plan?.price || 299).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                </span>
-                            </div>
+                        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/40">
+                            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                Histórico de faturamento ainda não configurado
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                O PandaNet ainda não possui uma tabela de faturas ou pagamentos.
+                                Nenhum pagamento será simulado e nenhuma validade será alterada por esta tela.
+                            </p>
                         </div>
 
-                        <div className="flex justify-end pt-4 border-t gap-2">
-                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Fechar</button>
+                        <div className="flex justify-end pt-4 border-t">
+                            <button
+                                onClick={closeModal}
+                                className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase"
+                            >
+                                Fechar
+                            </button>
                         </div>
                     </div>
                 </Modal>
             )}
 
             {modalOpen.disk && selectedCompany && (
-                <Modal onClose={closeModal} title={`Uso de Disco & Armazenamento: ${selectedCompany.name}`} width="max-w-xl">
+                <Modal
+                    onClose={closeModal}
+                    title={`Uso de Disco & Armazenamento: ${selectedCompany.name}`}
+                    width="max-w-xl"
+                >
                     <div className="p-6 space-y-6">
-                        <div className="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700 space-y-4">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-gray-500 dark:text-gray-400 font-bold">Espaço Consumido</span>
-                                <span className="font-bold text-brand-primary">320 MB de 10 GB</span>
+                        {statsLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <ArrowPathIcon className="w-10 h-10 text-brand-primary animate-spin" />
+                                <p className="text-sm text-gray-500 mt-4">
+                                    Calculando uso real...
+                                </p>
                             </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                                <div className="bg-brand-primary h-full rounded-full transition-all duration-500" style={{ width: '3.2%' }}></div>
-                            </div>
-                            <p className="text-[10px] text-gray-400 italic">Limite do plano: 10 GB por empresa. Entre em contato para expandir a capacidade de armazenamento.</p>
-                        </div>
+                        ) : usageStats?.storage ? (
+                            <>
 
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b pb-1">Distribuição do Espaço</h4>
-                            
-                            <div className="flex justify-between items-center text-xs py-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
-                                    <span className="text-gray-600 dark:text-gray-300 font-medium">Mídias do Chat (WhatsPanda)</span>
-                                </div>
-                                <span className="font-bold">145 MB</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs py-2 border-t border-gray-100 dark:border-gray-750">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></div>
-                                    <span className="text-gray-600 dark:text-gray-300 font-medium">Anexos do Feed de Notícias</span>
-                                </div>
-                                <span className="font-bold">120 MB</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs py-2 border-t border-gray-100 dark:border-gray-750">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
-                                    <span className="text-gray-600 dark:text-gray-300 font-medium">Anexos de E-mails</span>
-                                </div>
-                                <span className="font-bold">55 MB</span>
-                            </div>
-                        </div>
+                                {usageStats?.storageQuota && (() => {
 
-                        <div className="flex justify-between items-center pt-4 border-t gap-2">
-                            <button 
-                                onClick={() => {
-                                    showToast("Mídias antigas e lixeira foram limpas com sucesso! 45 MB liberados.", "success");
-                                    closeModal();
-                                }}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold uppercase transition-all shadow-sm"
+                                    const quota =
+                                        usageStats.storageQuota;
+
+                                    const percentage =
+                                        Math.min(
+                                            Number(
+                                                quota.percentage
+                                                || 0
+                                            ),
+                                            100
+                                        );
+
+                                    const statusLabel =
+                                        quota.status === 'limit'
+                                            ? 'Limite atingido'
+                                            : quota.status === 'critical'
+                                                ? 'Crítico'
+                                                : quota.status === 'warning'
+                                                    ? 'Atenção'
+                                                    : 'Normal';
+
+                                    const barClass =
+                                        quota.status === 'limit'
+                                            ? 'bg-red-500'
+                                            : quota.status === 'critical'
+                                                ? 'bg-orange-500'
+                                                : quota.status === 'warning'
+                                                    ? 'bg-amber-500'
+                                                    : 'bg-emerald-500';
+
+                                    return (
+                                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 bg-white dark:bg-slate-900 shadow-sm space-y-5">
+
+                                            <div className="flex items-start justify-between gap-4">
+
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                                                        Quota comercial
+                                                    </p>
+
+                                                    <h4 className="text-xl font-black text-slate-900 dark:text-white mt-1">
+
+                                                        {Number(
+                                                            quota.used_gb
+                                                            || 0
+                                                        ).toFixed(2)}
+                                                        {' '}GB
+
+                                                        <span className="text-sm text-slate-400">
+                                                            {' '}de{' '}
+                                                            {Number(
+                                                                quota.effective_limit_gb
+                                                                || 0
+                                                            ).toFixed(2)}
+                                                            {' '}GB
+                                                        </span>
+
+                                                    </h4>
+                                                </div>
+
+                                                <span className={`
+                                                    px-2.5
+                                                    py-1
+                                                    rounded-full
+                                                    text-[10px]
+                                                    font-black
+                                                    uppercase
+                                                    tracking-wider
+                                                    border
+                                                    ${
+                                                        quota.status === 'limit'
+                                                            ? 'bg-red-50 text-red-600 border-red-200'
+                                                            : quota.status === 'critical'
+                                                                ? 'bg-orange-50 text-orange-600 border-orange-200'
+                                                                : quota.status === 'warning'
+                                                                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                                                    : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                    }
+                                                `}>
+                                                    {statusLabel}
+                                                </span>
+
+                                            </div>
+
+
+                                            <div>
+
+                                                <div className="h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+
+                                                    <div
+                                                        className={`
+                                                            h-full
+                                                            rounded-full
+                                                            transition-all
+                                                            ${barClass}
+                                                        `}
+                                                        style={{
+                                                            width:
+                                                                `${percentage}%`
+                                                        }}
+                                                    />
+
+                                                </div>
+
+
+                                                <div className="flex justify-between text-[11px] font-bold text-slate-400 mt-2">
+
+                                                    <span>
+                                                        {Number(
+                                                            quota.percentage
+                                                            || 0
+                                                        ).toFixed(1)}
+                                                        % utilizado
+                                                    </span>
+
+                                                    <span>
+                                                        {Number(
+                                                            quota.remaining_gb
+                                                            || 0
+                                                        ).toFixed(2)}
+                                                        {' '}GB disponíveis
+                                                    </span>
+
+                                                </div>
+
+                                            </div>
+
+
+                                            {Number(
+                                                quota.percentage
+                                                || 0
+                                            ) >= 80 && (
+
+                                                <div className={`
+                                                    p-3
+                                                    rounded-xl
+                                                    border
+                                                    text-xs
+                                                    font-medium
+                                                    ${
+                                                        Number(
+                                                            quota.percentage
+                                                            || 0
+                                                        ) >= 100
+                                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                                            : Number(
+                                                                quota.percentage
+                                                                || 0
+                                                            ) >= 90
+                                                                ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                    }
+                                                `}>
+
+                                                    {Number(
+                                                        quota.percentage
+                                                        || 0
+                                                    ) >= 100
+                                                        ? 'Esta empresa atingiu o limite de armazenamento. Novos uploads autenticados serão bloqueados.'
+                                                        : `A empresa já utilizou ${Number(quota.used_gb || 0).toFixed(2)} GB do limite de ${Number(quota.effective_limit_gb || 0).toFixed(2)} GB.`}
+
+                                                </div>
+
+                                            )}
+
+
+                                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+
+                                                <div className="flex items-end gap-2">
+
+                                                    <div className="flex-1">
+
+                                                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                                                            Limite personalizado
+                                                        </label>
+
+                                                        <div className="relative">
+
+                                                            <input
+                                                                type="number"
+                                                                min="0.1"
+                                                                step="0.1"
+                                                                value={
+                                                                    storageOverrideInput
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setStorageOverrideInput(
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                placeholder={
+                                                                    `Plano: ${Number(
+                                                                        quota.plan_limit_gb
+                                                                        || 0
+                                                                    ).toFixed(2)} GB`
+                                                                }
+                                                                className="w-full p-2.5 pr-12 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 dark:bg-slate-800 dark:text-white"
+                                                            />
+
+                                                            <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                                                                GB
+                                                            </span>
+
+                                                        </div>
+
+                                                    </div>
+
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            handleSaveStorageOverride
+                                                        }
+                                                        className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black transition-colors"
+                                                    >
+                                                        Salvar
+                                                    </button>
+
+                                                </div>
+
+
+                                                <div className="flex items-center justify-between mt-3 gap-4">
+
+                                                    <p className="text-[10px] text-slate-400">
+
+                                                        Limite do plano:{' '}
+                                                        <strong>
+                                                            {Number(
+                                                                quota.plan_limit_gb
+                                                                || 0
+                                                            ).toFixed(2)}
+                                                            {' '}GB
+                                                        </strong>
+
+                                                        {quota.override_limit_gb != null && (
+                                                            <>
+                                                                {' '}• Personalizado:{' '}
+                                                                <strong>
+                                                                    {Number(
+                                                                        quota.override_limit_gb
+                                                                    ).toFixed(2)}
+                                                                    {' '}GB
+                                                                </strong>
+                                                            </>
+                                                        )}
+
+                                                    </p>
+
+
+                                                    {quota.override_limit_gb != null && (
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={
+                                                                handleResetStorageOverride
+                                                            }
+                                                            className="text-[10px] font-black text-purple-600 hover:underline shrink-0"
+                                                        >
+                                                            Usar limite do plano
+                                                        </button>
+
+                                                    )}
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+                                    );
+
+                                })()}
+
+                                <div className="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-xl border border-gray-100 dark:border-gray-700 space-y-4">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-500 dark:text-gray-400 font-bold">
+                                            Espaço estimado da empresa
+                                        </span>
+                                        <span className="font-bold text-brand-primary">
+                                            {Number(usageStats.storage.company_estimated_mb || 0).toFixed(2)} MB
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-sm border-t border-gray-100 dark:border-gray-700 pt-4">
+                                        <span className="text-gray-500 dark:text-gray-400 font-bold">
+                                            Registros estimados
+                                        </span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-200">
+                                            {Number(usageStats.storage.company_estimated_rows || 0).toLocaleString('pt-BR')}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-sm border-t border-gray-100 dark:border-gray-700 pt-4">
+                                        <span className="text-gray-500 dark:text-gray-400 font-bold">
+                                            Banco completo na VPS
+                                        </span>
+                                        <span className="font-bold text-gray-700 dark:text-gray-200">
+                                            {usageStats.storage.total_db_size_bytes
+                                                ? (
+                                                    Number(usageStats.storage.total_db_size_bytes)
+                                                    / (1024 * 1024)
+                                                ).toFixed(2)
+                                                : '0.00'} MB
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-900/40">
+                                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        Estes valores são calculados pelo banco através da função
+                                        de métricas do PandaNet. Não são valores demonstrativos.
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="p-4 rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/40">
+                                <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                                    Não foi possível carregar as métricas de armazenamento.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end pt-4 border-t">
+                            <button
+                                onClick={closeModal}
+                                className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase"
                             >
-                                Limpar Cache & Lixeira
+                                Fechar
                             </button>
-                            <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded text-xs font-bold uppercase">Fechar</button>
                         </div>
                     </div>
                 </Modal>
@@ -2155,7 +3455,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         {(modalOpen.createPlan || modalOpen.editPlan) && (
                             <div className="space-y-4 mb-8">
                                 <h4 className="font-bold text-gray-700 dark:text-gray-200 border-b pb-2 mb-4">Detalhes do Plano</h4>
-                                
+
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Nome do Plano</label>
                                     <input type="text" placeholder="Ex: Profissional" value={formData.name || ''} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
@@ -2176,7 +3476,36 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </div>
                                 </div>
 
-                                <div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                                            Armazenamento (GB)
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            min="0.1"
+                                            step="0.1"
+                                            placeholder="Ex: 10"
+                                            value={
+                                                formData.storageLimit
+                                                || '10'
+                                            }
+                                            onChange={(e) =>
+                                                handleInputChange(
+                                                    'storageLimit',
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white"
+                                        />
+
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            Limite total de arquivos da empresa.
+                                        </p>
+                                    </div>
+
+<div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Valor Mensal (R$)</label>
                                     <input type="number" placeholder="Ex: 299.00" value={formData.price || ''} onChange={(e) => handleInputChange('price', e.target.value)} className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all dark:bg-gray-800 dark:text-white" />
                                 </div>
@@ -2196,19 +3525,34 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 <Modal onClose={closeModal} title={`Usuários de ${selectedCompany.name}`} width="max-w-3xl">
                     <div className="p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <p className="text-sm text-gray-500">Gerencie os usuários e administradores desta empresa.</p>
+                            <div>
+                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Gerencie usuários e Administradores da Empresa.
+                                </p>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {companyUsers.filter(u => (u as any).status === 'active').length}
+                                    {typeof selectedCompany.plan?.userLimit === 'number'
+                                        ? ` de ${selectedCompany.plan.userLimit}`
+                                        : ''} usuários ativos
+                                    {selectedCompany.plan?.name
+                                        ? ` • Plano ${selectedCompany.plan.name}`
+                                        : ''}
+                                </p>
+                            </div>
                                 <button
                                     onClick={() => setIsAddingUser(!isAddingUser)}
                                     className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isAddingUser ? 'bg-gray-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                                 >
-                                    {isAddingUser ? 'Cancelar' : <><PlusIcon className="w-4 h-4" /> ADD</>}
+                                    {isAddingUser
+                                        ? 'Cancelar'
+                                        : <><PlusIcon className="w-4 h-4" /> Novo administrador</>}
                                 </button>
                             </div>
 
                             {isAddingUser && (
                                 <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800 rounded-xl animate-fadeIn">
                                     <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-3 flex items-center gap-2">
-                                        <PlusIcon className="w-4 h-4" /> Novo Administrador para {selectedCompany.name}
+                                        <PlusIcon className="w-4 h-4" /> Novo Administrador da Empresa
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <input
@@ -2239,7 +3583,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                             disabled={isSavingUser}
                                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2"
                                         >
-                                            {isSavingUser ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : 'Criar Usuário'}
+                                            {isSavingUser
+                                                ? <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                                : 'Criar administrador'}
                                         </button>
                                     </div>
                                 </div>
@@ -2252,14 +3598,14 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         <th className="px-4 py-3">Email</th>
                                         <th className="px-4 py-3">Papel</th>
                                         <th className="px-4 py-3 text-center">Admin da Empresa</th>
-                                        {(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') && (
+                                        {currentUser?.role === 'Super Admin' && (
                                             <th className="px-4 py-3 text-center">Ações</th>
                                         )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                     {companyUsers.length === 0 ? (
-                                        <tr><td colSpan={(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') ? 5 : 4} className="px-4 py-8 text-center text-gray-400">Nenhum usuário encontrado nesta empresa.</td></tr>
+                                        <tr><td colSpan={currentUser?.role === 'Super Admin' ? 5 : 4} className="px-4 py-8 text-center text-gray-400">Nenhum usuário encontrado nesta empresa.</td></tr>
                                     ) : (
                                         companyUsers.map(user => (
                                             <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -2277,7 +3623,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${user.isCompanyAdmin ? 'translate-x-6' : 'translate-x-1'}`} />
                                                     </button>
                                                 </td>
-                                                {(currentUser?.role === 'Super Admin' || currentUser?.email === 'ti@grupopixel.com.br') && (
+                                                {currentUser?.role === 'Super Admin' && (
                                                     <td className="px-4 py-3 text-center">
                                                         <button
                                                             onClick={() => handleDeleteUser(user.id, user.email, user.name || '')}

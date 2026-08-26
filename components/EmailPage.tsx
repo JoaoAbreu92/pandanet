@@ -90,7 +90,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const { t, language } = useLanguage();
     const { showToast } = useToast();
     const { setModuleUnreadCount, notifications, markAsRead, markNotificationsByLink } = useNotifications();
-    const { isGhostMode } = useAuth();
+    const { isGhostMode, realProfile } = useAuth();
 
     const canManageAccounts = currentUser?.email_permissions?.can_manage_accounts || 
                             currentUser?.isAdmin || 
@@ -232,7 +232,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     };
 
     const toggleUsersMultipleEmails = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (isGhostMode) return;
+        if (
+            isGhostMode
+            && realProfile?.role !== 'Super Admin'
+        ) return;
+
         const newVal = e.target.checked;
         setAllowUsersMultipleEmails(newVal);
         

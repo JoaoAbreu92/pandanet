@@ -36,28 +36,136 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [realProfile, setRealProfile] = useState<Employee | null>(null);
-    const [impersonatedUser, setImpersonatedUser] = useState<Employee | null>(() => {
-        const saved = localStorage.getItem('pixel_ghost_user_data');
-        return saved ? JSON.parse(saved) : null;
-    });
-    const [isGhostMode, setIsGhostMode] = useState(() => localStorage.getItem('pixel_is_ghost_mode') === 'true');
+    // Ghost nunca nasce autorizado apenas por localStorage.
+    // A restauracao somente acontece depois que o perfil REAL
+    // autenticado for carregado e confirmado como Super Admin.
+    const [impersonatedUser, setImpersonatedUser] = useState<Employee | null>(null);
+    const [isGhostMode, setIsGhostMode] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    const setGhostData = (isGhost: boolean, ghostUser: Employee | null = null) => {
-        setIsGhostMode(isGhost);
-        setImpersonatedUser(ghostUser);
-        if (isGhost) {
-            localStorage.setItem('pixel_is_ghost_mode', 'true');
-            if (ghostUser) {
-                localStorage.setItem('pixel_ghost_user_data', JSON.stringify(ghostUser));
-            } else {
-                localStorage.removeItem('pixel_ghost_user_data');
-            }
-        } else {
-            localStorage.removeItem('pixel_is_ghost_mode');
-            localStorage.removeItem('pixel_ghost_user_data');
-        }
+    const clearGhostStorage = () => {
+        localStorage.removeItem('pixel_is_ghost_mode');
+        localStorage.removeItem('pixel_ghost_user_data');
+        localStorage.removeItem('pixel_is_impersonating');
+        localStorage.removeItem('pixel_impersonated_company');
     };
+
+    const setGhostData = (isGhost: boolean, ghostUser: Employee | null = null) => {
+        if (!isGhost) {
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+            return;
+        }
+
+        const realGhostAuthority =
+            realProfile?.role === 'Super Admin'
+            && (
+                !(realProfile as any)?.status
+                || (realProfile as any)?.status === 'active'
+            );
+
+        if (!realGhostAuthority) {
+            console.error(
+                '[Ghost Audit] Ativacao recusada: perfil real sem autoridade.'
+            );
+
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+            return;
+        }
+
+        if (!ghostUser?.id || !ghostUser?.company_id) {
+            console.error(
+                '[Ghost Audit] Ativacao recusada: contexto Ghost invalido.'
+            );
+
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+            return;
+        }
+
+        setIsGhostMode(true);
+        setImpersonatedUser(ghostUser);
+
+        localStorage.setItem(
+            'pixel_is_ghost_mode',
+            'true'
+        );
+
+        localStorage.setItem(
+            'pixel_ghost_user_data',
+            JSON.stringify(ghostUser)
+        );
+    };
+
+    // Restaura Ghost somente depois de validar o perfil REAL.
+    useEffect(() => {
+        if (loading) return;
+
+        const storedGhost =
+            localStorage.getItem('pixel_is_ghost_mode') === 'true';
+
+        if (!storedGhost) return;
+
+        const authorized =
+            realProfile?.role === 'Super Admin'
+            && (
+                !(realProfile as any)?.status
+                || (realProfile as any)?.status === 'active'
+            );
+
+        if (!authorized) {
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+            return;
+        }
+
+        const raw =
+            localStorage.getItem('pixel_ghost_user_data');
+
+        if (!raw) {
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+            return;
+        }
+
+        try {
+            const restored = JSON.parse(raw) as Employee;
+
+            if (
+                !restored?.id
+                || !restored?.company_id
+            ) {
+                throw new Error(
+                    'Contexto Ghost persistido invalido'
+                );
+            }
+
+            setImpersonatedUser(restored);
+            setIsGhostMode(true);
+
+        } catch (error) {
+            console.error(
+                '[Ghost Audit] Restauracao recusada:',
+                error
+            );
+
+            setIsGhostMode(false);
+            setImpersonatedUser(null);
+            clearGhostStorage();
+        }
+
+    }, [
+        loading,
+        realProfile?.id,
+        realProfile?.role,
+        (realProfile as any)?.status
+    ]);
 
     const fetchProfile = async (userId: string, email?: string) => {
         try {

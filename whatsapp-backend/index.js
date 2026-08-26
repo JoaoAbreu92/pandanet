@@ -2689,6 +2689,46 @@ async function uploadMediaToSupabase(base64, mediatype, companyId, mimeType = nu
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const buffer = Buffer.from(base64Data, 'base64');
 
+        // -----------------------------------------------------
+        // STORAGE QUOTA
+        //
+        // Este backend usa service_role, portanto RLS do
+        // Storage nao e suficiente. Fazemos pre-check explicito
+        // antes do upload. O banco possui ainda um trigger como
+        // ultima camada de protecao contra bypass/race.
+        // -----------------------------------------------------
+
+        const {
+            data: quotaDecision,
+            error: quotaError
+        } = await supabase.rpc(
+            'authorize_service_storage_upload',
+            {
+                p_company_id: companyId,
+                p_bucket: 'chat-media',
+                p_name: filePath,
+                p_size: buffer.length
+            }
+        );
+
+        if (quotaError) {
+            console.error(
+                '[STORAGE][QUOTA] Falha ao validar quota:',
+                quotaError.message
+            );
+            return null;
+        }
+
+        if (!quotaDecision?.allowed) {
+            console.warn(
+                `[STORAGE][QUOTA] Upload bloqueado para empresa ${companyId}. `
+                + `Usado=${quotaDecision?.used_bytes || 0} `
+                + `Solicitado=${buffer.length} `
+                + `Limite=${quotaDecision?.limit_bytes || 0}`
+            );
+            return null;
+        }
+
         const { data, error } = await supabase.storage
             .from('chat-media')
             .upload(filePath, buffer, { contentType, upsert: true });
