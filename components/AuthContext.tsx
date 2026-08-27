@@ -332,7 +332,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     email_permissions: data.email_permissions || {
                         can_manage_accounts: isMasterAdmin || data.is_company_admin || false,
                         can_view_all_accounts: isMasterAdmin || data.is_company_admin || false,
-                        account_limit: isMasterAdmin ? 100 : (planEmailLimit || 1)
+                        account_limit: isMasterAdmin ? 100 : (planEmailLimit ?? 0)
                     },
                     plan_email_limit: isMasterAdmin ? 100 : planEmailLimit,
                     plan_whatsapp_limit: isMasterAdmin ? 100 : planWhatsappLimit,
@@ -409,6 +409,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         return () => subscription.unsubscribe();
     }, []);
+
+    // Mantem perfil, plano e limites sincronizados em paginas abertas.
+    useEffect(() => {
+        if (!user?.id || !realProfile?.company_id) return;
+
+        const companyId = realProfile.company_id;
+        const planId = (realProfile as any)?.company?.plan?.id;
+
+        const refreshCommercialProfile = () =>
+            fetchProfile(user.id, user.email);
+
+        const commercialChannel = supabase
+            .channel('commercial-profile-' + user.id)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: 'id=eq.' + user.id
+                },
+                refreshCommercialProfile
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'companies',
+                    filter: 'id=eq.' + companyId
+                },
+                refreshCommercialProfile
+            );
+
+        if (planId) {
+            commercialChannel.on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'plans',
+                    filter: 'id=eq.' + planId
+                },
+                refreshCommercialProfile
+            );
+        }
+
+        commercialChannel.subscribe();
+
+        return () => {
+            supabase.removeChannel(commercialChannel);
+        };
+    }, [
+        user?.id,
+        realProfile?.company_id,
+        (realProfile as any)?.company?.plan?.id
+    ]);
 
     const signOut = async () => {
         setIsGhostMode(false);

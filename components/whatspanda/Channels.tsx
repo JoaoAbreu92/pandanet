@@ -256,7 +256,7 @@ const Channels: React.FC = () => {
             
             if (companyData?.plan) {
                 const plan = (companyData.plan as any);
-                setWhatsappLimit(plan.whatsapp_limit || 1);
+                setWhatsappLimit(plan.whatsapp_limit ?? 0);
             }
         } catch (e) {
             console.error("Erro ao buscar limite do plano:", e);

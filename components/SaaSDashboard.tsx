@@ -154,8 +154,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
                     ...p,
                     userLimit: p.user_limit,
-                    whatsappLimit: p.whatsapp_limit || 1,
-                    emailLimit: p.email_limit || 1,
+                    whatsappLimit: p.whatsapp_limit ?? 0,
+                    emailLimit: p.email_limit ?? 0,
                     storageLimit: Number(
                         p.storage_limit_gb || 10
                     ),
@@ -598,8 +598,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 setFormData({
                     name: plan.name,
                     userLimit: plan.userLimit.toString(),
-                    whatsappLimit: (plan.whatsappLimit || 1).toString(),
-                    emailLimit: (plan.emailLimit || 1).toString(),
+                    whatsappLimit: (plan.whatsappLimit ?? 0).toString(),
+                    emailLimit: (plan.emailLimit ?? 0).toString(),
                     price: (plan.price || 0).toString()
                 });
                 setFeaturesState((plan.features || {}) as Record<string, any>);
@@ -2297,7 +2297,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                             <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-500" />
-                                            <span>Limite WhatsApp: <strong>{plan.whatsappLimit || 1} canais</strong></span>
+                                            <span>Limite WhatsApp: <strong>{plan.whatsappLimit ?? 0} canais</strong></span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                                             <CheckCircleIcon className="w-4 h-4 text-emerald-500" />

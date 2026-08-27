@@ -1,3 +1,8 @@
+import {
+    PAGE_FEATURE_MAP,
+    isCommercialFeatureEnabled,
+    resolveCommercialFeatures
+} from './utils/commercialFeatures';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, ActiveChatHead, Plan } from './types';
@@ -87,32 +92,8 @@ const AppContent: React.FC = () => {
     // Authentication & Tenant State
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
-    const getMergedFeatures = (company: Company | null) => {
-        if (!company) return {};
-        const planFeatures = company.plan?.features || {};
-        const customFeatures: Record<string, any> = company.custom_features || {};
-        const merged: Record<string, any> = {};
-        
-        if (company.plan) {
-            Object.keys(planFeatures).forEach(key => {
-                const planVal = planFeatures[key];
-                const customVal = customFeatures[key];
-                
-                if (planVal === false || planVal === 'disabled') {
-                    merged[key] = false;
-                } else if (customVal === false || customVal === 'disabled') {
-                    merged[key] = false;
-                } else {
-                    merged[key] = customVal !== undefined ? customVal : planVal;
-                }
-            });
-        } else {
-            Object.assign(merged, customFeatures);
-        }
-        return merged;
-    };
     const baseMergedFeatures =
-        getMergedFeatures(currentCompany);
+        resolveCommercialFeatures(currentCompany);
 
     const mergedFeatures: any =
         ghostAuditActive
@@ -445,8 +426,8 @@ const AppContent: React.FC = () => {
                                 id: rawPlan.id,
                                 name: rawPlan.name,
                                 userLimit: rawPlan.user_limit,
-                                whatsappLimit: rawPlan.whatsapp_limit || 1,
-                                emailLimit: rawPlan.email_limit || 1,
+                                whatsappLimit: rawPlan.whatsapp_limit ?? 0,
+                                emailLimit: rawPlan.email_limit ?? 0,
                                 features: rawPlan.features || {},
                                 price: rawPlan.price
                             } : undefined;
@@ -573,6 +554,101 @@ const AppContent: React.FC = () => {
         };
         loadInitialData();
     }, [currentUser?.id, currentUser?.company_id]);
+
+    // Atualiza plano, limites e modulos da empresa aberta via Realtime.
+    useEffect(() => {
+        const companyId = currentCompany?.id;
+        if (!companyId || companyId === 'root') return;
+
+        const refreshCommercialCompany = async () => {
+            const { data: company, error } = await supabase
+                .from('companies')
+                .select('*, plan:plans(*)')
+                .eq('id', companyId)
+                .single();
+
+            if (error || !company) {
+                console.error(
+                    '[Commercial Realtime] Falha ao atualizar empresa:',
+                    error
+                );
+                return;
+            }
+
+            const rawPlan = company.plan as any;
+            const mappedPlan: Plan | undefined = rawPlan
+                ? {
+                    id: rawPlan.id,
+                    name: rawPlan.name,
+                    userLimit: rawPlan.user_limit,
+                    whatsappLimit: rawPlan.whatsapp_limit ?? 0,
+                    emailLimit: rawPlan.email_limit ?? 0,
+                    features: rawPlan.features || {},
+                    price: rawPlan.price
+                }
+                : undefined;
+
+            setCurrentCompany(previous => {
+                if (!previous || previous.id !== companyId) {
+                    return previous;
+                }
+
+                return {
+                    ...previous,
+                    ...company,
+                    plan: mappedPlan,
+                    data: previous.data,
+                    settings: previous.settings
+                } as Company;
+            });
+
+            setCompanies(previous =>
+                previous.map(item =>
+                    item.id === companyId
+                        ? {
+                            ...item,
+                            ...company,
+                            plan: mappedPlan,
+                            data: item.data,
+                            settings: item.settings
+                        } as Company
+                        : item
+                )
+            );
+        };
+
+        const commercialChannel = supabase
+            .channel('commercial-company-' + companyId)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'companies',
+                    filter: 'id=eq.' + companyId
+                },
+                refreshCommercialCompany
+            );
+
+        if (currentCompany.plan?.id) {
+            commercialChannel.on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'plans',
+                    filter: 'id=eq.' + currentCompany.plan.id
+                },
+                refreshCommercialCompany
+            );
+        }
+
+        commercialChannel.subscribe();
+
+        return () => {
+            supabase.removeChannel(commercialChannel);
+        };
+    }, [currentCompany?.id, currentCompany?.plan?.id]);
 
     // Sync Online Status
     useEffect(() => {
@@ -1234,6 +1310,22 @@ const AppContent: React.FC = () => {
 
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
+
+        const requiredFeature = PAGE_FEATURE_MAP[currentPage];
+        if (
+            !ghostAuditActive
+            && requiredFeature
+            && !isCommercialFeatureEnabled(
+                mergedFeatures,
+                requiredFeature
+            )
+        ) {
+            return (
+                <div className="p-8 text-center text-red-600 font-extrabold">
+                    Acesso negado: este modulo nao esta habilitado no plano da empresa.
+                </div>
+            );
+        }
 
         switch (currentPage) {
             case 'home': return <HomePage onNavigate={handleNavigate} employees={companyData.employees} currentUser={currentUser} />;

@@ -96,7 +96,7 @@ const UserFormModal: React.FC<{
     const totalAllocatedOtherUsers = users
         .filter(u => u.id !== user?.id)
         .reduce((sum, u) => sum + (u.email_permissions?.account_limit || 0), 0);
-    const planEmailLimit = plan?.emailLimit || 1;
+    const planEmailLimit = plan?.emailLimit ?? 0;
     const remainingLimit = Math.max(0, planEmailLimit - totalAllocatedOtherUsers);
 
     const [permissionTab, setPermissionTab] = useState<'social' | 'rh' | 'ti' | 'rh_admin' | 'whatspanda' | 'admin_panel'>('social');
@@ -903,7 +903,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                 setUsers(users.map(u => u.id === userData.id ? userData : u));
             } else {
                 // CREATE USER via RPC (SECURITY DEFINER - corrected version)
-                if (users.length >= plan.userLimit) {
+                if (activeUsers.length >= plan.userLimit) {
                     alert(`Atenção: Sua empresa excedeu o limite de ${plan.userLimit} usuários do seu plano atual (${plan.name}). Por favor, contate o suporte para mudar o plano e liberar novos acessos.`);
                     return;
                 }
