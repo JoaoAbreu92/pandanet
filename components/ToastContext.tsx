@@ -1,54 +1,44 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'; // Using same icons as project
+import React, { createContext, useContext, useRef, useState, ReactNode } from 'react';
+import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
-
-interface Toast {
-    id: number;
-    message: string;
-    type: ToastType;
-}
-
-interface ToastContextType {
-    showToast: (message: string, type?: ToastType) => void;
-}
-
+interface Toast { id: number; message: string; type: ToastType; }
+interface ToastContextType { showToast: (message: string, type?: ToastType) => void; }
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+const appearance: Record<ToastType, { icon: React.FC<any>; accent: string; label: string }> = {
+    success: { icon: CheckCircleIcon, accent: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10', label: 'Sucesso' },
+    error: { icon: XCircleIcon, accent: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10', label: 'Erro' },
+    info: { icon: InformationCircleIcon, accent: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10', label: 'Informação' },
+    warning: { icon: ExclamationTriangleIcon, accent: 'text-amber-500 bg-amber-50 dark:bg-amber-500/10', label: 'Atenção' }
+};
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const nextId = useRef(0);
+    const dismiss = (id: number) => setToasts(current => current.filter(toast => toast.id !== id));
 
     const showToast = (message: string, type: ToastType = 'success') => {
-        const id = Date.now();
-        setToasts(prev => [...prev, { id, message, type }]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));
-        }, 3000); // 3 seconds
+        const id = ++nextId.current;
+        setToasts(current => [...current.slice(-3), { id, message, type }]);
+        window.setTimeout(() => dismiss(id), 4500);
     };
 
     return (
         <ToastContext.Provider value={{ showToast }}>
             {children}
-            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-                {toasts.map(toast => (
-                    <div
-                        key={toast.id}
-                        className={`
-                            pointer-events-auto flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-500 animate-slide-in-right
-                            ${toast.type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-l-4 border-white/30' : ''}
-                            ${toast.type === 'error' ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-l-4 border-white/30' : ''}
-                            ${toast.type === 'info' ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-l-4 border-white/30' : ''}
-                            ${toast.type === 'warning' ? 'bg-gradient-to-r from-orange-400 to-amber-500 text-white border-l-4 border-white/30' : ''}
-                        `}
-                    >
-                        {toast.type === 'success' && <CheckCircleIcon className="w-6 h-6 text-white animate-bounce-short" />}
-                        {toast.type === 'error' && <XCircleIcon className="w-6 h-6 text-white" />}
-                        {toast.type === 'info' && <InformationCircleIcon className="w-6 h-6 text-white" />}
-                        {toast.type === 'warning' && <ExclamationTriangleIcon className="w-6 h-6 text-white" />}
-
-                        <p className="font-bold text-sm tracking-wide shadow-black drop-shadow-sm">{toast.message}</p>
-                    </div>
-                ))}
+            <div className="pointer-events-none fixed inset-x-3 top-3 z-[9999] flex flex-col items-end gap-2 sm:left-auto sm:right-5 sm:top-5 sm:w-[min(24rem,calc(100vw-2.5rem))]" aria-live="polite" aria-atomic="false">
+                {toasts.map(toast => {
+                    const config = appearance[toast.type];
+                    const Icon = config.icon;
+                    return (
+                        <div key={toast.id} role={toast.type === 'error' ? 'alert' : 'status'} className="pointer-events-auto flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-[#101d2e]">
+                            <div className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${config.accent}`}><Icon className="h-5 w-5" /></div>
+                            <div className="min-w-0 flex-1 pt-0.5"><p className="text-xs font-bold text-slate-900 dark:text-white">{config.label}</p><p className="mt-0.5 text-sm leading-5 text-slate-600 dark:text-slate-300">{toast.message}</p></div>
+                            <button type="button" onClick={() => dismiss(toast.id)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Fechar aviso">✕</button>
+                        </div>
+                    );
+                })}
             </div>
         </ToastContext.Provider>
     );
@@ -56,8 +46,6 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
 export const useToast = () => {
     const context = useContext(ToastContext);
-    if (!context) {
-        throw new Error('useToast must be used within a ToastProvider');
-    }
+    if (!context) throw new Error('useToast must be used within a ToastProvider');
     return context;
 };

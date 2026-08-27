@@ -5,8 +5,10 @@ import { supabase } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
 import { useEffect } from 'react';
 import { UserAvatar } from './UserAvatar';
+import { PAGE_LABELS } from '../utils/navigation';
 
 interface HeaderProps {
+    currentPage: Page;
     onToggleSidebar: () => void;
     onToggleDebug?: () => void;
     currentUser: Employee;
@@ -24,7 +26,7 @@ interface HeaderProps {
 
 import { useLanguage } from './LanguageContext';
 
-const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme, onSearch }) => {
+const Header: React.FC<HeaderProps> = ({ currentPage, onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme, onSearch }) => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -119,7 +121,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
     };
 
     return (
-        <header className={`sticky top-0 right-0 left-0 bg-white/70 backdrop-blur-md border-b flex-shrink-0 dark:bg-[#020617]/60 dark:backdrop-blur-xl dark:border-white/5 transition-all duration-300 ${isDropdownOpen || isSoundMenuOpen || showSearchResults ? 'z-[9999]' : 'z-30'}`}>
+        <header className={`pandanet-topbar sticky left-0 right-0 top-0 flex-shrink-0 border-b border-white/10 bg-[#0b1727]/95 text-white shadow-[0_12px_35px_-28px_rgba(2,8,23,0.95)] backdrop-blur-xl ${isDropdownOpen || isSoundMenuOpen || showSearchResults ? 'z-[9999]' : 'z-30'}`}>
             {isImpersonating && (
                 <div className="bg-yellow-400 text-black py-2 px-6 text-sm flex items-center justify-center text-center">
                     <p className="font-semibold">
@@ -131,12 +133,16 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                     </button>
                 </div>
             )}
-            <div className="flex items-center justify-between h-16 px-6">
-                <div className="flex items-center">
-                    <button onClick={onToggleSidebar} className="p-2 -ml-2 text-gray-500 rounded-md hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
-                        <Bars3Icon className="w-6 h-6" />
+            <div className="flex h-16 items-center justify-between gap-3 px-3 sm:px-5 lg:px-6">
+                <div className="flex min-w-0 items-center">
+                    <button onClick={onToggleSidebar} className="-ml-1 rounded-xl border border-transparent p-2 text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/5" aria-label="Abrir ou recolher menu">
+                        <Bars3Icon className="h-5 w-5" />
                     </button>
-                    <div className="relative ml-6 hidden md:block group">
+                    <div className="ml-3 hidden min-w-0 border-l border-slate-200 pl-4 dark:border-white/10 sm:block">
+                        <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">PandaNet</p>
+                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{PAGE_LABELS[currentPage] || 'Área de trabalho'}</p>
+                    </div>
+                    <div className="relative ml-5 hidden lg:block group">
                         <MagnifyingGlassIcon className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-300 ${theme === 'dark' ? 'text-gray-500 group-focus-within:text-brand-primary' : 'text-gray-400'}`} />
                         <input
                             type="text"
@@ -144,9 +150,9 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onFocus={() => setShowSearchResults(searchResults.length > 0)}
                             placeholder={t('header.search_placeholder')}
-                            className="pl-11 pr-6 py-2.5 w-64 md:w-80 border-0 rounded-2xl bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-primary/50 dark:bg-white/5 dark:text-white transition-all duration-300 hover:bg-gray-200 dark:hover:bg-white/10"
+                            className="w-64 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none placeholder:text-slate-400 focus:border-brand-primary/50 focus:bg-white focus:ring-4 focus:ring-brand-primary/10 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:bg-white/10 xl:w-80"
                         />
-                        
+
                         {/* Search Results Dropdown */}
                         {showSearchResults && (
                             <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 z-[100]">
@@ -175,7 +181,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                 </div>
 
 
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Botão AI Assistant no Header */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('toggle-panda-ai'))}
@@ -204,7 +210,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             >
                                 <Cog6ToothIcon className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
                             </button>
-                            
+
                             <button
                                 onClick={() => window.location.reload()}
                                 className="p-2 text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -215,45 +221,63 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                         </div>
                     )}
 
-                    {/* Botão de Ativar Sons + Selector */}
-                    <div className="hidden lg:flex items-center">
+                    {/* Central premium de sons e notificacoes */}
+                    <div
+                        className="relative hidden lg:block"
+                        onMouseEnter={handleSoundMenuEnter}
+                        onMouseLeave={handleSoundMenuLeave}
+                    >
                         <button
-                            onClick={testNotifications}
-                            className="flex items-center justify-center gap-1.5 h-8 px-3 bg-emerald-50 text-emerald-600 rounded-l-full hover:bg-emerald-100 transition-all text-xs font-semibold border-y border-l border-emerald-200"
-                            title="Ativar e Testar Notificações do Windows"
+                            type="button"
+                            onClick={() => setSoundMenuOpen((open) => !open)}
+                            className={`group relative flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${isSoundMenuOpen
+                                ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300 shadow-[0_8px_24px_-12px_rgba(0,214,143,.9)]'
+                                : 'border-white/10 bg-white/[0.06] text-slate-300 hover:-translate-y-0.5 hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-300'
+                                }`}
+                            title="Sons e notificações"
+                            aria-label="Abrir sons e notificações"
+                            aria-expanded={isSoundMenuOpen}
                         >
-                            <PlayCircleIcon className="w-4 h-4" />
-                            <span className="hidden sm:inline">{t('header.notifications_activate')}</span>
+                            <BellIcon className="h-[18px] w-[18px]" />
+                            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-[#0b1727]" />
                         </button>
-                        <div
-                            className="relative"
-                            onMouseEnter={handleSoundMenuEnter}
-                            onMouseLeave={handleSoundMenuLeave}
-                        >
-                            <button className="flex items-center justify-center w-8 h-8 bg-emerald-50 text-emerald-600 rounded-r-full hover:bg-emerald-100 border border-emerald-200">
-                                <span className="text-[10px]">▼</span>
-                            </button>
-                            {/* Dropdown de Sons */}
-                            {isSoundMenuOpen && (
-                                <div className="absolute right-0 top-full pt-4 w-48 z-[100] animate-fade-in-down">
-                                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                                        <div className="p-2 text-xs font-semibold text-gray-500 bg-gray-50 dark:bg-gray-700/50 uppercase tracking-wider">
-                                            {t('header.notifications_choose_sound')}
-                                        </div>
+
+                        {isSoundMenuOpen && (
+                            <div className="absolute right-0 top-full z-[100] w-72 pt-3 animate-fade-in-down">
+                                <div className="pandanet-topbar-menu overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_-24px_rgba(15,23,42,.45)] dark:border-white/10 dark:bg-slate-900">
+                                    <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                                        <p className="text-sm font-bold text-gray-800 dark:text-white">Sons e notificações</p>
+                                        <p className="mt-0.5 text-[11px] text-gray-500 dark:text-slate-400">Escolha o toque usado nos alertas.</p>
+                                    </div>
+                                    <div className="space-y-1 p-2">
                                         {availableSounds?.map((sound) => (
                                             <button
                                                 key={sound.id}
+                                                type="button"
                                                 onClick={() => changeSound(sound.id)}
-                                                className={`w-full text-left px-4 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-gray-700 flex items-center justify-between ${selectedSound === sound.id ? 'text-emerald-600 font-semibold bg-emerald-50/50' : 'text-gray-700 dark:text-gray-200'}`}
+                                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${selectedSound === sound.id
+                                                    ? 'bg-emerald-50 font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300'
+                                                    : 'text-gray-700 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-white/[0.06]'
+                                                    }`}
                                             >
                                                 <span>{sound.name}</span>
-                                                {selectedSound === sound.id && <span className="text-emerald-500">✓</span>}
+                                                <span className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${selectedSound === sound.id ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-200 text-transparent dark:border-slate-700'}`}>✓</span>
                                             </button>
                                         ))}
                                     </div>
+                                    <div className="border-t border-slate-100 p-2 dark:border-white/10">
+                                        <button
+                                            type="button"
+                                            onClick={testNotifications}
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-bold text-white transition-all hover:bg-emerald-600 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
+                                        >
+                                            <PlayCircleIcon className="h-4 w-4" />
+                                            Testar notificação
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Botão de Tema (Sol/Lua) */}
@@ -303,7 +327,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                             </div>
                         </button>
                         {isDropdownOpen && (
-                             <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[10000] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                             <div className="pandanet-topbar-menu absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-64 bg-white rounded-2xl shadow-2xl py-2 z-[10000] dark:bg-gray-800 border border-gray-100 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
                                  {isMobileSoundSelectorOpen ? (
                                      <div className="px-2 py-1 space-y-1">
                                          <button
@@ -334,32 +358,32 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                              <p className="font-semibold text-sm text-gray-800 dark:text-white">{currentUser.name}</p>
                                              <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-widest">{currentUser.role}</p>
                                          </div>
-                                         
+
                                          <button type="button" onClick={() => { onNavigate('profile-page'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
                                              <UserCircleIcon className="w-5 h-5 mr-3 text-emerald-500" /> {t('header.profile')}
                                          </button>
-                                         
+
                                          <button type="button" onClick={() => { onNavigate('personal-notes' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 lg:border-t-0">
                                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-amber-500">
                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                                              </svg>
                                              {language === 'pt' ? 'Notas Pessoais' : language === 'en' ? 'Personal Notes' : 'Notas Personales'}
                                          </button>
-                                         
+
                                          <button type="button" onClick={() => { onNavigate('personal-tasks' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
                                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-emerald-500">
                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                                              </svg>
                                              {language === 'pt' ? 'Minhas Tarefas' : language === 'en' ? 'My Tasks' : 'Mis Tareas'}
                                          </button>
-                                         
+
                                          <button type="button" onClick={() => { onNavigate('manual-usuario' as Page); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
                                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-3 text-blue-500">
                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                                              </svg>
                                              {language === 'pt' ? 'Manual do Usuário' : language === 'en' ? 'User Manual' : 'Manual del Usuario'}
                                          </button>
-                                         
+
                                          {/* Mobile Only Items */}
                                          <div className="lg:hidden border-t border-gray-50 dark:border-white/5 mt-1 pt-1">
                                              <button type="button" onClick={toggleTheme} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left">
@@ -375,13 +399,13 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onToggleDebug, current
                                                  <BellIcon className="w-5 h-5 mr-3 text-orange-500" /> {t('header.notifications_choose_sound')}
                                              </button>
                                          </div>
-                                         
+
                                          {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && !isImpersonating && (
                                              <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
                                                  <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
                                              </button>
                                          )}
-                                         
+
                                          <button type="button" onClick={() => { onLogout(); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 text-left border-t border-gray-50 dark:border-white/5 mt-1">
                                              <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" /> {t('header.logout')}
                                          </button>

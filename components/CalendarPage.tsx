@@ -1349,12 +1349,12 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
 
     return (
         <div className="max-w-screen-2xl mx-auto space-y-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-2">
                 <div>
                     <h1 className="text-3xl font-black text-slate-800 dark:text-gray-100 tracking-tight">{t('calendar.title')} <span className="text-brand-primary italic">Panda</span></h1>
                     <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.subtitle')}</p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     {sharedWithMe.length > 0 && (
                         <div className="flex items-center space-x-2">
                             <label className="text-xs font-black text-slate-500 dark:text-gray-400 uppercase tracking-wider hidden sm:inline">Ver Agenda:</label>
@@ -1463,7 +1463,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 </div>
             )}
 
-            <Card title="" className="p-0 overflow-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
+            <Card title="" className="calendar-command-card p-0 overflow-x-auto overflow-y-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
                 <header className="bg-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 gap-4">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">

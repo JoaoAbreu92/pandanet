@@ -6,6 +6,7 @@ import {
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Company, Employee, Page, AppData, Announcement, EmployeePermissions, Notification, Post, Ticket, Conversation, CalendarEvent, Recognition, TIRequest, ActiveChatHead, Plan } from './types';
+import { persistNavigation, readNavigation, writeNavigation } from './utils/navigation';
 
 import Layout from './components/Layout';
 import { LanguageProvider } from './components/LanguageContext';
@@ -330,40 +331,24 @@ const AppContent: React.FC = () => {
         impersonatedUser?.company_id
     ]);
 
-    const [currentPage, setCurrentPage] = useState<Page>(() => {
-        const saved = localStorage.getItem('pixel_current_page');
-        if (saved && ['home', 'feed', 'messages', 'tickets', 'calendar', 'directory', 'documentos', 'recognition', 'marketplace', 'forms', 'benefits', 'bem-estar', 'onboarding', 'ti-dashboard', 'ti-requests', 'profile-page', 'saas-dashboard', 'admin', 'training', 'surveys', 'policies', 'knowledge-base', 'service-status', 'infosec', 'events', 'announcement-detail', 'manual-usuario', 'whatspanda', 'email', 'personal-notes', 'personal-tasks', 'scheduling', 'scheduling-events', 'scheduling-book'].includes(saved)) {
-            return saved as Page;
-        }
-        return 'home';
-    });
-    const [pageContext, setPageContext] = useState<any>(() => {
-        const saved = localStorage.getItem('pixel_page_context');
-        try {
-            return saved ? JSON.parse(saved) : null;
-        } catch {
-            return null;
-        }
-    });
+    const initialNavigation = React.useMemo(() => readNavigation(), []);
+    const [currentPage, setCurrentPage] = useState<Page>(initialNavigation.page);
+    const [pageContext, setPageContext] = useState<any>(initialNavigation.context);
 
     useEffect(() => {
-        const searchParams = new URLSearchParams(window.location.search);
-        const hash = window.location.hash;
-        const bookParam = searchParams.get('book');
-        
-        if (bookParam) {
-            setCurrentPage('scheduling-book');
-            setPageContext({ eventTypeId: bookParam, isPublic: true });
-        } else if (hash.startsWith('#/book/')) {
-            const parts = hash.split('/');
-            const eventId = parts[parts.length - 1];
-            setCurrentPage('scheduling-book');
-            setPageContext({ eventTypeId: eventId, isPublic: true });
-        } else if (window.location.search.includes('page=scheduling-book')) {
-            const id = searchParams.get('id');
-            setCurrentPage('scheduling-book');
-            setPageContext({ eventTypeId: id, isPublic: true });
+        if (currentPage !== 'scheduling-book' || !pageContext?.isPublic) {
+            writeNavigation(currentPage, pageContext, true);
         }
+
+        const handlePopState = () => {
+            const next = readNavigation();
+            setCurrentPage(next.page);
+            setPageContext(next.context);
+            persistNavigation(next.page, next.context);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
     }, []);
 
     const [companyData, setCompanyData] = useState<AppData | null>(null);
@@ -929,12 +914,7 @@ const AppContent: React.FC = () => {
     const handleNavigate = useCallback((page: Page, context?: any) => {
         setCurrentPage(page);
         setPageContext(context ?? null);
-        localStorage.setItem('pixel_current_page', page);
-        if (context) {
-            localStorage.setItem('pixel_page_context', JSON.stringify(context));
-        } else {
-            localStorage.removeItem('pixel_page_context');
-        }
+        writeNavigation(page, context);
         window.scrollTo(0, 0);
     }, []);
 
@@ -963,7 +943,7 @@ const AppContent: React.FC = () => {
         return [];
     });
     const [expandedChatHeadIds, setExpandedChatHeadIds] = useState<string[]>([]);
- 
+
     const handleMinimizeConversation = useCallback((conversationId: string, participantName: string, participantAvatarUrl: string, participantId?: string) => {
         setChatHeads(prev => {
             const cleanPrev = prev.filter(ch => ch.conversationId !== conversationId);
@@ -974,7 +954,7 @@ const AppContent: React.FC = () => {
                 });
                 return prev;
             }
- 
+
             if (prev.length >= 4) {
                 const oldest = prev[0];
                 const confirmClose = window.confirm(`Você já possui o limite máximo de 4 conversas simultâneas. Deseja fechar a conversa com "${oldest.participantName}" para abrir esta nova?`);
@@ -989,7 +969,7 @@ const AppContent: React.FC = () => {
                 });
                 return updated;
             }
- 
+
             const updated = [...prev, { conversationId, participantName, participantAvatarUrl, participantId }];
             localStorage.setItem('pixel_chat_heads', JSON.stringify(updated));
             setExpandedChatHeadIds(ids => {
@@ -1035,7 +1015,7 @@ const AppContent: React.FC = () => {
             return updated;
         });
     }, []);
- 
+
     const handleCloseChatHead = useCallback((conversationId: string) => {
         setChatHeads(prev => {
             const updated = prev.filter(ch => ch.conversationId !== conversationId);
@@ -1159,7 +1139,7 @@ const AppContent: React.FC = () => {
         }
 
         console.log("[App] Atualizando empresa:", updatedCompany);
-        
+
         setCurrentCompany(updatedCompany);
         setCompanyData(updatedCompany.data);
         setCompanySettings(updatedCompany.settings);
@@ -1180,7 +1160,7 @@ const AppContent: React.FC = () => {
                     .eq('id', updatedCompany.id);
                 if (error) throw error;
                 console.log("[App] ✅ Alterações da empresa salvas no Supabase.");
-                
+
                 // Recarregar do banco para garantir sincronização
                 console.log("[App] Recarregando empresa do banco...");
                 const { data: freshCompany, error: reloadError } = await supabase
@@ -1188,7 +1168,7 @@ const AppContent: React.FC = () => {
                     .select('*')
                     .eq('id', updatedCompany.id)
                     .single();
-                
+
                 if (!reloadError && freshCompany) {
                     console.log("[App] ✅ Empresa recarregada:", freshCompany);
                     setCompanySettings(freshCompany.settings || { companyName: freshCompany.name });
@@ -1260,7 +1240,7 @@ const AppContent: React.FC = () => {
         if (currentUser.role === 'Super Admin') return true;
 
         if (permission === 'viewWhatsPanda') {
-            const hasWhatsPanda = !!currentUser.is_whatsapp_agent || 
+            const hasWhatsPanda = !!currentUser.is_whatsapp_agent ||
                 (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
                 (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
             if (!hasWhatsPanda) return false;
@@ -1364,7 +1344,7 @@ const AppContent: React.FC = () => {
                             Área restrita.
                         </p>
                     );
-            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
+            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} isCompanyAdministrator={currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin'} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;

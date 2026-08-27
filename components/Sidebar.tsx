@@ -155,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             permission === 'viewWhatsPanda'
             && !ghostSuperAdmin
         ) {
-            const hasWhatsPanda = !!currentUser.is_whatsapp_agent || 
+            const hasWhatsPanda = !!currentUser.is_whatsapp_agent ||
                 (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
                 (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
             if (hasWhatsPanda) {
@@ -225,26 +225,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             <button
                 type="button"
                 onClick={() => onNavigate(page, context)}
-                className={`w-full flex items-center p-2.5 md:p-3 rounded-xl transition-all duration-300 relative group 
+                aria-current={isActive ? 'page' : undefined}
+                className={`group relative flex w-full items-center rounded-xl px-3 py-2.5 text-left transition-all duration-200 ease-out
                     ${isActive
-                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30 dark:shadow-brand-primary/10 scale-[1.02] border border-white/10'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
+                        ? 'bg-brand-primary text-slate-950 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.8)]'
+                        : 'text-slate-300 hover:translate-x-1 hover:bg-brand-primary/15 hover:text-white hover:shadow-[inset_3px_0_0_#00d68f,0_10px_22px_-18px_rgba(0,214,143,0.9)]'
                     } ${isOpen ? '' : 'justify-center'}`}
                 title={badgeCount > 0 ? `${label} (${badgeCount})` : label}
             >
                 <div className="relative">
-                    <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
+                    <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-slate-950' : 'text-slate-400 group-hover:text-brand-primary'}`} />
                     {badgeCount > 0 && (
-                        <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-lg border border-white dark:border-slate-950 animate-pulse">
+                        <span className="absolute -right-2 -top-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full border border-[#0b1727] bg-rose-500 px-1 text-[10px] font-bold text-white">
                             {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                     )}
                 </div>
-                {isOpen && <span className={`ml-3.5 md:ml-4 truncate text-sm md:text-base font-medium ${isActive ? 'font-semibold' : ''}`}>{label}</span>}
+                {isOpen && <span className={`ml-3 truncate text-sm ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>}
 
                 {/* Visual indicator for active item */}
                 {isActive && (
-                    <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                    <div className="absolute left-0 h-5 w-0.5 rounded-r-full bg-slate-950/70" />
                 )}
             </button>
         );
@@ -253,7 +254,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const NavMenu: React.FC<{ label: string; icon: React.FC<any>; menuKey: 'rh' | 'ti' | 'portal' | 'projects' | 'social' | 'agenda' | 'newAgenda' | 'reservations'; children: React.ReactNode, permission: boolean, featureId?: string }> = ({ label, icon: Icon, menuKey, children, permission, featureId }) => {
         const isAdmin = currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin';
 
-        // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito 
+        // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito
         if (
             !ghostSuperAdmin
             && featureId
@@ -297,28 +298,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                         e.stopPropagation();
                         toggleMenu(menuKey);
                     }}
-                    className={`w-full flex items-center justify-between p-2.5 md:p-3 rounded-xl transition-all duration-300 relative group
+                    aria-expanded={openMenus[menuKey]}
+                    className={`group relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200 ease-out
                         ${isActive
-                            ? 'bg-brand-primary/10 text-brand-primary dark:text-brand-primary border border-brand-primary/20'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
+                            ? 'bg-white/10 text-brand-primary'
+                            : 'text-slate-300 hover:translate-x-1 hover:bg-brand-primary/15 hover:text-white hover:shadow-[inset_3px_0_0_#00d68f]'
                         }`}
                 >
                     <div className="flex items-center">
                         <div className="relative">
-                            <Icon className={`w-5 h-5 md:w-6 md:h-6 flex-shrink-0 group-hover:scale-110 transition-transform duration-300 ${isActive ? 'text-brand-primary' : 'text-slate-400 group-hover:text-brand-primary dark:text-slate-400 dark:group-hover:text-brand-primary'} transition-colors`} />
+                            <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-brand-primary' : 'text-slate-400 group-hover:text-brand-primary'}`} />
                             {menuBadgeCount > 0 && !openMenus[menuKey] && (
                                 <span className="absolute -top-2 -right-2 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border border-white dark:border-slate-900 animate-pulse">
                                     {menuBadgeCount > 99 ? '99+' : menuBadgeCount}
                                 </span>
                             )}
                         </div>
-                        {isOpen && <span className="ml-3.5 md:ml-4 truncate font-semibold text-xs md:text-sm tracking-wide uppercase opacity-80">{label}</span>}
+                        {isOpen && <span className="ml-3 truncate text-[11px] font-bold uppercase tracking-[0.12em]">{label}</span>}
                     </div>
                     {isOpen && <ChevronDownIcon className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${openMenus[menuKey] ? 'rotate-180' : ''}`} />}
                 </button>
                 {openMenus[menuKey] && isOpen && (
-                    <div className="pl-4 mt-1 space-y-1 animate-in slide-in-from-top-2 duration-500 relative">
-                        <div className="absolute left-6 top-0 bottom-0 w-px bg-gray-100 dark:bg-slate-800" />
+                    <div className="relative mt-1 space-y-1 pl-4">
+                        <div className="absolute bottom-1 left-6 top-1 w-px bg-white/10" />
                         {children}
                     </div>
                 )}
@@ -334,20 +336,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
     const { t } = useLanguage();
 
     return (
-        <aside className={`transition-all duration-500 ease-in-out flex-shrink-0 flex flex-col shadow-2xl 
-            bg-white dark:bg-slate-900/80 dark:backdrop-blur-xl border-r border-gray-200 dark:border-white/5 
-            fixed md:relative z-50 h-full overflow-hidden
-            ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
+        <aside className={`pandanet-sidebar fixed z-50 flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#0b1727] text-white shadow-2xl transition-[width,transform] duration-300 lg:relative
+            ${isOpen ? 'w-[17rem] translate-x-0' : 'w-[17rem] -translate-x-full lg:w-[4.75rem] lg:translate-x-0'}
             ${isImpersonating ? 'border-t-4 border-t-red-500' : ''}
         `}>
-            <div className="h-16 flex items-center justify-center bg-white/50 dark:bg-transparent border-b border-gray-100 dark:border-white/5 backdrop-blur-sm">
-                <div className="hover:scale-105 transition-transform duration-300 transition-all">
+            <div className="flex h-16 items-center justify-center border-b border-white/10 bg-white/[0.02]">
+                <div>
                     <Logo showText={isOpen} className={isOpen ? 'h-8 md:h-9' : 'h-6 md:h-7'} />
                 </div>
             </div>
             <nav
                 ref={navRef}
-                className="flex-1 px-3 md:px-4 py-4 md:py-6 space-y-1.5 md:space-y-2 overflow-y-auto no-scrollbar"
+                className="flex-1 space-y-1 overflow-y-auto px-3 py-4 no-scrollbar"
             >
                 <NavItem page="home" label={t('sidebar.home')} icon={HomeIcon} permission={true} />
                 <NavItem page="whatspanda" label={t('sidebar.whatspanda')} icon={WhatsAppIcon} permission="viewWhatsPanda" featureId="whatspanda" />
@@ -377,7 +377,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     )}
                 </NavMenu>
 
-                <hr className="my-2 border-gray-100 dark:border-slate-800" />
+                <hr className="my-3 border-white/10" />
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
                 {/* <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" /> */}
@@ -413,8 +413,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                         <button
                             type="button"
                             onClick={() => onNavigate('saas-dashboard')}
-                            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${currentPage === 'saas-dashboard' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-gray-700'
-                                } ${isOpen ? '' : 'justify-center'} mt-2 border-2 border-dashed border-purple-200 dark:border-gray-700`}
+                            className={`mt-2 flex w-full items-center rounded-xl border px-3 py-2.5 transition-colors ${currentPage === 'saas-dashboard' ? 'border-violet-400/40 bg-violet-500 text-white' : 'border-violet-400/25 bg-violet-400/5 text-violet-200 hover:bg-violet-400/10 hover:text-white'} ${isOpen ? '' : 'justify-center'}`}
+                            aria-current={currentPage === 'saas-dashboard' ? 'page' : undefined}
                             title="Painel SaaS"
                         >
                             <BuildingOfficeIcon className="w-6 h-6 flex-shrink-0" />
@@ -425,12 +425,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
             </nav>
             {/* Company Logo Footer */}
-            <div className={`mt-auto p-3 lg:p-4 border-t border-gray-100 dark:border-white/5 text-center bg-white/50 dark:bg-white/5 backdrop-blur-sm 
+            <div className={`mt-auto border-t border-white/10 bg-white/[0.03] p-3 text-center
                 ${isOpen ? 'block' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
                     <img src={companyLogo} alt={companyName} className="h-8 md:h-10 mx-auto object-contain" />
                 )}
-                <p className="text-xs md:text-sm font-semibold text-gray-800 dark:text-gray-200 truncate mt-2">{companyName}</p>
+                <p className="mt-2 truncate text-xs font-semibold text-slate-200">{companyName}</p>
             </div>
         </aside>
     );

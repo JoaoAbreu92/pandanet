@@ -28,10 +28,12 @@ interface AdminPageProps {
     plan: Plan;
     customFeatures?: Record<string, boolean>;
     onNavigate?: (page: any) => void;
+    isCompanyAdministrator?: boolean;
 }
 
-const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate }) => {
+const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, customFeatures, onNavigate, isCompanyAdministrator = false }) => {
     const { profile } = useAuth();
+    const hasAdministratorAuthority = isCompanyAdministrator || profile?.isAdmin || profile?.isCompanyAdmin || profile?.role === 'Super Admin';
     const [activeTab, setActiveTab] = useState('users');
     const [activeCategory, setActiveCategory] = useState('DP (Departamento Pessoal)');
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -181,7 +183,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
     ];
 
     const categories = ['DP (Departamento Pessoal)', 'RH', 'Administrativo', 'Social', 'Tecnologia & TI', 'Comercial', 'Configurações'].filter(cat => {
-        if (profile?.role === 'Super Admin') return true;
+        if (hasAdministratorAuthority) return true;
         const permissions = profile?.permissions || {};
         const catMap: Record<string, string> = {
             'DP (Departamento Pessoal)': 'admin_view_dp',
@@ -194,7 +196,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         };
         const catKey = catMap[cat];
         if (!catKey) return true;
-        return profile?.isAdmin ? permissions[catKey] !== false : !!permissions[catKey];
+        return !!permissions[catKey];
     });
 
     const tabs = allTabs.filter(tab => {
@@ -202,7 +204,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         if (tab.featureId && customFeatures && customFeatures[tab.featureId] === false) return false;
 
         // Permissões granulares para não-Super Admins
-        if (profile?.role !== 'Super Admin') {
+        if (!hasAdministratorAuthority) {
             const permissions = profile?.permissions || {};
             const catMap: Record<string, string> = {
                 'DP (Departamento Pessoal)': 'admin_view_dp',
@@ -246,8 +248,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             };
             const tabKey = tabMap[tab.id];
 
-            const hasCatAccess = catKey ? (profile?.isAdmin ? permissions[catKey] !== false : !!permissions[catKey]) : true;
-            const hasTabAccess = tabKey ? (profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey]) : true;
+            const hasCatAccess = catKey ? !!permissions[catKey] : true;
+            const hasTabAccess = tabKey ? !!permissions[tabKey] : true;
 
             if (!hasCatAccess || !hasTabAccess) {
                 return false;
@@ -266,7 +268,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             const firstTab = allTabs.find(t => {
                 if (t.category !== firstCat) return false;
                 if (t.featureId && customFeatures && customFeatures[t.featureId] === false) return false;
-                if (profile?.role !== 'Super Admin') {
+                if (!hasAdministratorAuthority) {
                     const permissions = profile?.permissions || {};
                     const tabMap: Record<string, string> = {
                         'users': 'admin_tab_users',
@@ -299,7 +301,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     };
                     const tabKey = tabMap[t.id];
                     if (tabKey) {
-                        return profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey];
+                            return !!permissions[tabKey];
                     }
                 }
                 return true;
@@ -557,7 +559,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                                 const firstAllowedTab = allTabs.find(t => {
                                     if (t.category !== cat) return false;
                                     if (t.featureId && customFeatures && customFeatures[t.featureId] === false) return false;
-                                    if (profile?.role !== 'Super Admin') {
+                                    if (!hasAdministratorAuthority) {
                                         const permissions = profile?.permissions || {};
                                         const tabMap: Record<string, string> = {
                                             'users': 'admin_tab_users',
@@ -590,7 +592,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                                         };
                                         const tabKey = tabMap[t.id];
                                         if (tabKey) {
-                                            return profile?.isAdmin ? permissions[tabKey] !== false : !!permissions[tabKey];
+                                            return !!permissions[tabKey];
                                         }
                                     }
                                     return true;

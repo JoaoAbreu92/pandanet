@@ -25,7 +25,6 @@ export type Page =
   | 'support-inbox'
   | 'announcement-detail'
   | 'documentos'
-  | 'documentos'
   | 'feed'
   | 'events' // New Page
   // New RH Pages
@@ -1018,4 +1017,3 @@ export interface SchedulingTemplate {
   is_default: boolean;
   created_at?: string;
 }
-

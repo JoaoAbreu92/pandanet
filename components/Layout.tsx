@@ -69,6 +69,7 @@ const Layout: React.FC<LayoutProps> = ({
     const { realProfile } = useAuth();
     const [isSidebarOpen, setSidebarOpen] = useState(() => {
         if (typeof window !== 'undefined') {
+            if (!window.matchMedia('(min-width: 1024px)').matches) return false;
             const saved = localStorage.getItem('sidebar_open');
             return saved !== null ? saved === 'true' : true;
         }
@@ -99,13 +100,24 @@ const Layout: React.FC<LayoutProps> = ({
 
     // Sincronizar abertura da sidebar (apenas no celular)
     React.useEffect(() => {
-        if (window.innerWidth < 768) {
+        if (window.innerWidth < 1024) {
             setSidebarOpen(false);
         }
     }, [currentPage]);
 
+    React.useEffect(() => {
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            if (window.innerWidth < 1024) setSidebarOpen(false);
+            setNotificationsOpen(false);
+            setDebugOpen(false);
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, []);
+
     return (
-        <div className={`flex flex-col h-[125dvh] w-full overflow-hidden bg-slate-50 dark:bg-[#020617] ${isShaking ? 'nudge-shake' : ''}`}>
+        <div className={`pandanet-shell flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-[#f4f7fb] text-slate-900 dark:bg-[#07111f] dark:text-slate-100 ${isShaking ? 'nudge-shake' : ''}`}>
             {isImpersonating && (
                 <div className={`text-white text-xs py-1.5 px-4 text-center z-[60] flex items-center justify-center gap-2 font-medium shadow-sm ${impersonatedUser ? 'bg-purple-600' : 'bg-red-600'}`}>
                     <span className="relative flex h-2.5 w-2.5">
@@ -137,8 +149,9 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Mobile Overlay */}
                 {isSidebarOpen && (
                     <div
-                        className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+                        className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden"
                         onClick={() => setSidebarOpen(false)}
+                        aria-label="Fechar menu de navegação"
                     />
                 )}
 
@@ -147,7 +160,7 @@ const Layout: React.FC<LayoutProps> = ({
                         isOpen={isSidebarOpen}
                         onNavigate={(page, context) => {
                             onNavigate(page, context);
-                            if (window.innerWidth < 768) setSidebarOpen(false); // Close on nav on mobile
+                            if (window.innerWidth < 1024) setSidebarOpen(false); // Fecha a navegacao em telas compactas
                         }}
                         currentPage={currentPage}
                         pageContext={pageContext}
@@ -162,6 +175,7 @@ const Layout: React.FC<LayoutProps> = ({
 
                 <div className={`flex-1 flex flex-col overflow-hidden relative min-w-0 w-full transition-all duration-300`}>
                     <Header
+                        currentPage={currentPage}
                         onToggleSidebar={toggleSidebar}
                         onToggleDebug={() => setDebugOpen(!isDebugOpen)}
                         currentUser={currentUser}
@@ -191,8 +205,8 @@ const Layout: React.FC<LayoutProps> = ({
                         onClearAll={onClearAllNotifications}
                         onNavigate={onNavigate}
                     />
-                    <main className="flex-1 overflow-hidden p-0 relative">
-                        <div className={`h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
+                    <main className="pandanet-workspace relative flex-1 overflow-hidden p-0">
+                        <div className={`pandanet-page h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8'}`}>
                             {children}
                         </div>
                     </main>
@@ -201,9 +215,9 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Área invisível na extrema direita para acionar hover no desktop */}
                 {onStartDirectChat && (
                     <div
-                        className="hidden md:block fixed right-0 top-0 bottom-0 w-3 z-40 bg-transparent"
+                        className="hidden xl:block fixed right-0 top-0 bottom-0 w-3 z-40 bg-transparent"
                         onMouseEnter={() => {
-                            if (window.innerWidth >= 768) {
+                            if (window.innerWidth >= 1280) {
                                 setRightSidebarOpen(true);
                             }
                         }}
@@ -212,14 +226,14 @@ const Layout: React.FC<LayoutProps> = ({
 
                 {onStartDirectChat && (
                     <div
-                        className="hidden md:block h-full z-45"
+                        className="hidden xl:block h-full z-45"
                         onMouseEnter={() => {
-                            if (window.innerWidth >= 768) {
+                            if (window.innerWidth >= 1280) {
                                 setRightSidebarOpen(true);
                             }
                         }}
                         onMouseLeave={() => {
-                            if (window.innerWidth >= 768) {
+                            if (window.innerWidth >= 1280) {
                                 setRightSidebarOpen(false);
                             }
                         }}

@@ -2137,15 +2137,40 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                         />
 
                                                         {/* Mais ações */}
-                                                        <details className="relative group/actions">
-                                                            <summary
+                                                        <div className="relative group/actions">
+                                                            <button
+                                                                type="button"
                                                                 title="Mais ações"
+                                                                aria-label={`Mais ações para ${comp.name}`}
+                                                                aria-haspopup="menu"
+                                                                onClick={(event) => {
+                                                                    const menu = document.getElementById(`company-actions-${comp.id}`) as (HTMLElement & { togglePopover?: () => void }) | null;
+                                                                    if (!menu?.togglePopover) return;
+
+                                                                    const trigger = event.currentTarget.getBoundingClientRect();
+                                                                    const menuWidth = 320;
+                                                                    const menuHeight = 360;
+                                                                    const gutter = 12;
+                                                                    const left = Math.max(gutter, Math.min(window.innerWidth - menuWidth - gutter, trigger.right - menuWidth));
+                                                                    const top = trigger.bottom + menuHeight + gutter <= window.innerHeight
+                                                                        ? trigger.bottom + 8
+                                                                        : Math.max(gutter, trigger.top - menuHeight - 8);
+
+                                                                    menu.style.left = `${left}px`;
+                                                                    menu.style.top = `${top}px`;
+                                                                    menu.togglePopover();
+                                                                }}
                                                                 className="list-none cursor-pointer w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all select-none"
                                                             >
                                                                 <span className="text-xl leading-none tracking-widest -mt-1">•••</span>
-                                                            </summary>
+                                                            </button>
 
-                                                            <div className="absolute right-0 top-11 z-[80] w-[320px] p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl">
+                                                            <div
+                                                                id={`company-actions-${comp.id}`}
+                                                                {...({ popover: 'auto' } as any)}
+                                                                role="menu"
+                                                                className="fixed z-[10000] m-0 w-[min(320px,calc(100vw-24px))] max-h-[min(360px,calc(100vh-24px))] overflow-y-auto p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl backdrop:bg-transparent"
+                                                            >
                                                                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
                                                                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
                                                                         Gerenciar empresa
@@ -2160,7 +2185,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
-                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            (e.currentTarget.closest('[popover]') as (HTMLElement & { hidePopover?: () => void }) | null)?.hidePopover?.();
                                                                             openModal('disable', comp);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-colors"
@@ -2185,7 +2210,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
-                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            (e.currentTarget.closest('[popover]') as (HTMLElement & { hidePopover?: () => void }) | null)?.hidePopover?.();
                                                                             openModal('users', comp);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-colors"
@@ -2202,7 +2227,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
-                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            (e.currentTarget.closest('[popover]') as (HTMLElement & { hidePopover?: () => void }) | null)?.hidePopover?.();
                                                                             openModal('config', comp);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-colors"
@@ -2219,7 +2244,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
-                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            (e.currentTarget.closest('[popover]') as (HTMLElement & { hidePopover?: () => void }) | null)?.hidePopover?.();
                                                                             openModal('edit', comp);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors"
@@ -2238,7 +2263,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
-                                                                            (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open');
+                                                                            (e.currentTarget.closest('[popover]') as (HTMLElement & { hidePopover?: () => void }) | null)?.hidePopover?.();
                                                                             openModal('delete', comp);
                                                                         }}
                                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
@@ -2254,7 +2279,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
                                                                 </div>
                                                             </div>
-                                                        </details>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
