@@ -89,6 +89,8 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [localCompanies, setLocalCompanies] = useState<Company[]>([]);
     const [localPlans, setLocalPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState<string | null>(null);
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
     const [companyUsers, setCompanyUsers] = useState<Employee[]>([]); // Estado para usuários no modal
     const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
     const [usageStats, setUsageStats] = useState<any>(null);
@@ -103,7 +105,21 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const [videoLoading, setVideoLoading] = useState(false);
 
     // NEW: WhatsApp Status & Charts Data
-    const [whatsappStatus, setWhatsappStatus] = useState<{ count: number, activeCompanyIds: string[] }>({ count: 0, activeCompanyIds: [] });
+    const [whatsappStatus, setWhatsappStatus] = useState<{
+        count: number;
+        total: number;
+        activeCompanyIds: string[];
+        connections: Array<{
+            id: string;
+            companyId: string;
+            name: string;
+            phoneNumber: string | null;
+            connected: boolean;
+            syncHealthy: boolean;
+            updatedAt: string;
+        }>;
+    }>({ count: 0, total: 0, activeCompanyIds: [], connections: [] });
+    const [operationalMetrics, setOperationalMetrics] = useState<Record<string, number | null>>({});
     const [growthData, setGrowthData] = useState<any[]>([]);
     const [planDistribution, setPlanDistribution] = useState<any[]>([]);
     const [globalAnnouncements, setGlobalAnnouncements] = useState<any[]>([]);
@@ -146,11 +162,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     // --- Buscar Dados ---
     const fetchData = async () => {
         setLoading(true);
+        setDashboardError(null);
         console.log("[SaaS] Buscando dados gerais...");
         try {
             // Fetch Plans
             const { data: plansData, error: plansError } = await supabase.from('plans').select('*');
-            if (plansError) console.error('Error fetching plans', plansError);
+            if (plansError) throw plansError;
             else {
                 const mappedPlans: Plan[] = (plansData || []).map((p: any) => ({
                     ...p,
@@ -167,7 +184,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
             // Fetch Companies
             const { data: companiesData, error: companiesError } = await supabase.from('companies').select('*, plan:plans(*)');
-            if (companiesError) console.error('Error fetching companies', companiesError);
+            if (companiesError) throw companiesError;
             else {
                 setLocalCompanies(companiesData as unknown as Company[] || []);
             }
@@ -218,15 +235,23 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 if (iaIcon) setPandaIaIcon(iaIcon);
             }
 
-            // NEW: Fetch WhatsApp Status
+            // Resumo operacional global autenticado do Painel SaaS.
             try {
-                const res = await fetch('/api/sessions/status/all');
-                if (res.ok) {
-                    const statusData = await res.json();
-                    setWhatsappStatus(statusData);
-                }
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.access_token) throw new Error('Sessão administrativa não encontrada.');
+
+                const res = await fetch('/api/saas/overview', {
+                    headers: { Authorization: `Bearer ${session.access_token}` }
+                });
+                const statusData = await res.json();
+                if (!res.ok) throw new Error(statusData?.error || `HTTP ${res.status}`);
+
+                setWhatsappStatus(statusData.whatsapp);
+                setOperationalMetrics(statusData.activity || {});
+                setGlobalAnnouncements(statusData.recentAnnouncements || []);
             } catch (e) {
                 console.error("Erro ao buscar status do WhatsApp:", e);
+                throw e;
             }
 
             // Fetch Pending Users
@@ -242,8 +267,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 .select('*, company:companies(*)')
                 .eq('status', 'rejected');
             if (rejectedData) setRejectedUsers(rejectedData as any);
+            setLastUpdatedAt(new Date());
         } catch (error) {
             console.error('[SaaS] Erro ao buscar dados do dashboard:', error);
+            setDashboardError('Não foi possível atualizar todos os dados do Painel SaaS.');
         } finally {
             setLoading(false);
         }
@@ -457,6 +484,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     const activeCompaniesCount = localCompanies.filter(c => c.status !== 'inactive').length;
     const expiredCompaniesCount = localCompanies.filter(c => c.status === 'expired').length;
     const inactiveCompaniesCount = localCompanies.filter(c => c.status === 'inactive').length;
+    const activeCompanyRate = totalCompanies > 0
+        ? Math.round((activeCompaniesCount / totalCompanies) * 100)
+        : 0;
 
     // Estado para contagens
     const [totalUsers, setTotalUsers] = useState(0);
@@ -477,6 +507,12 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
 
     // Supabase Realtime Presence - contagem real de sessoes presentes.
     const onlineUsers = presenceOnlineUsers.size;
+    const averageUsersPerCompany = totalCompanies > 0
+        ? (totalUsers / totalCompanies).toFixed(1).replace('.', ',')
+        : '0';
+    const whatsappCoverage = totalCompanies > 0
+        ? Math.round((whatsappStatus.count / totalCompanies) * 100)
+        : 0;
 
     // --- CHART DATA PREPARATION ---
     useEffect(() => {
@@ -1673,7 +1709,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
         try {
             // Broadcast to ALL active companies
             const announcementsToInsert = localCompanies
-                .filter(c => c.status === 'active')
+                .filter(c => c.status !== 'inactive' && c.status !== 'expired')
                 .map(c => ({
                     company_id: c.id,
                     title: formData.title,
@@ -1702,6 +1738,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                 if (error) throw error;
                 showToast(`Aviso enviado para ${announcementsToInsert.length} empresas!`, 'success');
                 closeModal();
+                await fetchData();
             } else {
                 showToast('Nenhuma empresa ativa para enviar.', 'info');
             }
@@ -1882,9 +1919,9 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 Central SaaS
                                             </h2>
 
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                Status não monitorado
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${dashboardError ? 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-950/30 dark:border-rose-900/40' : 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40'}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${dashboardError ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
+                                                {dashboardError ? 'Atenção necessária' : 'Operação ativa'}
                                             </span>
                                         </div>
 
@@ -1894,7 +1931,16 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void fetchData()}
+                                        disabled={loading}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/70 text-xs font-black text-slate-600 dark:text-slate-200 hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 transition-colors"
+                                    >
+                                        <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                        {loading ? 'Atualizando' : 'Atualizar dados'}
+                                    </button>
                                     <div className="px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700">
                                         <p className="text-[9px] uppercase tracking-[0.14em] font-black text-slate-400">
                                             Empresas
@@ -1914,6 +1960,10 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     </div>
                                 </div>
                             </div>
+                            <div className="relative px-6 lg:px-8 pb-6 -mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
+                                <span>{lastUpdatedAt ? `Atualizado às ${lastUpdatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Aguardando primeira atualização'}</span>
+                                {dashboardError && <span role="alert" className="font-bold text-rose-600">{dashboardError}</span>}
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
                             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-slate-200/70 dark:border-slate-800 flex flex-col items-center text-center justify-center min-h-[160px]">
@@ -1921,7 +1971,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 <h2 className="text-4xl font-bold text-gray-800 dark:text-white mt-2">
                                     {SYSTEM_VERSION}
                                 </h2>
-                                <p className="text-xs text-green-500 mt-1 font-semibold">Sem verificação automática</p>
+                                <p className="text-xs text-emerald-500 mt-1 font-semibold">Versão em produção</p>
                             </div>
                             <MetricCardSimple title={t('dashboard.registered_companies')} value={totalCompanies} icon={BuildingOfficeIcon} />
                             <MetricCardSimple title={t('dashboard.active_companies')} value={activeCompaniesCount} icon={CheckCircleIcon} />
@@ -1931,6 +1981,64 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <MetricCardSimple title={t('dashboard.total_users')} value={totalUsers} icon={UserGroupIcon} />
                             <MetricCardSimple title={t('dashboard.online_users')} value={onlineUsers} icon={UsersIcon} />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Empresas ativas</p>
+                                <p className="mt-2 text-3xl font-black text-emerald-600">{activeCompanyRate}%</p>
+                                <p className="mt-1 text-xs text-slate-500">{activeCompaniesCount} de {totalCompanies} empresas</p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Média de usuários</p>
+                                <p className="mt-2 text-3xl font-black text-blue-600">{averageUsersPerCompany}</p>
+                                <p className="mt-1 text-xs text-slate-500">usuários por empresa</p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">WhatsPanda conectado</p>
+                                <p className="mt-2 text-3xl font-black text-violet-600">{whatsappCoverage}%</p>
+                                <p className="mt-1 text-xs text-slate-500">{whatsappStatus.count} sessões ativas</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('validations')}
+                                className="text-left rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
+                            >
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Validações pendentes</p>
+                                <p className="mt-2 text-3xl font-black text-amber-500">{pendingUsers.length}</p>
+                                <p className="mt-1 text-xs text-slate-500">Clique para revisar cadastros</p>
+                            </button>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 lg:p-6 shadow-sm">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+                                <div>
+                                    <h3 className="text-base font-black text-slate-900 dark:text-white">Atividade da plataforma</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Indicadores consolidados diretamente dos serviços em produção.</p>
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Dados reais</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                                {[
+                                    ['Mensagens', operationalMetrics.totalMessages],
+                                    ['No mês', operationalMetrics.monthlyMessages],
+                                    ['Conversas', operationalMetrics.totalConversations],
+                                    ['Contatos', operationalMetrics.totalContacts],
+                                    ['Projetos', operationalMetrics.totalProjects],
+                                    ['Eventos', operationalMetrics.totalEvents],
+                                    ['Chamados', operationalMetrics.totalTickets],
+                                    ['E-mails', operationalMetrics.totalEmails],
+                                    ['Marketplace', operationalMetrics.marketplaceItems],
+                                    ['Avisos', operationalMetrics.announcements],
+                                    ['Treinamentos', operationalMetrics.trainingModules],
+                                    ['Planos ativos', localPlans.length]
+                                ].map(([label, value]) => (
+                                    <div key={String(label)} className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 p-4">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                                        <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{typeof value === 'number' ? value.toLocaleString('pt-BR') : '—'}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         {/* CHARTS SECTION */}
@@ -1993,7 +2101,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     {t('sidebar.whatspanda')}
                                 </h3>
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${whatsappStatus.count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                    {whatsappStatus.count} {t('whatsapp.active_sessions')}
+                                    {whatsappStatus.count} conexões ativas
                                 </span>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2007,6 +2115,24 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                     )
                                 })}
                             </div>
+                            {whatsappStatus.connections.length > 0 && (
+                                <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-700 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                    {whatsappStatus.connections.map(connection => {
+                                        const company = localCompanies.find(item => item.id === connection.companyId);
+                                        return (
+                                            <div key={connection.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{company?.name || connection.name}</p>
+                                                    <p className="text-xs text-slate-500 truncate">{connection.name}{connection.phoneNumber ? ` · ${connection.phoneNumber}` : ''}</p>
+                                                </div>
+                                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${connection.connected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {connection.connected ? 'Conectado' : 'Desconectado'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                     </div>
@@ -2043,7 +2169,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                 onClick={() => openModal('createCompany')}
                                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase tracking-wide flex items-center gap-2 transition-colors"
                             >
-                                <PlusIcon className="w-4 h-4" /> Novo Plano
+                                <PlusIcon className="w-4 h-4" /> Nova Empresa
                             </button>
                         </div>
 
@@ -2300,7 +2426,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             <h2 className="text-xl font-bold text-gray-800 dark:text-white">{t('dashboard.plans_tab')}</h2>
                         </div>
                         <div className="flex justify-start mb-4">
-                            <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> {t('dashboard.add_company')}</button>
+                            <button onClick={() => openModal('createPlan')} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded text-sm font-bold uppercase flex items-center gap-2"><PlusIcon className="w-4 h-4" /> Adicionar Plano</button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {localPlans.map(plan => (
@@ -2666,6 +2792,47 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                             Envie comunicados importantes para <b>todas as empresas</b> registradas na plataforma de uma só vez.
                             Útil para avisos de manutenção, novidades ou alertas de segurança.
                         </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="font-black text-slate-900 dark:text-white">Histórico de transmissões</h3>
+                                <p className="text-xs text-slate-500 mt-1">Últimos avisos enviados para as empresas.</p>
+                            </div>
+                            <span className="text-xs font-bold text-slate-400">{globalAnnouncements.length} registros</span>
+                        </div>
+
+                        {globalAnnouncements.length === 0 ? (
+                            <div className="px-6 py-10 text-center text-sm text-slate-500">Nenhum aviso global enviado ainda.</div>
+                        ) : (
+                            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {globalAnnouncements.map(item => (
+                                    <div key={item.id} className="px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-bold text-slate-900 dark:text-white">{item.title}</p>
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase">{item.category || 'Informativo'}</span>
+                                            </div>
+                                            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{item.summary}</p>
+                                            <p className="text-xs text-slate-400 mt-2">
+                                                <span className="font-bold text-slate-500">Origem:</span> {item.origin || 'Administração PandaNet'}
+                                            </p>
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                <span className="font-bold text-slate-500">Empresas:</span>{' '}
+                                                {Array.isArray(item.recipientCompanies) && item.recipientCompanies.length > 0
+                                                    ? item.recipientCompanies.join(', ')
+                                                    : 'Destinatários não identificados'}
+                                            </p>
+                                        </div>
+                                        <div className="shrink-0 lg:text-right">
+                                            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{item.recipientCount} empresa(s)</p>
+                                            <p className="text-[11px] text-slate-400 mt-1">{item.createdAt ? new Date(item.createdAt).toLocaleString('pt-BR') : 'Data indisponível'}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -3443,19 +3610,6 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                         </select>
                         {modalOpen.createCompany && (
                             <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
-                                    <select value={formData.category || 'Notícias da Empresa'} onChange={(e) => handleInputChange('category', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all">
-                                        <option value="Notícias da Empresa">Notícias da Empresa</option>
-                                        <option value="Atualização de Produto">Atualização de Produto</option>
-                                        <option value="RH & Cultura">RH & Cultura</option>
-                                        <option value="Evento">Evento</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conteúdo</label>
-                                    <textarea rows={4} value={formData.content || ''} onChange={(e) => handleInputChange('content', e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
-                                </div>
                                 <input type="text" placeholder={t('dashboard.whatsapp')} value={formData.whatsapp || ''} onChange={(e) => handleInputChange('whatsapp', e.target.value)} className="w-full p-3 border rounded text-sm outline-none focus:border-blue-500" />
                                     <div className="pt-4 border-t">
                                         <h4 className="font-bold text-gray-700 mb-2">Dados do Administrador da Empresa</h4>
@@ -3710,6 +3864,65 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                     <div className="p-6 border-t flex justify-end gap-2">
                         <button onClick={closeModal} className="px-4 py-2 bg-gray-500 text-white rounded font-bold text-xs uppercase">Cancelar</button>
                         <button onClick={submitUpdateForm} className="px-6 py-2 bg-red-600 text-white rounded font-bold text-xs uppercase shadow-md">Publicar</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Global Announcement Modal */}
+            {modalOpen.createAnnouncement && (
+                <Modal onClose={closeModal} title="Novo Aviso Global" width="max-w-2xl">
+                    <div className="p-6 space-y-5">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                            Este aviso será enviado para todas as empresas ativas. Revise o conteúdo antes de publicar.
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
+                            <input
+                                type="text"
+                                maxLength={120}
+                                value={formData.title || ''}
+                                onChange={(event) => handleInputChange('title', event.target.value)}
+                                placeholder="Ex: Manutenção programada"
+                                className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-sm outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
+                            <select
+                                value={formData.category || 'Notícias da Empresa'}
+                                onChange={(event) => handleInputChange('category', event.target.value)}
+                                className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-sm outline-none focus:border-emerald-500"
+                            >
+                                <option value="Notícias da Empresa">Notícia</option>
+                                <option value="Manutenção">Manutenção</option>
+                                <option value="Segurança">Segurança</option>
+                                <option value="Atualização">Atualização</option>
+                                <option value="Importante">Importante</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mensagem</label>
+                            <textarea
+                                rows={6}
+                                maxLength={2000}
+                                value={formData.content || ''}
+                                onChange={(event) => handleInputChange('content', event.target.value)}
+                                placeholder="Escreva o comunicado que será exibido às empresas..."
+                                className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-sm outline-none focus:border-emerald-500 resize-y"
+                            />
+                            <p className="mt-1 text-right text-[11px] text-slate-400">{String(formData.content || '').length}/2000</p>
+                        </div>
+                    </div>
+                    <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                        <button type="button" onClick={closeModal} disabled={loading} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 rounded-lg font-bold text-xs uppercase disabled:opacity-50">Cancelar</button>
+                        <button
+                            type="button"
+                            onClick={submitAnnouncement}
+                            disabled={loading || !String(formData.title || '').trim() || !String(formData.content || '').trim()}
+                            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs uppercase shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? 'Enviando...' : 'Enviar para todas'}
+                        </button>
                     </div>
                 </Modal>
             )}

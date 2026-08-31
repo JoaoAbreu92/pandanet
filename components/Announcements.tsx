@@ -73,15 +73,39 @@ const Announcements: React.FC<AnnouncementsProps> = ({ onNavigate }) => {
     };
 
     useEffect(() => {
-        fetchAnnouncements();
+        let cancelled = false;
+        let channel: ReturnType<typeof supabase.channel> | null = null;
 
-        const channel = supabase
-            .channel('public:announcements')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchAnnouncements())
-            .subscribe();
+        const setupAnnouncements = async () => {
+            await fetchAnnouncements();
 
-        return () => { supabase.removeChannel(channel); };
-    }, [currentUser]);
+            const companyId = await getCompanyId();
+            if (!companyId || cancelled) return;
+
+            channel = supabase
+                .channel(`public:announcements:${companyId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'announcements',
+                        filter: `company_id=eq.${companyId}`
+                    },
+                    () => fetchAnnouncements()
+                )
+                .subscribe();
+        };
+
+        void setupAnnouncements();
+
+        return () => {
+            cancelled = true;
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
+        };
+    }, [currentUser?.id, currentUser?.company_id]);
 
     const parsePtBrDate = (dateString: string): Date => {
         // ... existing logic or use actual Date object comparison if source is Date

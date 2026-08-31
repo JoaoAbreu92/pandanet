@@ -632,6 +632,145 @@ app.get('/', (req, res) => res.send('WhatsPanda Backend (Evolution Proxy) 🐼')
 // --- ROUTES ---
 const router = express.Router();
 
+// Resumo operacional global usado exclusivamente pelo Painel SaaS.
+// Mantém a service key no backend e nunca expõe tokens ou configurações sensíveis.
+router.get('/saas/overview', authMiddleware, async (req, res) => {
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, is_admin')
+      .eq('id', req.user.id)
+      .maybeSingle();
+
+    const isMaster =
+      req.user.email?.toLowerCase() === 'ti@grupopixel.com.br' ||
+      profile?.role === 'Super Admin';
+
+    if (profileError || !isMaster) {
+      return res.status(403).json({ error: 'Acesso exclusivo do Super Admin.' });
+    }
+
+    const safeCount = async (table, configure = query => query) => {
+      try {
+        const query = configure(
+          supabase.from(table).select('*', { count: 'exact', head: true })
+        );
+        const { count, error } = await query;
+        return error ? null : (count || 0);
+      } catch {
+        return null;
+      }
+    };
+
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    const [
+      settingsResult,
+      totalMessages,
+      monthlyMessages,
+      totalConversations,
+      totalContacts,
+      totalTickets,
+      totalEmails,
+      totalProjects,
+      totalEvents,
+      marketplaceItems,
+      announcements,
+      trainingModules,
+      recentAnnouncementsResult
+    ] = await Promise.all([
+      supabase
+        .from('whatsapp_settings')
+        .select('id, company_id, connection_name, phone_number, is_connected, last_sync_error, updated_at')
+        .order('updated_at', { ascending: false }),
+      safeCount('whatsapp_messages'),
+      safeCount('whatsapp_messages', query => query.gte('created_at', monthStart.toISOString())),
+      safeCount('whatsapp_conversations'),
+      safeCount('whatsapp_contacts'),
+      safeCount('tickets'),
+      safeCount('emails'),
+      safeCount('projects'),
+      safeCount('events'),
+      safeCount('marketplace_items'),
+      safeCount('announcements'),
+      safeCount('training_modules'),
+      supabase
+        .from('announcements')
+        .select('id, title, summary, category, date, created_at, company_id, company:companies(name)')
+        .order('created_at', { ascending: false })
+        .limit(100)
+    ]);
+
+    if (settingsResult.error) throw settingsResult.error;
+
+    const connections = (settingsResult.data || []).map(item => ({
+      id: item.id,
+      companyId: item.company_id,
+      name: item.connection_name || item.phone_number || 'Canal WhatsApp',
+      phoneNumber: item.phone_number || null,
+      connected: item.is_connected === true,
+      syncHealthy: !item.last_sync_error,
+      updatedAt: item.updated_at
+    }));
+
+    const activeConnections = connections.filter(item => item.connected);
+    const broadcastMap = new Map();
+
+    for (const item of recentAnnouncementsResult.data || []) {
+      const timestamp = item.date || item.created_at;
+      const key = `${item.title || ''}|${item.summary || ''}|${timestamp || ''}`;
+      const existing = broadcastMap.get(key);
+
+      if (existing) {
+        existing.recipientCount += 1;
+        if (item.company?.name && !existing.recipientCompanies.includes(item.company.name)) {
+          existing.recipientCompanies.push(item.company.name);
+        }
+      } else {
+        broadcastMap.set(key, {
+          id: item.id,
+          title: item.title,
+          summary: item.summary,
+          category: item.category,
+          createdAt: timestamp,
+          recipientCount: 1,
+          origin: 'Administração PandaNet',
+          recipientCompanies: item.company?.name ? [item.company.name] : []
+        });
+      }
+    }
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      whatsapp: {
+        count: activeConnections.length,
+        total: connections.length,
+        activeCompanyIds: [...new Set(activeConnections.map(item => item.companyId).filter(Boolean))],
+        connections
+      },
+      activity: {
+        totalMessages,
+        monthlyMessages,
+        totalConversations,
+        totalContacts,
+        totalTickets,
+        totalEmails,
+        totalProjects,
+        totalEvents,
+        marketplaceItems,
+        announcements,
+        trainingModules
+      },
+      recentAnnouncements: [...broadcastMap.values()].slice(0, 20)
+    });
+  } catch (error) {
+    console.error('[SAAS_OVERVIEW] Falha ao montar resumo:', error);
+    return res.status(500).json({ error: 'Falha ao carregar o resumo operacional.' });
+  }
+});
+
 // API: Iniciar Sessão
 router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (req, res) => {
   const { companyId, connectionId } = req.params;

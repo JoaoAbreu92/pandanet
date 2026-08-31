@@ -366,7 +366,13 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     const canEditVideo = currentUser?.isAdmin || currentUser?.role === 'Super Admin' || currentUser?.isCompanyAdmin;
 
     const fetchHighlights = async () => {
-        if (!companyId) return;
+        if (!companyId) {
+            setLatestMarketplaces([]);
+            setLatestProjects([]);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             // 1. YouTube Video settings
@@ -433,9 +439,19 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 .neq('status', 'Concluído')
                 .order('created_at', { ascending: false });
 
-            const { data: taskData } = await supabase
-                .from('project_tasks')
-                .select('id, project_id, assigned_to, stage:project_stages(name)');
+            const companyProjectIds = (projData || [])
+                .map((project: any) => project.id)
+                .filter(Boolean);
+
+            const { data: taskData, error: taskError } =
+                companyProjectIds.length > 0
+                    ? await supabase
+                        .from('project_tasks')
+                        .select('id, project_id, assigned_to, stage:project_stages(name)')
+                        .in('project_id', companyProjectIds)
+                    : { data: [], error: null };
+
+            if (taskError) throw taskError;
 
             if (projData) {
                 const mapped = projData.map((p: any) => {
@@ -874,6 +890,7 @@ const PendingTrainingsWidget: React.FC<{ currentUser: Employee; onNavigate: (pag
                 const { data: submissions, error: subError } = await supabase
                     .from('training_submissions')
                     .select('training_id')
+                    .eq('company_id', currentUser.company_id)
                     .eq('employee_id', currentUser.id);
 
                 if (subError) throw subError;
@@ -931,8 +948,12 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
     const [recentAwards, setRecentAwards] = useState<RecentBadgeAward[]>([]);
 
     useEffect(() => {
+        let cancelled = false;
+        let companyId = currentUser?.company_id;
+        let channel: ReturnType<typeof supabase.channel> | null = null;
+
         const fetchRecentAwards = async () => {
-            let companyId = currentUser?.company_id;
+            companyId = currentUser?.company_id;
             if (!companyId && currentUser?.id) {
                 try {
                     const { data } = await supabase
@@ -984,15 +1005,36 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
             }
         };
 
-        fetchRecentAwards();
+        const setupRecentAwards = async () => {
+            await fetchRecentAwards();
 
-        const channel = supabase
-            .channel('public:user_badges_home')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges' }, () => fetchRecentAwards())
-            .subscribe();
+            if (!companyId || cancelled) return;
+
+            channel = supabase
+                .channel(`public:user_badges_home:${companyId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'user_badges',
+                        filter: `company_id=eq.${companyId}`
+                    },
+                    () => {
+                        void fetchRecentAwards();
+                    }
+                )
+                .subscribe();
+        };
+
+        void setupRecentAwards();
 
         return () => {
-            supabase.removeChannel(channel);
+            cancelled = true;
+
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }, [currentUser?.id, currentUser?.company_id]);
 
