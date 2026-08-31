@@ -5,11 +5,12 @@ import Carousel from './Carousel';
 import RecognitionWall from './RecognitionWall';
 import CompanyPoll from './CompanyPoll';
 import QuickLinks from './QuickLinks';
-import MiniCalendar from './MiniCalendar';
+import PremiumWeatherWidget from './PremiumWeatherWidget';
+import PremiumHeroCalendar from './PremiumHeroCalendar';
 import { supabase, getSignedStorageUrl } from '../supabaseClient';
 import type { Employee, AppData } from '../types';
 import Card from './Card';
-import { GiftIcon, UserPlusIcon, VideoCameraIcon, BuildingStorefrontIcon, ClipboardDocumentCheckIcon, Cog6ToothIcon } from './icons';
+import { GiftIcon, UserPlusIcon, VideoCameraIcon, BuildingStorefrontIcon, ClipboardDocumentCheckIcon, Cog6ToothIcon, CalendarDaysIcon, ChatBubbleLeftRightIcon, FolderIcon, SparklesIcon, ChevronRightIcon, UsersIcon, TrophyIcon } from './icons';
 import { useAuth } from './AuthContext';
 
 interface HomePageProps {
@@ -1038,17 +1039,98 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
         };
     }, [currentUser?.id, currentUser?.company_id]);
 
+    const now = new Date();
+    const firstName = currentUser?.name?.trim().split(/\s+/)[0] || 'Olá';
+    const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+    const todayLabel = now.toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long'
+    });
+    const birthdaysThisMonth = employees.filter(employee => {
+        if (!employee.birthDate) return false;
+        const date = new Date(employee.birthDate);
+        return !Number.isNaN(date.getTime()) && date.getUTCMonth() === now.getMonth();
+    }).length;
+    const newHiresThisMonth = employees.filter(employee => {
+        if (!employee.joinDate) return false;
+        const date = new Date(employee.joinDate);
+        if (Number.isNaN(date.getTime())) return false;
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return date >= thirtyDaysAgo;
+    }).length;
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 pb-10">
+            <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200/70 dark:border-emerald-900/50 bg-gradient-to-br from-slate-100 via-emerald-50 to-teal-100 text-slate-900 dark:from-slate-950 dark:via-emerald-950 dark:to-teal-900 dark:text-white shadow-[0_28px_70px_-34px_rgba(5,150,105,0.75)]">
+                <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+                <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+                <div className="relative grid grid-cols-1 xl:grid-cols-[1.05fr_1fr] gap-7 p-6 sm:p-8">
+                    <div className="flex flex-col justify-between gap-7">
+                        <div>
+                            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-white/15 dark:bg-white/10 dark:text-emerald-100 backdrop-blur-md">
+                                <SparklesIcon className="h-4 w-4" />
+                                Seu dia no PandaNet
+                            </div>
+                            <h1 className="mt-5 text-3xl sm:text-4xl font-black tracking-tight">
+                                {greeting}, {firstName}!
+                            </h1>
+                            <p className="mt-2 max-w-xl text-sm sm:text-base text-slate-600 capitalize dark:text-slate-300">
+                                {todayLabel}. Tudo o que importa para sua rotina, em um só lugar.
+                            </p>
+                        </div>
+
+                        <PremiumHeroCalendar
+                            onNavigate={onNavigate}
+                            currentUser={currentUser}
+                            employees={employees}
+                        />
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
+                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
+                                <UsersIcon className="h-5 w-5 text-cyan-300" />
+                                <p className="mt-2 text-xl font-black">{employees.length}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Pessoas</p>
+                            </div>
+                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
+                                <GiftIcon className="h-5 w-5 text-amber-300" />
+                                <p className="mt-2 text-xl font-black">{birthdaysThisMonth}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Aniversários</p>
+                            </div>
+                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
+                                <TrophyIcon className="h-5 w-5 text-emerald-300" />
+                                <p className="mt-2 text-xl font-black">{recentAwards.length}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Conquistas</p>
+                            </div>
+                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
+                                <UserPlusIcon className="h-5 w-5 text-violet-500 dark:text-violet-300" />
+                                <p className="mt-2 text-xl font-black">{newHiresThisMonth}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Novos talentos</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex min-w-0 flex-col gap-4">
+                        <PremiumWeatherWidget userId={currentUser.id} />
+                        <QuickLinks onNavigate={onNavigate} currentUser={currentUser} variant="hero" />
+                    </div>
+                </div>
+            </section>
+
             {/* Banner Master - visível para todos, editável só pelo Masteradmin/GrupoPixel */}
             <MasterBanner />
 
             {/* Carrossel principal da empresa */}
             <Carousel />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <section className="rounded-[2rem] border border-slate-200/80 dark:border-slate-800 bg-gradient-to-b from-white to-slate-50/80 dark:from-slate-900 dark:to-slate-950 p-4 sm:p-6 shadow-sm">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 {/* Main Column */}
-                <div className="lg:col-span-2 space-y-8">
+                <div className="xl:col-span-8 space-y-6">
+                    <div className="flex items-end justify-between px-1">
+                        <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Acontecendo agora</p><h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Sua empresa em movimento</h2></div>
+                        <span className="hidden sm:inline text-xs font-semibold text-slate-400">Conteúdo atualizado para você</span>
+                    </div>
                     <Announcements onNavigate={onNavigate} />
 
                     {recentAwards.length > 0 && (
@@ -1122,16 +1204,17 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                     <CompanyHighlightsWidget onNavigate={onNavigate} currentUser={currentUser} />
                 </div>
                 {/* Right Sidebar */}
-                <div className="space-y-8">
-                    <QuickLinks onNavigate={onNavigate} currentUser={currentUser} />
+                <div className="xl:col-span-4 space-y-6 xl:sticky xl:top-4">
+                    <div className="px-1"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">Minha rotina</p><h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white">Agenda e pessoas</h2></div>
                     <PendingTrainingsWidget currentUser={currentUser} onNavigate={onNavigate} />
-                    <MiniCalendar onNavigate={onNavigate} currentUser={currentUser} employees={employees} />
+
                     <CompanyPoll />
                     <Birthdays employees={employees} />
                     <NewHires employees={employees} />
                     <UpcomingEvents onNavigate={onNavigate} />
                 </div>
             </div>
+            </section>
         </div>
     );
 };

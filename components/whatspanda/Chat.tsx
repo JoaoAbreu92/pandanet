@@ -66,6 +66,66 @@ interface ChatProps {
   initialConversationId?: string | null;
 }
 
+
+type StableAudioPlayerProps = {
+  mediaUrl?: string | null;
+  authToken?: string | null;
+};
+
+const buildStableAudioProxyUrl = (
+  mediaUrl?: string | null,
+  authToken?: string | null
+) => {
+  if (!mediaUrl || !authToken) return '';
+
+  return `/api/whatsapp/media/proxy?url=${encodeURIComponent(
+    mediaUrl
+  )}&token=${encodeURIComponent(authToken)}`;
+};
+
+const StableAudioPlayer = React.memo(
+  ({ mediaUrl, authToken }: StableAudioPlayerProps) => {
+    const latestSource = buildStableAudioProxyUrl(
+      mediaUrl,
+      authToken
+    );
+
+    const latestSourceRef = React.useRef(latestSource);
+    latestSourceRef.current = latestSource;
+
+    const [source, setSource] = React.useState(latestSource);
+
+    React.useEffect(() => {
+      if (!source && latestSource) {
+        setSource(latestSource);
+      }
+    }, [latestSource, source]);
+
+    const handleError = () => {
+      const renewedSource = latestSourceRef.current;
+
+      if (renewedSource && renewedSource !== source) {
+        setSource(renewedSource);
+      }
+    };
+
+    return (
+      <audio
+        controls
+        preload="metadata"
+        src={source || undefined}
+        onClick={(event) => event.stopPropagation()}
+        onError={handleError}
+        className="block w-full min-w-0 h-12 brightness-95 opacity-90 hover:opacity-100 transition-opacity"
+      >
+        Seu navegador não suporta áudio.
+      </audio>
+    );
+  }
+);
+
+StableAudioPlayer.displayName = 'StableAudioPlayer';
+
 const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', type = 'private', initialConversationId }) => {
   const { user, profile, currentUser, isGhostMode, realProfile } = useAuth();
   const activeProfile = currentUser || profile;
@@ -1938,7 +1998,9 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start(200);
+      // Gerar um único arquivo contínuo. Fragmentos de 200 ms podem
+      // produzir duração incorreta ou reprodução cortada em alguns navegadores.
+      mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -2971,7 +3033,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                               </button>
                             </div>
                           ) : (msg.media_type?.includes('audio') || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(ogg|mp3|wav|m4a)$/i))) ? (
-                            <div className="flex flex-col gap-1 min-w-[200px] p-1">
+                            <div className="flex flex-col gap-1 w-[320px] max-w-[calc(100vw-7rem)] min-w-0 p-1">
                               <div className="flex justify-between items-center mb-1">
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">
                                   <Volume2 className="w-3.5 h-3.5" />
@@ -2986,29 +3048,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                                   <Download className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              <audio controls className="w-full h-8 brightness-95 opacity-90 hover:opacity-100 transition-opacity"
-                                src={(() => {
-                                  // Usar URL direta - o proxy é chamado somente no download
-                                  // Para reprodução, usamos a URL pública diretamente (funciona no PC via HTTPS)
-                                  return fixMediaUrl(msg.media_url);
-                                })()}
-                                onError={(ev) => {
-                                  // Se falhar por SSL/CORS, tenta carregar via proxy com token
-                                  const audioEl = ev.currentTarget;
-                                  if (audioEl.dataset.proxyTried) return;
-                                  audioEl.dataset.proxyTried = '1';
-                                  supabase.auth.getSession().then(({ data }) => {
-                                    const tk = data?.session?.access_token;
-                                    if (tk && msg.media_url) {
-                                      const proxyUrl = `/api/whatsapp/media/proxy?url=${encodeURIComponent(msg.media_url)}&token=${encodeURIComponent(tk)}`;
-                                      audioEl.src = proxyUrl;
-                                      audioEl.load();
-                                    }
-                                  });
-                                }}
-                              >
-                                Seu navegador não suporta áudio.
-                              </audio>
+                              <StableAudioPlayer
+                                  mediaUrl={msg.media_url}
+                                  authToken={authToken}
+                                />
                             </div>
                           ) : (msg.media_type?.includes('video') || (msg.media_url && typeof msg.media_url === 'string' && msg.media_url.match(/\.(mp4|mov|avi|webm)$/i))) ? (
                             <div className="relative group rounded-xl overflow-hidden shadow-sm cursor-pointer" onClick={() => setSelectedMedia({ url: fixMediaUrl(msg.media_url)!, type: 'video' })}>

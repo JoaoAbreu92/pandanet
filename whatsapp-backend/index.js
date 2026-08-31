@@ -1528,10 +1528,98 @@ router.get('/media/proxy', authMiddleware, async (req, res) => {
         const filename = rawUrl.split('/').pop()?.split('?')[0] || 'documento';
         const safeFilename = encodeURIComponent(filename);
 
+        const isAudioContent =
+            String(contentType || '').toLowerCase().startsWith('audio/')
+            || /\.(ogg|opus|mp3|wav|m4a|webm)$/i.test(filename);
+
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
-        res.setHeader('Content-Length', fileBuffer.length);
+        res.setHeader(
+            'Content-Disposition',
+            `${isAudioContent ? 'inline' : 'attachment'}; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`
+        );
+        res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Cache-Control', 'private, max-age=300');
+
+        const rangeHeader = req.headers.range;
+
+        if (rangeHeader) {
+            const rangeMatch = /^bytes=(\d*)-(\d*)$/i.exec(
+                String(rangeHeader).trim()
+            );
+
+            if (!rangeMatch) {
+                res.setHeader(
+                    'Content-Range',
+                    `bytes */${fileBuffer.length}`
+                );
+
+                return res.status(416).end();
+            }
+
+            let start = rangeMatch[1]
+                ? Number.parseInt(rangeMatch[1], 10)
+                : 0;
+
+            let end = rangeMatch[2]
+                ? Number.parseInt(rangeMatch[2], 10)
+                : fileBuffer.length - 1;
+
+            if (!rangeMatch[1] && rangeMatch[2]) {
+                const suffixLength = Number.parseInt(
+                    rangeMatch[2],
+                    10
+                );
+
+                start = Math.max(
+                    fileBuffer.length - suffixLength,
+                    0
+                );
+
+                end = fileBuffer.length - 1;
+            }
+
+            if (
+                !Number.isFinite(start)
+                || !Number.isFinite(end)
+                || start < 0
+                || end < start
+                || start >= fileBuffer.length
+            ) {
+                res.setHeader(
+                    'Content-Range',
+                    `bytes */${fileBuffer.length}`
+                );
+
+                return res.status(416).end();
+            }
+
+            end = Math.min(
+                end,
+                fileBuffer.length - 1
+            );
+
+            const partialBuffer = fileBuffer.subarray(
+                start,
+                end + 1
+            );
+
+            res.status(206);
+            res.setHeader(
+                'Content-Range',
+                `bytes ${start}-${end}/${fileBuffer.length}`
+            );
+            res.setHeader(
+                'Content-Length',
+                partialBuffer.length
+            );
+
+            return res.send(partialBuffer);
+        }
+
+        res.setHeader(
+            'Content-Length',
+            fileBuffer.length
+        );
 
         return res.send(fileBuffer);
     } catch (err) {
