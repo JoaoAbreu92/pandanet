@@ -1,5 +1,12 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
+import { Textarea } from './ui/Textarea';
+import ConfirmModal from './ui/ConfirmModal';
+import { useToast } from './ToastContext';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon } from './icons';
 import type { Announcement } from '../types';
 import { supabase } from '../supabaseClient';
@@ -15,6 +22,7 @@ const AnnouncementFormModal: React.FC<{
     onSave: () => void;
     currentUser: any;
 }> = ({ announcement, onClose, onSave, currentUser }) => {
+    const { showToast } = useToast();
     const [formData, setFormData] = useState({
         title: announcement?.title || '',
         summary: announcement?.summary || '',
@@ -42,7 +50,7 @@ const AnnouncementFormModal: React.FC<{
         e.preventDefault();
         const companyId = currentUser?.company_id;
         if (!companyId) {
-            alert('Erro: Empresa não identificada.');
+            showToast('Não foi possível identificar a empresa.', 'error');
             return;
         }
         setIsProcessing(true);
@@ -93,69 +101,164 @@ const AnnouncementFormModal: React.FC<{
                 if (error) throw error;
             }
 
-            onSave();
+            await Promise.resolve(onSave());
+            showToast(
+                announcement?.id
+                    ? 'Anúncio atualizado com sucesso.'
+                    : 'Anúncio criado com sucesso.',
+                'success'
+            );
             onClose();
-
         } catch (error: any) {
             console.error('Error saving announcement:', error);
-            alert(`Erro ao salvar anúncio: ${error.message || 'Erro desconhecido'}`);
+            showToast(
+                `Erro ao salvar anúncio: ${error?.message || 'Erro desconhecido'}`,
+                'error'
+            );
         } finally {
             setIsProcessing(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative animate-fade-in-up">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircleIcon className="w-6 h-6" /></button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">{announcement?.id ? 'Editar Anúncio' : 'Criar Novo Anúncio'}</h3>
-                <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
-                    {/* Form Fields */}
-                    <div><label className="block text-sm font-medium text-brand-subtle-text">Título</label><input type="text" name="title" value={formData.title} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                    <div><label className="block text-sm font-medium text-brand-subtle-text">Resumo</label><textarea name="summary" value={formData.summary} onChange={handleChange} rows={4} required className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" /></div>
-                    <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Categoria</label>
-                        <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text">
-                            <option>Notícias da Empresa</option>
-                            <option>Atualização de Produto</option>
-                            <option>RH & Cultura</option>
-                            <option>Evento</option>
-                        </select>
-                    </div>
+        <ModalPortal
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[3px] pandanet-modal-viewport"
+            role="presentation"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !isProcessing) onClose();
+            }}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="announcement-modal-title"
+                className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_30px_80px_-24px_rgba(2,6,23,0.55)] animate-fade-in-up dark:border-white/10 dark:bg-[#101d2e] sm:p-6"
+            >
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Fechar"
+                    disabled={isProcessing}
+                    onClick={onClose}
+                    className="absolute right-3 top-3"
+                >
+                    <XCircleIcon className="h-5 w-5" />
+                </Button>
+                <h3
+                    id="announcement-modal-title"
+                    className="mb-5 pr-12 text-xl font-bold text-slate-950 dark:text-white"
+                >
+                    {announcement?.id ? 'Editar anúncio' : 'Criar novo anúncio'}
+                </h3>
+                <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-4 overflow-y-auto pr-2">
+                    <Input
+                        label="Título"
+                        type="text"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        required
+                        autoFocus
+                        placeholder="Título do anúncio"
+                    />
+
+                    <Textarea
+                        label="Resumo"
+                        name="summary"
+                        value={formData.summary}
+                        onChange={handleChange}
+                        rows={4}
+                        required
+                        placeholder="Escreva um resumo claro para o anúncio"
+                    />
+
+                    <Select
+                        label="Categoria"
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                    >
+                        <option>Notícias da Empresa</option>
+                        <option>Atualização de Produto</option>
+                        <option>RH & Cultura</option>
+                        <option>Evento</option>
+                    </Select>
                     {/* Media Inputs */}
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Upload Imagem</label>
-                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100" />
+                        <label
+                            htmlFor="announcement-image"
+                            className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+                        >
+                            Imagem
+                        </label>
+                        <input
+                            id="announcement-image"
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => handleFileChange(event, 'image')}
+                            className="block min-h-10 w-full cursor-pointer rounded-xl border border-slate-200 bg-white text-sm text-slate-600 shadow-sm file:mr-4 file:min-h-10 file:border-0 file:bg-emerald-50 file:px-4 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300 dark:file:bg-emerald-400/10 dark:file:text-emerald-300"
+                        />
                         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
                             💡 Dimensão recomendada: <strong>1200x400 pixels (proporção 3:1)</strong>. Para se adaptar ao tamanho do banner da empresa, a imagem será recortada e ajustada automaticamente.
                         </p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Upload Vídeo (ou URL externa abaixo)</label>
-                        <input type="file" accept="video/*" onChange={(e) => handleFileChange(e, 'video')} className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100" />
+                        <label
+                            htmlFor="announcement-video"
+                            className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+                        >
+                            Vídeo
+                        </label>
+                        <input
+                            id="announcement-video"
+                            type="file"
+                            accept="video/*"
+                            onChange={(event) => handleFileChange(event, 'video')}
+                            className="block min-h-10 w-full cursor-pointer rounded-xl border border-slate-200 bg-white text-sm text-slate-600 shadow-sm file:mr-4 file:min-h-10 file:border-0 file:bg-emerald-50 file:px-4 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300 dark:file:bg-emerald-400/10 dark:file:text-emerald-300"
+                        />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">URL do Vídeo (YouTube/Externo)</label>
-                        <input type="url" name="videoUrl" value={formData.videoUrl} onChange={handleChange} placeholder="https://..." className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text" />
-                    </div>
+                    <Input
+                        label="URL do vídeo"
+                        hint="Use uma URL externa quando não enviar um arquivo."
+                        type="url"
+                        name="videoUrl"
+                        value={formData.videoUrl}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                    />
 
                     <div className="flex justify-end space-x-3 pt-2">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:bg-emerald-300">
-                            {isProcessing ? 'Salvando...' : 'Salvar Anúncio'}
-                        </button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={isProcessing}
+                            onClick={onClose}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            isLoading={isProcessing}
+                            loadingText="Salvando..."
+                        >
+                            Salvar anúncio
+                        </Button>
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
     const { currentUser } = useAuth();
+    const { showToast } = useToast();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+    const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchAnnouncements = async () => {
         if (!currentUser?.company_id) return;
@@ -189,42 +292,124 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = () => {
         fetchAnnouncements();
     }, [currentUser]);
 
-    const handleDelete = async (id: string, title: string) => {
-        if (window.confirm(`Tem certeza que deseja apagar "${title}"?`)) {
-            await supabase.from('announcements').delete().eq('id', id);
-            fetchAnnouncements();
+    const handleDelete = async (announcement: Announcement) => {
+        if (isDeleting) return;
+        setIsDeleting(true);
+
+        try {
+            const { error } = await supabase
+                .from('announcements')
+                .delete()
+                .eq('id', announcement.id);
+
+            if (error) throw error;
+
+            await fetchAnnouncements();
+            showToast('Anúncio excluído com sucesso.', 'success');
+        } catch (error: any) {
+            console.error('Error deleting announcement:', error);
+            showToast(
+                `Erro ao excluir anúncio: ${error?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsDeleting(false);
+            setAnnouncementToDelete(null);
         }
     };
 
     return (
         <>
             <Card title="Gerenciar Anúncios" headerAction={
-                <button onClick={() => { setEditingAnnouncement(null); setModalOpen(true); }} className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
-                    <PlusIcon className="w-4 h-4" />
-                    <span>Criar Novo</span>
-                </button>
+                <Button
+                    type="button"
+                    size="sm"
+                    leftIcon={<PlusIcon className="h-4 w-4" />}
+                    onClick={() => {
+                        setEditingAnnouncement(null);
+                        setModalOpen(true);
+                    }}
+                >
+                    Criar anúncio
+                </Button>
             }>
                 <div className="space-y-3">
-                    {announcements.length === 0 ? <p className="text-brand-subtle-text">Nenhum anúncio encontrado.</p> :
+                    {announcements.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-slate-300 px-6 py-12 text-center text-sm text-slate-500 dark:border-white/15 dark:text-slate-400">
+                            Nenhum anúncio encontrado.
+                        </p>
+                    ) :
                         announcements.map(ann => (
-                            <div key={ann.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
-                                <div>
-                                    <p className="font-semibold text-brand-text">{ann.title}</p>
-                                    <p className="text-sm text-brand-subtle-text">{ann.category} - {new Date(ann.date).toLocaleDateString('pt-BR')}</p>
+                            <article
+                                key={ann.id}
+                                className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-emerald-200 hover:shadow-md dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-emerald-400/30 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <div className="min-w-0">
+                                    <p className="truncate font-semibold text-slate-950 dark:text-white">
+                                        {ann.title}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                        {ann.category} · {new Date(ann.date).toLocaleDateString('pt-BR')}
+                                    </p>
                                 </div>
-                                <div className="flex space-x-2">
-                                    <button onClick={() => { setEditingAnnouncement(ann); setModalOpen(true); }} className="p-2 text-brand-subtle-text hover:text-brand-primary">
-                                        <PencilIcon className="w-5 h-5" />
-                                    </button>
-                                    <button onClick={() => handleDelete(ann.id, ann.title)} className="p-2 text-brand-subtle-text hover:text-red-500">
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
+                                <div className="flex flex-none gap-1">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Editar anúncio ${ann.title}`}
+                                        title="Editar anúncio"
+                                        onClick={() => {
+                                            setEditingAnnouncement(ann);
+                                            setModalOpen(true);
+                                        }}
+                                        className="h-9 w-9"
+                                    >
+                                        <PencilIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Excluir anúncio ${ann.title}`}
+                                        title="Excluir anúncio"
+                                        onClick={() => setAnnouncementToDelete(ann)}
+                                        className="h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                            </div>
+                            </article>
                         ))}
                 </div>
             </Card>
-            {isModalOpen && <AnnouncementFormModal announcement={editingAnnouncement} onClose={() => setModalOpen(false)} onSave={fetchAnnouncements} currentUser={currentUser} />}
+            <ConfirmModal
+                isOpen={announcementToDelete !== null}
+                type="danger"
+                title="Excluir anúncio?"
+                message={announcementToDelete
+                    ? `O anúncio "${announcementToDelete.title}" será removido permanentemente.`
+                    : ''}
+                confirmText={isDeleting ? 'Excluindo...' : 'Excluir anúncio'}
+                cancelText="Cancelar"
+                onCancel={() => {
+                    if (!isDeleting) setAnnouncementToDelete(null);
+                }}
+                onConfirm={() => {
+                    if (announcementToDelete) {
+                        void handleDelete(announcementToDelete);
+                    }
+                }}
+            />
+
+            {isModalOpen && (
+                <AnnouncementFormModal
+                    announcement={editingAnnouncement}
+                    onClose={() => setModalOpen(false)}
+                    onSave={fetchAnnouncements}
+                    currentUser={currentUser}
+                />
+            )}
         </>
     );
 };

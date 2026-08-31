@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import {
     FaceSmileIcon,
     PaperClipIcon,
@@ -1540,12 +1541,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             {/* Left Sidebar: Conversations/Contacts/Teams */}
             <div className={`w-full md:w-80 lg:w-96 bg-white/80 dark:bg-[#020617]/40 backdrop-blur-xl border-r border-gray-200 dark:border-white/5 flex flex-col shrink-0 ${selectedConversationId !== null ? 'hidden md:flex' : 'flex'}`}>
                 <div className="hidden md:block p-4 border-b border-gray-100 dark:border-white/5">
-                    <div className="flex bg-gray-100 dark:bg-white/5 rounded-xl p-1">
-                        <button onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'conversations' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Chat</button>
-                        <button onClick={() => setActiveTab('contacts')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'contacts' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Contatos</button>
-                        <button onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Equipes</button>
+                    <div role="tablist" aria-label="Navegação de mensagens" className="flex bg-gray-100 dark:bg-white/5 rounded-xl p-1">
+                        <button id="messages-desktop-tab-conversations" role="tab" aria-selected={activeTab === 'conversations'} tabIndex={activeTab === 'conversations' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('conversations')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'conversations' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Chat</button>
+                        <button id="messages-desktop-tab-contacts" role="tab" aria-selected={activeTab === 'contacts'} tabIndex={activeTab === 'contacts' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('contacts')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'contacts' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Contatos</button>
+                        <button id="messages-desktop-tab-teams" role="tab" aria-selected={activeTab === 'teams'} tabIndex={activeTab === 'teams' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('teams')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'teams' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Equipes</button>
                         {currentUser?.email === 'ti@grupopixel.com.br' && (
-                            <button onClick={() => setActiveTab('support')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'support' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Suporte</button>
+                            <button id="messages-desktop-tab-support" role="tab" aria-selected={activeTab === 'support'} tabIndex={activeTab === 'support' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('support')} className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeTab === 'support' ? 'bg-white dark:bg-brand-primary text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Suporte</button>
                         )}
                     </div>
                 </div>
@@ -2159,21 +2160,21 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
 
             {/* Mobile Bottom Navigation Component */}
             {!selectedConversationId && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white dark:bg-[#020617] border-t border-gray-100 dark:border-white/5 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2 pb-[max(env(safe-area-inset-bottom),8px)]">
-                    <button onClick={() => setActiveTab('conversations')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'conversations' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
+                <div role="tablist" aria-label="Navegação móvel de mensagens" className="md:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white dark:bg-[#020617] border-t border-gray-100 dark:border-white/5 flex justify-around items-center z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.03)] px-2 pb-[max(env(safe-area-inset-bottom),8px)]">
+                    <button id="messages-mobile-tab-conversations" role="tab" aria-selected={activeTab === 'conversations'} tabIndex={activeTab === 'conversations' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('conversations')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'conversations' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
                         <ChatBubbleLeftRightIcon className="w-6 h-6" />
                         <span className="text-[10px] font-bold">Chat</span>
                     </button>
-                    <button onClick={() => setActiveTab('contacts')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'contacts' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
+                    <button id="messages-mobile-tab-contacts" role="tab" aria-selected={activeTab === 'contacts'} tabIndex={activeTab === 'contacts' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('contacts')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'contacts' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
                         <UserGroupIcon className="w-6 h-6" />
                         <span className="text-[10px] font-bold">Contatos</span>
                     </button>
-                    <button onClick={() => setActiveTab('teams')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'teams' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
+                    <button id="messages-mobile-tab-teams" role="tab" aria-selected={activeTab === 'teams'} tabIndex={activeTab === 'teams' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('teams')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'teams' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
                         <UserGroupIcon className="w-6 h-6" />
                         <span className="text-[10px] font-bold">Equipes</span>
                     </button>
                     {currentUser?.email === 'ti@grupopixel.com.br' && (
-                        <button onClick={() => setActiveTab('support')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'support' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
+                        <button id="messages-mobile-tab-support" role="tab" aria-selected={activeTab === 'support'} tabIndex={activeTab === 'support' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('support')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'support' ? 'text-brand-primary scale-110' : 'text-gray-400 hover:text-gray-500 transition-transform'}`}>
                             <SparklesIcon className="w-6 h-6" />
                             <span className="text-[10px] font-bold">Suporte</span>
                         </button>

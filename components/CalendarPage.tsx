@@ -1581,7 +1581,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                     />
                                                     <div className="flex items-center space-x-2">
                                                         {emp.avatarUrl ? (
-                                                            <img src={emp.avatarUrl} className="w-6 h-6 rounded-full object-cover" />
+                                                            <img src={emp.avatarUrl} className="w-6 h-6 rounded-full object-cover"  alt="Imagem relacionada ao evento" />
                                                         ) : (
                                                             <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
                                                                 {emp.name?.charAt(0)}
@@ -1666,7 +1666,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                                 <div key={inv.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600">
                                                     <div className="flex items-center gap-2">
                                                         {inv.invitee_avatar ? (
-                                                            <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover" />
+                                                            <img src={inv.invitee_avatar} className="w-8 h-8 rounded-full object-cover"  alt="Imagem relacionada ao evento" />
                                                         ) : (
                                                             <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500">
                                                                 {inv.invitee_name?.charAt(0)}

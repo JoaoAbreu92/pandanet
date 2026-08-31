@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { handleTabKeyDown } from '../../utils/tabAccessibility';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase, getSignedStorageUrl } from '../../supabaseClient';
@@ -1391,7 +1392,48 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
 
     const { data, error } = await query.order('created_at', { ascending: true });
 
-    if (data) setMessages(data);
+    if (data) {
+      const seenMessages = new Set<string>();
+
+      const uniqueMessages = data.filter((item: any) => {
+        const identity = item.whatsapp_message_id
+          ? `${item.company_id}:${item.whatsapp_message_id}`
+          : item.id;
+
+        if (seenMessages.has(identity)) return false;
+
+        seenMessages.add(identity);
+        return true;
+      });
+
+      const hydratedMessages = await Promise.all(
+        uniqueMessages.map(async (item: any) => {
+          if (!item.media_url) return item;
+
+          try {
+            const renewedMediaUrl = await getSignedStorageUrl(
+              item.media_url,
+              86400
+            );
+
+            return {
+              ...item,
+              media_url: renewedMediaUrl
+            };
+          } catch (mediaError) {
+            console.warn(
+              'Não foi possível renovar a URL da mídia:',
+              mediaError
+            );
+
+            return item;
+          }
+        })
+      );
+
+      setMessages(hydratedMessages);
+    }
+
     if (!silent) setLoadingMessages(false);
   };
 
@@ -1767,7 +1809,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         }
       } else {
         const cleanUrl = rawUrl.split('?')[0];
-        const extracted = cleanUrl.split('/').pop();
+        const extractedPart = cleanUrl.split('/').pop();
+        const extracted = extractedPart
+          ? decodeURIComponent(extractedPart)
+          : undefined;
         if (extracted && extracted.includes('.')) {
           filename = extracted;
         }
@@ -1833,7 +1878,24 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         && realProfile?.role !== 'Super Admin'
     ) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaDevices = navigator.mediaDevices;
+      if (!mediaDevices?.getUserMedia) {
+        throw new Error("API de microfone indisponivel neste dispositivo");
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (firstError) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        stream = await mediaDevices.getUserMedia({ audio: true });
+      }
       audioChunksRef.current = [];
 
       let mimeType = 'audio/webm;codecs=opus';
@@ -1852,7 +1914,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       }
 
       const options = mimeType ? { mimeType } : undefined;
-      const mediaRecorder = new MediaRecorder(stream, options);
+      let mediaRecorder: MediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (codecError) {
+        console.warn("Codec preferencial indisponivel; usando formato nativo", codecError);
+        mediaRecorder = new MediaRecorder(stream);
+      }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -2045,9 +2113,10 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           }
         }
 
-        const fileExt = fileToUpload.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `whatsapp/${selectedConversation.id}/${fileName}`;
+        const originalFileName =
+          attachedFile.name.replace(/[\\/]/g, '_');
+        const filePath =
+          `whatsapp/${selectedConversation.id}/${Date.now()}/${originalFileName}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('chat-media')
@@ -2058,7 +2127,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           alert(`Erro ao subir arquivo: ${uploadError.message}`);
           return;
         } else if (uploadData) {
-          const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
+          const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${uploadData.path}`);
           uploadedFileUrl = publicUrl;
           fileType = attachedFile.type;
           console.log(`[SEND] Upload OK. URL: ${publicUrl} | MIME: ${fileType}`);
@@ -2269,7 +2338,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           })()}
 
           {/* Tabs */}
-          <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5">
+          <div
+            className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl shadow-inner border border-transparent dark:border-white/5"
+            role="tablist"
+            aria-label="Filtrar atendimentos"
+          >
             {(isAdmin
               ? (['meus', 'aguardando', 'todos', 'fechados'] as const)
               : (['meus', 'aguardando', 'fechados'] as const)
@@ -2278,6 +2351,13 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
               return (
                 <button
                   key={tab}
+                  type="button"
+                  role="tab"
+                  id={`whatspanda-tab-${tab}`}
+                  aria-selected={activeTab === tab}
+                  aria-controls="whatspanda-conversation-list"
+                  tabIndex={activeTab === tab ? 0 : -1}
+                  onKeyDown={handleTabKeyDown}
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-xl capitalize transition-all duration-300 ${activeTab === tab
                     ? 'bg-white dark:bg-emerald-500 text-emerald-600 dark:text-white shadow-xl scale-[1.02]'
@@ -3056,65 +3136,157 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                 </div>
 
                 {/* Input Area */}
-                <div className="px-1.5 py-1.5 sm:px-3 sm:py-2 md:px-6 md:py-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 pb-2 sm:pb-3 md:pb-4 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] w-full overflow-hidden">
+                <div className="relative px-2 py-2 sm:px-3 md:px-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 z-20 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] w-full overflow-visible">
 
                   {/* Sticker Picker UI */}
                   {showStickerPicker && (
-                    <div className="absolute bottom-[100%] left-2 right-2 sm:left-4 sm:right-4 mb-4 bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300">
-                      <div className="flex border-b border-slate-100 dark:border-white/5">
-                        <button
-                          onClick={() => setStickerTab('emojis')}
-                          className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'emojis' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
-                        >
-                          Emojis & Gifs
-                        </button>
-                        <button
-                          onClick={() => setStickerTab('saved')}
-                          className={`flex-1 py-2 text-xs font-bold transition-colors ${stickerTab === 'saved' ? 'text-emerald-500 border-b-2 border-emerald-500' : 'text-slate-400'}`}
-                        >
-                          Minhas Figurinhas ({customStickers.length})
-                        </button>
+                    <div
+                      className="absolute bottom-[calc(100%+0.5rem)] left-3 z-[120] w-[min(22rem,calc(100%-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_55px_-18px_rgba(15,23,42,0.48)] animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-white/10 dark:bg-slate-900 sm:left-4 sm:w-[22rem]"
+                      role="dialog"
+                      aria-label="Emojis, GIFs e figurinhas"
+                    >
+                      <div className="flex border-b border-slate-200 bg-slate-50 p-1.5 pb-0 dark:border-white/10 dark:bg-white/5">
+                        {[
+                          ['emojis', 'Emojis'],
+                          ['gallery', 'GIFs'],
+                          ['saved', 'Figurinhas']
+                        ].map(([tab, label]) => (
+                          <button
+                            type="button"
+                            key={tab}
+                            onClick={() => setStickerTab(tab as 'emojis' | 'gallery' | 'saved')}
+                            className={`flex-1 rounded-t-xl px-2 py-2 text-[11px] font-bold transition ${
+                              stickerTab === tab
+                                ? 'bg-white text-emerald-600 shadow-sm dark:bg-slate-800 dark:text-emerald-400'
+                                : 'text-slate-500 hover:bg-white/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
 
-
-                      <div className="p-4 max-h-60 overflow-y-auto custom-scrollbar">
-                        {stickerTab === 'emojis' ? (
-                          <div className="grid grid-cols-6 gap-2">
-                            {['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉', '👏', '🤝', '✅', '❌', '💯', '⭐', '💡', '🚀', '👀', '📌'].map((emoji, i) => (
+                      <div className="max-h-64 overflow-y-auto overscroll-contain p-3 custom-scrollbar">
+                        {stickerTab === 'emojis' && (
+                          <div className="grid grid-cols-7 gap-1">
+                            {[
+                              '😀','😃','😄','😁','😆','😅','😂',
+                              '🤣','😊','😇','🙂','🙃','😉','😍',
+                              '🥰','😘','😎','🤩','🥳','😢','😭',
+                              '😡','🤔','🤭','😴','😮','😱','🙏',
+                              '👍','👎','👏','🙌','🤝','💪','👀',
+                              '❤️','💚','💙','💜','💔','🔥','✨',
+                              '🎉','🎂','🎁','✅','❌','⚠️','📌',
+                              '💯','⭐','💡','🚀','📞','📎','💬',
+                              '☕','🌟','💼','📅','📊','🔔','📝'
+                            ].map((emoji, index) => (
                               <button
-                                key={i}
-                                onClick={() => {
-                                  setNewMessage(prev => prev + emoji);
-                                  setShowStickerPicker(false);
-                                }}
-                                className="text-2xl p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all hover:scale-125"
+                                type="button"
+                                key={index}
+                                onClick={() => setNewMessage(previous => previous + emoji)}
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:scale-110 hover:bg-emerald-50 active:scale-95 dark:hover:bg-emerald-500/10"
+                                title={emoji}
                               >
                                 {emoji}
                               </button>
                             ))}
                           </div>
-                        ) : (
-                          <div className="grid grid-cols-4 gap-3">
-                            {(customStickers.length === 0 ? [
+                        )}
+
+                        {stickerTab === 'gallery' && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f60d/512.gif',
                               'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44d/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f389/512.gif',
                               'https://fonts.gstatic.com/s/e/notoemoji/latest/1f525/512.gif',
                               'https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif',
-                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif'
-                            ] : customStickers).map((url, i) => (
-                              <div key={i} className="relative group aspect-square max-w-[60px] mx-auto">
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4af/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f923/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f973/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f44f/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f914/512.gif',
+                              'https://fonts.gstatic.com/s/e/notoemoji/latest/1f64f/512.gif'
+                            ].map((url, index) => (
+                              <button
+                                type="button"
+                                key={index}
+                                onClick={() => handleSendSticker(url)}
+                                className="aspect-square overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-2 transition hover:scale-[1.04] hover:border-emerald-300 hover:bg-emerald-50 dark:border-white/5 dark:bg-white/5 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10"
+                              >
                                 <img
                                   src={url}
-                                  alt="sticker"
-                                  className="w-full h-full object-contain cursor-pointer hover:scale-110 transition-transform drop-shadow-sm"
-                                  onClick={() => handleSendSticker(url)}
+                                  alt="GIF"
+                                  loading="lazy"
+                                  className="h-full w-full object-contain"
                                 />
-                                {stickerTab === 'saved' && (
-                                  <button onClick={() => removeSticker(url)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
-                                )}
-                              </div>
+                              </button>
                             ))}
                           </div>
                         )}
+
+                        {stickerTab === 'saved' && (
+                          <>
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <span className="truncate text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                Minhas figurinhas ({customStickers.length})
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => stickerUploadRef.current?.click()}
+                                className="shrink-0 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                              >
+                                + Adicionar
+                              </button>
+                            </div>
+
+                            {customStickers.length > 0 ? (
+                              <div className="grid grid-cols-4 gap-2">
+                                {customStickers.map((url, index) => (
+                                  <div
+                                    key={index}
+                                    className="group relative aspect-square overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-1.5 dark:border-white/5 dark:bg-white/5"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSendSticker(url)}
+                                      className="h-full w-full"
+                                    >
+                                      <img
+                                        src={url}
+                                        alt="Figurinha"
+                                        loading="lazy"
+                                        className="h-full w-full object-contain transition group-hover:scale-105"
+                                      />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSticker(url)}
+                                      className="absolute right-1 top-1 rounded-full bg-red-500 p-1 text-white opacity-0 shadow transition hover:bg-red-600 group-hover:opacity-100"
+                                      title="Remover figurinha"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 text-center dark:border-white/10">
+                                <Smile className="mb-2 h-7 w-7 text-slate-300" />
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                  Nenhuma figurinha salva.
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="border-t border-slate-100 bg-slate-50/80 px-3 py-2 text-center text-[9px] font-medium text-slate-400 dark:border-white/5 dark:bg-white/[0.03]">
+                        Role para visualizar mais opções
                       </div>
                     </div>
                   )}
@@ -3169,7 +3341,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       </p>
                     </div>
                   ) : (
-                    <div className="flex-1 min-w-0 w-full bg-gray-100/80 dark:bg-white/5 rounded-3xl flex items-end p-1 md:p-2 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-xl transition-all duration-300">
+                    <div className="flex-1 min-w-0 w-full bg-gray-100/80 dark:bg-white/5 rounded-2xl flex items-center p-1 border border-transparent dark:border-white/5 focus-within:bg-white dark:focus-within:bg-white/10 focus-within:shadow-lg transition-all duration-300">
                       <input
                         type="file"
                         ref={fileInputRef}
@@ -3214,6 +3386,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                       ) : (
                         <div className="flex items-center w-full min-w-0 gap-0.5 sm:gap-1.5">
                           <button
+                            type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className={`p-1.5 sm:p-2.5 md:p-3 rounded-2xl transition-all duration-300 shrink-0 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'}`}
                             disabled={!canSendMedia}
@@ -3223,10 +3396,11 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => setShowStickerPicker(!showStickerPicker)}
-                            className={`p-1.5 sm:p-2.5 md:p-3 rounded-2xl transition-all duration-300 shrink-0 ${canSendMedia ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
-                            disabled={!canSendMedia}
-                            title={!canSendMedia ? "Figurinhas / Gifs" : "Figurinhas / Gifs"}
+                            className={`p-1.5 sm:p-2.5 md:p-3 rounded-2xl transition-all duration-300 shrink-0 ${canSendMessagesResult ? 'hover:bg-brand-primary/10 text-slate-500 dark:text-gray-400 hover:text-brand-primary' : 'opacity-50 cursor-not-allowed text-slate-300'} ${showStickerPicker ? 'bg-brand-primary/10 text-brand-primary' : ''}`}
+                            disabled={!canSendMessagesResult}
+                            title={!canSendMessagesResult ? "Figurinhas / Gifs" : "Figurinhas / Gifs"}
                           >
                             <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
@@ -3336,11 +3510,12 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                             placeholder={canSendMessagesResult ? "Mensagem" : "Apenas leitura"}
                             disabled={!canSendMessagesResult || isSending}
                             style={{ fontSize: `${chatFontSize}px` }}
-                            className="flex-1 min-w-0 max-h-32 min-h-[36px] sm:min-h-[40px] py-2 sm:py-3 px-1.5 sm:px-3 bg-transparent resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
+                            className="flex-1 min-w-0 h-10 min-h-10 max-h-10 overflow-y-auto py-2 px-2 sm:px-3 bg-transparent resize-none focus:outline-none dark:text-white placeholder-gray-400/80 font-medium leading-[1.3]"
                             rows={1}
                           />
                           {newMessage.trim() || attachedFile ? (
                             <button
+                              type="button"
                               onClick={handleSendMessage}
                               disabled={!canSendMessagesResult || isSending}
                               className="p-2 sm:p-2.5 md:p-3 bg-brand-primary text-white rounded-full md:rounded-2xl hover:bg-emerald-600 dark:hover:bg-emerald-400 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-white/10 disabled:cursor-not-allowed transform transition-all active:scale-95 shrink-0"

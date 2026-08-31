@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import Card from './Card';
 import { PencilIcon, SparklesIcon, CheckIcon } from './icons';
 import type { Employee, Post, CompanyBadge, UserBadge } from '../types';
@@ -766,9 +767,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
             <div className="pt-4">
                 {/* Tabs */}
                 <div className="border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar">
-                    <nav className="-mb-px flex space-x-8 min-w-max">
+                    <nav
+                        className="-mb-px flex space-x-8 min-w-max"
+                        role="tablist"
+                        aria-label="Seções do perfil"
+                    >
                         {isOwnProfile && (
                             <button
+                                type="button"
+                                role="tab"
+                                id="profile-tab-info"
+                                aria-selected={activeTab === 'info'}
+                                tabIndex={activeTab === 'info' ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setActiveTab('info')}
                                 className={`${activeTab === 'info' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                             >
@@ -776,6 +787,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             </button>
                         )}
                         <button
+                            type="button"
+                            role="tab"
+                            id="profile-tab-activity"
+                            aria-selected={activeTab === 'activity'}
+                            tabIndex={activeTab === 'activity' ? 0 : -1}
+                            onKeyDown={handleTabKeyDown}
                             onClick={() => setActiveTab('activity')}
                             className={`${activeTab === 'activity' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >
@@ -783,6 +800,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         </button>
                         {isOwnProfile && (
                             <button
+                                type="button"
+                                role="tab"
+                                id="profile-tab-security"
+                                aria-selected={activeTab === 'security'}
+                                tabIndex={activeTab === 'security' ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setActiveTab('security')}
                                 className={`${activeTab === 'security' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                             >
@@ -791,6 +814,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                         )}
                         {isOwnProfile && isAIEnabled && (
                             <button
+                                type="button"
+                                role="tab"
+                                id="profile-tab-ai"
+                                aria-selected={activeTab === 'ai'}
+                                tabIndex={activeTab === 'ai' ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setActiveTab('ai')}
                                 className={`${activeTab === 'ai' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
                             >
@@ -799,6 +828,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                             </button>
                         )}
                         <button
+                            type="button"
+                            role="tab"
+                            id="profile-tab-conquistas"
+                            aria-selected={activeTab === 'conquistas'}
+                            tabIndex={activeTab === 'conquistas' ? 0 : -1}
+                            onKeyDown={handleTabKeyDown}
                             onClick={() => setActiveTab('conquistas')}
                             className={`${activeTab === 'conquistas' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                         >

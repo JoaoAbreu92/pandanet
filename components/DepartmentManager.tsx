@@ -1,5 +1,10 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import ConfirmModal from './ui/ConfirmModal';
+import { useToast } from './ToastContext';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from './icons';
 import { supabase } from '../supabaseClient';
 import type { Department } from '../types';
@@ -9,11 +14,15 @@ interface DepartmentManagerProps {
 }
 
 export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId }) => {
+    const { showToast } = useToast();
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
     const [name, setName] = useState('');
+    const [departmentToDelete, setDepartmentToDelete] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchDepartments = async () => {
         setLoading(true);
@@ -33,6 +42,9 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSaving) return;
+        setIsSaving(true);
+
         try {
             if (!companyId) throw new Error('Company ID is required to save department');
             if (editingDept) {
@@ -52,22 +64,47 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
             setName('');
             setEditingDept(null);
             setIsModalOpen(false);
-            fetchDepartments();
+            await fetchDepartments();
+            showToast(
+                editingDept
+                    ? 'Departamento atualizado com sucesso.'
+                    : 'Departamento criado com sucesso.',
+                'success'
+            );
         } catch (err: any) {
             console.error('Error saving department:', err);
-            alert(`Erro ao salvar departamento: ${err.message || 'Erro desconhecido'}`);
+            showToast(
+                `Erro ao salvar departamento: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir este departamento? Funcionários vinculados ficarão sem departamento.')) return;
+        if (isDeleting) return;
+        setIsDeleting(true);
+
         try {
-            const { error } = await supabase.from('departments').delete().eq('id', id);
+            const { error } = await supabase
+                .from('departments')
+                .delete()
+                .eq('id', id);
+
             if (error) throw error;
-            fetchDepartments();
-        } catch (err) {
+
+            await fetchDepartments();
+            showToast('Departamento excluído com sucesso.', 'success');
+        } catch (err: any) {
             console.error(err);
-            alert('Erro ao excluir departamento');
+            showToast(
+                `Erro ao excluir departamento: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsDeleting(false);
+            setDepartmentToDelete(null);
         }
     };
 
@@ -76,13 +113,18 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <p className="text-sm text-gray-500">Crie e gerencie os departamentos da sua empresa para organizar chamados e eventos.</p>
-                    <button
-                        onClick={() => { setName(''); setEditingDept(null); setIsModalOpen(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                    <Button
+                        type="button"
+                        size="sm"
+                        leftIcon={<PlusIcon className="h-4 w-4" />}
+                        onClick={() => {
+                            setName('');
+                            setEditingDept(null);
+                            setIsModalOpen(true);
+                        }}
                     >
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Novo Departamento</span>
-                    </button>
+                        Novo departamento
+                    </Button>
                 </div>
 
                 {loading ? (
@@ -100,7 +142,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
                                         <PencilIcon className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => handleDelete(dept.id)}
+                                        onClick={() => setDepartmentToDelete(dept.id)}
                                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                     >
                                         <TrashIcon className="w-4 h-4" />
@@ -113,34 +155,82 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
             </div>
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-                        <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                            <XMarkIcon className="w-6 h-6" />
-                        </button>
-                        <h3 className="text-xl font-bold text-brand-text mb-4">
+                <ModalPortal
+                    className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[3px] pandanet-modal-viewport"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) setIsModalOpen(false);
+                    }}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="department-modal-title"
+                        className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_-24px_rgba(2,6,23,0.55)] dark:border-white/10 dark:bg-[#101d2e]"
+                    >
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Fechar"
+                            onClick={() => setIsModalOpen(false)}
+                            className="absolute right-3 top-3"
+                        >
+                            <XMarkIcon className="h-5 w-5" />
+                        </Button>
+                        <h3
+                            id="department-modal-title"
+                            className="mb-5 pr-12 text-xl font-bold text-slate-950 dark:text-white"
+                        >
                             {editingDept ? 'Editar Departamento' : 'Novo Departamento'}
                         </h3>
                         <form onSubmit={handleSave} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Departamento</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    required
-                                    placeholder="Ex: TI, RH, Financeiro"
-                                    className="w-full border-gray-300 rounded-lg focus:ring-brand-primary focus:border-brand-primary"
-                                />
-                            </div>
+                            <Input
+                                label="Nome do departamento"
+                                type="text"
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                required
+                                autoFocus
+                                placeholder="Ex.: TI, RH ou Financeiro"
+                            />
                             <div className="flex justify-end gap-3 mt-6">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium">Cancelar</button>
-                                <button type="submit" className="px-6 py-2 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-all shadow-md">Salvar</button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setIsModalOpen(false)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    isLoading={isSaving}
+                                    loadingText="Salvando..."
+                                >
+                                    Salvar
+                                </Button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
+
+            <ConfirmModal
+                isOpen={departmentToDelete !== null}
+                type="danger"
+                title="Excluir departamento?"
+                message="Os funcionários vinculados ficarão sem departamento. Esta ação não pode ser desfeita."
+                confirmText={isDeleting ? 'Excluindo...' : 'Excluir departamento'}
+                cancelText="Cancelar"
+                onCancel={() => {
+                    if (!isDeleting) setDepartmentToDelete(null);
+                }}
+                onConfirm={() => {
+                    if (departmentToDelete) {
+                        void handleDelete(departmentToDelete);
+                    }
+                }}
+            />
         </Card>
     );
 };

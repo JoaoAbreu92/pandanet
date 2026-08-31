@@ -1,4 +1,6 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserGroupIcon, PlusIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from './icons';
 import type { Event } from '../types';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
@@ -369,8 +371,18 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
             </div>
 
             {/* Premium Tabs Menu */}
-            <div className="flex space-x-1 p-1 bg-gray-150 dark:bg-slate-800/80 rounded-xl max-w-xs mb-8 border border-gray-200/50 dark:border-slate-700">
+            <div
+                className="flex space-x-1 p-1 bg-gray-150 dark:bg-slate-800/80 rounded-xl max-w-xs mb-8 border border-gray-200/50 dark:border-slate-700"
+                role="tablist"
+                aria-label="Visualização de eventos"
+            >
                 <button
+                    type="button"
+                    role="tab"
+                    id="events-tab-ativos"
+                    aria-selected={activeTab === 'ativos'}
+                    tabIndex={activeTab === 'ativos' ? 0 : -1}
+                    onKeyDown={handleTabKeyDown}
                     onClick={() => setActiveTab('ativos')}
                     className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                         activeTab === 'ativos'
@@ -381,6 +393,12 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                     Próximos Eventos
                 </button>
                 <button
+                    type="button"
+                    role="tab"
+                    id="events-tab-historico"
+                    aria-selected={activeTab === 'historico'}
+                    tabIndex={activeTab === 'historico' ? 0 : -1}
+                    onKeyDown={handleTabKeyDown}
                     onClick={() => setActiveTab('historico')}
                     className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                         activeTab === 'historico'
@@ -463,7 +481,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
 
             {/* Event Detail Modal */}
             {selectedEvent && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="h-48 relative">
                             <img
@@ -536,12 +554,12 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {
                 declineModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
                         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Justificar Ausência</h3>
@@ -564,18 +582,18 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalPortal>
                 )
             }
             {
                 isCreateModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-                            <div className="flex justify-between items-center mb-6">
+                    <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
+                        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-xl p-4 sm:p-5 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-center mb-3">
                                 <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Cadastrar Novo Evento</h3>
                                 <button onClick={() => setIsCreateModalOpen(false)}><XMarkIcon className="w-6 h-6 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" /></button>
                             </div>
-                            <form onSubmit={handleCreateEvent} className="space-y-4">
+                            <form onSubmit={handleCreateEvent} className="space-y-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título do Evento</label>
                                     <input
@@ -750,7 +768,7 @@ const EventsPage: React.FC<EventsPageProps> = ({ initialEventId }) => {
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </ModalPortal>
                 )
             }
         </div >

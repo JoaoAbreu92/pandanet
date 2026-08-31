@@ -1,3 +1,4 @@
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import React, { useState, useEffect } from 'react';
 import type { Company, Plan, KBArticle, ServiceStatusItem, SecurityAlert, ResourceDocument, WellnessItem, Employee, Recognition, TIRequest } from '../types';
 import Dashboard from './Dashboard';
@@ -614,10 +615,17 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 </div>
 
                 <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex space-x-6 overflow-x-auto no-scrollbar" aria-label="Tabs">
+                    <nav className="-mb-px flex space-x-6 overflow-x-auto no-scrollbar" aria-label="Tabs" role="tablist">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
+                                type="button"
+                                role="tab"
+                                id={`admin-tab-${tab.id}`}
+                                aria-selected={activeTab === tab.id}
+                                aria-controls={`admin-panel-${tab.id}`}
+                                tabIndex={activeTab === tab.id ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`${activeTab === tab.id
                                     ? 'border-brand-primary text-brand-primary'
@@ -631,7 +639,12 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                 </div>
             </div>
 
-            <div>
+            <div
+                role="tabpanel"
+                id={`admin-panel-${activeTab}`}
+                aria-labelledby={`admin-tab-${activeTab}`}
+                tabIndex={0}
+            >
                 {renderContent()}
             </div>
         </div>

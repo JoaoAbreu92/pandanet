@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import type { Company, Plan, Employee } from '../types';
 import { SYSTEM_VERSION } from '../version';
 import { supabase } from '../supabaseClient';
@@ -1846,13 +1847,13 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
     return (
         <div className="bg-gray-50/50 dark:bg-gray-900 min-h-screen flex flex-col font-sans relative">
             <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 pt-2 flex items-center justify-between">
-                <div className="flex space-x-1 overflow-x-auto no-scrollbar tracking-wide uppercase">
-                    <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.dashboard_tab')}</button>
-                    <button onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.companies_tab')}</button>
-                    <button onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.plans_tab')}</button>
-                    <button onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.announcements_tab')}</button>
-                    <button onClick={() => setActiveTab('validations')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'validations' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>Validações {pendingUsers.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingUsers.length}</span>}</button>
-                    <button onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.settings_tab')}</button>
+                <div role="tablist" aria-label="Seções do Painel SaaS" className="flex space-x-1 overflow-x-auto no-scrollbar tracking-wide uppercase">
+                    <button id="saas-dashboard-tab-dashboard" role="tab" aria-selected={activeTab === 'dashboard'} tabIndex={activeTab === 'dashboard' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.dashboard_tab')}</button>
+                    <button id="saas-dashboard-tab-companies" role="tab" aria-selected={activeTab === 'companies'} tabIndex={activeTab === 'companies' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('companies')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'companies' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.companies_tab')}</button>
+                    <button id="saas-dashboard-tab-plans" role="tab" aria-selected={activeTab === 'plans'} tabIndex={activeTab === 'plans' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('plans')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'plans' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.plans_tab')}</button>
+                    <button id="saas-dashboard-tab-announcements" role="tab" aria-selected={activeTab === 'announcements'} tabIndex={activeTab === 'announcements' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('announcements')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'announcements' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.announcements_tab')}</button>
+                    <button id="saas-dashboard-tab-validations" role="tab" aria-selected={activeTab === 'validations'} tabIndex={activeTab === 'validations' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('validations')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'validations' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>Validações {pendingUsers.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingUsers.length}</span>}</button>
+                    <button id="saas-dashboard-tab-settings" role="tab" aria-selected={activeTab === 'settings'} tabIndex={activeTab === 'settings' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('settings')} className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-brand-primary text-brand-primary font-bold' : 'border-transparent text-gray-500'}`}>{t('dashboard.settings_tab')}</button>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Versão</span>
@@ -2408,7 +2409,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="w-16 h-16 rounded-full border-2 border-emerald-500 overflow-hidden flex-shrink-0 bg-white dark:bg-gray-900 shadow-inner">
-                                                {pandaIaIcon ? <img src={pandaIaIcon} className="w-full h-full object-cover" /> : <img src="/logo.png" className="w-full h-full object-contain p-2" />}
+                                                {pandaIaIcon ? <img src={pandaIaIcon} className="w-full h-full object-cover"  alt="Identidade visual da empresa" /> : <img src="/logo.png" className="w-full h-full object-contain p-2"  alt="Identidade visual da empresa" />}
                                             </div>
                                             <div className="flex-1">
                                                 <label className="block w-full text-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all uppercase">
@@ -2476,7 +2477,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                                 <div key={vid.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700 group">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-12 h-8 bg-black rounded flex items-center justify-center overflow-hidden">
-                                                            {vid.thumbnail && <img src={vid.thumbnail} className="w-full h-full object-cover opacity-60" />}
+                                                            {vid.thumbnail && <img src={vid.thumbnail} className="w-full h-full object-cover opacity-60"  alt="Identidade visual da empresa" />}
                                                         </div>
                                                         <div>
                                                             <p className="text-xs font-bold text-gray-800 dark:text-white line-clamp-1">{vid.title}</p>
@@ -3635,7 +3636,7 @@ const SaaSDashboard: React.FC<SaaSDashboardProps> = ({ companies = [], onImperso
                                         companyUsers.map(user => (
                                             <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                                                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-white flex items-center gap-2">
-                                                    {user.avatarUrl && <img src={user.avatarUrl} className="w-6 h-6 rounded-full" />}
+                                                    {user.avatarUrl && <img src={user.avatarUrl} className="w-6 h-6 rounded-full"  alt="Identidade visual da empresa" />}
                                                     {user.name || 'Sem Nome'}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-500">{user.email}</td>

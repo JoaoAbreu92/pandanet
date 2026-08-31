@@ -188,9 +188,8 @@ const AppContent: React.FC = () => {
 
                 if (newNudge.receiver_id === currentUser.id) {
                     console.log('[PandaNet] Nudge match! Executing shake.');
-                    // DEBUG: Force visual confirmation
                     if (localStorage.getItem('debug_nudge')) {
-                        alert(`DEBUG: Recebi Nudge de ${newNudge.sender_id}`);
+
                     }
                     handleNudge(newNudge.sender_id, newNudge.conversation_id);
                 } else {

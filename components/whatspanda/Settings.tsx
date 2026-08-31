@@ -1,3 +1,4 @@
+import { handleTabKeyDown } from '../../utils/tabAccessibility';
 import React, { useState } from 'react';
 import UsersTab from './settings/UsersTab';
 import QueuesTab from './settings/QueuesTab';
@@ -34,7 +35,7 @@ const Settings: React.FC = () => {
             </div>
             
             <div className="flex space-x-4 md:space-x-10 mb-6 px-2 overflow-x-auto no-scrollbar">
-                <div className="flex min-w-max">
+                <div className="flex min-w-max" role="tablist" aria-label="Configurações do WhatsPanda">
                     {[
                         { id: 'users', label: 'Usuários' },
                         { id: 'queues', label: 'Filas / Setores' },
@@ -46,6 +47,13 @@ const Settings: React.FC = () => {
                     ].map((tab) => (
                         <button 
                             key={tab.id}
+                            type="button"
+                            role="tab"
+                            id={`whatspanda-settings-tab-${tab.id}`}
+                            aria-selected={activeTab === tab.id}
+                            aria-controls={`whatspanda-settings-panel-${tab.id}`}
+                            tabIndex={activeTab === tab.id ? 0 : -1}
+                            onKeyDown={handleTabKeyDown}
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`pb-4 px-2 text-[11px] font-semibold transition-all relative whitespace-nowrap ${
                                 activeTab === tab.id 
@@ -63,7 +71,13 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div
+                    role="tabpanel"
+                    id={`whatspanda-settings-panel-${activeTab}`}
+                    aria-labelledby={`whatspanda-settings-tab-${activeTab}`}
+                    tabIndex={0}
+                    className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+                >
                     {activeTab === 'users' && <UsersTab />}
                     {activeTab === 'queues' && <QueuesTab />}
                     {activeTab === 'tags' && <TagsTab />}

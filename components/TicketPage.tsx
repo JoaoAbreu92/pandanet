@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import Card from './Card';
 import TicketForm from './TicketForm';
 import TicketDetail from './TicketDetail';
@@ -280,9 +281,19 @@ const TicketPage: React.FC = () => {
         <>
             <div className="mb-4">
                 <div className="border-b border-gray-200">
-                    <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
+                    <ul
+                        role="tablist"
+                        aria-label="Situação dos chamados"
+                        className="flex flex-wrap -mb-px text-sm font-medium text-center"
+                    >
                         <li className="mr-2">
                             <button
+                                id="tickets-tab-active"
+                                role="tab"
+                                aria-selected={currentTab === 'active'}
+                                aria-controls="tickets-panel"
+                                tabIndex={currentTab === 'active' ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setCurrentTab('active')}
                                 className={`inline-block p-4 border-b-2 rounded-t-lg ${currentTab === 'active' ? 'text-brand-primary border-brand-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                             >
@@ -291,6 +302,12 @@ const TicketPage: React.FC = () => {
                         </li>
                         <li className="mr-2">
                             <button
+                                id="tickets-tab-archived"
+                                role="tab"
+                                aria-selected={currentTab === 'archived'}
+                                aria-controls="tickets-panel"
+                                tabIndex={currentTab === 'archived' ? 0 : -1}
+                                onKeyDown={handleTabKeyDown}
                                 onClick={() => setCurrentTab('archived')}
                                 className={`inline-block p-4 border-b-2 rounded-t-lg ${currentTab === 'archived' ? 'text-brand-primary border-brand-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300'}`}
                             >
@@ -301,6 +318,13 @@ const TicketPage: React.FC = () => {
                 </div>
             </div>
 
+            <div
+                id="tickets-panel"
+                role="tabpanel"
+                aria-labelledby={currentTab === 'active'
+                    ? 'tickets-tab-active'
+                    : 'tickets-tab-archived'}
+            >
             <Card title={currentTab === 'active' ? "Central de Suporte (Chamados Ativos)" : "Histórico de Chamados"} headerAction={
                 (!isGhostMode || realProfile?.role === 'Super Admin') && (
                     <button
@@ -368,6 +392,7 @@ const TicketPage: React.FC = () => {
                     )}
                 </div>
             </Card>
+            </div>
 
             {isFormOpen && currentUser && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

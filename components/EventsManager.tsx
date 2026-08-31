@@ -1,4 +1,11 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
+import { Textarea } from './ui/Textarea';
+import ConfirmModal from './ui/ConfirmModal';
+import { useToast } from './ToastContext';
 import { PlusIcon, PencilIcon, TrashIcon, CalendarDaysIcon, XMarkIcon, PhotoIcon } from './icons';
 import type { Event, Employee } from '../types';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
@@ -10,11 +17,14 @@ interface EventsManagerProps {
 
 const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
     const { currentUser } = useAuth();
+    const { showToast } = useToast();
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [filterDate, setFilterDate] = useState('');
     const [filterUserId, setFilterUserId] = useState('');
@@ -177,29 +187,48 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                 if (error) throw error;
             }
 
-            fetchEvents();
+            await fetchEvents();
             setIsModalOpen(false);
-        } catch (err) {
+            showToast(
+                editingEvent
+                    ? 'Evento atualizado com sucesso.'
+                    : 'Evento criado com sucesso.',
+                'success'
+            );
+        } catch (err: any) {
             console.error('Error saving event:', err);
-            alert('Erro ao salvar evento.');
+            showToast(
+                `Erro ao salvar evento: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Tem certeza que deseja excluir este evento?')) {
-            try {
-                const { error } = await supabase
-                    .from('events')
-                    .delete()
-                    .eq('id', id);
-                if (error) throw error;
-                fetchEvents();
-            } catch (err) {
-                console.error('Error deleting event:', err);
-                alert('Erro ao excluir evento.');
-            }
+    const handleDelete = async (event: Event) => {
+        if (isDeleting) return;
+        setIsDeleting(true);
+
+        try {
+            const { error } = await supabase
+                .from('events')
+                .delete()
+                .eq('id', event.id);
+
+            if (error) throw error;
+
+            await fetchEvents();
+            showToast('Evento excluído com sucesso.', 'success');
+        } catch (err: any) {
+            console.error('Error deleting event:', err);
+            showToast(
+                `Erro ao excluir evento: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsDeleting(false);
+            setEventToDelete(null);
         }
     };
 
@@ -208,56 +237,49 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-800">Gerenciar Eventos</h2>
-                <button
+                <h2 className="text-xl font-bold text-slate-950 dark:text-white">Gerenciar Eventos</h2>
+                <Button
+                    type="button"
+                    leftIcon={<PlusIcon className="h-4 w-4" />}
                     onClick={() => handleOpenModal()}
-                    className="flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-emerald-600 transition-colors"
                 >
-                    <PlusIcon className="w-5 h-5 mr-2" />
-                    Novo Evento
-                </button>
+                    Novo evento
+                </Button>
             </div>
 
             {/* Filtros de Eventos */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Data</label>
-                    <input
-                        type="date"
-                        value={filterDate}
-                        onChange={e => setFilterDate(e.target.value)}
-                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Usuário Convocado</label>
-                    <select
-                        value={filterUserId}
-                        onChange={e => setFilterUserId(e.target.value)}
-                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    >
-                        <option value="">Todos os usuários</option>
-                        {employees.map(emp => (
-                            <option key={emp.id} value={emp.id}>{emp.name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtrar por Categoria (Tipo)</label>
-                    <select
-                        value={filterCategory}
-                        onChange={e => setFilterCategory(e.target.value)}
-                        className="w-full border border-gray-250 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    >
-                        <option value="">Todas as categorias</option>
-                        <option value="Social">Social</option>
-                        <option value="Comemorativo">Comemorativo</option>
-                        <option value="Corporativo">Corporativo</option>
-                        <option value="Treinamento">Treinamento</option>
-                        <option value="Evento da Empresa">Evento da Empresa</option>
-                        <option value="Outro">Outro</option>
-                    </select>
-                </div>
+            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:grid-cols-3">
+                <Input
+                    label="Filtrar por data"
+                    type="date"
+                    value={filterDate}
+                    onChange={(event) => setFilterDate(event.target.value)}
+                />
+                <Select
+                    label="Usuário convocado"
+                    value={filterUserId}
+                    onChange={(event) => setFilterUserId(event.target.value)}
+                >
+                    <option value="">Todos os usuários</option>
+                    {employees.map(employee => (
+                        <option key={employee.id} value={employee.id}>
+                            {employee.name}
+                        </option>
+                    ))}
+                </Select>
+                <Select
+                    label="Categoria"
+                    value={filterCategory}
+                    onChange={(event) => setFilterCategory(event.target.value)}
+                >
+                    <option value="">Todas as categorias</option>
+                    <option value="Social">Social</option>
+                    <option value="Comemorativo">Comemorativo</option>
+                    <option value="Corporativo">Corporativo</option>
+                    <option value="Treinamento">Treinamento</option>
+                    <option value="Evento da Empresa">Evento da Empresa</option>
+                    <option value="Outro">Outro</option>
+                </Select>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -305,12 +327,30 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                                         {event.attendees?.length || 0}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => handleOpenModal(event)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                                            <PencilIcon className="w-5 h-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(event.id)} className="text-red-600 hover:text-red-900">
-                                            <TrashIcon className="w-5 h-5" />
-                                        </button>
+                                        <div className="flex justify-end gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={`Editar evento ${event.title}`}
+                                                title="Editar evento"
+                                                onClick={() => handleOpenModal(event)}
+                                                className="h-9 w-9"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={`Excluir evento ${event.title}`}
+                                                title="Excluir evento"
+                                                onClick={() => setEventToDelete(event)}
+                                                className="h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))
@@ -319,48 +359,121 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                 </table>
             </div>
 
+            <ConfirmModal
+                isOpen={eventToDelete !== null}
+                type="danger"
+                title="Excluir evento?"
+                message={eventToDelete
+                    ? `O evento "${eventToDelete.title}" será removido permanentemente.`
+                    : ''}
+                confirmText={isDeleting ? 'Excluindo...' : 'Excluir evento'}
+                cancelText="Cancelar"
+                onCancel={() => {
+                    if (!isDeleting) setEventToDelete(null);
+                }}
+                onConfirm={() => {
+                    if (eventToDelete) {
+                        void handleDelete(eventToDelete);
+                    }
+                }}
+            />
+
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h3 className="text-lg font-bold text-gray-900">{editingEvent ? 'Editar Evento' : 'Novo Evento'}</h3>
-                            <button onClick={() => setIsModalOpen(false)}><XMarkIcon className="w-6 h-6 text-gray-400" /></button>
+                <ModalPortal
+                    className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[3px] pandanet-modal-viewport"
+                    role="presentation"
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="event-modal-title"
+                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_-24px_rgba(2,6,23,0.55)] animate-in fade-in zoom-in-95 duration-200 dark:border-white/10 dark:bg-[#101d2e]"
+                    >
+                        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-white/10">
+                            <h3 id="event-modal-title" className="text-lg font-bold text-slate-950 dark:text-white">
+                                {editingEvent ? 'Editar evento' : 'Novo evento'}
+                            </h3>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Fechar"
+                                disabled={isProcessing}
+                                onClick={() => setIsModalOpen(false)}
+                            >
+                                <XMarkIcon className="h-5 w-5" />
+                            </Button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Título</label>
-                                <input type="text" required value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Descrição</label>
-                                <textarea required rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
+                            <Input
+                                label="Título"
+                                type="text"
+                                required
+                                autoFocus
+                                value={formData.title}
+                                onChange={(event) => setFormData({
+                                    ...formData,
+                                    title: event.target.value
+                                })}
+                            />
+                            <Textarea
+                                label="Descrição"
+                                required
+                                rows={3}
+                                value={formData.description}
+                                onChange={(event) => setFormData({
+                                    ...formData,
+                                    description: event.target.value
+                                })}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Data"
+                                    type="date"
+                                    required
+                                    value={formData.date}
+                                    onChange={(event) => setFormData({
+                                        ...formData,
+                                        date: event.target.value
+                                    })}
+                                />
+                                <Input
+                                    label="Hora"
+                                    type="time"
+                                    required
+                                    value={formData.time}
+                                    onChange={(event) => setFormData({
+                                        ...formData,
+                                        time: event.target.value
+                                    })}
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Data</label>
-                                    <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Hora</label>
-                                    <input type="time" required value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Local</label>
-                                    <input type="text" required value={formData.location || ''} onChange={e => setFormData({ ...formData, location: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Categoria</label>
-                                    <select value={formData.category || 'Social'} onChange={e => setFormData({ ...formData, category: e.target.value as any })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary p-2 border">
-                                        <option value="Social">Social</option>
-                                        <option value="Comemorativo">Comemorativo</option>
-                                        <option value="Corporativo">Corporativo</option>
-                                        <option value="Treinamento">Treinamento</option>
-                                        <option value="Evento da Empresa">Evento da Empresa</option>
-                                        <option value="Outro">Outro</option>
-                                    </select>
-                                </div>
+                                <Input
+                                    label="Local"
+                                    type="text"
+                                    required
+                                    value={formData.location || ''}
+                                    onChange={(event) => setFormData({
+                                        ...formData,
+                                        location: event.target.value
+                                    })}
+                                />
+                                <Select
+                                    label="Categoria"
+                                    value={formData.category || 'Social'}
+                                    onChange={(event) => setFormData({
+                                        ...formData,
+                                        category: event.target.value as any
+                                    })}
+                                >
+                                    <option value="Social">Social</option>
+                                    <option value="Comemorativo">Comemorativo</option>
+                                    <option value="Corporativo">Corporativo</option>
+                                    <option value="Treinamento">Treinamento</option>
+                                    <option value="Evento da Empresa">Evento da Empresa</option>
+                                    <option value="Outro">Outro</option>
+                                </Select>
                             </div>
 
                             <div className="space-y-2">
@@ -386,7 +499,16 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                                         {imageFile && <p className="text-xs text-green-600 mt-2">Arquivo selecionado: {imageFile.name}</p>}
                                     </div>
                                 ) : (
-                                    <input className="w-full border p-2 rounded" placeholder="URL da Imagem" value={formData.imageUrl || ''} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} />
+                                    <Input
+                                        label="URL da imagem"
+                                        type="url"
+                                        placeholder="https://..."
+                                        value={formData.imageUrl || ''}
+                                        onChange={(event) => setFormData({
+                                            ...formData,
+                                            imageUrl: event.target.value
+                                        })}
+                                    />
                                 )}
                             </div>
 
@@ -410,15 +532,26 @@ const EventsManager: React.FC<EventsManagerProps> = ({ employees }) => {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2 font-medium">Selecione os usuários que devem comparecer.</p>
                             </div>
-                            <div className="pt-4 flex justify-end space-x-3 sticky bottom-0 bg-white pb-2">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
-                                <button type="submit" disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
-                                    {isProcessing ? 'Salvando...' : 'Salvar'}
-                                </button>
+                            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white pb-2 pt-4 dark:border-white/10 dark:bg-[#101d2e]">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    disabled={isProcessing}
+                                    onClick={() => setIsModalOpen(false)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    isLoading={isProcessing}
+                                    loadingText="Salvando..."
+                                >
+                                    Salvar evento
+                                </Button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
         </div>
     );

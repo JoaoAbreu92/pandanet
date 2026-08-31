@@ -1,3 +1,4 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, XCircleIcon } from './icons';
@@ -24,7 +25,7 @@ const VacationRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">{t('forms.vacation')}</h3>
@@ -61,7 +62,7 @@ const VacationRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -84,7 +85,7 @@ const LeaveRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Ausência / Folga</h3>
@@ -126,7 +127,7 @@ const LeaveRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -145,7 +146,7 @@ const EpiRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de EPI</h3>
@@ -170,7 +171,7 @@ const EpiRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -190,7 +191,7 @@ const UniformRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Uniforme</h3>
@@ -240,7 +241,7 @@ const UniformRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -258,7 +259,7 @@ const DocRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Documento</h3>
@@ -286,7 +287,7 @@ const DocRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -306,7 +307,7 @@ const DataChangeRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Alteração de Dados</h3>
@@ -344,7 +345,7 @@ const DataChangeRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -366,7 +367,7 @@ const RefundRequestModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
                 <button onClick={onClose} disabled={submitting} className="absolute top-4 right-4 text-gray-400 hover:text-gray-655"><XCircleIcon className="w-6 h-6" /></button>
                 <h3 className="text-xl font-bold text-brand-text dark:text-white mb-4">Solicitação de Reembolso</h3>
@@ -407,7 +408,7 @@ const RefundRequestModal: React.FC<{
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 

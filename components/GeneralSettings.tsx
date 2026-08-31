@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
+import { Button } from './ui/Button';
+import { useToast } from './ToastContext';
 import { PencilIcon, XCircleIcon } from './icons';
 import { supabase, getSignedStorageUrl } from '../supabaseClient';
 // FIX: Correcting the import path for types.
@@ -11,23 +13,23 @@ interface GeneralSettingsProps {
 }
 
 const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings }) => {
+    const { showToast } = useToast();
     const [tempSettings, setTempSettings] = useState<CompanySettings>(settings);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
-        console.log("[GeneralSettings] ========== SALVANDO CONFIGURAÇÕES ==========");
-        console.log("[GeneralSettings] Settings atuais:", tempSettings);
+        if (isSaving) return;
+        setIsSaving(true);
         
         let finalSettings = { ...tempSettings };
         const newFile = (tempSettings as any)._newLogoFile;
 
         if (newFile) {
-            console.log("[GeneralSettings] Novo arquivo de logo detectado:", newFile.name);
             try {
                 const fileExt = newFile.name.split('.').pop();
                 const fileName = `logo_${Date.now()}.${fileExt}`;
                 const filePath = `branding/${fileName}`;
 
-                console.log("[GeneralSettings] Fazendo upload para:", filePath);
                 const { data, error } = await supabase.storage
                     .from('chat-media')
                     .upload(filePath, newFile);
@@ -37,23 +39,26 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                     throw error;
                 }
 
-                console.log("[GeneralSettings] Upload bem-sucedido:", data);
-                const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
-                console.log("[GeneralSettings] URL pública:", publicUrl);
+                const uploadedPath = data?.path || filePath;
+                const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${uploadedPath}`);
                 
                 finalSettings.logoUrl = publicUrl;
                 delete (finalSettings as any)._newLogoFile;
             } catch (err: any) {
                 console.error("[GeneralSettings] Erro ao subir logotipo:", err);
-                alert('Erro ao subir logotipo: ' + err.message);
+                showToast(
+                    'Não foi possível atualizar o logotipo. ' +
+                    (err?.message || 'Erro desconhecido.'),
+                    'error'
+                );
+                setIsSaving(false);
                 return;
             }
         }
 
-        console.log("[GeneralSettings] Chamando setSettings com:", finalSettings);
         setSettings(finalSettings);
-        console.log("[GeneralSettings] ========== CONFIGURAÇÕES SALVAS ==========");
-        alert('Configurações salvas!');
+        showToast('Configurações salvas com sucesso.', 'success');
+        setIsSaving(false);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,10 +119,19 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                             )}
                         </div>
                         <div>
-                            <label className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary">
-                                <PencilIcon className="w-4 h-4 mr-2" />
-                                Alterar Logo
-                                <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                            <label
+                                htmlFor="company-logo-upload"
+                                className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 focus-within:ring-4 focus-within:ring-emerald-500/20 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-200 dark:hover:border-emerald-400/30 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-300"
+                            >
+                                <PencilIcon className="h-4 w-4" />
+                                Alterar logo
+                                <input
+                                    id="company-logo-upload"
+                                    type="file"
+                                    className="sr-only"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                />
                             </label>
                             <p className="mt-1 text-xs text-gray-500">Recomendado: PNG Transparente.</p>
                         </div>
@@ -125,12 +139,14 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                 </div>
 
                 <div className="flex justify-end pt-2 border-t mt-6">
-                    <button
+                    <Button
+                        type="button"
                         onClick={handleSave}
-                        className="px-4 py-2 text-sm font-medium text-white bg-brand-primary border border-transparent rounded-md shadow-sm hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+                        isLoading={isSaving}
+                        loadingText="Salvando..."
                     >
-                        Salvar Configurações
-                    </button>
+                        Salvar configurações
+                    </Button>
                 </div>
             </div>
         </Card>

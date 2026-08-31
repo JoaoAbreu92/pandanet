@@ -84,8 +84,36 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-[125vh] flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
-            <div className="absolute top-4 right-4 group">
+        <div className="min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 lg:grid lg:grid-cols-[minmax(0,1.55fr)_minmax(420px,0.65fr)]">
+            <section
+                className="relative hidden min-h-screen overflow-hidden bg-slate-950 lg:block"
+                style={{
+                    backgroundImage: "url('/login-panda-office.jpg')",
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover'
+                }}
+                aria-label="Ambiente corporativo PandaNet"
+            >
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/5 to-transparent" />
+
+                <div className="absolute bottom-14 left-14 max-w-xl text-white">
+                    <span className="mb-5 block h-1 w-16 rounded-full bg-brand-primary" />
+
+                    <h1 className="text-4xl font-black leading-tight tracking-tight xl:text-5xl">
+                        Conecte pessoas.
+                        <span className="block font-medium text-slate-100">
+                            Simplifique o trabalho.
+                        </span>
+                    </h1>
+
+                    <p className="mt-5 max-w-md text-base leading-7 text-slate-300">
+                        Comunicação, colaboração e gestão reunidas em uma experiência corporativa inteligente.
+                    </p>
+                </div>
+            </section>
+
+            <main className="relative flex min-h-screen flex-col items-center justify-center overflow-y-auto px-5 py-20 sm:px-8">
+            <div className="absolute right-5 top-5 z-20 group sm:right-8 sm:top-7">
                 {/* Language Selector */}
                 <div className="relative inline-block text-left">
                     <select
@@ -100,19 +128,23 @@ const LoginPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-10 rounded-xl shadow-2xl">
+            <div className="w-full max-w-[430px] space-y-6 rounded-[28px] border border-white/80 bg-white/95 p-7 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.38)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95 sm:p-9">
                 <div className="flex justify-center">
-                    <Logo showText={true} />
+                    <Logo showText={true} className="h-40 w-full sm:h-44" />
                 </div>
                 <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                    <h2 className="mt-4 text-center text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
                         {isSignUp
                             ? (language === 'pt' ? 'Crie sua conta' : language === 'en' ? 'Create your account' : 'Crea tu cuenta')
                             : (language === 'pt' ? 'Entrar na sua conta' : language === 'en' ? 'Sign in to your account' : 'Iniciar sesión')
                         }
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-                        Pixel Intranet
+                        {language === 'pt'
+                            ? 'Acesse seu ambiente corporativo'
+                            : language === 'en'
+                                ? 'Access your corporate workspace'
+                                : 'Accede a tu entorno corporativo'}
                     </p>
                 </div>
 
@@ -122,7 +154,7 @@ const LoginPage: React.FC = () => {
                     </div>
                 )}
 
-                <form className="mt-8 space-y-6" onSubmit={handleAuth}>
+                <form className="mt-6 space-y-5" onSubmit={handleAuth}>
                     <div className="rounded-md shadow-sm -space-y-px">
                         {isSignUp && (
                             <div>
@@ -242,7 +274,7 @@ const LoginPage: React.FC = () => {
             </div>
 
 
-            <div className="mt-8 text-center space-y-2">
+            <div className="mt-7 text-center space-y-2">
                 <p className="text-xs text-gray-500">
                     &copy; 2026 Pixel Intranet. All rights reserved.
                 </p>
@@ -261,6 +293,7 @@ const LoginPage: React.FC = () => {
                     </span>
                 </a>
             </div>
+            </main>
         </div>
     );
 };

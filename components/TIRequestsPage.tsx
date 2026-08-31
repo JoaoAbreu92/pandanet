@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import Card from './Card';
 import { PlusIcon, XCircleIcon, TrashIcon, CheckCircleIcon, ArchiveBoxIcon, PaperAirplaneIcon } from './icons';
 import type { TIRequest, TIRequestStatus, TIRequestType, Employee } from '../types';
@@ -350,15 +351,15 @@ const TIRequestsPage: React.FC<TIRequestsPageProps> = ({ submissions, setSubmiss
                 </div>
 
 
-                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg w-fit">
+                <div role="tablist" aria-label="Situação das solicitações de T.I." className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg w-fit">
                     <button
-                        onClick={() => setActiveTab('active')}
+                        id="ti-requests-tab-active" role="tab" aria-selected={activeTab === 'active'} tabIndex={activeTab === 'active' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('active')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'active' ? 'bg-white dark:bg-slate-900 text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                     >
                         Solicitações Ativas
                     </button>
                     <button
-                        onClick={() => setActiveTab('finalized')}
+                        id="ti-requests-tab-finalized" role="tab" aria-selected={activeTab === 'finalized'} tabIndex={activeTab === 'finalized' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('finalized')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'finalized' ? 'bg-white dark:bg-slate-900 text-brand-primary dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                     >
                         Finalizadas

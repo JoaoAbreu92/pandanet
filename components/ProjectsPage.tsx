@@ -1,4 +1,6 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect, useMemo } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -1619,7 +1621,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                         <div className="flex items-center justify-between pt-3 border-t dark:border-slate-800 text-xs">
                                             <div className="flex items-center gap-2">
                                                 {proj.manager?.avatar_url ? (
-                                                    <img src={proj.manager.avatar_url} className="w-6 h-6 rounded-full object-cover" />
+                                                    <img src={proj.manager.avatar_url} className="w-6 h-6 rounded-full object-cover"  alt="Imagem relacionada ao projeto" />
                                                 ) : (
                                                     <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-bold text-slate-400 uppercase">
                                                         {proj.manager?.full_name?.substring(0, 2) || 'M'}
@@ -1645,8 +1647,18 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
                         {/* Abas responsivas */}
                         <div className="overflow-x-auto no-scrollbar w-full lg:w-auto">
-                            <div className="flex items-center gap-2 min-w-max">
+                            <div
+                                className="flex items-center gap-2 min-w-max"
+                                role="tablist"
+                                aria-label="Visualizações do projeto"
+                            >
                                 <button
+                                    type="button"
+                                    role="tab"
+                                    id="projects-tab-kanban"
+                                    aria-selected={activeTab === 'kanban'}
+                                    tabIndex={activeTab === 'kanban' ? 0 : -1}
+                                    onKeyDown={handleTabKeyDown}
                                     onClick={() => handleTabClick('kanban')}
                                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                                         activeTab === 'kanban'
@@ -1657,6 +1669,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                     Painel
                                 </button>
                                 <button
+                                    type="button"
+                                    role="tab"
+                                    id="projects-tab-planning"
+                                    aria-selected={activeTab === 'planning'}
+                                    tabIndex={activeTab === 'planning' ? 0 : -1}
+                                    onKeyDown={handleTabKeyDown}
                                     onClick={() => handleTabClick('planning')}
                                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                                         activeTab === 'planning'
@@ -1667,6 +1685,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                     Planejamento
                                 </button>
                                 <button
+                                    type="button"
+                                    role="tab"
+                                    id="projects-tab-list"
+                                    aria-selected={activeTab === 'list'}
+                                    tabIndex={activeTab === 'list' ? 0 : -1}
+                                    onKeyDown={handleTabKeyDown}
                                     onClick={() => handleTabClick('list')}
                                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                                         activeTab === 'list'
@@ -1677,6 +1701,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                     Lista
                                 </button>
                                 <button
+                                    type="button"
+                                    role="tab"
+                                    id="projects-tab-calendar"
+                                    aria-selected={activeTab === 'calendar'}
+                                    tabIndex={activeTab === 'calendar' ? 0 : -1}
+                                    onKeyDown={handleTabKeyDown}
                                     onClick={() => handleTabClick('calendar')}
                                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                                         activeTab === 'calendar'
@@ -1687,6 +1717,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                     Calendário
                                 </button>
                                 <button
+                                    type="button"
+                                    role="tab"
+                                    id="projects-tab-timesheet"
+                                    aria-selected={activeTab === 'timesheet'}
+                                    tabIndex={activeTab === 'timesheet' ? 0 : -1}
+                                    onKeyDown={handleTabKeyDown}
                                     onClick={() => handleTabClick('timesheet')}
                                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
                                         activeTab === 'timesheet'
@@ -2122,7 +2158,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
                                                                             {/* Avatar do Responsável */}
                                                                             {task.assignee?.avatar_url ? (
-                                                                                <img src={task.assignee.avatar_url} className="w-5 h-5 rounded-full object-cover" title={task.assignee.full_name} />
+                                                                                <img src={task.assignee.avatar_url} className="w-5 h-5 rounded-full object-cover" title={task.assignee.full_name}  alt="Imagem relacionada ao projeto" />
                                                                             ) : (
                                                                                 <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400 dark:text-slate-355 uppercase" title={task.assignee?.full_name || 'Sem responsável'}>
                                                                                     {task.assignee?.full_name?.substring(0, 2) || '?'}
@@ -2502,7 +2538,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                             {projectMembers.slice(0, 5).map(e => (
                                                                 <div key={e.id} className="flex items-center gap-1.5 bg-white dark:bg-slate-850 px-2.5 py-1 rounded-full border dark:border-slate-800">
                                                                     {e.avatarUrl ? (
-                                                                        <img src={e.avatarUrl} className="w-4 h-4 rounded-full object-cover" />
+                                                                        <img src={e.avatarUrl} className="w-4 h-4 rounded-full object-cover"  alt="Imagem relacionada ao projeto" />
                                                                     ) : (
                                                                         <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold text-slate-400 uppercase">{e.name.substring(0,2)}</div>
                                                                     )}
@@ -2581,7 +2617,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
             {/* --- MODAL 1: CRIAR / EDITAR PROJETO --- */}
             {isProjectModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <ModalPortal className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in">
                         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center">
                             <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">
@@ -2787,14 +2823,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
              {isTaskModalOpen && (() => {
                 const currentStage = selectedTask ? stages.find(s => s.id === selectedTask.stage_id) : null;
                 const isReadOnly = !isNewTaskMode && !canUserModifyTaskInStage(selectedTask, currentStage);
                 return (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <ModalPortal className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in pandanet-modal-viewport">
                         <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
                             {/* Header do Modal */}
                             <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
@@ -3384,7 +3420,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                             return (
                                                                 <div key={item.id} className="flex gap-2.5 items-start">
                                                                     {item.user?.avatar_url ? (
-                                                                        <img src={item.user.avatar_url} className="w-6 h-6 rounded-full object-cover mt-0.5 animate-fade-in" />
+                                                                        <img src={item.user.avatar_url} className="w-6 h-6 rounded-full object-cover mt-0.5 animate-fade-in"  alt="Imagem relacionada ao projeto" />
                                                                     ) : (
                                                                         <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[7px] font-bold text-slate-400 dark:text-slate-300 uppercase mt-0.5">
                                                                             {item.user?.full_name?.substring(0,2) || 'US'}
@@ -3496,13 +3532,13 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </ModalPortal>
                 );
             })()}
 
             {/* --- MODAL 4: TRANSIÇÃO SETOR / PRÓXIMO CHECKLIST --- */}
             {transitionData && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
+                <ModalPortal className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
                         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                             <div>
@@ -3643,12 +3679,12 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                             </button>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* --- MODAL 3: GERENCIAR ESTÁGIO (COLUNAS) --- */}
             {isStageModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <ModalPortal className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-scale-in">
                         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                             <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">
@@ -3706,7 +3742,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
         </div>
     );

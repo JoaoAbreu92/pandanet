@@ -1,5 +1,10 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect, useCallback } from 'react';
 import Card from './Card';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import ConfirmModal from './ui/ConfirmModal';
+import { useToast } from './ToastContext';
 import type { Banner } from '../types';
 import { PencilIcon, PlusIcon, XCircleIcon, TrashIcon } from './icons';
 import { supabase, getCleanImageUrl, getSignedStorageUrl } from '../supabaseClient';
@@ -69,7 +74,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCrop, onCancel 
     };
 
     return (
-        <div className="fixed inset-0 bg-black/85 z-[60] flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/85 z-[60] flex items-center justify-center p-4 pandanet-modal-viewport">
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl shadow-2xl border dark:border-white/10 space-y-6">
                 <div className="flex justify-between items-center border-b dark:border-white/5 pb-4">
                     <h4 className="text-xl font-bold text-gray-900 dark:text-white">Ajustar e Recortar Imagem (3:1)</h4>
@@ -129,23 +134,15 @@ const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCrop, onCancel 
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t dark:border-white/5">
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 dark:text-gray-300 dark:bg-white/10 rounded-xl hover:bg-gray-250 text-xs font-bold uppercase tracking-widest"
-                    >
+                    <Button type="button" variant="ghost" onClick={onCancel}>
                         Cancelar
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleConfirm}
-                        className="px-8 py-2 bg-brand-primary text-white rounded-xl hover:bg-emerald-600 text-xs font-bold uppercase tracking-widest shadow-lg shadow-brand-primary/20"
-                    >
-                        Cortar e Confirmar
-                    </button>
+                    </Button>
+                    <Button type="button" onClick={handleConfirm}>
+                        Cortar e confirmar
+                    </Button>
                 </div>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
@@ -156,6 +153,7 @@ const BannerFormModal: React.FC<{
     onSave: (bannerData: Partial<Banner>) => void;
     isProcessing?: boolean;
 }> = ({ banner, onClose, onSave, isProcessing }) => {
+    const { showToast } = useToast();
     const [formData, setFormData] = useState({
         title: banner?.title || '',
         subtitle: banner?.subtitle || '',
@@ -192,7 +190,7 @@ const BannerFormModal: React.FC<{
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.imageUrl && !imageFile) {
-            alert("Por favor, selecione uma imagem para o banner.");
+            showToast('Selecione uma imagem para o banner.', 'error');
             return;
         }
 
@@ -205,13 +203,17 @@ const BannerFormModal: React.FC<{
                 .upload(fileName, imageFile);
 
             if (uploadError) {
-                alert("Erro ao enviar imagem.");
+                console.error('Error uploading banner image:', uploadError);
+                showToast(
+                    `Erro ao enviar imagem: ${uploadError.message || 'Erro desconhecido'}`,
+                    'error'
+                );
                 return;
             }
 
             finalImageUrl = await getSignedStorageUrl(
-            `https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${fileName}`
-        );
+            `https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${data?.path || fileName}`
+            );
         }
 
         onSave({ ...formData, imageUrl: finalImageUrl });
@@ -219,19 +221,40 @@ const BannerFormModal: React.FC<{
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg p-6 relative animate-fade-in-up">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" disabled={isProcessing}><XCircleIcon className="w-6 h-6" /></button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Fechar"
+                        onClick={onClose}
+                        disabled={isProcessing}
+                        className="absolute right-3 top-3"
+                    >
+                        <XCircleIcon className="h-5 w-5" />
+                    </Button>
                     <h3 className="text-xl font-bold text-brand-text mb-4 dark:text-white">{banner?.id ? 'Editar Banner' : 'Adicionar Novo Banner'}</h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Título</label>
-                            <input type="text" name="title" value={formData.title} onChange={handleChange} required className="mt-1 w-full border-gray-300 dark:border-gray-700 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2 focus:outline-none focus:ring-1 focus:ring-brand-primary" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Subtítulo</label>
-                            <input type="text" name="subtitle" value={formData.subtitle} onChange={handleChange} required className="mt-1 w-full border-gray-300 dark:border-gray-700 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2 focus:outline-none focus:ring-1 focus:ring-brand-primary" />
-                        </div>
+                        <Input
+                            label="Título"
+                            type="text"
+                            name="title"
+                            value={formData.title}
+                            onChange={handleChange}
+                            required
+                            autoFocus
+                            placeholder="Título principal do banner"
+                        />
+                        <Input
+                            label="Subtítulo"
+                            type="text"
+                            name="subtitle"
+                            value={formData.subtitle}
+                            onChange={handleChange}
+                            required
+                            placeholder="Texto complementar"
+                        />
                         
                         <div className="flex items-center justify-between py-2">
                             <label className="text-sm font-medium text-brand-subtle-text dark:text-gray-300">Mostrar botão "Saiba mais"</label>
@@ -244,10 +267,15 @@ const BannerFormModal: React.FC<{
                         </div>
 
                         {formData.showButton && (
-                            <div>
-                                <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Link de Destino</label>
-                                <input type="text" name="link" value={formData.link} onChange={handleChange} required={formData.showButton} className="mt-1 w-full border-gray-300 dark:border-gray-700 rounded-md sm:text-sm bg-white dark:bg-slate-800 text-brand-text dark:text-white border p-2 focus:outline-none focus:ring-1 focus:ring-brand-primary" />
-                            </div>
+                            <Input
+                                label="Link de destino"
+                                type="url"
+                                name="link"
+                                value={formData.link}
+                                onChange={handleChange}
+                                required={formData.showButton}
+                                placeholder="https://..."
+                            />
                         )}
 
                         <div>
@@ -257,14 +285,25 @@ const BannerFormModal: React.FC<{
                             <input type="file" accept="image/*" onChange={handleFileChange} className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer" />
                         </div>
                         <div className="flex justify-end space-x-3 pt-2">
-                            <button type="button" onClick={onClose} disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-gray-750 bg-gray-200 dark:bg-slate-800 dark:text-gray-300 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" disabled={isProcessing} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600 disabled:opacity-50">
-                                {isProcessing ? 'Salvando...' : 'Salvar Banner'}
-                            </button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={onClose}
+                                disabled={isProcessing}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="submit"
+                                isLoading={isProcessing}
+                                loadingText="Salvando..."
+                            >
+                                Salvar banner
+                            </Button>
                         </div>
                     </form>
                 </div>
-            </div>
+            </ModalPortal>
             {showCropper && tempImageSrc && (
                 <ImageCropper
                     imageSrc={tempImageSrc}
@@ -278,11 +317,14 @@ const BannerFormModal: React.FC<{
 
 // --- Main Component ---
 const BannerManager: React.FC = () => {
+    const { showToast } = useToast();
     const { currentUser } = useAuth();
     const [banners, setBanners] = useState<Banner[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+    const [bannerToDelete, setBannerToDelete] = useState<Banner | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const fetchBanners = async () => {
@@ -343,12 +385,21 @@ const BannerManager: React.FC = () => {
                 if (error) throw error;
             }
 
-            fetchBanners();
+            await fetchBanners();
             setModalOpen(false);
             setEditingBanner(null);
-        } catch (err) {
+            showToast(
+                bannerData.id
+                    ? 'Banner atualizado com sucesso.'
+                    : 'Banner criado com sucesso.',
+                'success'
+            );
+        } catch (err: any) {
             console.error('Error saving banner:', err);
-            alert('Erro ao salvar banner.');
+            showToast(
+                `Erro ao salvar banner: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
         } finally {
             setIsProcessing(false);
         }
@@ -359,19 +410,29 @@ const BannerManager: React.FC = () => {
         setModalOpen(true);
     };
 
-    const handleDelete = async (bannerId: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este banner?")) {
-            try {
-                const { error } = await supabase
-                    .from('banners')
-                    .delete()
-                    .eq('id', bannerId);
-                if (error) throw error;
-                fetchBanners();
-            } catch (err) {
-                console.error('Error deleting banner:', err);
-                alert('Erro ao excluir banner.');
-            }
+    const handleDelete = async (banner: Banner) => {
+        if (isDeleting) return;
+        setIsDeleting(true);
+
+        try {
+            const { error } = await supabase
+                .from('banners')
+                .delete()
+                .eq('id', banner.id);
+
+            if (error) throw error;
+
+            await fetchBanners();
+            showToast('Banner excluído com sucesso.', 'success');
+        } catch (err: any) {
+            console.error('Error deleting banner:', err);
+            showToast(
+                `Erro ao excluir banner: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsDeleting(false);
+            setBannerToDelete(null);
         }
     };
 
@@ -380,10 +441,17 @@ const BannerManager: React.FC = () => {
     return (
         <>
             <Card title="Gerenciar Banners" headerAction={
-                <button onClick={() => { setEditingBanner(null); setModalOpen(true); }} className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600">
-                    <PlusIcon className="w-4 h-4" />
-                    <span>Criar Novo</span>
-                </button>
+                <Button
+                    type="button"
+                    size="sm"
+                    leftIcon={<PlusIcon className="h-4 w-4" />}
+                    onClick={() => {
+                        setEditingBanner(null);
+                        setModalOpen(true);
+                    }}
+                >
+                    Criar banner
+                </Button>
             }>
                 <div className="space-y-4">
                     {banners.length === 0 ? (
@@ -400,18 +468,53 @@ const BannerManager: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex space-x-1">
-                                    <button onClick={() => handleEdit(banner)} className="p-2 text-brand-subtle-text hover:text-brand-primary dark:text-gray-400 dark:hover:text-brand-primary">
-                                        <PencilIcon className="w-5 h-5" />
-                                    </button>
-                                    <button onClick={() => handleDelete(banner.id)} className="p-2 text-brand-subtle-text hover:text-red-500 dark:text-gray-400 dark:hover:text-red-500">
-                                        <TrashIcon className="w-5 h-5" />
-                                    </button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Editar banner ${banner.title}`}
+                                        title="Editar banner"
+                                        onClick={() => handleEdit(banner)}
+                                        className="h-9 w-9"
+                                    >
+                                        <PencilIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Excluir banner ${banner.title}`}
+                                        title="Excluir banner"
+                                        onClick={() => setBannerToDelete(banner)}
+                                        className="h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </div>
                         ))
                     )}
                 </div>
             </Card>
+            <ConfirmModal
+                isOpen={bannerToDelete !== null}
+                type="danger"
+                title="Excluir banner?"
+                message={bannerToDelete
+                    ? `O banner "${bannerToDelete.title}" será removido permanentemente.`
+                    : ''}
+                confirmText={isDeleting ? 'Excluindo...' : 'Excluir banner'}
+                cancelText="Cancelar"
+                onCancel={() => {
+                    if (!isDeleting) setBannerToDelete(null);
+                }}
+                onConfirm={() => {
+                    if (bannerToDelete) {
+                        void handleDelete(bannerToDelete);
+                    }
+                }}
+            />
+
             {isModalOpen && (
                 <BannerFormModal
                     banner={editingBanner}

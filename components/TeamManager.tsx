@@ -1,5 +1,10 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useMemo } from 'react';
 import Card from './Card';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import ConfirmModal from './ui/ConfirmModal';
+import { useToast } from './ToastContext';
 import type { Employee } from '../types';
 import { PlusIcon, PencilIcon, TrashIcon, XCircleIcon, UsersIcon } from './icons';
 import { supabase } from '../supabaseClient';
@@ -38,80 +43,118 @@ const TeamFormModal: React.FC<TeamFormModalProps> = ({ teamName, initialMembers 
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative animate-fade-in-up">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                    <XCircleIcon className="w-6 h-6" />
-                </button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">
+        <ModalPortal
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[3px] pandanet-modal-viewport"
+            role="presentation"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget) onClose();
+            }}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="team-modal-title"
+                className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_30px_80px_-24px_rgba(2,6,23,0.55)] animate-fade-in-up dark:border-white/10 dark:bg-[#101d2e] sm:p-6"
+            >
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Fechar"
+                    onClick={onClose}
+                    className="absolute right-3 top-3"
+                >
+                    <XCircleIcon className="h-5 w-5" />
+                </Button>
+                <h3
+                    id="team-modal-title"
+                    className="mb-5 pr-12 text-xl font-bold text-slate-950 dark:text-white"
+                >
                     {teamName ? 'Editar Equipe' : 'Criar Nova Equipe'}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text">Nome da Equipe</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            required
-                            className="mt-1 w-full border-gray-300 rounded-md sm:text-sm bg-white text-brand-text p-2 border"
-                            placeholder="Ex: Marketing"
-                        />
-                    </div>
+                    <Input
+                        label="Nome da equipe"
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        required
+                        autoFocus
+                        placeholder="Ex.: Marketing"
+                    />
 
                     <div>
-                        <label className="block text-sm font-medium text-brand-subtle-text mb-2">Membros</label>
-                        <input
-                            type="text"
+                        <Input
+                            label="Membros"
+                            type="search"
                             placeholder="Buscar colaboradores..."
                             value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full mb-2 p-2 text-sm border border-gray-300 rounded-md"
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            wrapperClassName="mb-3"
                         />
-                        <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto divide-y">
-                            {filteredUsers.map(user => (
-                                <div
-                                    key={user.id}
-                                    onClick={() => toggleMember(user.id)}
-                                    className={`p-2 flex items-center space-x-3 cursor-pointer hover:bg-gray-50 ${selectedMemberIds.includes(user.id) ? 'bg-blue-50' : ''}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedMemberIds.includes(user.id)}
-                                        readOnly
-                                        className="rounded text-brand-primary"
-                                    />
-                                    <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full" />
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                                        <p className="text-xs text-gray-500">{user.team || 'Sem Equipe'}</p>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/60 divide-y divide-slate-200 dark:border-white/10 dark:bg-slate-950/30 dark:divide-white/[0.08]">
+                            {filteredUsers.map(user => {
+                                const selected = selectedMemberIds.includes(user.id);
+
+                                return (
+                                    <label
+                                        key={user.id}
+                                        className={`flex cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-emerald-50/70 dark:hover:bg-emerald-400/[0.08] ${selected ? 'bg-emerald-50 dark:bg-emerald-400/10' : ''}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selected}
+                                            onChange={() => toggleMember(user.id)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-4 focus:ring-emerald-500/20 dark:border-white/20 dark:bg-slate-900"
+                                        />
+                                        <img
+                                            src={user.avatarUrl}
+                                            alt=""
+                                            className="h-9 w-9 rounded-full object-cover ring-2 ring-white dark:ring-white/10"
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">
+                                                {user.name}
+                                            </span>
+                                            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                                {user.team || 'Sem Equipe'}
+                                            </span>
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                            {filteredUsers.length === 0 && (
+                                <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                                    Nenhum colaborador encontrado.
+                                </p>
+                            )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                             {selectedMemberIds.length} membros selecionados
                         </p>
                     </div>
 
                     <div className="flex justify-end space-x-3 pt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                        <Button type="button" variant="ghost" onClick={onClose}>
                             Cancelar
-                        </button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-md hover:bg-emerald-600">
-                            Salvar Equipe
-                        </button>
+                        </Button>
+                        <Button type="submit">
+                            Salvar equipe
+                        </Button>
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 
 const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }) => {
     const { currentUser } = useAuth();
+    const { showToast } = useToast();
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingTeamName, setEditingTeamName] = useState<string | null>(null);
+    const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Extract unique teams
     const teams = useMemo(() => {
@@ -178,9 +221,13 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
             });
             setUsers(updatedUsers);
             setModalOpen(false);
-        } catch (err) {
+            showToast('Equipe criada com sucesso.', 'success');
+        } catch (err: any) {
             console.error('Error creating team:', err);
-            alert('Erro ao criar equipe.');
+            showToast(
+                `Erro ao criar equipe: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
         }
     };
 
@@ -301,9 +348,13 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
             setUsers(updatedUsers);
             setModalOpen(false);
             setEditingTeamName(null);
-        } catch (err) {
+            showToast('Equipe atualizada com sucesso.', 'success');
+        } catch (err: any) {
             console.error('Error editing team:', err);
-            alert('Erro ao editar equipe.');
+            showToast(
+                `Erro ao editar equipe: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
         }
     };
 
@@ -313,43 +364,55 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
     };
 
     const handleDeleteTeam = async (teamName: string) => {
-        if (window.confirm(`Tem certeza que deseja dissolver a equipe "${teamName}"? Os membros ficarão "Sem Equipe".`)) {
-            try {
-                const { error } = await supabase
-                    .from('profiles')
-                    .update({ team: 'Sem Equipe' })
-                    .eq('team', teamName);
+        if (isDeleting) return;
+        setIsDeleting(true);
 
-                if (error) throw error;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ team: 'Sem Equipe' })
+                .eq('team', teamName);
 
-                // Sync: delete the conversation (cascade handles participants and messages)
-                if (currentUser) {
-                    const compId = currentUser.company_id;
-                    const { data: existingConv } = await supabase
+            if (error) throw error;
+
+            // Mantém a sincronização existente com a conversa da equipe.
+            if (currentUser) {
+                const compId = currentUser.company_id;
+                const { data: existingConv } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .eq('is_group', true)
+                    .eq('group_name', teamName)
+                    .eq('company_id', compId)
+                    .maybeSingle();
+
+                if (existingConv) {
+                    const { error: deleteError } = await supabase
                         .from('conversations')
-                        .select('id')
-                        .eq('is_group', true)
-                        .eq('group_name', teamName)
-                        .eq('company_id', compId)
-                        .maybeSingle();
+                        .delete()
+                        .eq('id', existingConv.id);
 
-                    if (existingConv) {
-                        const { error: deleteError } = await supabase
-                            .from('conversations')
-                            .delete()
-                            .eq('id', existingConv.id);
-                        if (deleteError) throw deleteError;
-                    }
+                    if (deleteError) throw deleteError;
                 }
-
-                const updatedUsers = users.map(u =>
-                    u.team === teamName ? { ...u, team: 'Sem Equipe' } : u
-                );
-                setUsers(updatedUsers);
-            } catch (err) {
-                console.error('Error deleting team:', err);
-                alert('Erro ao excluir equipe.');
             }
+
+            const updatedUsers = users.map(user =>
+                user.team === teamName
+                    ? { ...user, team: 'Sem Equipe' }
+                    : user
+            );
+
+            setUsers(updatedUsers);
+            showToast('Equipe dissolvida com sucesso.', 'success');
+        } catch (err: any) {
+            console.error('Error deleting team:', err);
+            showToast(
+                `Erro ao excluir equipe: ${err?.message || 'Erro desconhecido'}`,
+                'error'
+            );
+        } finally {
+            setIsDeleting(false);
+            setTeamToDelete(null);
         }
     };
 
@@ -357,47 +420,66 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
         <>
             <Card title="Gerenciar Equipes" headerAction={
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => { setEditingTeamName(null); setModalOpen(true); }}
-                        className="flex items-center space-x-2 px-3 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-emerald-600"
+                    <Button
+                        type="button"
+                        size="sm"
+                        leftIcon={<PlusIcon className="h-4 w-4" />}
+                        onClick={() => {
+                            setEditingTeamName(null);
+                            setModalOpen(true);
+                        }}
                     >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>Criar Equipe</span>
-                    </button>
+                        Criar equipe
+                    </Button>
                     {onNavigate && (
-                        <button
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            leftIcon={<UsersIcon className="h-4 w-4" />}
                             onClick={() => onNavigate('org-chart')}
-                            className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                         >
-                            <UsersIcon className="w-4 h-4" />
-                            <span>Ver Organograma</span>
-                        </button>
+                            Ver organograma
+                        </Button>
                     )}
                 </div>
             }>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {teams.map(({ name, members }) => (
-                        <div key={name} className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
+                        <article
+                            key={name}
+                            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-emerald-400/30"
+                        >
                             <div className="flex justify-between items-start mb-3">
                                 <div>
-                                    <h4 className="font-bold text-lg text-brand-text">{name}</h4>
-                                    <p className="text-sm text-gray-500">{members.length} membros</p>
+                                    <h4 className="text-lg font-bold text-slate-950 dark:text-white">{name}</h4>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        {members.length} {members.length === 1 ? 'membro' : 'membros'}
+                                    </p>
                                 </div>
                                 <div className="flex space-x-1">
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Editar equipe ${name}`}
+                                        title="Editar equipe"
                                         onClick={() => openEditModal(name)}
-                                        className="p-1 text-gray-400 hover:text-brand-primary"
-                                        title="Editar Membros/Nome"
+                                        className="h-8 w-8"
                                     >
-                                        <PencilIcon className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteTeam(name)}
-                                        className="p-1 text-gray-400 hover:text-red-500"
-                                        title="Dissolver Equipe"
+                                        <PencilIcon className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`Dissolver equipe ${name}`}
+                                        title="Dissolver equipe"
+                                        onClick={() => setTeamToDelete(name)}
+                                        className="h-8 w-8 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
                                     >
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
+                                        <TrashIcon className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </div>
 
@@ -417,15 +499,34 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </article>
                     ))}
                     {teams.length === 0 && (
-                        <div className="col-span-full text-center py-8 text-gray-500">
-                            Nenhuma equipe encontrada. Crie uma para começar!
+                        <div className="col-span-full rounded-2xl border border-dashed border-slate-300 px-6 py-12 text-center text-sm text-slate-500 dark:border-white/15 dark:text-slate-400">
+                            Nenhuma equipe encontrada. Crie uma para começar.
                         </div>
                     )}
                 </div>
             </Card>
+
+            <ConfirmModal
+                isOpen={teamToDelete !== null}
+                type="danger"
+                title="Dissolver equipe?"
+                message={teamToDelete
+                    ? `Os membros da equipe "${teamToDelete}" ficarão sem equipe e a conversa vinculada será removida.`
+                    : ''}
+                confirmText={isDeleting ? 'Dissolvendo...' : 'Dissolver equipe'}
+                cancelText="Cancelar"
+                onCancel={() => {
+                    if (!isDeleting) setTeamToDelete(null);
+                }}
+                onConfirm={() => {
+                    if (teamToDelete) {
+                        void handleDeleteTeam(teamToDelete);
+                    }
+                }}
+            />
 
             {isModalOpen && (
                 <TeamFormModal

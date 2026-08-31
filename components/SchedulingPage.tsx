@@ -1,4 +1,6 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -1029,8 +1031,18 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
 
             {/* Navigation Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
-                <div className="flex min-w-max">
+                <div
+                    className="flex min-w-max"
+                    role="tablist"
+                    aria-label="Seções de agendamento"
+                >
                     <button
+                        type="button"
+                        role="tab"
+                        id="scheduling-tab-events"
+                        aria-selected={activeTab === 'events'}
+                        tabIndex={activeTab === 'events' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('events')}
                         className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
                             activeTab === 'events' 
@@ -1041,6 +1053,12 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                         {mode === 'events' ? 'Nossos Espaços / Salas' : 'Suas Agendas'}
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="scheduling-tab-bookings"
+                        aria-selected={activeTab === 'bookings'}
+                        tabIndex={activeTab === 'bookings' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('bookings')}
                         className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all relative whitespace-nowrap ${
                             activeTab === 'bookings' 
@@ -1056,6 +1074,12 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                         )}
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="scheduling-tab-templates"
+                        aria-selected={activeTab === 'templates'}
+                        tabIndex={activeTab === 'templates' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('templates')}
                         className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
                             activeTab === 'templates' 
@@ -1066,6 +1090,12 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                         Modelos de E-mail
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="scheduling-tab-settings"
+                        aria-selected={activeTab === 'settings'}
+                        tabIndex={activeTab === 'settings' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('settings')}
                         className={`px-5 py-3 border-b-2 font-semibold text-sm transition-all whitespace-nowrap ${
                             activeTab === 'settings' 
@@ -1396,7 +1426,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
 
             {/* Modal: Create/Edit Event Type */}
             {showEventModal && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <ModalPortal className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1781,12 +1811,12 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* Modal: Create/Edit Template */}
             {showTemplateModal && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <ModalPortal className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1881,12 +1911,12 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                             </div>
                         </form>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* Modal: Confirm Booking (Email Preview & Edit) */}
             {showConfirmModal && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <ModalPortal className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 pandanet-modal-viewport">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1959,7 +1989,7 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                             </div>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
         </div>
     );

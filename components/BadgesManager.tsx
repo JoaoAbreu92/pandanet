@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import { supabase } from '../supabaseClient';
 import type { Company, Employee, CompanyBadge, UserBadge } from '../types';
 import { useNotifications } from './NotificationContext';
@@ -665,32 +666,71 @@ export const BadgesManager: React.FC<BadgesManagerProps> = ({ company, employees
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">Gerenciador de Gamificação (RPG)</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Crie selos de qualidade, configure metas de XP e premie colaboradores de destaque</p>
                 </div>
-                <div className="flex flex-wrap bg-gray-100 dark:bg-slate-700/50 p-1.5 rounded-xl gap-1 shrink-0">
+                <div
+                    className="flex flex-wrap bg-gray-100 dark:bg-slate-700/50 p-1.5 rounded-xl gap-1 shrink-0"
+                    role="tablist"
+                    aria-label="Seções de gamificação"
+                >
                     <button
+                        type="button"
+                        role="tab"
+                        id="badges-tab-create"
+                        aria-selected={activeTab === 'create'}
+                        aria-controls="badges-panel-create"
+                        tabIndex={activeTab === 'create' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('create')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'create' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Criar Selos
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="badges-tab-award"
+                        aria-selected={activeTab === 'award'}
+                        aria-controls="badges-panel-award"
+                        tabIndex={activeTab === 'award' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('award')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'award' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Conceder Selo
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="badges-tab-history"
+                        aria-selected={activeTab === 'history'}
+                        aria-controls="badges-panel-history"
+                        tabIndex={activeTab === 'history' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('history')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         Histórico
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="badges-tab-gamification"
+                        aria-selected={activeTab === 'gamification'}
+                        aria-controls="badges-panel-gamification"
+                        tabIndex={activeTab === 'gamification' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('gamification')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'gamification' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >
                         ⚙️ Elos, RPG & Metas
                     </button>
                     <button
+                        type="button"
+                        role="tab"
+                        id="badges-tab-design-elo"
+                        aria-selected={activeTab === 'design_elo'}
+                        aria-controls="badges-panel-design-elo"
+                        tabIndex={activeTab === 'design_elo' ? 0 : -1}
+                        onKeyDown={handleTabKeyDown}
                         onClick={() => setActiveTab('design_elo')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'design_elo' ? 'bg-white dark:bg-slate-600 shadow-sm text-brand-primary' : 'text-slate-500 hover:text-slate-700 dark:text-gray-400'}`}
                     >

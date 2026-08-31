@@ -366,7 +366,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                                 onClick={() => { setCurrentAgent(null); setShowAgentManager(false); }}
                                 className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${!currentAgent ? 'bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'}`}
                             >
-                                <img src="/logo.png" className="w-8 h-8 object-contain" />
+                                <img src="/logo.png" className="w-8 h-8 object-contain"  alt="Conteúdo visual do assistente" />
                                 <div className="text-left">
                                     <p className="text-sm font-bold dark:text-white">Panda IA (Padrão)</p>
                                     <p className="text-[10px] text-slate-500">Assistente geral</p>
@@ -379,7 +379,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ currentUser, isAIEnabled }) =
                                         onClick={() => { setCurrentAgent(agent); setShowAgentManager(false); }}
                                         className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${currentAgent?.id === agent.id ? 'bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'}`}
                                     >
-                                        <img src={agent.avatar_url} className="w-8 h-8 rounded-full object-cover bg-slate-100" />
+                                        <img src={agent.avatar_url} className="w-8 h-8 rounded-full object-cover bg-slate-100"  alt="Conteúdo visual do assistente" />
                                         <div className="text-left">
                                             <p className="text-sm font-bold dark:text-white">{agent.name}</p>
                                             <p className="text-[10px] text-slate-500 truncate max-w-[180px]">{agent.system_prompt}</p>

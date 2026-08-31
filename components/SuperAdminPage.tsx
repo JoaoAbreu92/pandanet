@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import type { Company, Plan, EmployeePermissions } from '../types';
 import Card from './Card';
 import { mockPlans } from '../mockData';
@@ -193,9 +194,9 @@ const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ companies, setCompanies
                 </header>
                 <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 space-y-8">
                      <div className="border-b border-gray-200">
-                        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                            <button onClick={() => setActiveTab('companies')} className={`${activeTab === 'companies' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Empresas</button>
-                            <button onClick={() => setActiveTab('plans')} className={`${activeTab === 'plans' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Planos</button>
+                        <nav role="tablist" aria-label="Seções do Super Admin" className="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button id="super-admin-tab-companies" role="tab" aria-selected={activeTab === 'companies'} tabIndex={activeTab === 'companies' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('companies')} className={`${activeTab === 'companies' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Empresas</button>
+                            <button id="super-admin-tab-plans" role="tab" aria-selected={activeTab === 'plans'} tabIndex={activeTab === 'plans' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('plans')} className={`${activeTab === 'plans' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Planos</button>
                         </nav>
                     </div>
 

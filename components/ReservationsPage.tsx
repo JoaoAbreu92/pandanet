@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
@@ -283,8 +284,18 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
             </div>
 
             {/* Abas */}
-            <div className="flex gap-2">
+            <div
+                className="flex gap-2"
+                role="tablist"
+                aria-label="Tipos de reserva"
+            >
                 <button
+                    type="button"
+                    role="tab"
+                    id="reservations-tab-rooms"
+                    aria-selected={activeTab === 'rooms'}
+                    tabIndex={activeTab === 'rooms' ? 0 : -1}
+                    onKeyDown={handleTabKeyDown}
                     onClick={() => setActiveTab('rooms')}
                     className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all border-2 ${
                         activeTab === 'rooms'
@@ -297,6 +308,12 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
                     {activeTab === 'rooms' && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-black">{reservations.length}</span>}
                 </button>
                 <button
+                    type="button"
+                    role="tab"
+                    id="reservations-tab-vehicles"
+                    aria-selected={activeTab === 'vehicles'}
+                    tabIndex={activeTab === 'vehicles' ? 0 : -1}
+                    onKeyDown={handleTabKeyDown}
                     onClick={() => setActiveTab('vehicles')}
                     className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all border-2 ${
                         activeTab === 'vehicles'

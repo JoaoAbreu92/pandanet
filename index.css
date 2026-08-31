@@ -765,3 +765,153 @@
     color: #f8fafc !important;
   }
 }
+
+/* ETAPA 12 - MODAIS RENDERIZADOS POR PORTAL */
+
+html:has(.pandanet-modal-viewport),
+body:has(.pandanet-modal-viewport) {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.pandanet-modal-viewport {
+  position: fixed !important;
+  inset: 0 !important;
+
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+
+  box-sizing: border-box !important;
+
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+
+  z-index: 9999 !important;
+
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important;
+  padding-right: 1rem !important;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: 1rem !important;
+}
+
+.pandanet-modal-viewport > * {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+
+  margin-top: auto !important;
+  margin-right: auto !important;
+  margin-bottom: auto !important;
+  margin-left: auto !important;
+}
+
+@media (max-width: 639px) {
+  .pandanet-modal-viewport {
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px)) !important;
+    padding-right: 0.5rem !important;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: 0.5rem !important;
+  }
+}
+
+/* ETAPA 12 - ACESSIBILIDADE GLOBAL DE CONTROLES */
+
+/*
+ * Foco por teclado consistente sem mostrar contorno permanente
+ * durante o uso normal do mouse.
+ */
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 3px solid color-mix(
+    in srgb,
+    var(--brand-primary, #00ce8d) 72%,
+    white
+  ) !important;
+  outline-offset: 2px !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 0 0 5px color-mix(
+      in srgb,
+      var(--brand-primary, #00ce8d) 24%,
+      transparent
+    ) !important;
+}
+
+/*
+ * Impede que estilos antigos eliminem completamente a indicação
+ * visual de foco para usuários de teclado.
+ */
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"]
+):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * Padrão visual e comportamental para controles indisponíveis.
+ */
+:where(
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"]
+):disabled,
+:where(
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"]
+)[aria-disabled="true"] {
+  cursor: not-allowed !important;
+  opacity: 0.55;
+  filter: saturate(0.65);
+}
+
+/*
+ * Links e botões desabilitados não devem aparentar interação.
+ */
+[aria-disabled="true"] {
+  pointer-events: none;
+}
+
+/*
+ * Respeita a preferência do sistema operacional sem eliminar
+ * feedbacks funcionais de estado.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

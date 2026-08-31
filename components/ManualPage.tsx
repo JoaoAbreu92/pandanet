@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleTabKeyDown } from '../utils/tabAccessibility';
 import Card from './Card';
 import { 
     PlayIcon, 
@@ -137,14 +138,30 @@ const ManualPage: React.FC = () => {
 
                 {/* Center Content: Main Video or Updates */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-gray-100 max-w-xs">
+                    <div
+                        className="flex bg-white p-1 rounded-2xl shadow-sm border border-gray-100 max-w-xs"
+                        role="tablist"
+                        aria-label="Conteúdo do manual"
+                    >
                         <button 
+                            type="button"
+                            role="tab"
+                            id="manual-tab-videos"
+                            aria-selected={activeTab === 'videos'}
+                            tabIndex={activeTab === 'videos' ? 0 : -1}
+                            onKeyDown={handleTabKeyDown}
                             onClick={() => setActiveTab('videos')}
                             className={`flex-1 py-2 px-4 rounded-xl text-sm font-bold transition-all ${activeTab === 'videos' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                             Vídeos
                         </button>
                         <button 
+                            type="button"
+                            role="tab"
+                            id="manual-tab-updates"
+                            aria-selected={activeTab === 'updates'}
+                            tabIndex={activeTab === 'updates' ? 0 : -1}
+                            onKeyDown={handleTabKeyDown}
                             onClick={() => setActiveTab('updates')}
                             className={`flex-1 py-2 px-4 rounded-xl text-sm font-bold transition-all ${activeTab === 'updates' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                         >

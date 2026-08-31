@@ -178,18 +178,30 @@ export function parseSupabaseStorageUrl(url: string): { bucket: string; path: st
     if (!url) return null;
 
     try {
-        const marker = '/storage/v1/object/public/';
-        const idx = url.indexOf(marker);
+        const markers = [
+            '/storage/v1/object/public/',
+            '/storage/v1/object/sign/',
+            '/storage/v1/object/authenticated/'
+        ];
 
-        if (idx === -1) return null;
+        const marker = markers.find(candidate => url.includes(candidate));
+        if (!marker) return null;
 
-        const remainder = url.substring(idx + marker.length);
+        const markerIndex = url.indexOf(marker);
+        const remainder = url
+            .substring(markerIndex + marker.length)
+            .split('?')[0];
+
         const slashIndex = remainder.indexOf('/');
-
         if (slashIndex === -1) return null;
 
-        const bucket = remainder.substring(0, slashIndex);
-        const path = decodeURIComponent(remainder.substring(slashIndex + 1));
+        const bucket = decodeURIComponent(
+            remainder.substring(0, slashIndex)
+        );
+
+        const path = decodeURIComponent(
+            remainder.substring(slashIndex + 1)
+        );
 
         if (!bucket || !path) return null;
 

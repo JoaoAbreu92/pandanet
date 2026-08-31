@@ -934,7 +934,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             }
             
             const cleanUrl = mediaUrl.split('?')[0];
-            const fileName = cleanUrl.split('/').pop() || 'file';
+            const fileName = decodeURIComponent(
+                cleanUrl.split('/').pop() || 'file'
+            );
 
             // Fazer upload de mídias base64 para o Supabase Storage para obter URL pública HTTPS limpa
             const cleanMediaType = mediaType ? mediaType.split(';')[0] : 'audio/webm';
@@ -980,8 +982,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 finalMediaUrl = finalMediaUrl.replace('https://pandanet.grupopixel.com.br', 'http://77.37.43.60:8000');
             }
 
-            const audioSource = finalMediaUrl || audioDataUri;
-            const mediaSource = finalMediaUrl || base64Data;
+            const audioSource = base64Data;
+            const mediaSource = base64Data;
 
             // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
@@ -1133,7 +1135,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
         // 3. Save message in Supabase
         const { data: newMsg, error: msgErr } = await supabase
             .from('whatsapp_messages')
-            .insert({
+            .upsert({
                 company_id: conv.company_id,
                 conversation_id: conversationId,
                 message_text: message,
@@ -1145,6 +1147,9 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 queue_id: conv.queue_id || null,
                 quoted_message_text: quoted_message_text || null,
                 quoted_message_sender: quoted_message_sender || null
+            }, {
+                onConflict: 'company_id,whatsapp_message_id',
+                ignoreDuplicates: false
             })
             .select()
             .single();
@@ -1201,7 +1206,7 @@ async function getBase64FromUrl(url) {
             }
         }
 
-        const resp = await fetch(targetUrl);
+        const resp = await fetch(encodeURI(targetUrl));
         if (!resp.ok) {
             throw new Error(`Failed to fetch media from ${targetUrl}: ${resp.status} ${resp.statusText}`);
         }
@@ -2781,7 +2786,10 @@ async function fetchGroupInfo(instanceName, groupJid) {
  * Retorna { inHours: boolean, awayMessage: string | null }
  */
 async function checkBusinessHours(companyId, connectionId, queueId = null) {
-    // Obter partes estruturadas da data no fuso de São Paulo via Intl.DateTimeFormat (imune a parsing de locale)
+    /*
+     * Todos os cálculos são feitos explicitamente no fuso comercial
+     * da aplicação, independentemente do fuso do servidor/container.
+     */
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Sao_Paulo',
@@ -2792,74 +2800,322 @@ async function checkBusinessHours(companyId, connectionId, queueId = null) {
     });
 
     const parts = {};
-    formatter.formatToParts(now).forEach(p => { parts[p.type] = p.value; });
-    const weekdayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
-    const dayOfWeekNum = weekdayMap[parts.weekday] !== undefined ? weekdayMap[parts.weekday] : now.getDay();
-    const currentDayStr = dayOfWeekNum.toString(); // "0" (domingo) a "6" (sábado)
-    
-    let hour = parts.hour === '24' ? '00' : parts.hour;
-    const currentHourStr = `${hour}:${parts.minute}`;
 
-    // 1. Buscar configurações da conexão do WhatsApp
-    const { data: settings } = await supabase
-        .from('whatsapp_settings')
-        .select('business_hours, business_hours_start, business_hours_end, away_message, enable_away_message')
-        .eq('id', connectionId)
-        .maybeSingle();
+    formatter.formatToParts(now).forEach(part => {
+        parts[part.type] = part.value;
+    });
+
+    const weekdayMap = {
+        Sun: 0,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6
+    };
+
+    const namedDayMap = [
+        'sun',
+        'mon',
+        'tue',
+        'wed',
+        'thu',
+        'fri',
+        'sat'
+    ];
+
+    const dayOfWeekNum =
+        weekdayMap[parts.weekday] !== undefined
+            ? weekdayMap[parts.weekday]
+            : now.getDay();
+
+    const currentDayKey = String(dayOfWeekNum);
+    const currentNamedDay = namedDayMap[dayOfWeekNum];
+
+    const normalizedHour =
+        parts.hour === '24' ? '00' : parts.hour;
+
+    const currentTime =
+        `${normalizedHour}:${parts.minute}`;
+
+    const normalizeBusinessTime = value => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const match = value.match(/^(\d{1,2}):(\d{2})/);
+
+        if (!match) {
+            return null;
+        }
+
+        return `${match[1].padStart(2, '0')}:${match[2]}`;
+    };
+
+    /*
+     * Também aceita expedientes que atravessem a meia-noite,
+     * por exemplo 22:00 até 06:00.
+     */
+    const isInsideInterval = interval => {
+        if (!interval || typeof interval !== 'object') {
+            return false;
+        }
+
+        const start = normalizeBusinessTime(interval.start);
+        const end = normalizeBusinessTime(interval.end);
+
+        if (!start || !end) {
+            return false;
+        }
+
+        if (start === end) {
+            return true;
+        }
+
+        if (start < end) {
+            return currentTime >= start && currentTime <= end;
+        }
+
+        return currentTime >= start || currentTime <= end;
+    };
+
+    const hasScheduleKeys = schedule => {
+        return (
+            schedule &&
+            typeof schedule === 'object' &&
+            !Array.isArray(schedule) &&
+            Object.keys(schedule).length > 0
+        );
+    };
+
+    /*
+     * Formato avançado do painel geral:
+     * {
+     *   "1": [{ "start": "08:00", "end": "12:00" }],
+     *   "2": [...]
+     * }
+     *
+     * Se existem dias configurados e o dia atual não existe,
+     * significa que ele foi explicitamente marcado como fechado.
+     */
+    const evaluateIntervalSchedule = schedule => {
+        if (!hasScheduleKeys(schedule)) {
+            return null;
+        }
+
+        const dayIntervals =
+            schedule[currentDayKey] ??
+            schedule[dayOfWeekNum];
+
+        if (!Array.isArray(dayIntervals)) {
+            return false;
+        }
+
+        if (dayIntervals.length === 0) {
+            return false;
+        }
+
+        return dayIntervals.some(isInsideInterval);
+    };
+
+    /*
+     * Formato usado na configuração própria da fila:
+     * {
+     *   "mon": {
+     *     "start": "08:00",
+     *     "end": "18:00",
+     *     "closed": false
+     *   }
+     * }
+     */
+    const evaluateNamedDaySchedule = schedule => {
+        if (!hasScheduleKeys(schedule)) {
+            return null;
+        }
+
+        const dayConfig = schedule[currentNamedDay];
+
+        if (!dayConfig || typeof dayConfig !== 'object') {
+            return false;
+        }
+
+        if (dayConfig.closed === true) {
+            return false;
+        }
+
+        return isInsideInterval(dayConfig);
+    };
+
+    const { data: settings, error: settingsError } =
+        await supabase
+            .from('whatsapp_settings')
+            .select(
+                'business_hours, business_hours_start, business_hours_end, away_message, enable_away_message'
+            )
+            .eq('id', connectionId)
+            .eq('company_id', companyId)
+            .maybeSingle();
+
+    if (settingsError) {
+        console.error(
+            '[BUSINESS-HOURS] Erro ao carregar configuração:',
+            settingsError.message
+        );
+
+        /*
+         * Em caso de erro de banco, não deve enviar uma mensagem
+         * incorreta afirmando que a empresa está fechada.
+         */
+        return {
+            inHours: true,
+            awayMessage: null
+        };
+    }
 
     if (!settings || settings.enable_away_message === false) {
-        return { inHours: true, awayMessage: null };
+        return {
+            inHours: true,
+            awayMessage: null
+        };
     }
 
-    const awayMessage = settings.away_message || 'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
+    const generalAwayMessage =
+        settings.away_message ||
+        'Estamos fora do horário de atendimento. Deixe sua mensagem que responderemos assim que possível.';
 
-    // 2. Se houver configuração business_hours JSONB
-    if (settings.business_hours && typeof settings.business_hours === 'object') {
-        const bh = settings.business_hours;
-        let dayConfig = null;
+    /*
+     * 1. Configuração própria da fila salva em whatsapp_queues.
+     * Ela possui precedência quando custom_hours está ativado.
+     */
+    if (queueId) {
+        const { data: queue, error: queueError } =
+            await supabase
+                .from('whatsapp_queues')
+                .select(
+                    'custom_hours, business_hours, away_message'
+                )
+                .eq('id', queueId)
+                .eq('company_id', companyId)
+                .maybeSingle();
 
-        // Se passamos queueId, tentar achar expediente da fila
-        if (queueId && bh.queues && bh.queues[queueId]) {
-            dayConfig = bh.queues[queueId][currentDayStr];
-            if (Array.isArray(dayConfig) && dayConfig.length > 0) {
-                const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
-                if (inRange) {
-                    return { inHours: true, awayMessage: null };
-                } else {
-                    return { inHours: false, awayMessage: 'Estamos fora do horário de expediente deste setor.' };
-                }
+        if (queueError) {
+            console.error(
+                '[BUSINESS-HOURS] Erro ao carregar horário da fila:',
+                queueError.message
+            );
+        } else if (
+            queue &&
+            queue.custom_hours === true
+        ) {
+            let queueResult =
+                evaluateNamedDaySchedule(queue.business_hours);
+
+            if (queueResult === null) {
+                queueResult =
+                    evaluateIntervalSchedule(queue.business_hours);
             }
-        }
 
-        // Se não achou na fila ou não passou queueId, verificar no Geral (general)
-        if (bh.general && (bh.general[currentDayStr] || bh.general[dayOfWeekNum])) {
-            dayConfig = bh.general[currentDayStr] || bh.general[dayOfWeekNum];
-            if (Array.isArray(dayConfig) && dayConfig.length > 0) {
-                const inRange = dayConfig.some(interval => currentHourStr >= interval.start && currentHourStr <= interval.end);
-                if (inRange) {
-                    return { inHours: true, awayMessage: null };
-                } else {
-                    return { inHours: false, awayMessage };
-                }
+            /*
+             * custom_hours ligado sem configuração válida é tratado
+             * como fechado, evitando ignorar uma decisão administrativa.
+             */
+            if (queueResult === null) {
+                queueResult = false;
             }
+
+            return {
+                inHours: queueResult,
+                awayMessage: queueResult
+                    ? null
+                    : (
+                        queue.away_message ||
+                        'Estamos fora do horário de expediente deste setor.'
+                    )
+            };
         }
     }
 
-    // 3. Fallback: Lógica Legada (business_hours_start / business_hours_end)
-    const start = settings.business_hours_start ? settings.business_hours_start.slice(0, 5) : null;
-    const end = settings.business_hours_end ? settings.business_hours_end.slice(0, 5) : null;
+    const businessHours =
+        settings.business_hours &&
+        typeof settings.business_hours === 'object'
+            ? settings.business_hours
+            : {};
 
-    if (start && end) {
-        if (currentHourStr < start || currentHourStr > end) {
-            return { inHours: false, awayMessage };
-        }
-        const isWeekend = dayOfWeekNum === 0 || dayOfWeekNum === 6;
-        if (isWeekend) {
-            return { inHours: false, awayMessage };
-        }
+    /*
+     * 2. Expediente da fila configurado dentro do painel geral.
+     */
+    if (
+        queueId &&
+        businessHours.queues &&
+        hasScheduleKeys(businessHours.queues[queueId])
+    ) {
+        const queueResult = evaluateIntervalSchedule(
+            businessHours.queues[queueId]
+        );
+
+        return {
+            inHours: queueResult === true,
+            awayMessage: queueResult === true
+                ? null
+                : 'Estamos fora do horário de expediente deste setor.'
+        };
     }
 
-    return { inHours: true, awayMessage: null };
+    /*
+     * 3. Expediente avançado geral.
+     */
+    if (
+        businessHours.general &&
+        hasScheduleKeys(businessHours.general)
+    ) {
+        const generalResult = evaluateIntervalSchedule(
+            businessHours.general
+        );
+
+        return {
+            inHours: generalResult === true,
+            awayMessage: generalResult === true
+                ? null
+                : generalAwayMessage
+        };
+    }
+
+    /*
+     * 4. Configuração simples/legada.
+     * Ela define apenas o intervalo, não fecha automaticamente
+     * sábado e domingo. Assim, respeita os dias configurados no
+     * painel avançado e não inventa uma regra de fim de semana.
+     */
+    const legacyStart = normalizeBusinessTime(
+        settings.business_hours_start
+    );
+
+    const legacyEnd = normalizeBusinessTime(
+        settings.business_hours_end
+    );
+
+    if (legacyStart && legacyEnd) {
+        const legacyResult = isInsideInterval({
+            start: legacyStart,
+            end: legacyEnd
+        });
+
+        return {
+            inHours: legacyResult,
+            awayMessage: legacyResult
+                ? null
+                : generalAwayMessage
+        };
+    }
+
+    /*
+     * Sem qualquer expediente configurado, não dispara ausência.
+     */
+    return {
+        inHours: true,
+        awayMessage: null
+    };
 }
 
 const activeCreations = new Map(); // key: `${companyId}_${fromPhone}` -> Promise<conversationId>
@@ -3396,7 +3652,7 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     addDebugLog('MSG_UPDATE_ID_OK', `ID ${msgId} associado à mensagem manual pré-existente ${existingId}`);
                 }
             } else {
-                const { error: insertErr } = await supabase.from('whatsapp_messages').insert({
+                const { error: insertErr } = await supabase.from('whatsapp_messages').upsert({
                     company_id: companyId,
                     conversation_id: conversationId,
                     message_text: text,
@@ -3410,6 +3666,9 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
                     quoted_message_sender: quotedMessageSender,
                     created_at: parseMessageTimestamp(message.messageTimestamp),
                     queue_id: conv ? conv.queue_id : null
+                }, {
+                    onConflict: 'company_id,whatsapp_message_id',
+                    ignoreDuplicates: false
                 });
 
                 if (insertErr) {

@@ -1,3 +1,4 @@
+import { handleTabKeyDown } from '../../utils/tabAccessibility';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { WhatsAppContact, WhatsAppQueue, WhatsAppTag } from '../../types';
@@ -473,10 +474,17 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
                         </div>
 
                         <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#11141d] overflow-x-auto no-scrollbar">
-                            <div className="flex min-w-max w-full">
+                            <div className="flex min-w-max w-full" role="tablist" aria-label="Seções do contato">
                                 {['dados', 'kanban', 'etiqueta', 'anotacoes'].map(id => (
                                     <button
                                         key={id}
+                                        type="button"
+                                        role="tab"
+                                        id={`contact-tab-${id}`}
+                                        aria-selected={activeTab === id}
+                                        aria-controls={`contact-panel-${id}`}
+                                        tabIndex={activeTab === id ? 0 : -1}
+                                        onKeyDown={handleTabKeyDown}
                                         onClick={() => setActiveTab(id as any)}
                                         className={`flex-1 py-3 px-4 text-[10px] font-semibold tracking-wider border-b-2 transition-all whitespace-nowrap ${
                                             activeTab === id ? 'border-emerald-500 text-emerald-600 dark:text-white' : 'border-transparent text-gray-400'
@@ -488,7 +496,13 @@ const Contacts: React.FC<ContactsProps> = ({ initialSearch = '', onChat }) => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                        <div
+                            role="tabpanel"
+                            id={`contact-panel-${activeTab}`}
+                            aria-labelledby={`contact-tab-${activeTab}`}
+                            tabIndex={0}
+                            className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"
+                        >
                             {activeTab === 'dados' && (
                                 <div className="space-y-4">
                                     <div className="space-y-1">

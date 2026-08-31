@@ -1,3 +1,4 @@
+import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getCleanImageUrl, downloadFile, getSignedStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
@@ -1605,7 +1606,7 @@ const HRManager: React.FC = () => {
       )}
 
       {showCompetenciesModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md p-6 relative">
             <button onClick={() => setShowCompetenciesModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white font-bold text-sm">X</button>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Competências da Empresa</h3>
@@ -1655,11 +1656,11 @@ const HRManager: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {viewingDocUrl && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <ModalPortal className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 pandanet-modal-viewport">
           <div className="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-white/10">
             <div className="p-4 bg-gray-50 dark:bg-slate-800 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1685,7 +1686,7 @@ const HRManager: React.FC = () => {
               <iframe src={viewingSignedUrl || undefined} className="w-full h-full border-0 bg-white dark:bg-slate-900" title="Visualizador de Documento" />
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
       {profile && <HRCalculatorAI currentUser={profile} />}
     </div>
