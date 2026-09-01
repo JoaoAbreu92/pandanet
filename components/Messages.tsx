@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { launchPremiumReaction } from './PremiumReactionBurst';
 import { handleTabKeyDown } from '../utils/tabAccessibility';
 import {
     FaceSmileIcon,
@@ -184,7 +185,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                 const visitTime = message.payload.visit_time;
                                 const visitId = message.payload.visit_id;
                                 const creatorId = message.payload.creator_id;
-                                
+
                                 return (
                                     <div className="flex flex-col gap-3 p-1 text-slate-800 dark:text-white">
                                         <div className="flex items-center gap-2 border-b border-gray-150 dark:border-slate-800 pb-2">
@@ -281,7 +282,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                 </div>
                 <div className="flex justify-between items-center w-full">
                     <div className={`flex gap-1 mt-1 ${isMe ? 'order-2' : ''}`}>
-                        {message.reactions.length > 0 && message.reactions.map((r, i) => (<span key={i} className="text-xs bg-gray-200 px-1.5 py-0.5 rounded-full cursor-pointer" title={r.user}>{r.emoji}</span>))}
+                        {message.reactions.length > 0 && message.reactions.map((reaction, index) => (
+                            <span
+                                key={`${reaction.user}-${reaction.emoji}-${index}`}
+                                className="premium-reaction-chip cursor-pointer"
+                                style={{ animationDelay: `${index * 45}ms` }}
+                                title={reaction.user}
+                            >
+                                {reaction.emoji}
+                            </span>
+                        ))}
                     </div>
                     <span className={`text-xs text-gray-400 mt-1 ${isMe ? 'mr-2' : 'ml-1'}`}>{message.timestamp}</span>
                 </div>
@@ -1416,16 +1426,16 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         try {
             const msg = messages.find(m => m.id === msgId);
             if (!msg) return;
-            
+
             const updatedPayload = { ...msg.payload, confirmed: true, confirmed_at: new Date().toISOString() };
-            
+
             const { error } = await supabase
                 .from('messages')
                 .update({ payload: updatedPayload })
                 .eq('id', msgId);
-                
+
             if (error) throw error;
-            
+
             await supabase
                 .from('notifications')
                 .insert({
@@ -1436,9 +1446,9 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     description: `${currentUser.full_name || currentUser.name} confirmou a leitura do compromisso da visita.`,
                     is_read: false
                 });
-                
+
             showToast('Confirmação de recebimento enviada!', 'success');
-            
+
             setMessages(prev => prev.map(m => m.id === msgId ? { ...m, payload: updatedPayload } : m));
         } catch (err: any) {
             console.error('Erro ao confirmar recebimento:', err);
@@ -1683,7 +1693,6 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         setNotes(notes.filter(n => n.id !== id));
         setNoteWarning(false);
     };
-
 
 
     if (!currentUser) return <div className="flex items-center justify-center h-full">Carregando...</div>;
@@ -2337,7 +2346,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             {/* Context Menu for Message Bubble */}
             {contextMenuMessage && (
                 <div
-                    className="fixed bg-white/80 dark:bg-slate-900/90 backdrop-blur-md border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-2xl p-2 z-50 w-56 animate-in fade-in zoom-in-95 duration-100"
+                    className="premium-reaction-context fixed z-50 w-56 p-2"
                     style={{
                         top: Math.min(contextMenuCoords.y, window.innerHeight - 155),
                         left: Math.min(contextMenuCoords.x, window.innerWidth - 240)
@@ -2345,15 +2354,22 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Reactions Bar */}
-                    <div className="flex justify-around items-center border-b border-gray-100 dark:border-white/5 pb-2 mb-2">
+                    <div className="premium-reaction-row flex justify-around items-center border-b border-gray-100/70 dark:border-white/10 pb-2 mb-2">
                         {quickReactions.map(emoji => (
                             <button
                                 key={emoji}
-                                onClick={() => {
-                                    handleReact(contextMenuMessage.id, emoji);
+                                onClick={(event) => {
+                                    launchPremiumReaction(
+                                        emoji,
+                                        event.currentTarget
+                                    );
+                                    handleReact(
+                                        contextMenuMessage.id,
+                                        emoji
+                                    );
                                     setContextMenuMessage(null);
                                 }}
-                                className="text-xl p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-all duration-200 active:scale-125 hover:scale-115 hover:-translate-y-0.5"
+                                className="premium-reaction-item premium-reaction-item--light text-xl w-9 h-9"
                             >
                                 {emoji}
                             </button>

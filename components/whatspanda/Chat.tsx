@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { launchPremiumReaction } from '../PremiumReactionBurst';
 import { handleTabKeyDown } from '../../utils/tabAccessibility';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -986,7 +987,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         const hostname = window.location.hostname;
         const port = window.location.port;
         isDevServer = port === '3000' || port === '5173' || port === '3001' ||
-                      hostname === 'localhost' || 
+                      hostname === 'localhost' ||
                       hostname === '127.0.0.1';
       }
 
@@ -1005,7 +1006,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       const hostname = window.location.hostname;
       const port = window.location.port;
       isDevServer = port === '3000' || port === '5173' || port === '3001' ||
-                    hostname === 'localhost' || 
+                    hostname === 'localhost' ||
                     hostname === '127.0.0.1';
     }
 
@@ -1854,17 +1855,17 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       // Fazer fetch do arquivo através do proxy
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error(`Falha no download (Status: ${response.status})`);
-      
+
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
-      
+
       // Tentar obter o nome correto do arquivo
       let filename = defaultFilename || 'arquivo';
       const disposition = response.headers.get('content-disposition');
       if (disposition && disposition.indexOf('attachment') !== -1) {
         const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
         const matches = filenameRegex.exec(disposition);
-        if (matches != null && matches[1]) { 
+        if (matches != null && matches[1]) {
           filename = matches[1].replace(/['"]/g, '');
         }
       } else {
@@ -4241,7 +4242,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
       {/* Message Context Menu */}
       {messageContextMenu && (
         <div
-          className="fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 w-56 animate-in fade-in zoom-in-95 duration-100 font-sans overflow-hidden"
+          className="premium-reaction-context fixed z-[9999] py-2 w-56 font-sans overflow-hidden"
           style={{
             top: `${messageContextMenu.y}px`,
             left: `${messageContextMenu.x}px`
@@ -4249,13 +4250,22 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
           onClick={(e) => e.stopPropagation()}
         >
           {/* Quick Emojis Bar */}
-          <div className="flex items-center justify-around px-2 py-1.5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
+          <div className="premium-reaction-row flex items-center justify-around px-2 py-2 border-b border-slate-100/70 dark:border-white/10">
             {['❤️', '👍', '👊', '😂', '😮', '🙏', '🔥', '👏'].map((emoji) => (
               <button
                 key={emoji}
                 type="button"
-                onClick={() => handleSendReaction(messageContextMenu.message, emoji)}
-                className="text-base hover:scale-125 transition-transform p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10"
+                onClick={(event) => {
+                  launchPremiumReaction(
+                    emoji,
+                    event.currentTarget
+                  );
+                  handleSendReaction(
+                    messageContextMenu.message,
+                    emoji
+                  );
+                }}
+                className="premium-reaction-item premium-reaction-item--light text-base w-8 h-8"
                 title={`Reagir com ${emoji}`}
               >
                 {emoji}

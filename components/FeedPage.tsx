@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { launchPremiumReaction } from './PremiumReactionBurst';
 import Card from './Card';
 import EventsCarouselMini from './EventsCarouselMini';
 import RecognitionWidget from './RecognitionWidget';
@@ -107,11 +108,11 @@ export const PostCard: React.FC<{
     }
 
     return (
-        <Card 
-            title="" 
+        <Card
+            title=""
             className={`pb-2 overflow-visible transition-all duration-500 ${
-                badgeData 
-                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/40 via-white to-rose-50/40 shadow-xl shadow-amber-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-amber-400/40 rounded-3xl' 
+                badgeData
+                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50/40 via-white to-rose-50/40 shadow-xl shadow-amber-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-amber-400/40 rounded-3xl'
                     : levelUpData
                         ? 'border-2 border-purple-500/40 bg-gradient-to-br from-indigo-50/30 via-white to-purple-50/30 shadow-xl shadow-purple-500/5 dark:from-slate-800/90 dark:via-slate-900/95 dark:to-slate-800/90 relative overflow-hidden dark:border-purple-500/30 rounded-3xl'
                         : ''
@@ -121,12 +122,12 @@ export const PostCard: React.FC<{
                 <div className="py-6 px-5 flex flex-col md:flex-row items-center gap-6 relative select-none">
                     {/* Glowing background rays */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-                    
+
                     {/* Delete button for badge award post */}
                     {isAuthor && (
-                        <button 
-                            onClick={() => onDelete(post.id)} 
-                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10" 
+                        <button
+                            onClick={() => onDelete(post.id)}
+                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10"
                             title={t('feed.delete_post')}
                         >
                             <TrashIcon className="w-5 h-5" />
@@ -143,21 +144,21 @@ export const PostCard: React.FC<{
                             )}
                         </div>
                     </div>
-                    
+
                     {/* Right Side: Information */}
                     <div className="flex-1 min-w-0 text-left space-y-3">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 uppercase tracking-widest">
                             🏆 Nova Conquista Registrada
                         </span>
-                        
+
                         <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white leading-tight">
                             Parabéns, {badgeData.recipient_name}! 🎉
                         </h3>
-                        
+
                         <p className="text-sm text-slate-650 dark:text-slate-300 font-medium">
                             Conquistou o selo <span className="font-extrabold text-brand-primary dark:text-emerald-400">{badgeData.badge_name}</span>
                         </p>
-                        
+
                         <div className="relative w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/50 italic text-slate-700 dark:text-slate-200 text-sm font-medium shadow-sm leading-relaxed">
                             <span className="absolute -top-3.5 left-4 text-3xl text-brand-primary font-serif select-none">“</span>
                             <p className="px-2">{badgeData.reason}</p>
@@ -176,12 +177,12 @@ export const PostCard: React.FC<{
                 <div className="py-6 px-5 flex flex-col md:flex-row items-center gap-6 relative select-none">
                     {/* Glowing background rays */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-                    
+
                     {/* Delete button for level up post */}
                     {isAuthor && (
-                        <button 
-                            onClick={() => onDelete(post.id)} 
-                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10" 
+                        <button
+                            onClick={() => onDelete(post.id)}
+                            className="absolute right-2 top-2 p-2 text-slate-400 hover:text-red-500 transition-colors z-10"
                             title={t('feed.delete_post')}
                         >
                             <TrashIcon className="w-5 h-5" />
@@ -190,29 +191,29 @@ export const PostCard: React.FC<{
 
                     {/* Left Side: Avatar with Special Level Ring */}
                     <div className="flex-shrink-0 relative">
-                        <UserAvatar 
-                            src={levelUpData.recipient_avatar} 
-                            name={levelUpData.recipient_name} 
-                            level={levelUpData.new_level} 
-                            size="xl" 
-                            className="shadow-2xl scale-110" 
+                        <UserAvatar
+                            src={levelUpData.recipient_avatar}
+                            name={levelUpData.recipient_name}
+                            level={levelUpData.new_level}
+                            size="xl"
+                            className="shadow-2xl scale-110"
                         />
                     </div>
-                    
+
                     {/* Right Side: Information */}
                     <div className="flex-1 min-w-0 text-left space-y-3">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 uppercase tracking-widest">
                             ⚔️ Evolução de Nível (RPG)
                         </span>
-                        
+
                         <h3 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white leading-tight">
                             {levelUpData.recipient_name} subiu para o Nível {levelUpData.new_level}! 🚀
                         </h3>
-                        
+
                         <p className="text-sm text-slate-650 dark:text-slate-300 font-medium">
                             {levelUpData.message}
                         </p>
-                        
+
                         <div className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 bg-purple-50 dark:bg-purple-950/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900/30">
                             <span>✨ Incentive o seu colega reagindo e comentando abaixo!</span>
                         </div>
@@ -285,7 +286,13 @@ export const PostCard: React.FC<{
                     {post.reactions.length > 0 && (
                         <div className="flex -space-x-1">
                             {Array.from(new Set(post.reactions.map(r => r.emoji))).slice(0, 3).map((emoji, i) => (
-                                <span key={i} className="bg-white rounded-full px-0.5 border text-xs">{emoji}</span>
+                                <span
+                                    key={i}
+                                    className="premium-reaction-chip"
+                                    style={{ animationDelay: `${i * 45}ms` }}
+                                >
+                                    {emoji}
+                                </span>
                             ))}
                         </div>
                     )}
@@ -295,26 +302,32 @@ export const PostCard: React.FC<{
             </div>
 
             <div className="flex justify-around py-1 relative">
-                <div 
-                    className="flex-1 relative" 
+                <div
+                    className="flex-1 relative"
                     ref={reactionMenuRef}
-                    onMouseEnter={() => { if (!isGhostMode) setShowReactionMenu(true); }}
-                    onMouseLeave={() => { setShowReactionMenu(false); setShowFullReactions(false); }}
                 >
-                    <button 
+                    <button
                         disabled={isGhostMode}
                         onClick={() => { if (!isGhostMode) setShowReactionMenu(!showReactionMenu); }}
-                        className={`w-full flex items-center justify-center space-x-2 py-2 rounded-lg ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'active:scale-[0.98]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                        className={`premium-reaction-trigger w-full flex items-center justify-center space-x-2 py-2 rounded-xl ${isGhostMode ? 'opacity-50 cursor-not-allowed' : 'active:scale-[0.96]'} transition-all duration-300 ${post.reactions.some(r => r.userId === currentUser.id) ? 'premium-reaction-trigger--active text-brand-primary font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
                         <HandThumbUpIcon className="w-5 h-5" /><span>{t('feed.react')}</span>
                     </button>
                     {showReactionMenu && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl shadow-2xl border border-white/10 rounded-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="premium-reaction-picker absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50">
                             <div className="flex items-center gap-1">
                                 {quickReactions.map(emoji => (
-                                    <button 
-                                        key={emoji} 
-                                        onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} 
-                                        className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl active:scale-95 hover:scale-125 hover:-translate-y-1 transition-all duration-200 text-white"
+                                    <button
+                                        key={emoji}
+                                        onClick={(event) => {
+                                            launchPremiumReaction(
+                                                emoji,
+                                                event.currentTarget
+                                            );
+                                            onToggleReaction(post.id, emoji);
+                                            setShowReactionMenu(false);
+                                            setShowFullReactions(false);
+                                        }}
+                                        className="premium-reaction-item text-2xl w-10 h-10"
                                     >
                                         {emoji}
                                     </button>
@@ -330,10 +343,18 @@ export const PostCard: React.FC<{
                             {showFullReactions && (
                                 <div className="grid grid-cols-6 gap-1 mt-2 pt-2 border-t border-white/10 max-h-40 overflow-y-auto custom-scrollbar">
                                     {allReactions.filter(e => !quickReactions.includes(e)).map(emoji => (
-                                        <button 
-                                            key={emoji} 
-                                            onClick={() => { onToggleReaction(post.id, emoji); setShowReactionMenu(false); setShowFullReactions(false); }} 
-                                            className="text-xl w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 hover:scale-125 hover:-translate-y-1 transition-all duration-200 text-white"
+                                        <button
+                                            key={emoji}
+                                            onClick={(event) => {
+                                            launchPremiumReaction(
+                                                emoji,
+                                                event.currentTarget
+                                            );
+                                            onToggleReaction(post.id, emoji);
+                                            setShowReactionMenu(false);
+                                            setShowFullReactions(false);
+                                        }}
+                                            className="premium-reaction-item text-xl w-9 h-9"
                                         >
                                             {emoji}
                                         </button>
@@ -405,7 +426,7 @@ const OnlineUsersWidget: React.FC<{ users: Employee[], onNavigate: (page: Page, 
     const onlineUsers = users.filter(u => u.isOnline);
     // Sugerimos pessoas que NÃO estão online no momento para "descobrir"
     const suggestedUsers = users.filter(u => !u.isOnline).slice(0, 10);
-    // Fallback: se não houver "offline", mostra qualquer um exceto o atual? 
+    // Fallback: se não houver "offline", mostra qualquer um exceto o atual?
     // Por enquanto vamos apenas garantir que mostre algo se a lista existir
     const displaySuggestions = suggestedUsers.length > 0 ? suggestedUsers : users.slice(0, 10);
 
@@ -473,7 +494,68 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [mentionSearch, setMentionSearch] = useState('');
     const [mentionIndex, setMentionIndex] = useState(-1);
     const [mentions, setMentions] = useState<{ id: string, name: string }[]>([]);
+
+    const [mentionAudience, setMentionAudience] =
+        useState<'individual' | 'company' | 'department'>(
+            'individual'
+        );
+
+    const [mentionDepartmentId, setMentionDepartmentId] =
+        useState('');
+
     const { t } = useLanguage();
+
+    const canMentionCollectively =
+        currentUser.role === 'Super Admin'
+        || currentUser.isAdmin === true
+        || currentUser.isCompanyAdmin === true
+        || (currentUser as any).is_company_admin === true;
+
+    const companyEmployees = allEmployees.filter(employee =>
+        !currentUser.company_id
+        || employee.company_id === currentUser.company_id
+    );
+
+    const mentionDepartments = Array.from(
+        new Map(
+            companyEmployees
+                .filter(employee => employee.department_id)
+                .map(employee => [
+                    employee.department_id as string,
+                    {
+                        id: employee.department_id as string,
+                        name:
+                            employee.department_name
+                            || employee.team
+                            || 'Equipe sem nome'
+                    }
+                ])
+        ).values()
+    ).sort((first, second) =>
+        first.name.localeCompare(second.name, 'pt-BR')
+    );
+
+    const collectiveMentionCount = (() => {
+        if (!canMentionCollectively) return 0;
+
+        if (mentionAudience === 'company') {
+            return companyEmployees.filter(
+                employee => employee.id !== currentUser.id
+            ).length;
+        }
+
+        if (
+            mentionAudience === 'department'
+            && mentionDepartmentId
+        ) {
+            return companyEmployees.filter(employee =>
+                employee.department_id === mentionDepartmentId
+                && employee.id !== currentUser.id
+            ).length;
+        }
+
+        return 0;
+    })();
 
     // Gamification states
     const [showGalleryModal, setShowGalleryModal] = useState(false);
@@ -686,10 +768,36 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const selectMention = (user: Employee) => {
-        const before = newPostContent.slice(0, mentionIndex);
-        const after = newPostContent.slice(postTextareaRef.current?.selectionStart || 0);
-        setNewPostContent(`${before}@${user.name} ${after}`);
-        setMentions(prev => [...prev, { id: user.id, name: user.name }]);
+        const before =
+            newPostContent.slice(0, mentionIndex);
+
+        const after =
+            newPostContent.slice(
+                postTextareaRef.current?.selectionStart || 0
+            );
+
+        setNewPostContent(
+            `${before}@${user.name} ${after}`
+        );
+
+        setMentions(previous => {
+            if (
+                previous.some(
+                    mention => mention.id === user.id
+                )
+            ) {
+                return previous;
+            }
+
+            return [
+                ...previous,
+                {
+                    id: user.id,
+                    name: user.name
+                }
+            ];
+        });
+
         setMentionSearch('');
         postTextareaRef.current?.focus();
     };
@@ -785,6 +893,17 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         try {
             if (!newPostContent.trim() && !mediaFile) return;
 
+            if (
+                canMentionCollectively
+                && mentionAudience === 'department'
+                && !mentionDepartmentId
+            ) {
+                alert(
+                    'Selecione o departamento ou altere o público da menção.'
+                );
+                return;
+            }
+
             const permissions = currentUser.permissions || {};
 
             if (
@@ -844,9 +963,46 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 if (publicUrl) uploadedMediaUrl = publicUrl;
             }
 
-            const finalMentionIds = mentions
-                .filter(m => newPostContent.includes(`@${m.name}`))
-                .map(m => m.id);
+            const individualMentionIds = mentions
+                .filter(mention =>
+                    newPostContent.includes(
+                        `@${mention.name}`
+                    )
+                )
+                .map(mention => mention.id);
+
+            let collectiveMentionIds: string[] = [];
+
+            if (
+                canMentionCollectively
+                && mentionAudience === 'company'
+            ) {
+                collectiveMentionIds =
+                    companyEmployees.map(
+                        employee => employee.id
+                    );
+            }
+
+            if (
+                canMentionCollectively
+                && mentionAudience === 'department'
+                && mentionDepartmentId
+            ) {
+                collectiveMentionIds =
+                    companyEmployees
+                        .filter(employee =>
+                            employee.department_id
+                            === mentionDepartmentId
+                        )
+                        .map(employee => employee.id);
+            }
+
+            const finalMentionIds = Array.from(
+                new Set([
+                    ...individualMentionIds,
+                    ...collectiveMentionIds
+                ])
+            ).filter(id => id !== currentUser.id);
 
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             if (!profile?.company_id) throw new Error('Company ID not found');
@@ -862,23 +1018,50 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
 
             if (error) throw error;
 
-            for (const id of finalMentionIds) {
-                if (id !== currentUser.id) {
-                    await addNotification({
+            const selectedDepartment =
+                mentionDepartments.find(
+                    department =>
+                        department.id === mentionDepartmentId
+                );
+
+            const notificationDescription =
+                mentionAudience === 'company'
+                    ? `${currentUser.name} mencionou toda a empresa em uma publicação.`
+                    : mentionAudience === 'department'
+                        ? `${currentUser.name} mencionou a equipe ${selectedDepartment?.name || ''} em uma publicação.`
+                        : `${currentUser.name} mencionou você em uma publicação.`;
+
+            await Promise.allSettled(
+                finalMentionIds.map(id =>
+                    addNotification({
                         user_id: id,
                         company_id: profile.company_id,
                         type: 'mention',
-                        title: 'Você foi mencionado!',
-                        description: `${currentUser.name} mencionou você em um post.`,
+                        title:
+                            mentionAudience === 'individual'
+                                ? 'Você foi mencionado!'
+                                : 'Nova publicação para seu grupo',
+                        description: notificationDescription,
                         avatarUrl: currentUser.avatarUrl,
-                        link: '/'
-                    });
-                }
-            }
+                        link: '/?page=feed',
+                        metadata: {
+                            source: 'feed',
+                            mentioned_by: currentUser.id,
+                            mention_scope: mentionAudience,
+                            department_id:
+                                mentionAudience === 'department'
+                                    ? mentionDepartmentId
+                                    : null
+                        }
+                    } as any)
+                )
+            );
 
             setNewPostContent('');
             setMediaFile(null);
             setMentions([]);
+            setMentionAudience('individual');
+            setMentionDepartmentId('');
             fetchPosts(); // Refresh immediately for the author
         } catch (error: any) {
             console.error('Error creating post:', error);
@@ -1114,14 +1297,14 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                             <div className="mt-5 pt-4 border-t border-gray-100 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="text-[10px] font-bold text-brand-subtle-text dark:text-gray-500 uppercase tracking-wider">Selos em Destaque</span>
-                                    <button 
+                                    <button
                                         onClick={() => setShowGalleryModal(true)}
                                         className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg"
                                     >
                                         🏆 Galeria
                                     </button>
                                 </div>
-                                
+
                                 <div className="flex justify-around items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-h-[80px]">
                                     {Array.from({ length: 3 }).map((_, idx) => {
                                         const userBadge = equippedBadges[idx];
@@ -1129,8 +1312,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             const badge = userBadge.company_badges;
                                             const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
                                             return (
-                                                <div 
-                                                    key={userBadge.id} 
+                                                <div
+                                                    key={userBadge.id}
                                                     onClick={() => setSelectedBadgeForComments(userBadge)}
                                                     className={`w-16 h-16 rounded-2xl ${badge.color} border flex items-center justify-center text-3xl shadow-md select-none transform hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer animate-float overflow-hidden`}
                                                     title={`${badge.name}: ${badge.description || ''}`}
@@ -1144,8 +1327,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             );
                                         }
                                         return (
-                                            <div 
-                                                key={idx} 
+                                            <div
+                                                key={idx}
                                                 className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 dark:border-slate-800/60 flex items-center justify-center text-lg text-gray-300 dark:text-slate-700 select-none font-bold"
                                                 title="Slot de Selo Vazio"
                                             >
@@ -1182,10 +1365,123 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             value={newPostContent}
                                             onChange={handlePostContentChange}
                                         ></textarea>
+
+                                        {canMentionCollectively && (
+                                            <div className="mt-3 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-cyan-50/70 shadow-sm dark:border-emerald-900/50 dark:from-emerald-950/30 dark:via-slate-800 dark:to-cyan-950/20">
+                                                <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-400">
+                                                            Público da menção
+                                                        </p>
+                                                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                            Avise pessoas específicas ou um grupo inteiro.
+                                                        </p>
+                                                    </div>
+
+                                                    <select
+                                                        value={mentionAudience}
+                                                        onChange={(event) => {
+                                                            const value =
+                                                                event.target.value as
+                                                                    | 'individual'
+                                                                    | 'company'
+                                                                    | 'department';
+
+                                                            setMentionAudience(value);
+
+                                                            if (value !== 'department') {
+                                                                setMentionDepartmentId('');
+                                                            }
+                                                        }}
+                                                        className="h-10 rounded-xl border border-emerald-100 bg-white px-3 text-xs font-bold text-gray-700 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-gray-100"
+                                                    >
+                                                        <option value="individual">
+                                                            Pessoas mencionadas
+                                                        </option>
+                                                        <option value="company">
+                                                            Toda a empresa
+                                                        </option>
+                                                        <option value="department">
+                                                            Departamento/equipe
+                                                        </option>
+                                                    </select>
+
+                                                    {mentionAudience === 'department' && (
+                                                        <select
+                                                            value={mentionDepartmentId}
+                                                            onChange={(event) =>
+                                                                setMentionDepartmentId(
+                                                                    event.target.value
+                                                                )
+                                                            }
+                                                            className="h-10 rounded-xl border border-cyan-100 bg-white px-3 text-xs font-bold text-gray-700 outline-none transition-all focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:border-cyan-900/60 dark:bg-slate-900 dark:text-gray-100"
+                                                        >
+                                                            <option value="">
+                                                                Selecione a equipe
+                                                            </option>
+
+                                                            {mentionDepartments.map(
+                                                                department => (
+                                                                    <option
+                                                                        key={department.id}
+                                                                        value={department.id}
+                                                                    >
+                                                                        {department.name}
+                                                                    </option>
+                                                                )
+                                                            )}
+                                                        </select>
+                                                    )}
+                                                </div>
+
+                                                {mentionAudience !== 'individual' && (
+                                                    <div className="flex items-center justify-between border-t border-emerald-100/80 bg-white/60 px-3 py-2 text-[11px] dark:border-emerald-900/40 dark:bg-black/10">
+                                                        <span className="font-medium text-gray-500 dark:text-gray-400">
+                                                            {mentionAudience === 'company'
+                                                                ? 'Todos os colaboradores receberão uma notificação.'
+                                                                : mentionDepartmentId
+                                                                    ? 'A equipe selecionada receberá uma notificação.'
+                                                                    : 'Selecione uma equipe para continuar.'}
+                                                        </span>
+
+                                                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-extrabold text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300">
+                                                            {collectiveMentionCount} pessoa(s)
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {mentions.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {mentions
+                                                    .filter(mention =>
+                                                        newPostContent.includes(
+                                                            `@${mention.name}`
+                                                        )
+                                                    )
+                                                    .map(mention => (
+                                                        <span
+                                                            key={mention.id}
+                                                            className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300"
+                                                        >
+                                                            @{mention.name}
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                        )}
+
                                         {mentionSearch !== '' && (
                                             <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                                                {allEmployees
-                                                    .filter(emp => emp.name.toLowerCase().includes(mentionSearch.toLowerCase()))
+                                                {companyEmployees
+                                                    .filter(emp =>
+                                                        emp.id !== currentUser.id
+                                                        && emp.name
+                                                            .toLowerCase()
+                                                            .includes(
+                                                                mentionSearch.toLowerCase()
+                                                            )
+                                                    )
                                                     .map(user => (
                                                         <div key={user.id} onClick={() => selectMention(user)} className="flex items-center space-x-3 p-3 cursor-pointer border-b dark:border-slate-700 last:border-0 transition-colors">
                                                             <UserAvatar src={user.avatarUrl} name={user.name} level={user.level} size="xs" className="shrink-0" />
@@ -1196,7 +1492,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                         )}
                                     </div>
                                 </div>
-    
+
                                 {mediaFile && (
                                     <div className="relative mb-4 ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800 p-2 flex flex-col items-center">
                                         {mediaFile.type === 'video' ? (
@@ -1215,8 +1511,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             />
                                         )}
                                         <div className="flex gap-2 mt-2 w-full justify-center">
-                                            <button 
-                                                type="button" 
+                                            <button
+                                                type="button"
                                                 onClick={handleRotateImage}
                                                 className={mediaFile.type === 'video'
                                                     ? 'hidden'
@@ -1225,9 +1521,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                             >
                                                 🔄 Girar 90° (Mudar Orientação)
                                             </button>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => setMediaFile(null)} 
+                                            <button
+                                                type="button"
+                                                onClick={() => setMediaFile(null)}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 rounded-lg transition-colors border border-red-100"
                                             >
                                                 ✕ Remover
@@ -1235,7 +1531,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                         </div>
                                     </div>
                                 )}
-    
+
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
                                     <div className="flex justify-around sm:justify-start space-x-2">
                                         {currentUser.permissions?.canPostImage !== false && (
@@ -1270,7 +1566,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     </div>
                                     <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organized e eficiente'}</span>
                                 </div>
-    
+
                                 <input
                                     type="file"
                                     ref={imageInputRef}
@@ -1395,14 +1691,14 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     Equipe até 3 selos conquistados para exibir em seu perfil
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setShowGalleryModal(false)}
                                 className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center font-bold text-slate-500 transition-colors"
                             >
                                 ✕
                             </button>
                         </div>
-                        
+
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
                                 <span className="text-xs text-emerald-800 dark:text-emerald-400 font-bold">
@@ -1412,7 +1708,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     {equippedBadges.length} / 3 Equipados
                                 </span>
                             </div>
-                            
+
                             {allCompanyBadges.length === 0 ? (
                                 <p className="text-sm text-slate-500 text-center py-6">
                                     Nenhum selo cadastrado pela empresa até o momento.
@@ -1422,39 +1718,39 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     {allCompanyBadges.map(badge => {
                                         const earned = earnedBadges.find(ub => ub.badge_id === badge.id);
                                         const isEquipped = earned?.is_equipped || false;
-                                        
+
                                         return (
                                             <button
                                                 key={badge.id}
                                                 onClick={async () => {
                                                     if (!earned) return; // Locked badge
-                                                    
+
                                                     const newEquippedState = !isEquipped;
                                                     if (newEquippedState && equippedBadges.length >= 3) {
                                                         alert("Você só pode equipar no máximo 3 selos em destaque!");
                                                         return;
                                                     }
-                                                    
+
                                                     const { error } = await supabase
                                                         .from('user_badges')
                                                         .update({ is_equipped: newEquippedState })
                                                         .eq('id', earned.id);
-                                                    
+
                                                     if (!error) {
                                                         fetchUserBadgesData();
                                                     }
                                                 }}
                                                 className={`relative flex flex-col items-center p-3.5 rounded-2xl border transition-all duration-300 outline-none ${
-                                                    earned 
-                                                        ? isEquipped 
-                                                            ? 'border-brand-primary bg-emerald-50/10 dark:bg-emerald-500/5 shadow-md scale-105' 
+                                                    earned
+                                                        ? isEquipped
+                                                            ? 'border-brand-primary bg-emerald-50/10 dark:bg-emerald-500/5 shadow-md scale-105'
                                                             : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-900 hover:scale-[1.02] hover:border-slate-300 dark:hover:border-slate-700'
                                                         : 'border-slate-50 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/30 opacity-60 cursor-not-allowed'
                                                 }`}
                                             >
                                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-3 select-none overflow-hidden ${
-                                                    earned 
-                                                        ? badge.color 
+                                                    earned
+                                                        ? badge.color
                                                         : 'bg-slate-200 dark:bg-slate-800 text-slate-455 dark:text-slate-650 grayscale'
                                                 }`}>
                                                     {badge.icon.startsWith('http') ? (
@@ -1463,11 +1759,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                                         badge.icon
                                                     )}
                                                 </div>
-                                                
+
                                                 <span className="text-[10px] font-bold text-center truncate w-full">
                                                     {badge.name}
                                                 </span>
-                                                
+
                                                 {earned ? (
                                                     isEquipped ? (
                                                         <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white dark:border-slate-950">
@@ -1493,7 +1789,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 </div>
             )}
             {selectedBadgeForComments && (
-                <BadgeDetailModal 
+                <BadgeDetailModal
                     userBadge={selectedBadgeForComments}
                     onClose={() => setSelectedBadgeForComments(null)}
                 />
