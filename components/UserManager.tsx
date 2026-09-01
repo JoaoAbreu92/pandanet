@@ -158,6 +158,8 @@ const UserFormModal: React.FC<{
             canPostImage: user?.permissions?.canPostImage ?? true,
             canPostVideo: user?.permissions?.canPostVideo ?? true,
             retainFeedPosts: user?.permissions?.retainFeedPosts ?? false,
+            canSendChatAttachments: user?.permissions?.canSendChatAttachments ?? true,
+            chatAttachmentMaxMb: user?.permissions?.chatAttachmentMaxMb ?? 10,
             viewProjects: user?.permissions?.viewProjects ?? true,
             viewTimeBank: user?.permissions?.viewTimeBank ?? true,
             manageTimeBank: user?.permissions?.manageTimeBank ?? false,
@@ -499,6 +501,64 @@ const UserFormModal: React.FC<{
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Imagem" name="canPostImage" checked={formData.permissions.canPostImage} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Vídeo" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Manter publicações após 90 dias" name="retainFeedPosts" checked={formData.permissions.retainFeedPosts ?? false} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+
+                                            <PermissionToggle
+                                                icon={<ChatBubbleLeftRightIcon className="w-4 h-4" />}
+                                                label="Enviar anexos no chat"
+                                                name="canSendChatAttachments"
+                                                checked={formData.permissions.canSendChatAttachments !== false}
+                                                onChange={(name, checked) =>
+                                                    setFormData(previous => ({
+                                                        ...previous,
+                                                        permissions: {
+                                                            ...previous.permissions,
+                                                            [name]: checked
+                                                        }
+                                                    }))
+                                                }
+                                            />
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <label className="px-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                                    Limite de cada anexo
+                                                </label>
+
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="200"
+                                                        value={formData.permissions.chatAttachmentMaxMb}
+                                                        disabled={formData.permissions.canSendChatAttachments === false}
+                                                        onChange={(event) => {
+                                                            const limit = Math.min(
+                                                                200,
+                                                                Math.max(
+                                                                    1,
+                                                                    Number(event.target.value) || 1
+                                                                )
+                                                            );
+
+                                                            setFormData(previous => ({
+                                                                ...previous,
+                                                                permissions: {
+                                                                    ...previous.permissions,
+                                                                    chatAttachmentMaxMb: limit
+                                                                }
+                                                            }));
+                                                        }}
+                                                        className="w-full rounded-xl border border-gray-250 bg-white px-4 py-2 pr-12 text-sm text-gray-800 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                    />
+
+                                                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                                                        MB
+                                                    </span>
+                                                </div>
+
+                                                <p className="px-1 text-[10px] text-gray-400 dark:text-gray-500">
+                                                    Valor permitido: 1 a 200 MB.
+                                                </p>
+                                            </div>
                                         </div>
                                     </section>
 
@@ -837,6 +897,93 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     const [resetPasswordUser, setResetPasswordUser] = useState<Employee | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [isResetting, setIsResetting] = useState(false);
+
+    const [attachmentPolicyScope, setAttachmentPolicyScope] =
+        useState<'all' | 'department'>('all');
+
+    const [attachmentPolicyDepartment, setAttachmentPolicyDepartment] =
+        useState('');
+
+    const [attachmentPolicyEnabled, setAttachmentPolicyEnabled] =
+        useState(true);
+
+    const [attachmentPolicyMaxMb, setAttachmentPolicyMaxMb] =
+        useState(10);
+
+    const [isApplyingAttachmentPolicy, setIsApplyingAttachmentPolicy] =
+        useState(false);
+
+    const handleApplyAttachmentPolicy = async () => {
+        const targetCompanyId =
+            profile?.company_id
+            || '56eaa5ed-8d1b-4879-a002-838702eeb14d';
+
+        if (
+            attachmentPolicyScope === 'department'
+            && !attachmentPolicyDepartment
+        ) {
+            alert('Selecione um departamento ou equipe.');
+            return;
+        }
+
+        const normalizedLimit = Math.min(
+            200,
+            Math.max(1, Number(attachmentPolicyMaxMb) || 1)
+        );
+
+        setIsApplyingAttachmentPolicy(true);
+
+        try {
+            const { data, error } = await supabase.rpc(
+                'set_internal_chat_attachment_policy',
+                {
+                    p_company_id: targetCompanyId,
+                    p_scope: attachmentPolicyScope,
+                    p_department_id:
+                        attachmentPolicyScope === 'department'
+                            ? attachmentPolicyDepartment
+                            : null,
+                    p_enabled: attachmentPolicyEnabled,
+                    p_max_mb: normalizedLimit
+                }
+            );
+
+            if (error) throw error;
+
+            setUsers(users.map(user => {
+                const isTarget =
+                    attachmentPolicyScope === 'all'
+                    || user.department_id === attachmentPolicyDepartment;
+
+                if (!isTarget) return user;
+
+                return {
+                    ...user,
+                    permissions: {
+                        ...user.permissions,
+                        canSendChatAttachments: attachmentPolicyEnabled,
+                        chatAttachmentMaxMb: normalizedLimit
+                    }
+                };
+            }));
+
+            alert(
+                `Política aplicada com sucesso para ${Number(data) || 0} usuário(s).`
+            );
+        } catch (error: any) {
+            console.error(
+                'Erro ao aplicar política de anexos:',
+                error
+            );
+
+            alert(
+                'Não foi possível aplicar a política: '
+                + (error?.message || 'erro desconhecido')
+            );
+        } finally {
+            setIsApplyingAttachmentPolicy(false);
+        }
+    };
 
     const handleSave = async (userData: Omit<Employee, 'id'> | Employee) => {
         if (!profile?.company_id && profile?.role !== 'Super Admin') {
@@ -1275,6 +1422,154 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     </div>
                 </Card>
             )}
+
+            <section className="overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-cyan-50/50 shadow-sm dark:border-emerald-900/50 dark:from-gray-900 dark:via-emerald-950/20 dark:to-cyan-950/20">
+                <div className="border-b border-emerald-100 px-5 py-4 dark:border-emerald-900/40">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                                Mensagens internas
+                            </p>
+
+                            <h3 className="mt-1 text-base font-bold text-gray-900 dark:text-white">
+                                Política de anexos do chat
+                            </h3>
+
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Controle o envio e o tamanho dos arquivos por empresa, departamento ou usuário.
+                            </p>
+                        </div>
+
+                        <span className="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                            Limite máximo: 200 MB
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Aplicar para
+                        </label>
+
+                        <select
+                            value={attachmentPolicyScope}
+                            onChange={(event) => {
+                                const scope =
+                                    event.target.value as 'all' | 'department';
+
+                                setAttachmentPolicyScope(scope);
+
+                                if (scope === 'all') {
+                                    setAttachmentPolicyDepartment('');
+                                }
+                            }}
+                            className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        >
+                            <option value="all">Toda a empresa</option>
+                            <option value="department">Departamento/equipe</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Departamento
+                        </label>
+
+                        <select
+                            value={attachmentPolicyDepartment}
+                            disabled={attachmentPolicyScope !== 'department'}
+                            onChange={(event) =>
+                                setAttachmentPolicyDepartment(event.target.value)
+                            }
+                            className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        >
+                            <option value="">Selecione...</option>
+
+                            {departments.map(department => (
+                                <option
+                                    key={department.id}
+                                    value={department.id}
+                                >
+                                    {department.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Envio de anexos
+                        </label>
+
+                        <select
+                            value={
+                                attachmentPolicyEnabled
+                                    ? 'enabled'
+                                    : 'disabled'
+                            }
+                            onChange={(event) =>
+                                setAttachmentPolicyEnabled(
+                                    event.target.value === 'enabled'
+                                )
+                            }
+                            className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        >
+                            <option value="enabled">Permitido</option>
+                            <option value="disabled">Bloqueado</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Limite por arquivo
+                        </label>
+
+                        <div className="relative">
+                            <input
+                                type="number"
+                                min="1"
+                                max="200"
+                                value={attachmentPolicyMaxMb}
+                                disabled={!attachmentPolicyEnabled}
+                                onChange={(event) =>
+                                    setAttachmentPolicyMaxMb(
+                                        Math.min(
+                                            200,
+                                            Math.max(
+                                                1,
+                                                Number(event.target.value) || 1
+                                            )
+                                        )
+                                    )
+                                }
+                                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 pr-12 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                            />
+
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                                MB
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-end">
+                        <button
+                            type="button"
+                            disabled={isApplyingAttachmentPolicy}
+                            onClick={handleApplyAttachmentPolicy}
+                            className="flex h-11 w-full items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-wait disabled:opacity-60"
+                        >
+                            {isApplyingAttachmentPolicy
+                                ? 'Aplicando...'
+                                : 'Aplicar política'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="border-t border-emerald-100 bg-white/50 px-5 py-3 text-[11px] text-gray-500 dark:border-emerald-900/40 dark:bg-black/10 dark:text-gray-400">
+                    Para criar uma exceção, edite o usuário e altere sua permissão individual.
+                </div>
+            </section>
 
             <Card title={t('users.title')} headerAction={
                 <div className="flex items-center space-x-4">

@@ -600,6 +600,48 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         localStorage.setItem('custom_stickers', JSON.stringify(customStickers));
     }, [customStickers]);
 
+    const chatAttachmentsEnabled =
+        currentUser.permissions?.canSendChatAttachments !== false;
+
+    const chatAttachmentMaxMb = Math.min(
+        200,
+        Math.max(
+            1,
+            Number(
+                currentUser.permissions?.chatAttachmentMaxMb
+                ?? 10
+            )
+        )
+    );
+
+    const validateInternalChatAttachment = (
+        file: File,
+        origin: 'selecionado' | 'colado' | 'GIF' = 'selecionado'
+    ) => {
+        if (!chatAttachmentsEnabled) {
+            showToast(
+                'O envio de anexos está desativado para seu usuário. Solicite a liberação ao administrador da empresa.',
+                'warning'
+            );
+            return false;
+        }
+
+        const maximumBytes =
+            chatAttachmentMaxMb * 1024 * 1024;
+
+        if (file.size > maximumBytes) {
+            showToast(
+                `O arquivo ${origin} possui ${(
+                    file.size / 1024 / 1024
+                ).toFixed(1)} MB. Seu limite é de ${chatAttachmentMaxMb} MB por arquivo.`,
+                'warning'
+            );
+            return false;
+        }
+
+        return true;
+    };
+
     const handleAddManualGif = () => {
         const url = prompt('Cole o link do GIF (URL):');
         if (url && url.trim()) {
@@ -610,6 +652,12 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const handleUploadGif = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        if (!validateInternalChatAttachment(file, 'GIF')) {
+            e.target.value = '';
+            return;
+        }
+
         if (!file.type.includes('gif') && !file.type.includes('image')) {
             showToast('Por favor, selecione um GIF ou imagem.', 'warning');
             return;
@@ -1105,31 +1153,108 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
             let uploadedFileUrl = null;
             let fileType = null;
 
-            if (attachedFile) {
-                // Lógica de Upload
-                const fileExt = attachedFile.name.split('.').pop();
-                const fileName = `${Date.now()}.${fileExt}`;
-                const filePath = `${selectedConversationId}/${fileName}`;
+            // Use the conversation's company_id (not sender's) to support cross-company chats
+            const currentConv = conversations.find(
+                conversation =>
+                    conversation.id === selectedConversationId
+            );
 
-                const { data, error: uploadError } = await supabase.storage
-                    .from('chat-media')
-                    .upload(filePath, attachedFile);
+            const compId =
+                currentConv?.company_id
+                || currentUser.company_id
+                || (profile as any)?.company_id;
+
+            if (attachedFile) {
+                if (
+                    !validateInternalChatAttachment(
+                        attachedFile,
+                        'selecionado'
+                    )
+                ) {
+                    return;
+                }
+
+                if (!compId) {
+                    showToast(
+                        'Não foi possível identificar a empresa desta conversa.',
+                        'error'
+                    );
+                    return;
+                }
+
+                const safeExtension =
+                    attachedFile.name
+                        .split('.')
+                        .pop()
+                        ?.replace(/[^a-zA-Z0-9]/g, '')
+                        .toLowerCase()
+                    || 'bin';
+
+                const randomPart =
+                    typeof crypto !== 'undefined'
+                    && typeof crypto.randomUUID === 'function'
+                        ? crypto.randomUUID()
+                        : Math.random().toString(36).slice(2);
+
+                const storedFileName =
+                    `${Date.now()}-${randomPart}.${safeExtension}`;
+
+                const privateFilePath = [
+                    compId,
+                    currentUser.id,
+                    selectedConversationId,
+                    storedFileName
+                ].join('/');
+
+                const { data, error: uploadError } =
+                    await supabase.storage
+                        .from('message-attachments')
+                        .upload(
+                            privateFilePath,
+                            attachedFile,
+                            {
+                                cacheControl: '3600',
+                                contentType:
+                                    attachedFile.type
+                                    || 'application/octet-stream',
+                                upsert: false,
+                                metadata: {
+                                    originalName: attachedFile.name,
+                                    size: String(attachedFile.size)
+                                }
+                            }
+                        );
 
                 if (uploadError) {
-                    console.error('Falha no upload:', uploadError);
-                    showToast(`Erro ao subir arquivo: ${uploadError.message}`, "error");
-                    setIsSending(false);
-                    return; // ABORTA O ENVIO SE O UPLOAD FALHAR
-                } else if (data) {
-                    const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${filePath}`);
-                    uploadedFileUrl = publicUrl;
-                    fileType = attachedFile.type;
+                    console.error(
+                        'Falha no upload privado:',
+                        uploadError
+                    );
+
+                    showToast(
+                        uploadError.message
+                            ?.toLowerCase()
+                            .includes('policy')
+                            ? 'O envio foi bloqueado pela política de anexos da empresa.'
+                            : `Erro ao enviar o arquivo: ${uploadError.message}`,
+                        'error'
+                    );
+
+                    return;
+                }
+
+                if (data) {
+                    const canonicalUrl =
+                        `https://pandanet.grupopixel.com.br/storage/v1/object/public/message-attachments/${data.path}`;
+
+                    uploadedFileUrl =
+                        await getSignedStorageUrl(canonicalUrl);
+
+                    fileType =
+                        attachedFile.type
+                        || 'application/octet-stream';
                 }
             }
-
-            // Use the conversation's company_id (not sender's) to support cross-company chats
-            const currentConv = conversations.find(c => c.id === selectedConversationId);
-            const compId = currentConv?.company_id || currentUser.company_id || (profile as any)?.company_id;
 
             if (!compId) {
                 console.error("Missing company_id", currentUser);
@@ -1190,26 +1315,53 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
         }
     };
 
-    const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 10 * 1024 * 1024) { alert('O arquivo excede o limite de 10MB.'); return; }
-            setAttachedFile(file);
+    const handleFileAttach = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+        if (
+            !validateInternalChatAttachment(
+                file,
+                'selecionado'
+            )
+        ) {
+            event.target.value = '';
+            return;
         }
+
+        setAttachedFile(file);
     };
 
-    const handlePaste = (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('file') !== -1) {
-                const file = items[i].getAsFile();
-                if (file) {
-                    if (file.size > 10 * 1024 * 1024) {
-                        alert('O arquivo colado excede o limite de 10MB.');
-                        return;
-                    }
-                    setAttachedFile(file);
+    const handlePaste = (
+        event: React.ClipboardEvent
+    ) => {
+        const items = event.clipboardData.items;
+
+        for (let index = 0; index < items.length; index++) {
+            const item = items[index];
+
+            if (
+                item.type.includes('image')
+                || item.kind === 'file'
+            ) {
+                const file = item.getAsFile();
+
+                if (!file) continue;
+
+                if (
+                    !validateInternalChatAttachment(
+                        file,
+                        'colado'
+                    )
+                ) {
+                    return;
                 }
+
+                setAttachedFile(file);
+                return;
             }
         }
     };

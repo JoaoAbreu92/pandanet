@@ -186,6 +186,17 @@ export interface EmployeePermissions {
    */
   retainFeedPosts?: boolean;
 
+  /**
+   * Permite enviar imagens, vídeos e documentos
+   * no chat interno.
+   */
+  canSendChatAttachments?: boolean;
+
+  /**
+   * Limite individual de cada anexo, em megabytes.
+   */
+  chatAttachmentMaxMb?: number;
+
   // RH
   viewDirectory: boolean;
   viewForms: boolean;

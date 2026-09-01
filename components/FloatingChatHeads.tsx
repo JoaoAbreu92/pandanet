@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { ActiveChatHead, Employee, Message } from '../types';
-import { supabase } from '../supabaseClient';
+import { supabase, getSignedStorageUrl } from '../supabaseClient';
 import { useNotifications } from './NotificationContext';
 import {
     XMarkIcon,
@@ -29,67 +29,148 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
     const { playNotificationSound } = useNotifications();
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
-    // 1. Fetch initial unread counts for all active chat heads
+    const chatHeadsRef = useRef(chatHeads);
+    const expandedIdsRef = useRef(expandedChatHeadIds);
+
     useEffect(() => {
-        const fetchInitialUnreadCounts = async () => {
-            if (!currentUser?.id || chatHeads.length === 0) return;
-            
-            try {
-                const { data } = await supabase
-                    .from('messages')
-                    .select('conversation_id, id')
-                    .eq('receiver_id', currentUser.id)
-                    .eq('is_read', false)
-                    .in('conversation_id', chatHeads.map(ch => ch.conversationId));
-                
-                if (data) {
-                    const counts: Record<string, number> = {};
-                    data.forEach((msg: any) => {
-                        counts[msg.conversation_id] = (counts[msg.conversation_id] || 0) + 1;
-                    });
-                    setUnreadCounts(counts);
-                }
-            } catch (err) {
-                console.error('[ChatHeads] Error fetching unread counts:', err);
+        chatHeadsRef.current = chatHeads;
+    }, [chatHeads]);
+
+    useEffect(() => {
+        expandedIdsRef.current = expandedChatHeadIds;
+    }, [expandedChatHeadIds]);
+
+    const chatHeadIdsKey = chatHeads
+        .map(head => head.conversationId)
+        .sort()
+        .join('|');
+
+    const reconcileUnreadCounts = useCallback(async () => {
+        const ids = chatHeadsRef.current.map(
+            head => head.conversationId
+        );
+
+        if (!currentUser?.id || ids.length === 0) {
+            setUnreadCounts({});
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('messages')
+            .select('conversation_id, id')
+            .eq('receiver_id', currentUser.id)
+            .eq('is_read', false)
+            .in('conversation_id', ids);
+
+        if (error) {
+            console.error(
+                '[ChatHeads] Falha ao atualizar badges:',
+                error
+            );
+            return;
+        }
+
+        const counts: Record<string, number> = {};
+
+        (data || []).forEach((message: any) => {
+            counts[message.conversation_id] =
+                (counts[message.conversation_id] || 0) + 1;
+        });
+
+        setUnreadCounts(counts);
+    }, [currentUser?.id]);
+
+    useEffect(() => {
+        void reconcileUnreadCounts();
+
+        const interval = window.setInterval(
+            () => void reconcileUnreadCounts(),
+            12000
+        );
+
+        const refresh = () => {
+            if (document.visibilityState === 'visible') {
+                void reconcileUnreadCounts();
             }
         };
-        
-        fetchInitialUnreadCounts();
-    }, [chatHeads, currentUser?.id]);
 
-    // 2. Global Realtime subscription for incoming messages in minimized heads
+        document.addEventListener('visibilitychange', refresh);
+        window.addEventListener('focus', refresh);
+
+        return () => {
+            window.clearInterval(interval);
+            document.removeEventListener(
+                'visibilitychange',
+                refresh
+            );
+            window.removeEventListener('focus', refresh);
+        };
+    }, [chatHeadIdsKey, reconcileUnreadCounts]);
+
     useEffect(() => {
         if (!currentUser?.id || !currentUser?.company_id) return;
 
-        const companyFilter = `company_id=eq.${currentUser.company_id}`;
+        let timer: number | undefined;
+
+        const scheduleRefresh = () => {
+            if (timer) window.clearTimeout(timer);
+            timer = window.setTimeout(
+                () => void reconcileUnreadCounts(),
+                180
+            );
+        };
 
         const channel = supabase
-            .channel('floating-chat-heads-global')
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: companyFilter
-            }, (payload) => {
-                const newMsg = payload.new as any;
-                
-                // If message is from someone else and belongs to one of our minimized bubbles
-                if (newMsg.sender_id !== currentUser.id && chatHeads.some(ch => ch.conversationId === newMsg.conversation_id)) {
-                    if (!expandedChatHeadIds.includes(newMsg.conversation_id)) {
-                        setUnreadCounts(prev => ({
-                            ...prev,
-                            [newMsg.conversation_id]: (prev[newMsg.conversation_id] || 0) + 1
-                        }));
+            .channel(
+                `floating-chat-global-${currentUser.id}`
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'messages',
+                    filter:
+                        `company_id=eq.${currentUser.company_id}`
+                },
+                payload => {
+                    const message =
+                        (payload.new || payload.old) as any;
+
+                    if (
+                        payload.eventType === 'INSERT'
+                        && message?.sender_id !== currentUser.id
+                        && chatHeadsRef.current.some(
+                            head =>
+                                head.conversationId
+                                === message?.conversation_id
+                        )
+                        && !expandedIdsRef.current.includes(
+                            message?.conversation_id
+                        )
+                    ) {
                         playNotificationSound('message');
                     }
+
+                    scheduleRefresh();
                 }
-            })
-            .subscribe();
+            )
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') {
+                    void reconcileUnreadCounts();
+                }
+            });
 
         return () => {
+            if (timer) window.clearTimeout(timer);
             supabase.removeChannel(channel);
         };
-    }, [chatHeads, currentUser?.id, currentUser?.company_id, playNotificationSound, expandedChatHeadIds]);
+    }, [
+        currentUser?.id,
+        currentUser?.company_id,
+        playNotificationSound,
+        reconcileUnreadCounts
+    ]);
 
     if (chatHeads.length === 0) return null;
 
@@ -204,6 +285,72 @@ const FloatingChatHeads: React.FC<FloatingChatHeadsProps> = ({
     );
 };
 
+const FloatingMediaPreview: React.FC<{
+    file: NonNullable<Message['file']>;
+}> = ({ file }) => {
+    const [failed, setFailed] = useState(false);
+    const type = (file.type || '').toLowerCase();
+
+    if (failed) {
+        return (
+            <div className="mt-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                ⚠️ Mídia indisponível
+            </div>
+        );
+    }
+
+    if (
+        type === 'sticker'
+        || type.startsWith('image/')
+    ) {
+        return (
+            <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 block overflow-hidden rounded-xl bg-black/5"
+            >
+                <img
+                    src={file.url}
+                    alt="Imagem enviada"
+                    loading="lazy"
+                    className="max-h-40 w-full object-contain"
+                    onError={() => setFailed(true)}
+                />
+            </a>
+        );
+    }
+
+    if (type.startsWith('video/')) {
+        return (
+            <div className="mt-1 overflow-hidden rounded-xl bg-black">
+                <video
+                    src={file.url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="max-h-40 w-full object-contain"
+                    onError={() => setFailed(true)}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <a
+            href={file.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 flex max-w-[210px] items-center gap-2 rounded-xl bg-black/10 px-3 py-2 text-xs font-semibold"
+        >
+            📎
+            <span className="truncate">
+                {file.name || 'Abrir arquivo'}
+            </span>
+        </a>
+    );
+};
+
 // Encapsulated Chat Box Component
 const FloatingChatBox: React.FC<{
     conversationId: string;
@@ -258,15 +405,71 @@ const FloatingChatBox: React.FC<{
                     .limit(40);
                 
                 if (data) {
-                    const mapped: Message[] = data.reverse().map((msg: any) => ({
-                        id: msg.id,
-                        sender: msg.sender_id === currentUser.id ? 'me' : msg.sender_id,
-                        senderName: msg.sender_id === currentUser.id ? currentUser.name : (activeHead?.participantName || 'Colega'),
-                        avatarUrl: msg.sender_id === currentUser.id ? currentUser.avatarUrl : (activeHead?.participantAvatarUrl || ''),
-                        text: msg.text,
-                        timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        reactions: []
-                    }));
+                    const mapped = await Promise.all(
+                        data.reverse().map(
+                            async (msg: any): Promise<Message> => {
+                                const signedUrl = msg.file_url
+                                    ? await getSignedStorageUrl(
+                                        msg.file_url,
+                                        86400
+                                    )
+                                    : null;
+
+                                const rawName = msg.file_url
+                                    ? msg.file_url
+                                        .split('?')[0]
+                                        .split('/')
+                                        .pop()
+                                    : null;
+
+                                return {
+                                    id: msg.id,
+                                    sender:
+                                        msg.sender_id === currentUser.id
+                                            ? 'me'
+                                            : msg.sender_id,
+                                    senderName:
+                                        msg.sender_id === currentUser.id
+                                            ? currentUser.name
+                                            : (
+                                                activeHead.participantName
+                                                || 'Colega'
+                                            ),
+                                    avatarUrl:
+                                        msg.sender_id === currentUser.id
+                                            ? currentUser.avatarUrl
+                                            : (
+                                                activeHead.participantAvatarUrl
+                                                || ''
+                                            ),
+                                    text: msg.text || '',
+                                    timestamp: new Date(
+                                        msg.created_at
+                                    ).toLocaleTimeString(
+                                        [],
+                                        {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        }
+                                    ),
+                                    reactions: Array.isArray(msg.reactions)
+                                        ? msg.reactions
+                                        : [],
+                                    file: signedUrl
+                                        ? {
+                                            name: rawName
+                                                ? decodeURIComponent(rawName)
+                                                : 'arquivo',
+                                            url: signedUrl,
+                                            type:
+                                                msg.file_type
+                                                || undefined
+                                        }
+                                        : undefined
+                                };
+                            }
+                        )
+                    );
                     setMessages(mapped);
                     scrollToBottom('auto');
                 }
@@ -288,28 +491,83 @@ const FloatingChatBox: React.FC<{
                 schema: 'public',
                 table: 'messages',
                 filter: `conversation_id=eq.${conversationId}`
-            }, async (payload) => {
+            }, async payload => {
                 const newMsg = payload.new as any;
-                
-                setMessages(prev => {
-                    if (prev.some(m => m.id === newMsg.id)) return prev;
-                    const isMe = newMsg.sender_id === currentUser.id;
-                    const mappedMsg: Message = {
-                        id: newMsg.id,
-                        sender: isMe ? 'me' : newMsg.sender_id,
-                        senderName: isMe ? currentUser.name : (activeHead?.participantName || 'Colega'),
-                        avatarUrl: isMe ? currentUser.avatarUrl : (activeHead?.participantAvatarUrl || ''),
-                        text: newMsg.text,
-                        timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        reactions: []
-                    };
-                    return [...prev, mappedMsg];
+                const isMe =
+                    newMsg.sender_id === currentUser.id;
+
+                const signedUrl = newMsg.file_url
+                    ? await getSignedStorageUrl(
+                        newMsg.file_url,
+                        86400
+                    )
+                    : null;
+
+                const rawName = newMsg.file_url
+                    ? newMsg.file_url
+                        .split('?')[0]
+                        .split('/')
+                        .pop()
+                    : null;
+
+                const mappedMessage: Message = {
+                    id: newMsg.id,
+                    sender: isMe
+                        ? 'me'
+                        : newMsg.sender_id,
+                    senderName: isMe
+                        ? currentUser.name
+                        : (
+                            activeHead.participantName
+                            || 'Colega'
+                        ),
+                    avatarUrl: isMe
+                        ? currentUser.avatarUrl
+                        : (
+                            activeHead.participantAvatarUrl
+                            || ''
+                        ),
+                    text: newMsg.text || '',
+                    timestamp: new Date(
+                        newMsg.created_at
+                    ).toLocaleTimeString(
+                        [],
+                        {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }
+                    ),
+                    reactions: Array.isArray(newMsg.reactions)
+                        ? newMsg.reactions
+                        : [],
+                    file: signedUrl
+                        ? {
+                            name: rawName
+                                ? decodeURIComponent(rawName)
+                                : 'arquivo',
+                            url: signedUrl,
+                            type: newMsg.file_type || undefined
+                        }
+                        : undefined
+                };
+
+                setMessages(previous => {
+                    if (
+                        previous.some(
+                            message => message.id === mappedMessage.id
+                        )
+                    ) {
+                        return previous;
+                    }
+
+                    return [...previous, mappedMessage];
                 });
-                
+
                 scrollToBottom();
 
-                if (newMsg.sender_id !== currentUser.id) {
+                if (!isMe) {
                     playNotificationSound('message');
+
                     await supabase
                         .from('messages')
                         .update({ is_read: true })
@@ -416,7 +674,23 @@ const FloatingChatBox: React.FC<{
                                         ? 'bg-brand-primary text-white border-transparent'
                                         : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border-gray-100 dark:border-white/5'
                                 }`}>
-                                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                                    {msg.file && (
+                                        <FloatingMediaPreview
+                                            file={msg.file}
+                                        />
+                                    )}
+                                    {msg.text && (
+                                        <p className={`whitespace-pre-wrap ${
+                                            msg.file ? 'mt-2' : ''
+                                        }`}>
+                                            {msg.text}
+                                        </p>
+                                    )}
+                                    {!msg.text && !msg.file && (
+                                        <p className="text-xs italic opacity-70">
+                                            Mensagem sem conteúdo
+                                        </p>
+                                    )}
                                 </div>
                                 <span className="text-[10px] text-gray-400 mt-1 px-1">
                                     {msg.timestamp}
