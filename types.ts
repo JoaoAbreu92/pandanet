@@ -180,6 +180,11 @@ export interface EmployeePermissions {
   canPostText: boolean;
   canPostImage: boolean;
   canPostVideo: boolean;
+  /**
+   * Quando true, as publicações do usuário não participam
+   * da limpeza automática após 90 dias.
+   */
+  retainFeedPosts?: boolean;
 
   // RH
   viewDirectory: boolean;

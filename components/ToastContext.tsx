@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -18,11 +18,140 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const nextId = useRef(0);
     const dismiss = (id: number) => setToasts(current => current.filter(toast => toast.id !== id));
 
-    const showToast = (message: string, type: ToastType = 'success') => {
+    const showToastRef = useRef<
+        (message: string, type?: ToastType) => void
+    >(() => undefined);
+
+    const showToast = (
+        message: string,
+        type: ToastType = 'success'
+    ) => {
+        const normalizedMessage = String(message || '').trim();
+        if (!normalizedMessage) return;
+
         const id = ++nextId.current;
-        setToasts(current => [...current.slice(-3), { id, message, type }]);
-        window.setTimeout(() => dismiss(id), 4500);
+
+        setToasts(current => [
+            ...current.slice(-3),
+            {
+                id,
+                message: normalizedMessage,
+                type
+            }
+        ]);
+
+        const duration =
+            type === 'error'
+                ? 7000
+                : type === 'warning'
+                    ? 6000
+                    : 4800;
+
+        window.setTimeout(() => dismiss(id), duration);
     };
+
+    showToastRef.current = showToast;
+
+    const normalizeNativeAlert = (
+        rawValue: unknown
+    ): { message: string; type: ToastType } => {
+        const originalMessage = String(rawValue ?? '').trim();
+        const lower =
+            originalMessage.toLocaleLowerCase('pt-BR');
+
+        if (
+            lower.includes('row-level security')
+            || lower.includes('security policy')
+            || lower.includes('feed-media')
+            || lower.includes('migration_feed_storage')
+        ) {
+            return {
+                type: 'warning',
+                message: 'Sua conta não possui permissão para concluir esta ação. Solicite a liberação ao administrador da empresa.'
+            };
+        }
+
+        if (
+            lower.includes('jwt')
+            || lower.includes('postgres')
+            || lower.includes('supabase')
+            || lower.includes('duplicate key')
+            || lower.includes('foreign key')
+            || lower.includes('violates')
+            || lower.includes('stack trace')
+        ) {
+            return {
+                type: 'error',
+                message: 'Não foi possível concluir a operação. Tente novamente em alguns instantes.'
+            };
+        }
+
+        let type: ToastType = 'info';
+
+        if (
+            lower.includes('sucesso')
+            || lower.includes('concluíd')
+            || lower.includes('salvo')
+            || lower.includes('salva')
+            || lower.includes('criado')
+            || lower.includes('criada')
+            || lower.includes('enviado')
+            || lower.includes('enviada')
+            || lower.includes('copiado')
+            || lower.includes('copiada')
+            || lower.includes('atualizado')
+            || lower.includes('atualizada')
+            || lower.includes('publicado')
+            || lower.includes('publicada')
+        ) {
+            type = 'success';
+        } else if (
+            lower.includes('erro')
+            || lower.includes('falha')
+            || lower.includes('não foi possível')
+            || lower.includes('indisponível')
+        ) {
+            type = 'error';
+        } else if (
+            lower.includes('permiss')
+            || lower.includes('atenção')
+            || lower.includes('limite')
+            || lower.includes('não pode')
+            || lower.includes('máximo')
+            || lower.includes('obrigatóri')
+        ) {
+            type = 'warning';
+        }
+
+        const message = originalMessage
+            .replace(/^erro:\s*/i, '')
+            .replace(/^aviso:\s*/i, '')
+            .replace(/^atenção:\s*/i, '')
+            .trim();
+
+        return {
+            type,
+            message: message || 'Operação concluída.'
+        };
+    };
+
+    useEffect(() => {
+        const originalAlert = window.alert.bind(window);
+
+        window.alert = ((value?: unknown) => {
+            const notification =
+                normalizeNativeAlert(value);
+
+            showToastRef.current(
+                notification.message,
+                notification.type
+            );
+        }) as typeof window.alert;
+
+        return () => {
+            window.alert = originalAlert;
+        };
+    }, []);
 
     return (
         <ToastContext.Provider value={{ showToast }}>

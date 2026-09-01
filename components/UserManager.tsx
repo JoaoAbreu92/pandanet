@@ -157,6 +157,7 @@ const UserFormModal: React.FC<{
             canPostText: user?.permissions?.canPostText ?? true,
             canPostImage: user?.permissions?.canPostImage ?? true,
             canPostVideo: user?.permissions?.canPostVideo ?? true,
+            retainFeedPosts: user?.permissions?.retainFeedPosts ?? false,
             viewProjects: user?.permissions?.viewProjects ?? true,
             viewTimeBank: user?.permissions?.viewTimeBank ?? true,
             manageTimeBank: user?.permissions?.manageTimeBank ?? false,
@@ -497,6 +498,7 @@ const UserFormModal: React.FC<{
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Texto" name="canPostText" checked={formData.permissions.canPostText} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Imagem" name="canPostImage" checked={formData.permissions.canPostImage} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                             <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Postar Vídeo" name="canPostVideo" checked={formData.permissions.canPostVideo} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<PlusIcon className="w-4 h-4" />} label="Manter publicações após 90 dias" name="retainFeedPosts" checked={formData.permissions.retainFeedPosts ?? false} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         </div>
                                     </section>
 

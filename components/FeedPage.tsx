@@ -241,7 +241,26 @@ export const PostCard: React.FC<{
 
                     {post.mediaUrl && (
                         <div className="mb-4 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 dark:bg-slate-700 dark:border-slate-600 text-center">
-                            <img src={post.mediaUrl} alt="Post content" className="w-full h-auto object-contain max-h-[500px]" />
+                            {post.mediaType === 'video' ? (
+                                <video
+                                    src={post.mediaUrl}
+                                    controls
+                                    playsInline
+                                    preload="metadata"
+                                    className="max-h-[620px] w-full bg-black object-contain"
+                                    aria-label="Vídeo da publicação"
+                                >
+                                    Seu navegador não oferece suporte a este vídeo.
+                                </video>
+                            ) : (
+                                <img
+                                    src={post.mediaUrl}
+                                    alt="Imagem da publicação"
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="h-auto max-h-[620px] w-full object-contain"
+                                />
+                            )}
                         </div>
                     )}
 
@@ -444,7 +463,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     const [posts, setPosts] = useState<Post[]>([]);
     const [localRecognitions, setLocalRecognitions] = useState<Recognition[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
-    const [mediaFile, setMediaFile] = useState<{ url: string, type: 'image', file?: File } | null>(null);
+    const [mediaFile, setMediaFile] = useState<{
+        url: string;
+        type: 'image' | 'video';
+        file?: File;
+    } | null>(null);
     const [showRecognitionModal, setShowRecognitionModal] = useState(false);
     const [loading, setLoading] = useState(true);
     const [mentionSearch, setMentionSearch] = useState('');
@@ -510,15 +533,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const imageInputRef = useRef<HTMLInputElement>(null);
+    const videoInputRef = useRef<HTMLInputElement>(null);
     const postTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     const fetchPosts = async () => {
         try {
             const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', currentUser.id).single();
             if (!profile?.company_id) return;
-
-            const ninetyDaysAgo = new Date();
-            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
             const { data, error } = await supabase
                 .from('posts')
@@ -529,7 +550,6 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                     comments(id, content, created_at, author_id, profiles: author_id(full_name, avatar_url, level))
                 `)
                 .eq('company_id', profile.company_id)
-                .gte('created_at', ninetyDaysAgo.toISOString())
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -542,7 +562,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 authorLevel: item.profiles?.level || 1,
                 content: item.content,
                 mediaUrl: item.media_url,
-                mediaType: item.media_type as 'image',
+                mediaType: item.media_type as 'image' | 'video',
                 timestamp: item.created_at,
                 mentions: item.mentions || [],
                 reactions: item.post_reactions.map((r: any) => ({
@@ -617,23 +637,36 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     useEffect(() => {
+        const companyId = currentUser.company_id;
+
+        if (!companyId) {
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
-        Promise.all([fetchPosts(), fetchRecognitions(), fetchUserBadgesData()]).finally(() => setLoading(false));
+        Promise.all([
+            fetchPosts(),
+            fetchRecognitions(),
+            fetchUserBadgesData()
+        ]).finally(() => setLoading(false));
+
+        const tenantFilter = `company_id=eq.${companyId}`;
 
         const channel = supabase
-            .channel('public:posts_and_recognitions')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchPosts())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions' }, () => fetchPosts())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'recognitions' }, () => fetchRecognitions())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges' }, () => fetchUserBadgesData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'company_badges' }, () => fetchUserBadgesData())
+            .channel(`feed:${companyId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: tenantFilter }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: tenantFilter }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'post_reactions', filter: tenantFilter }, () => fetchPosts())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'recognitions', filter: tenantFilter }, () => fetchRecognitions())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges', filter: tenantFilter }, () => fetchUserBadgesData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'company_badges', filter: tenantFilter }, () => fetchUserBadgesData())
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [currentUser.id, currentUser.company_id]);
 
     const handlePostContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
@@ -711,7 +744,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     };
 
     const handleRotateImage = () => {
-        if (!mediaFile) return;
+        if (!mediaFile || mediaFile.type !== 'image') return;
         const img = new Image();
         img.src = mediaFile.url;
         img.onload = () => {
@@ -752,12 +785,49 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
         try {
             if (!newPostContent.trim() && !mediaFile) return;
 
+            const permissions = currentUser.permissions || {};
+
+            if (
+                newPostContent.trim()
+                && permissions.canPostText === false
+            ) {
+                alert('Você não tem permissão para publicar textos no feed.');
+                return;
+            }
+
+            if (
+                mediaFile?.type === 'image'
+                && permissions.canPostImage === false
+            ) {
+                alert('Você não tem permissão para publicar imagens no feed.');
+                return;
+            }
+
+            if (
+                mediaFile?.type === 'video'
+                && permissions.canPostVideo === false
+            ) {
+                alert('Você não tem permissão para publicar vídeos no feed.');
+                return;
+            }
+
             let uploadedMediaUrl = null;
             if (mediaFile && mediaFile.file) {
-                // Compress image before upload
-                const fileToUpload = await compressImage(mediaFile.file);
+                const fileToUpload =
+                    mediaFile.type === 'image'
+                        ? await compressImage(mediaFile.file)
+                        : mediaFile.file;
 
-                const fileExt = fileToUpload.name.split('.').pop();
+                const fileExt =
+                    mediaFile.type === 'image'
+                        ? 'jpg'
+                        : (
+                            fileToUpload.name
+                                .split('.')
+                                .pop()
+                                ?.toLowerCase()
+                            || 'mp4'
+                        );
                 const fileName = `${Math.random()}.${fileExt}`;
                 const filePath = `${currentUser.id}/${fileName}`;
 
@@ -814,9 +884,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             console.error('Error creating post:', error);
             const msg = error.message || 'Erro desconhecido.';
             if (msg.includes('row-level security') || msg.includes('security policy')) {
-                alert('Erro de permissão ao publicar. O bucket de mídia "feed-media" pode não estar configurado no banco de dados. Verifique as políticas de Storage no Supabase ou execute o script SQL de correção (MIGRATION_FEED_STORAGE.sql).');
+                alert('Você não possui permissão para publicar este tipo de conteúdo. Solicite a liberação ao administrador da empresa.');
             } else {
-                alert('Erro ao publicar post: ' + msg);
+                alert('Não foi possível publicar agora. Verifique o conteúdo e tente novamente.');
             }
         }
     };
@@ -906,22 +976,60 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
             isGhostMode
             && realProfile?.role !== 'Super Admin'
         ) return;
+
         if (!window.confirm(t('feed.delete_confirm'))) return;
 
-        // Optimistic update
-        setPosts(prev => prev.filter(p => p.id !== postId));
+        const postToDelete = posts.find(
+            post => post.id === postId
+        );
+
+        setPosts(previous =>
+            previous.filter(post => post.id !== postId)
+        );
 
         try {
-            const { error } = await supabase.from('posts').delete().eq('id', postId);
+            const { error } = await supabase
+                .from('posts')
+                .delete()
+                .eq('id', postId)
+                .eq('company_id', currentUser.company_id);
+
             if (error) {
-                console.error("Error deleting post:", error);
-                alert("Erro ao excluir postagem: " + (error.details || error.message || "Permissão negada."));
-                fetchPosts(); // Revert
+                console.error('Error deleting post:', error);
+                alert('Não foi possível excluir a publicação.');
+                fetchPosts();
+                return;
             }
-        } catch (err: any) {
-            console.error("Error deleting post:", err);
-            alert("Erro inesperado ao excluir: " + (err.message || "Erro desconhecido."));
-            fetchPosts(); // Revert
+
+            if (postToDelete?.mediaUrl) {
+                const marker = '/feed-media/';
+                const markerIndex =
+                    postToDelete.mediaUrl.indexOf(marker);
+
+                if (markerIndex >= 0) {
+                    const objectPath = decodeURIComponent(
+                        postToDelete.mediaUrl.slice(
+                            markerIndex + marker.length
+                        )
+                    );
+
+                    const { error: mediaError } =
+                        await supabase.storage
+                            .from('feed-media')
+                            .remove([objectPath]);
+
+                    if (mediaError) {
+                        console.warn(
+                            'Falha não crítica ao remover mídia:',
+                            mediaError
+                        );
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Unexpected delete error:', error);
+            alert('Não foi possível excluir a publicação.');
+            fetchPosts();
         }
     };
 
@@ -1091,12 +1199,29 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     
                                 {mediaFile && (
                                     <div className="relative mb-4 ring-2 ring-brand-primary/20 rounded-xl overflow-hidden shadow-inner bg-gray-50 dark:bg-slate-800 p-2 flex flex-col items-center">
-                                        <img src={mediaFile.url} className="max-w-full h-auto object-contain max-h-[350px] rounded-lg" alt="Preview" />
+                                        {mediaFile.type === 'video' ? (
+                                            <video
+                                                src={mediaFile.url}
+                                                controls
+                                                playsInline
+                                                preload="metadata"
+                                                className="max-h-[350px] w-full rounded-lg bg-black object-contain"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={mediaFile.url}
+                                                className="h-auto max-h-[350px] max-w-full rounded-lg object-contain"
+                                                alt="Prévia da imagem"
+                                            />
+                                        )}
                                         <div className="flex gap-2 mt-2 w-full justify-center">
                                             <button 
                                                 type="button" 
                                                 onClick={handleRotateImage}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-primary bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-lg transition-colors border border-emerald-100 dark:border-emerald-500/20"
+                                                className={mediaFile.type === 'video'
+                                                    ? 'hidden'
+                                                    : 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-primary bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-lg transition-colors border border-emerald-100 dark:border-emerald-500/20'
+                                                }
                                             >
                                                 🔄 Girar 90° (Mudar Orientação)
                                             </button>
@@ -1113,7 +1238,27 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
     
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800 gap-4">
                                     <div className="flex justify-around sm:justify-start space-x-2">
-                                        <button onClick={() => imageInputRef.current?.click()} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 rounded-lg transition-all"><PhotoIcon className="w-5 h-5 text-emerald-500" /><span className="text-sm font-medium">{t('feed.photo')}</span></button>
+                                        {currentUser.permissions?.canPostImage !== false && (
+                                            <button
+                                                type="button"
+                                                onClick={() => imageInputRef.current?.click()}
+                                                className="flex items-center space-x-2 rounded-lg px-3 py-2 text-gray-500 transition-all dark:text-gray-400"
+                                            >
+                                                <PhotoIcon className="h-5 w-5 text-emerald-500" />
+                                                <span className="text-sm font-medium">{t('feed.photo')}</span>
+                                            </button>
+                                        )}
+
+                                        {currentUser.permissions?.canPostVideo !== false && (
+                                            <button
+                                                type="button"
+                                                onClick={() => videoInputRef.current?.click()}
+                                                className="flex items-center space-x-2 rounded-lg px-3 py-2 text-gray-500 transition-all dark:text-gray-400"
+                                            >
+                                                <span aria-hidden="true" className="text-lg">🎬</span>
+                                                <span className="text-sm font-medium">Vídeo</span>
+                                            </button>
+                                        )}
                                         <button onClick={() => setShowRecognitionModal(true)} className="flex items-center space-x-2 px-3 py-2 text-gray-500 dark:text-gray-400 rounded-lg transition-all"><CakeIcon className="w-5 h-5 text-purple-500" /><span className="text-sm font-medium">{t('feed.recognize')}</span></button>
                                     </div>
                                     <button onClick={handleCreatePost} disabled={!newPostContent.trim() && !mediaFile} className="flex items-center justify-center space-x-2 px-6 py-2 sm:py-2.5 bg-brand-primary text-white font-bold rounded-xl disabled:opacity-50 transition-all shadow-md shadow-brand-primary/20 active:scale-95 w-full sm:w-auto"><PaperAirplaneIcon className="w-5 h-5" /><span>{t('feed.post')}</span></button>
@@ -1126,7 +1271,64 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                                     <span className="italic whitespace-nowrap hidden sm:inline text-right">{t('feed.motto') || 'Acervo organized e eficiente'}</span>
                                 </div>
     
-                                <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setMediaFile({ url: URL.createObjectURL(file), type: 'image', file }); }} />
+                                <input
+                                    type="file"
+                                    ref={imageInputRef}
+                                    className="hidden"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={event => {
+                                        const file = event.target.files?.[0];
+                                        event.target.value = '';
+
+                                        if (!file) return;
+
+                                        if (file.size > 20 * 1024 * 1024) {
+                                            alert('A imagem deve ter no máximo 20 MB antes da compactação.');
+                                            return;
+                                        }
+
+                                        setMediaFile({
+                                            url: URL.createObjectURL(file),
+                                            type: 'image',
+                                            file
+                                        });
+                                    }}
+                                />
+
+                                <input
+                                    type="file"
+                                    ref={videoInputRef}
+                                    className="hidden"
+                                    accept="video/mp4,video/webm,video/quicktime"
+                                    onChange={event => {
+                                        const file = event.target.files?.[0];
+                                        event.target.value = '';
+
+                                        if (!file) return;
+
+                                        const allowedTypes = [
+                                            'video/mp4',
+                                            'video/webm',
+                                            'video/quicktime'
+                                        ];
+
+                                        if (!allowedTypes.includes(file.type)) {
+                                            alert('Formato de vídeo não permitido. Utilize MP4, WebM ou MOV.');
+                                            return;
+                                        }
+
+                                        if (file.size > 40 * 1024 * 1024) {
+                                            alert('O vídeo deve ter no máximo 40 MB.');
+                                            return;
+                                        }
+
+                                        setMediaFile({
+                                            url: URL.createObjectURL(file),
+                                            type: 'video',
+                                            file
+                                        });
+                                    }}
+                                />
                             </div>
                         )}
                     </Card>
