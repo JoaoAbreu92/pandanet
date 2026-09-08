@@ -286,42 +286,29 @@ const EmailNotifier: React.FC = () => {
         let cancelled = false;
 
         const loadAccounts = async () => {
-            let query = supabase
-                .from('email_settings')
-                .select('*')
-                .eq('company_id', companyId);
+            const EMAIL_SERVER_URL =
+                (import.meta.env.VITE_EMAIL_SERVER_URL as string)
+                || `${window.location.origin}/api/email`;
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+            if (!token) return;
+            const response = await fetch(`${EMAIL_SERVER_URL}/accounts/list`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ viewAllCompanyEmails: true })
+            });
+            const result = await response.json();
 
-            const permissions = currentUser?.email_permissions;
-            const canViewAll =
-                currentUser?.role === 'Super Admin'
-                || currentUser?.email === 'ti@grupopixel.com.br'
-                || permissions?.can_view_all_accounts === true;
-
-            if (!canViewAll) {
-                if (
-                    permissions?.allowed_accounts
-                    && permissions.allowed_accounts.length > 0
-                ) {
-                    query = query.or(
-                        `user_id.eq.${userId},id.in.(${permissions.allowed_accounts.join(',')})`
-                    );
-                } else {
-                    query = query.eq('user_id', userId);
-                }
-            }
-
-            const { data, error } = await query;
-
-            if (error) {
+            if (!response.ok) {
                 console.error(
                     '[EmailNotifier] Erro ao carregar contas:',
-                    error
+                    result.error || response.status
                 );
                 return;
             }
 
             if (!cancelled) {
-                setAccounts((data || []) as EmailAccount[]);
+                setAccounts((result.accounts || []) as EmailAccount[]);
             }
         };
 

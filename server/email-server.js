@@ -29,6 +29,18 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+const { createClient } = require('@supabase/supabase-js');
+const supabaseUrl = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+const supabaseKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+}) : null;
+
+if (!supabase) {
+    console.error('FATAL: Supabase service role configuration not found.');
+    process.exit(1);
+}
+
 // --- Security Middlewares ---
 app.use(helmet()); // Basic security headers
 app.use(hpp());    // Prevent HTTP Parameter Pollution
@@ -46,13 +58,13 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.get('/api/email/diagnose-nodemailer', (req, res) => {
+app.get('/api/email/diagnose-nodemailer', authMiddleware, (req, res) => {
     const diagnostics = {
         nodemailer_installed: false,
         nodemailer_version: null,
         mail_composer_required: false,
         mail_composer_error: null,
-        env_keys: Object.keys(process.env)
+        service_ready: true
     };
 
     try {
@@ -74,7 +86,7 @@ app.get('/api/email/diagnose-nodemailer', (req, res) => {
 });
 
 // --- JWT Auth Middleware ---
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         console.warn('[auth] Email: Missing or invalid Authorization header');
@@ -86,13 +98,258 @@ function authMiddleware(req, res, next) {
             console.error('[auth] JWT_SECRET is undefined!');
             return res.status(500).json({ error: 'Internal Auth Configuration Error' });
         }
-        jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const userId = decoded && typeof decoded === 'object' ? decoded.sub : null;
+        if (!userId) {
+            return res.status(401).json({ error: 'Token sem identidade de usuário.' });
+        }
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, company_id, role, is_admin, is_company_admin, email_permissions')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (profileError || !profile) {
+            return res.status(403).json({ error: 'Perfil não autorizado para o PandaMail.' });
+        }
+
+        req.authUser = profile;
+
+        const suppliedConfig = req.body && req.body.config;
+        const accountId = req.body && (req.body.accountId || (suppliedConfig && suppliedConfig.id));
+        const isConnectionTest = req.path === '/api/email/test';
+        const isAccountManagement = req.path.startsWith('/api/email/accounts/');
+
+        if (accountId) {
+            const { data: account, error: accountError } = await supabase
+                .from('email_settings')
+                .select('*')
+                .eq('id', accountId)
+                .maybeSingle();
+
+            if (accountError || !account) {
+                return res.status(404).json({ error: 'Conta de e-mail não localizada.' });
+            }
+
+            const permissions = profile.email_permissions || {};
+            const allowedAccounts = Array.isArray(permissions.allowed_accounts)
+                ? permissions.allowed_accounts
+                : [];
+            const isAdministrator = profile.role === 'Super Admin'
+                || profile.is_admin === true
+                || profile.is_company_admin === true;
+            const sameCompany = !!profile.company_id && account.company_id === profile.company_id;
+            const isOwner = account.user_id === profile.id;
+            const canUseAccount = isOwner || (
+                sameCompany && (
+                    isAdministrator
+                    || permissions.can_view_all_accounts === true
+                    || allowedAccounts.includes(account.id)
+                )
+            );
+
+            if (!canUseAccount) {
+                return res.status(403).json({ error: 'Acesso negado a esta conta de e-mail.' });
+            }
+
+            req.emailAccount = account;
+            req.body.config = account;
+            req.body.user_id = profile.id;
+        } else if (!isConnectionTest && !isAccountManagement) {
+            return res.status(400).json({ error: 'Identificador da conta de e-mail ausente.' });
+        } else {
+            req.body.user_id = profile.id;
+        }
+
         next();
     } catch (err) {
         console.error('[auth] Email: Token verification failed:', err.message);
         return res.status(401).json({ error: 'Invalid or expired token: ' + err.message });
     }
 }
+
+const publicAccountColumns = 'id, company_id, user_id, imap_host, imap_port, imap_user, imap_ssl, smtp_host, smtp_port, smtp_user, smtp_ssl, signature, updated_at';
+
+const sanitizeAccount = account => ({
+    id: account.id,
+    company_id: account.company_id,
+    user_id: account.user_id,
+    imap_host: account.imap_host,
+    imap_port: account.imap_port,
+    imap_user: account.imap_user,
+    imap_ssl: account.imap_ssl,
+    smtp_host: account.smtp_host,
+    smtp_port: account.smtp_port,
+    smtp_user: account.smtp_user,
+    smtp_ssl: account.smtp_ssl,
+    signature: account.signature || '',
+    updated_at: account.updated_at,
+    has_imap_password: Boolean(account.imap_pass),
+    has_smtp_password: Boolean(account.smtp_pass || account.imap_pass)
+});
+
+const isEmailAdministrator = profile => profile.role === 'Super Admin'
+    || profile.is_admin === true
+    || profile.is_company_admin === true;
+
+app.post('/api/email/accounts/list', authMiddleware, async (req, res) => {
+    try {
+        const profile = req.authUser;
+        const permissions = profile.email_permissions || {};
+        const allowedAccounts = Array.isArray(permissions.allowed_accounts)
+            ? permissions.allowed_accounts
+            : [];
+        const hiddenAccounts = Array.isArray(permissions.hidden_accounts)
+            ? permissions.hidden_accounts
+            : [];
+        const canViewAll = profile.role === 'Super Admin'
+            || permissions.can_view_all_accounts === true
+            || (isEmailAdministrator(profile) && req.body.viewAllCompanyEmails === true);
+
+        let query = supabase.from('email_settings').select(publicAccountColumns)
+            .eq('company_id', profile.company_id);
+
+        if (!canViewAll) {
+            query = allowedAccounts.length
+                ? query.or(`user_id.eq.${profile.id},id.in.(${allowedAccounts.join(',')})`)
+                : query.eq('user_id', profile.id);
+        }
+
+        const { data, error } = await query.order('updated_at', { ascending: true, nullsFirst: true });
+        if (error) throw error;
+        const visibleAccounts = (data || []).filter(account => !hiddenAccounts.includes(account.id));
+        return res.json({ accounts: visibleAccounts });
+    } catch (err) {
+        console.error('[email-server] Account list error:', err.message);
+        return res.status(500).json({ error: 'Não foi possível carregar as contas de e-mail.' });
+    }
+});
+
+app.post('/api/email/accounts/save', authMiddleware, async (req, res) => {
+    try {
+        const profile = req.authUser;
+        const input = req.body.account || {};
+        const id = typeof input.id === 'string' && input.id ? input.id : null;
+        let existing = null;
+
+        if (id) {
+            const result = await supabase.from('email_settings').select('*').eq('id', id).maybeSingle();
+            if (result.error || !result.data) return res.status(404).json({ error: 'Conta de e-mail não localizada.' });
+            existing = result.data;
+            const canManage = existing.user_id === profile.id || (
+                existing.company_id === profile.company_id && (
+                    isEmailAdministrator(profile) || profile.email_permissions?.can_manage_accounts === true
+                )
+            );
+            if (!canManage) return res.status(403).json({ error: 'Sem permissão para alterar esta conta.' });
+        }
+
+        const requiredText = value => typeof value === 'string' ? value.trim() : '';
+        const port = value => {
+            const parsed = Number(value);
+            return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : null;
+        };
+        const imapHost = requiredText(input.imap_host);
+        const imapUser = requiredText(input.imap_user);
+        const smtpHost = requiredText(input.smtp_host) || imapHost;
+        const smtpUser = requiredText(input.smtp_user) || imapUser;
+        const imapPort = port(input.imap_port);
+        const smtpPort = port(input.smtp_port);
+        const imapPass = requiredText(input.imap_pass) || existing?.imap_pass || '';
+        const smtpPass = requiredText(input.smtp_pass) || existing?.smtp_pass || imapPass;
+
+        if (!imapHost || !imapPort || !imapUser || !imapPass || !smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+            return res.status(400).json({ error: 'Preencha servidores, portas, usuário e senha da conta.' });
+        }
+
+        const payload = {
+            company_id: profile.company_id,
+            user_id: existing?.user_id || profile.id,
+            imap_host: imapHost,
+            imap_port: imapPort,
+            imap_user: imapUser,
+            imap_pass: imapPass,
+            imap_ssl: input.imap_ssl !== false,
+            smtp_host: smtpHost,
+            smtp_port: smtpPort,
+            smtp_user: smtpUser,
+            smtp_pass: smtpPass,
+            smtp_ssl: input.smtp_ssl !== false,
+            signature: typeof input.signature === 'string' ? input.signature : ''
+        };
+
+        const query = id
+            ? supabase.from('email_settings').update(payload).eq('id', id)
+            : supabase.from('email_settings').insert(payload);
+        const { data, error } = await query.select('*').single();
+        if (error) throw error;
+        return res.json({ account: sanitizeAccount(data) });
+    } catch (err) {
+        console.error('[email-server] Account save error:', err.message);
+        return res.status(500).json({ error: 'Não foi possível salvar a conta de e-mail.' });
+    }
+});
+
+app.post('/api/email/accounts/delete', authMiddleware, async (req, res) => {
+    try {
+        const profile = req.authUser;
+        const accountId = typeof req.body.accountId === 'string' ? req.body.accountId : '';
+        const { data: account, error } = await supabase.from('email_settings')
+            .select('id, company_id, user_id').eq('id', accountId).maybeSingle();
+        if (error || !account) return res.status(404).json({ error: 'Conta de e-mail não localizada.' });
+        const canDelete = account.user_id === profile.id || (
+            account.company_id === profile.company_id && (
+                isEmailAdministrator(profile) || profile.email_permissions?.can_manage_accounts === true
+            )
+        );
+        if (!canDelete) return res.status(403).json({ error: 'Sem permissão para excluir esta conta.' });
+        const deletion = await supabase.from('email_settings').delete().eq('id', accountId);
+        if (deletion.error) throw deletion.error;
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('[email-server] Account delete error:', err.message);
+        return res.status(500).json({ error: 'Não foi possível excluir a conta de e-mail.' });
+    }
+});
+
+app.post('/api/email/accounts/hide', authMiddleware, async (req, res) => {
+    try {
+        const profile = req.authUser;
+        const accountId = typeof req.body.accountId === 'string' ? req.body.accountId : '';
+        const { data: account, error: accountError } = await supabase.from('email_settings')
+            .select('id, company_id, user_id').eq('id', accountId).maybeSingle();
+        if (accountError || !account) return res.status(404).json({ error: 'Conta de e-mail não localizada.' });
+        if (account.company_id !== profile.company_id) {
+            return res.status(403).json({ error: 'A conta pertence a outra empresa.' });
+        }
+        if (account.user_id === profile.id) {
+            return res.status(400).json({ error: 'A conta própria deve ser excluída pela ação de exclusão definitiva.' });
+        }
+
+        const permissions = profile.email_permissions || {};
+        const allowedAccounts = Array.isArray(permissions.allowed_accounts)
+            ? permissions.allowed_accounts.filter(id => id !== accountId)
+            : [];
+        const hiddenAccounts = Array.isArray(permissions.hidden_accounts)
+            ? permissions.hidden_accounts
+            : [];
+        const updatedPermissions = {
+            ...permissions,
+            allowed_accounts: allowedAccounts,
+            hidden_accounts: Array.from(new Set([...hiddenAccounts, accountId]))
+        };
+
+        const { error: updateError } = await supabase.from('profiles')
+            .update({ email_permissions: updatedPermissions })
+            .eq('id', profile.id);
+        if (updateError) throw updateError;
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('[email-server] Account hide error:', err.message);
+        return res.status(500).json({ error: 'Não foi possível remover a conta da sua lista.' });
+    }
+});
 
 // --- Helper ---
 const ensureNumber = (val) => {
@@ -727,16 +984,6 @@ app.post('/api/email/folders', authMiddleware, async (req, res) => {
     }
 });
 
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase Client (Service Role for backend ops)
-// Note: We use process.env vars which should be available
-const supabaseUrl = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
-const supabaseKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-}) : null;
-
 // --- SEND EMAIL (SMTP) ---
 app.post('/api/email/send', authMiddleware, async (req, res) => {
     const { config, payload, user_id } = req.body; // user_id passed from frontend or decoded from token
@@ -750,8 +997,7 @@ app.post('/api/email/send', authMiddleware, async (req, res) => {
     if (payload.cc) recipients.push(...payload.cc.split(',').map(e => e.trim()));
     if (payload.bcc) recipients.push(...payload.bcc.split(',').map(e => e.trim()));
 
-    console.log(`[email-server] SEND: ${config.smtp_host}:${config.smtp_port} -> To: ${payload.to} - Subject: ${payload.subject}`);
-    console.log(`[email-server] SEND PAYLOAD: html_len=${(payload.html || '').length}, text_len=${(payload.text || '').length}, attachments=${(payload.attachments || []).length}`);
+    console.log(`[email-server] SEND: account=${config.id || 'connection-test'}, recipients=${recipients.length}, attachments=${(payload.attachments || []).length}`);
 
     const smtpUser = (config.smtp_user && String(config.smtp_user).trim()) ? String(config.smtp_user).trim() : (config.imap_user ? String(config.imap_user).trim() : '');
     const smtpPass = (config.smtp_pass && String(config.smtp_pass).trim()) ? String(config.smtp_pass).trim() : (config.imap_pass ? String(config.imap_pass).trim() : '');
@@ -956,9 +1202,9 @@ app.post('/api/email/test', authMiddleware, async (req, res) => {
 });
 
 // --- HEALTH CHECK ---
-app.get('/api/email/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
+app.get('/api/email/health', (req, res) => res.json({ status: 'ok' }));
 // Also support root /health for direct testing
-app.get('/health', (req, res) => res.json({ status: 'ok', secret_loaded: !!JWT_SECRET }));
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
     console.log(`[email-server] Running on port ${PORT}`);

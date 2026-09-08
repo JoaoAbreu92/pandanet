@@ -38,6 +38,7 @@ import ConfirmModal from './ui/ConfirmModal';
 // --- Types ---
 
 interface EmailSettings {
+    id?: string;
     imap_host: string;
     imap_port: number;
     imap_user: string;
@@ -539,15 +540,16 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             const activeAccount = accounts.find(a => a.id === activeAccountId);
             if (activeAccount) {
                 const config: EmailSettings = {
+                    id: activeAccount.id,
                     imap_host: activeAccount.imap_host,
                     imap_port: activeAccount.imap_port,
                     imap_user: activeAccount.imap_user,
-                    imap_pass: activeAccount.imap_pass,
+                    imap_pass: '',
                     imap_ssl: activeAccount.imap_ssl ?? true,
                     smtp_host: activeAccount.smtp_host || activeAccount.imap_host,
                     smtp_port: activeAccount.smtp_port || 465,
                     smtp_user: (activeAccount.smtp_user && activeAccount.smtp_user.trim()) ? activeAccount.smtp_user.trim() : activeAccount.imap_user,
-                    smtp_pass: (activeAccount.smtp_pass && activeAccount.smtp_pass.trim()) ? activeAccount.smtp_pass.trim() : activeAccount.imap_pass,
+                    smtp_pass: '',
                     smtp_ssl: activeAccount.smtp_ssl ?? true,
                     signature: activeAccount.signature || ''
                 };
@@ -587,22 +589,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const fetchAccounts = async () => {
         if (!currentUser?.company_id) return;
 
-        let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
-
-        const perms = currentUser.email_permissions;
-        const isSuperOrMaster = currentUser.role === 'Super Admin' || currentUser.email === 'ti@grupopixel.com.br';
-        const isAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || isSuperOrMaster;
-        const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true || (isAdmin && viewAllCompanyEmails);
-
-        if (!canViewAll) {
-            if (perms?.allowed_accounts && perms.allowed_accounts.length > 0) {
-                query = query.or(`user_id.eq.${currentUser.id},id.in.(${perms.allowed_accounts.join(',')})`);
-            } else {
-                query = query.eq('user_id', currentUser.id);
-            }
-        }
-
-        const { data, error } = await query;
+        const { data: response, error } = await callEmailServer('accounts/list', { viewAllCompanyEmails });
+        const data = response?.accounts || [];
 
         if (data && !error) {
             setAccounts(data);
@@ -668,7 +656,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             ...safeSettings
         };
 
-        const { data, error } = await supabase.from('email_settings').upsert(payload).select();
+        const { data, error } = await callEmailServer('accounts/save', { account: payload });
 
         if (error) {
             showToast('Erro ao salvar as configurações: ' + error.message, 'error');
@@ -676,9 +664,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             showToast('Configurações salvas com sucesso!', 'success');
             await fetchAccounts();
             setView('inbox');
-            if (data && data.length > 0) {
-                setActiveAccountId(data[0].id);
-                setSavedImapUser(data[0].imap_user);
+            if (data?.account) {
+                setActiveAccountId(data.account.id);
+                setSavedImapUser(data.account.imap_user);
             }
         }
     };
@@ -697,35 +685,31 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (!isOwner) {
             const perms = currentUser.email_permissions || {};
             const allowed = perms.allowed_accounts || [];
+            const hidden = Array.isArray(perms.hidden_accounts) ? perms.hidden_accounts : [];
 
-            if (allowed.includes(accountId)) {
-                openConfirm(
-                    'Remover Acesso Compartilhado',
-                    `Tem certeza que deseja remover o seu acesso à conta de e-mail "${account.imap_user}"? A conta continuará ativa para o usuário proprietário.`,
-                    async () => {
-                        closeConfirm();
-                        const newAllowed = allowed.filter((id: string) => id !== accountId);
-                        const newPerms = { ...perms, allowed_accounts: newAllowed };
+            openConfirm(
+                'Remover da Minha Lista',
+                `Deseja remover a conta "${account.imap_user}" somente da sua lista? Ela continuará ativa para o proprietário e para os demais usuários autorizados.`,
+                async () => {
+                    closeConfirm();
+                    const newPerms = {
+                        ...perms,
+                        allowed_accounts: allowed.filter((id: string) => id !== accountId),
+                        hidden_accounts: Array.from(new Set([...hidden, accountId]))
+                    };
 
-                        const { error } = await supabase.from('profiles')
-                            .update({ email_permissions: newPerms })
-                            .eq('id', currentUser.id);
+                    const { error } = await callEmailServer('accounts/hide', { accountId });
 
-                        if (error) {
-                            showToast('Erro ao remover acesso compartilhado: ' + error.message, 'error');
-                        } else {
-                            showToast('Acesso compartilhado removido com sucesso.', 'success');
-                            currentUser.email_permissions = newPerms;
-                            await fetchAccounts();
-                            if (activeAccountId === accountId) {
-                                setActiveAccountId(null);
-                            }
-                        }
+                    if (error) {
+                        showToast('Erro ao remover a conta da sua lista: ' + error.message, 'error');
+                    } else {
+                        showToast('Conta removida somente da sua lista.', 'success');
+                        currentUser.email_permissions = newPerms;
+                        if (activeAccountId === accountId) setActiveAccountId(null);
+                        await fetchAccounts();
                     }
-                );
-            } else {
-                showToast('Você não é o proprietário desta conta de e-mail. Apenas o proprietário pode excluí-la de forma definitiva.', 'error');
-            }
+                }
+            );
             return;
         }
 
@@ -734,7 +718,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             'Tem certeza que deseja remover esta conta de e-mail? Todos os metadados e tags associados serão excluídos.',
             async () => {
                 closeConfirm();
-                const { error } = await supabase.from('email_settings').delete().eq('id', accountId);
+                const { error } = await callEmailServer('accounts/delete', { accountId });
                 if (error) {
                     showToast('Erro ao excluir conta: ' + error.message, 'error');
                 } else {
@@ -1528,12 +1512,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     imap_host: acc.imap_host,
                     imap_port: acc.imap_port,
                     imap_user: acc.imap_user,
-                    imap_pass: acc.imap_pass,
+                    id: acc.id,
+                    imap_pass: '',
                     imap_ssl: acc.imap_ssl,
                     smtp_host: acc.smtp_host,
                     smtp_port: acc.smtp_port,
                     smtp_user: acc.smtp_user,
-                    smtp_pass: acc.smtp_pass,
+                    smtp_pass: '',
                     smtp_ssl: acc.smtp_ssl,
                     signature: acc.signature || ''
                 });
@@ -1588,6 +1573,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         else if (type === 'bcc') setBccTags(bccTags.filter(t => t !== email));
     };
 
+    const collectRecipients = (tags: string[], pending: string) => {
+        const typed = pending
+            .split(/[;,]/)
+            .map(value => value.trim())
+            .filter(value => value.includes('@'));
+        return Array.from(new Set([...tags, ...typed])).join(', ');
+    };
+
     const saveDraft = async (showNotification = true) => {
         setLoading(true);
         console.log("[EmailPage] Saving draft payload:", {
@@ -1600,7 +1593,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             const { data, error } = await callEmailServer('save-draft', {
                 config: settings,
                 payload: {
-                    to: toTags.join(', '),
+                    to: collectRecipients(toTags, composeTo),
+                    cc: collectRecipients(ccTags, composeCc),
+                    bcc: collectRecipients(bccTags, composeBcc),
                     subject: composeSubject,
                     text: composeBody.replace(/<[^>]*>?/gm, ''),
                     html: composeBody,
@@ -1625,9 +1620,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         setIsSending(true);
         setLoading(true);
         try {
-            const finalTo = toTags.join(', ');
-            const finalCc = ccTags.join(', ');
-            const finalBcc = bccTags.join(', ');
+            const finalTo = collectRecipients(toTags, composeTo);
+            const finalCc = collectRecipients(ccTags, composeCc);
+            const finalBcc = collectRecipients(bccTags, composeBcc);
 
             // Validation: prevent sending empty body
             const plainBody = composeBody.replace(/<[^>]*>/g, '').trim();
